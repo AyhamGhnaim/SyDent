@@ -1,0 +1,26 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_content:
+        description: 'HTML content'
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update index.html
+        run: echo "${{ github.event.inputs.file_content }}" > index.html
+      - name: Commit and push
+        run: |
+          git config user.email "bot@dentsyr.com"
+          git config user.name "DentSyr Bot"
+          git add index.html
+          git commit -m "Update via Claude"
+          git push
