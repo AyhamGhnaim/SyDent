@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DentSyr — المرضى</title>
+<title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -417,7 +417,7 @@ textarea { resize: vertical; min-height: 80px; }
   <div class="sidebar-logo">
     <div class="logo-icon">🦷</div>
     <div>
-      <div class="logo-text">DentSyr</div>
+      <div class="logo-text">SyDent</div>
       <div class="logo-sub">DENTAL SYSTEM</div>
     </div>
   </div>
@@ -611,7 +611,7 @@ textarea { resize: vertical; min-height: 80px; }
 // ─── Data ───
 const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
 
-let patients = JSON.parse(localStorage.getItem('dentsyr_patients') || '[]');
+let patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
 if (patients.length === 0) {
   patients = [
     { id:'P001', name:'أحمد محمود السيد',    phone:'0934567890', dob:'1985-03-12', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-04-15', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-01' },
@@ -632,7 +632,7 @@ const PER_PAGE = 7;
 let editingId  = null;
 
 // ─── Utils ───
-function save() { localStorage.setItem('dentsyr_patients', JSON.stringify(patients)); }
+function save() { localStorage.setItem('sydent_patients', JSON.stringify(patients)); }
 
 function initials(name) {
   const p = name.trim().split(' ');

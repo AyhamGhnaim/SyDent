@@ -73,6 +73,7 @@
     font-size: 14px;
     font-weight: 600;
     border-right: 3px solid transparent;
+    text-decoration: none;
   }
 
   .nav-item:hover { background: rgba(46,232,158,0.05); color: var(--text-primary); }
@@ -90,7 +91,6 @@
     color: var(--text-muted);
     font-weight: 700;
     letter-spacing: 1px;
-    text-transform: uppercase;
   }
 
   .main {
@@ -119,6 +119,8 @@
     font-weight: 700;
     font-size: 14px;
     transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
   }
 
   .btn-primary {
@@ -147,6 +149,10 @@
     border-radius: 12px;
     padding: 20px;
     transition: all 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
   }
   .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 
@@ -172,7 +178,11 @@
     margin-bottom: 16px;
   }
   .card-title { font-size: 15px; font-weight: 700; }
-  .card-action { font-size: 12px; color: var(--accent); cursor: pointer; }
+  .card-action {
+    font-size: 12px; color: var(--accent); cursor: pointer;
+    text-decoration: none;
+  }
+  .card-action:hover { text-decoration: underline; }
 
   .patient-item {
     display: flex; align-items: center; gap: 12px;
@@ -180,6 +190,8 @@
     border-bottom: 1px solid rgba(255,255,255,0.05);
     cursor: pointer;
     transition: all 0.2s;
+    text-decoration: none;
+    color: inherit;
   }
   .patient-item:last-child { border-bottom: none; }
   .patient-item:hover { padding-right: 8px; }
@@ -272,6 +284,7 @@
     font-size: 14px;
     width: 220px;
     outline: none;
+    cursor: pointer;
   }
   .search-bar:focus { border-color: var(--accent); }
   .search-bar::placeholder { color: var(--text-muted); }
@@ -284,6 +297,21 @@
     border-radius: 20px;
     font-size: 12px;
     font-weight: 700;
+  }
+
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+  }
+
+  @media (max-width: 1100px) {
+    .stats-grid { grid-template-columns: repeat(2,1fr); }
+    .grid-2, .grid-2b { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .main { margin-right: 0; padding: 16px; }
   }
 </style>
 </head>
@@ -300,17 +328,21 @@
 
   <div class="nav">
     <div class="nav-section">الرئيسية</div>
-    <div class="nav-item active"><span class="nav-icon">📊</span> لوحة التحكم</div>
-    <div class="nav-item"><span class="nav-icon">👥</span> المرضى</div>
-    <div class="nav-item"><span class="nav-icon">📅</span> المواعيد</div>
+    <a class="nav-item active" href="index.html"><span class="nav-icon">📊</span> لوحة التحكم</a>
+    <a class="nav-item" href="patients.html"><span class="nav-icon">👥</span> المرضى</a>
+    <a class="nav-item" href="#"><span class="nav-icon">📅</span> المواعيد</a>
 
     <div class="nav-section">الإدارة</div>
-    <div class="nav-item"><span class="nav-icon">🧪</span> المخابر</div>
-    <div class="nav-item"><span class="nav-icon">💰</span> المدفوعات</div>
-    <div class="nav-item"><span class="nav-icon">📋</span> العلاجات</div>
+    <a class="nav-item" href="#"><span class="nav-icon">🧪</span> المخابر</a>
+    <a class="nav-item" href="#"><span class="nav-icon">💰</span> المدفوعات</a>
+    <a class="nav-item" href="#"><span class="nav-icon">📋</span> العلاجات</a>
 
     <div class="nav-section">النظام</div>
-    <div class="nav-item"><span class="nav-icon">⚙️</span> الإعدادات</div>
+    <a class="nav-item" href="#"><span class="nav-icon">⚙️</span> الإعدادات</a>
+  </div>
+
+  <div class="sidebar-footer">
+    د. أيهم غنيم<br>طبيب أسنان
   </div>
 </div>
 
@@ -319,21 +351,21 @@
   <div class="header">
     <div>
       <div class="header-title">لوحة التحكم</div>
-      <div class="header-sub">الخميس، 24 أبريل 2026 — تم التحديث ✓</div>
+      <div class="header-sub" id="dateDisplay">جارٍ التحميل...</div>
     </div>
     <div class="header-actions">
-      <input class="search-bar" placeholder="🔍  بحث عن مريض..." />
-      <button class="btn btn-primary">+ مريض جديد</button>
+      <input class="search-bar" placeholder="🔍  بحث عن مريض..." onclick="window.location.href='patients.html'" readonly />
+      <a href="patients.html" class="btn btn-primary">＋ مريض جديد</a>
     </div>
   </div>
 
   <div class="stats-grid">
-    <div class="stat-card">
+    <a class="stat-card" href="patients.html">
       <span class="stat-icon">👥</span>
       <div class="stat-label">إجمالي المرضى</div>
-      <div class="stat-value">247</div>
-      <div class="stat-change up">↑ 12 هذا الشهر</div>
-    </div>
+      <div class="stat-value" id="statPatients">—</div>
+      <div class="stat-change up" id="statPatientsNew"></div>
+    </a>
     <div class="stat-card">
       <span class="stat-icon">📅</span>
       <div class="stat-label">مواعيد اليوم</div>
@@ -346,12 +378,12 @@
       <div class="stat-value">4.2M</div>
       <div class="stat-change up">↑ ل.س</div>
     </div>
-    <div class="stat-card">
+    <a class="stat-card" href="patients.html">
       <span class="stat-icon">⚠️</span>
       <div class="stat-label">مستحقات</div>
-      <div class="stat-value">890K</div>
-      <div class="stat-change down">↓ 5 مرضى</div>
-    </div>
+      <div class="stat-value" id="statPending">—</div>
+      <div class="stat-change down" id="statPendingCount"></div>
+    </a>
   </div>
 
   <div class="grid-2">
@@ -359,103 +391,40 @@
     <div class="card">
       <div class="card-header">
         <div class="card-title">آخر المرضى</div>
-        <span class="card-action">عرض الكل ←</span>
+        <a class="card-action" href="patients.html">عرض الكل ←</a>
       </div>
-
-      <div class="patient-item">
-        <div class="patient-avatar" style="background:rgba(46,232,158,0.2);color:#2ee89e">أح</div>
-        <div>
-          <div class="patient-name">أحمد محمد الخطيب</div>
-          <div class="patient-info">حشوة ضوئية — سن 36</div>
-        </div>
-        <span class="patient-status status-paid">مسدّد</span>
-      </div>
-
-      <div class="patient-item">
-        <div class="patient-avatar" style="background:rgba(239,83,80,0.2);color:#ef5350">سم</div>
-        <div>
-          <div class="patient-name">سمر علي حسين</div>
-          <div class="patient-info">تلبيسة خزفية — سن 21</div>
-        </div>
-        <span class="patient-status status-due">متبقي</span>
-      </div>
-
-      <div class="patient-item">
-        <div class="patient-avatar" style="background:rgba(124,179,255,0.2);color:#7cb3ff">مح</div>
-        <div>
-          <div class="patient-name">محمود إبراهيم سالم</div>
-          <div class="patient-info">علاج عصب — سن 46</div>
-        </div>
-        <span class="patient-status status-paid">مسدّد</span>
-      </div>
-
-      <div class="patient-item">
-        <div class="patient-avatar" style="background:rgba(245,200,66,0.2);color:#f5c842">رن</div>
-        <div>
-          <div class="patient-name">رنا خالد مصطفى</div>
-          <div class="patient-info">تقويم — زيارة متابعة</div>
-        </div>
-        <span class="patient-status status-due">متبقي</span>
-      </div>
-
-      <div class="patient-item">
-        <div class="patient-avatar" style="background:rgba(46,232,158,0.2);color:#2ee89e">عم</div>
-        <div>
-          <div class="patient-name">عمر فارس الدندشي</div>
-          <div class="patient-info">قلع جراحي — سن 18</div>
-        </div>
-        <span class="patient-status status-paid">مسدّد</span>
-      </div>
+      <div id="recentPatients"></div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <div class="card-title">مواعيد اليوم</div>
-        <span class="today-badge">الخميس</span>
+        <span class="today-badge" id="dayName">—</span>
       </div>
 
       <div class="appt-item">
         <div class="appt-time">9:00</div>
-        <div>
-          <div class="appt-name">أحمد الخطيب</div>
-          <div class="appt-type">حشوة ضوئية</div>
-        </div>
+        <div><div class="appt-name">أحمد الخطيب</div><div class="appt-type">حشوة ضوئية</div></div>
         <div class="appt-dot" style="background:#2ee89e"></div>
       </div>
-
       <div class="appt-item">
         <div class="appt-time">10:30</div>
-        <div>
-          <div class="appt-name">سمر حسين</div>
-          <div class="appt-type">تلبيسة خزفية</div>
-        </div>
+        <div><div class="appt-name">سمر حسين</div><div class="appt-type">تلبيسة خزفية</div></div>
         <div class="appt-dot" style="background:#2ee89e"></div>
       </div>
-
       <div class="appt-item">
         <div class="appt-time">12:00</div>
-        <div>
-          <div class="appt-name">محمود سالم</div>
-          <div class="appt-type">علاج عصب</div>
-        </div>
+        <div><div class="appt-name">محمود سالم</div><div class="appt-type">علاج عصب</div></div>
         <div class="appt-dot" style="background:#f5c842"></div>
       </div>
-
       <div class="appt-item">
         <div class="appt-time">2:00</div>
-        <div>
-          <div class="appt-name">رنا مصطفى</div>
-          <div class="appt-type">تقويم - متابعة</div>
-        </div>
+        <div><div class="appt-name">رنا مصطفى</div><div class="appt-type">تقويم - متابعة</div></div>
         <div class="appt-dot" style="background:#7cb3ff"></div>
       </div>
-
       <div class="appt-item">
         <div class="appt-time">3:30</div>
-        <div>
-          <div class="appt-name">عمر الدندشي</div>
-          <div class="appt-type">قلع جراحي</div>
-        </div>
+        <div><div class="appt-name">عمر الدندشي</div><div class="appt-type">قلع جراحي</div></div>
         <div class="appt-dot" style="background:#ef5350"></div>
       </div>
     </div>
@@ -468,7 +437,6 @@
         <div class="card-title">الملخص المالي — أبريل</div>
         <span class="card-action">تفاصيل ←</span>
       </div>
-
       <div class="finance-row">
         <span class="finance-label">إجمالي الفواتير</span>
         <span class="finance-value">5,090,000 ل.س</span>
@@ -489,7 +457,6 @@
         <span class="finance-label" style="font-weight:700;color:var(--text-primary)">الربح الصافي</span>
         <span class="finance-value" style="color:var(--accent);font-size:16px">3,580,000 ل.س</span>
       </div>
-
       <div style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px">
           <span>نسبة التحصيل</span><span style="color:var(--accent)">82%</span>
@@ -503,7 +470,6 @@
         <div class="card-title">طلبات المخابر</div>
         <span class="card-action">عرض الكل ←</span>
       </div>
-
       <div class="lab-item">
         <div class="lab-dot" style="background:#7cb3ff"></div>
         <div class="lab-name">
@@ -512,7 +478,6 @@
         </div>
         <span class="lab-status lab-s3">قيد العمل</span>
       </div>
-
       <div class="lab-item">
         <div class="lab-dot" style="background:#f5c842"></div>
         <div class="lab-name">
@@ -521,7 +486,6 @@
         </div>
         <span class="lab-status lab-s1">جاهز</span>
       </div>
-
       <div class="lab-item">
         <div class="lab-dot" style="background:#2ee89e"></div>
         <div class="lab-name">
@@ -530,7 +494,6 @@
         </div>
         <span class="lab-status lab-s2">مستلم</span>
       </div>
-
       <div class="lab-item">
         <div class="lab-dot" style="background:#ef5350"></div>
         <div class="lab-name">
@@ -539,7 +502,6 @@
         </div>
         <span class="lab-status lab-s3">مرسل</span>
       </div>
-
       <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;font-size:12px">
         <span style="color:var(--text-muted)">مستحق للمخابر</span>
         <span style="color:var(--red);font-weight:700">320,000 ل.س</span>
@@ -548,6 +510,63 @@
 
   </div>
 </div>
+
+<script>
+// ─── التاريخ ───
+const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const now = new Date();
+document.getElementById('dateDisplay').textContent =
+  days[now.getDay()] + '، ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+document.getElementById('dayName').textContent = days[now.getDay()];
+
+// ─── بيانات من localStorage ───
+const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
+
+function avatarColor(name) {
+  let h = 0;
+  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
+  return COLORS[h];
+}
+function initials(name) {
+  const p = name.trim().split(' ');
+  return p.length >= 2 ? p[0][0] + p[1][0] : p[0].slice(0,2);
+}
+function isThisMonth(str) {
+  if (!str) return false;
+  const d = new Date(str);
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+const patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
+
+// إحصائيات
+document.getElementById('statPatients').textContent = patients.length || '—';
+const newCount = patients.filter(p => isThisMonth(p.createdAt)).length;
+document.getElementById('statPatientsNew').textContent = newCount ? '↑ ' + newCount + ' هذا الشهر' : '';
+
+const pendingCount = patients.filter(p => p.payment === 'متبقي').length;
+document.getElementById('statPending').textContent = pendingCount || '0';
+document.getElementById('statPendingCount').textContent = pendingCount ? pendingCount + ' مرضى' : 'لا توجد مستحقات';
+
+// آخر 5 مرضى
+const recent = [...patients].slice(0, 5);
+const container = document.getElementById('recentPatients');
+if (recent.length === 0) {
+  container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد بيانات — <a href="patients.html" style="color:var(--accent)">أضف مريضاً</a></div>';
+} else {
+  container.innerHTML = recent.map(p => `
+    <a class="patient-item" href="patients.html">
+      <div class="patient-avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
+      <div>
+        <div class="patient-name">${p.name}</div>
+        <div class="patient-info">${p.status} — ${p.id}</div>
+      </div>
+      <span class="patient-status ${p.payment === 'مسدّد' ? 'status-paid' : 'status-due'}">${p.payment}</span>
+    </a>
+  `).join('');
+}
+</script>
 
 </body>
 </html>
