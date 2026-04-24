@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DentSyr — المرضى</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --green-dim: rgba(46,232,158,0.12);
+  --red:       #ef5350;
+  --yellow:    #f5c842;
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --radius:    12px;
+  --sidebar:   240px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+}
+
+/* ─── Sidebar ─── */
+.sidebar {
+  width: var(--sidebar);
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  right: 0; top: 0; bottom: 0;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 24px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--green), #0a9b63);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+}
+.logo-text { font-size: 17px; font-weight: 800; color: var(--text); }
+.logo-sub  { font-size: 10px; color: var(--text2); letter-spacing: 1px; }
+
+.nav { flex: 1; padding: 16px 0; overflow-y: auto; }
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 20px;
+  font-size: 14px; font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .2s;
+  border-right: 3px solid transparent;
+  text-decoration: none;
+}
+.nav-item:hover { color: var(--text); background: var(--green-dim); }
+.nav-item.active {
+  color: var(--green);
+  background: var(--green-dim);
+  border-right-color: var(--green);
+}
+.nav-icon { font-size: 17px; width: 22px; text-align: center; }
+
+.sidebar-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text2);
+}
+
+/* ─── Main ─── */
+.main {
+  flex: 1;
+  margin-right: var(--sidebar);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* ─── Top Bar ─── */
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-title { font-size: 20px; font-weight: 700; flex: 1; }
+.topbar-title span { color: var(--green); }
+
+.search-wrap {
+  position: relative; flex: 1; max-width: 380px;
+}
+.search-wrap input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 40px 10px 14px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+}
+.search-wrap input:focus { border-color: var(--green); }
+.search-wrap input::placeholder { color: var(--text2); }
+.search-icon {
+  position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+  color: var(--text2); font-size: 15px; pointer-events: none;
+}
+
+.btn-add {
+  background: var(--green);
+  color: #0a1628;
+  border: none; border-radius: 10px;
+  padding: 10px 20px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  transition: opacity .2s, transform .15s;
+  white-space: nowrap;
+}
+.btn-add:hover { opacity: .88; transform: translateY(-1px); }
+
+/* ─── Content ─── */
+.content { padding: 28px; flex: 1; }
+
+/* ─── Stats Strip ─── */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.stat-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.stat-icon.g { background: rgba(46,232,158,0.15); }
+.stat-icon.b { background: rgba(99,179,237,0.15); }
+.stat-icon.y { background: rgba(245,200,66,0.15); }
+.stat-icon.r { background: rgba(239,83,80,0.15); }
+.stat-num { font-size: 22px; font-weight: 800; line-height: 1; }
+.stat-lbl { font-size: 12px; color: var(--text2); margin-top: 3px; }
+
+/* ─── Filters ─── */
+.filters {
+  display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.filter-btn {
+  padding: 7px 16px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  font-family: 'Cairo', sans-serif; font-size: 13px;
+  cursor: pointer; transition: all .2s;
+}
+.filter-btn:hover, .filter-btn.active {
+  background: var(--green-dim);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+/* ─── Table ─── */
+.table-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.table-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.table-head-title { font-size: 15px; font-weight: 700; }
+.count-badge {
+  background: var(--green-dim);
+  color: var(--green);
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 12px 18px;
+  text-align: right;
+  font-size: 12px; font-weight: 600;
+  color: var(--text2);
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+  cursor: pointer;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(46,232,158,0.04); }
+td {
+  padding: 14px 18px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.patient-cell { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; flex-shrink: 0;
+}
+.patient-name { font-weight: 600; font-size: 14px; }
+.patient-id   { font-size: 11px; color: var(--text2); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 6px;
+  font-size: 12px; font-weight: 600;
+}
+.badge.green  { background: rgba(46,232,158,0.15); color: #2ee89e; }
+.badge.yellow { background: rgba(245,200,66,0.15);  color: #f5c842; }
+.badge.red    { background: rgba(239,83,80,0.15);   color: #ef5350; }
+.badge.blue   { background: rgba(99,179,237,0.15);  color: #63b3ed; }
+.badge::before { content: '●'; font-size: 8px; }
+
+.text-muted { color: var(--text2); font-size: 13px; }
+
+.action-btns { display: flex; gap: 8px; align-items: center; }
+.btn-sm {
+  padding: 6px 12px; border-radius: 7px; border: none;
+  font-family: 'Cairo', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.btn-sm.outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn-sm.outline:hover { border-color: var(--green); color: var(--green); }
+.btn-sm.danger:hover  { border-color: var(--red); color: var(--red); }
+
+/* ─── Empty State ─── */
+.empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text2);
+}
+.empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-text { font-size: 16px; margin-bottom: 6px; color: var(--text); }
+.empty-sub  { font-size: 13px; }
+
+/* ─── Pagination ─── */
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--text2);
+}
+.page-btns { display: flex; gap: 6px; }
+.page-btn {
+  width: 32px; height: 32px; border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  font-family: 'Cairo', sans-serif; font-size: 13px;
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.page-btn:hover, .page-btn.active {
+  background: var(--green-dim); border-color: var(--green); color: var(--green);
+}
+
+/* ─── Modal ─── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%; max-width: 560px;
+  max-height: 90vh; overflow-y: auto;
+  padding: 28px;
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.modal-title { font-size: 18px; font-weight: 700; }
+.modal-close {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.modal-close:hover { border-color: var(--red); color: var(--red); }
+
+.form-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-group.full { grid-column: 1 / -1; }
+label { font-size: 13px; font-weight: 600; color: var(--text2); }
+input, select, textarea {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 14px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif; font-size: 14px;
+  outline: none; transition: border-color .2s;
+  width: 100%;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--green); }
+input::placeholder, textarea::placeholder { color: var(--text2); }
+select option { background: var(--bg2); }
+textarea { resize: vertical; min-height: 80px; }
+
+.modal-footer {
+  display: flex; gap: 12px; justify-content: flex-end;
+  margin-top: 24px;
+}
+.btn-cancel {
+  padding: 10px 22px; border-radius: 9px;
+  border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.btn-cancel:hover { border-color: var(--text2); color: var(--text); }
+.btn-save {
+  padding: 10px 24px; border-radius: 9px;
+  border: none;
+  background: var(--green); color: #0a1628;
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+}
+.btn-save:hover { opacity: .88; }
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--bg3);
+  border: 1px solid var(--green);
+  border-radius: 10px; padding: 12px 22px;
+  font-size: 14px; font-weight: 600; color: var(--green);
+  z-index: 300;
+  transition: transform .35s cubic-bezier(.175,.885,.32,1.275);
+  white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ─── Responsive ─── */
+@media (max-width: 1100px) {
+  .stats-strip { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 820px) {
+  .sidebar { display: none; }
+  .main { margin-right: 0; }
+  .content { padding: 16px; }
+  .stats-strip { grid-template-columns: repeat(2, 1fr); }
+  .form-grid { grid-template-columns: 1fr; }
+  td:nth-child(4), th:nth-child(4),
+  td:nth-child(5), th:nth-child(5) { display: none; }
+}
+@media (max-width: 480px) {
+  .stats-strip { grid-template-columns: 1fr 1fr; }
+  .topbar { flex-wrap: wrap; }
+  .search-wrap { max-width: 100%; width: 100%; order: 3; }
+  .modal { padding: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Sidebar ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🦷</div>
+    <div>
+      <div class="logo-text">DentSyr</div>
+      <div class="logo-sub">DENTAL SYSTEM</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a class="nav-item" href="index.html">
+      <span class="nav-icon">🏠</span> لوحة التحكم
+    </a>
+    <a class="nav-item active" href="patients.html">
+      <span class="nav-icon">👥</span> المرضى
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">📅</span> المواعيد
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">💳</span> المدفوعات
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">🧪</span> المخابر
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">💊</span> قائمة العلاجات
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">📊</span> التقارير
+    </a>
+    <a class="nav-item" href="#">
+      <span class="nav-icon">⚙️</span> الإعدادات
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    د. أيهم غنيم<br>طبيب أسنان
+  </div>
+</aside>
+
+<!-- ═══ Main ═══ -->
+<div class="main">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-title">سجل <span>المرضى</span></div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم الهاتف أو رقم المريض…">
+    </div>
+    <button class="btn-add" onclick="openModal()">
+      ＋ مريض جديد
+    </button>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Stats -->
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-icon g">👥</div>
+        <div>
+          <div class="stat-num" id="statTotal">0</div>
+          <div class="stat-lbl">إجمالي المرضى</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon b">📅</div>
+        <div>
+          <div class="stat-num" id="statNew">0</div>
+          <div class="stat-lbl">مرضى هذا الشهر</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon y">⏳</div>
+        <div>
+          <div class="stat-num" id="statPending">0</div>
+          <div class="stat-lbl">مستحقات متبقية</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon r">🦷</div>
+        <div>
+          <div class="stat-num" id="statActive">0</div>
+          <div class="stat-lbl">تحت العلاج</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all', this)">الكل</button>
+      <button class="filter-btn" onclick="setFilter('active', this)">تحت العلاج</button>
+      <button class="filter-btn" onclick="setFilter('pending', this)">متبقي دفع</button>
+      <button class="filter-btn" onclick="setFilter('new', this)">جدد (هذا الشهر)</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-head-title">قائمة المرضى</span>
+        <span class="count-badge" id="countBadge">0 مريض</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>المريض</th>
+            <th>رقم الهاتف</th>
+            <th>حالة الدفع</th>
+            <th>آخر زيارة</th>
+            <th>الحالة</th>
+            <th>إجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div id="emptyState" class="empty" style="display:none">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">لا توجد نتائج</div>
+        <div class="empty-sub">جرّب كلمة بحث مختلفة أو أضف مريضاً جديداً</div>
+      </div>
+      <div class="pagination" id="pagination">
+        <span id="pageInfo"></span>
+        <div class="page-btns" id="pageBtns"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ═══ Modal: إضافة مريض ═══ -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">إضافة مريض جديد</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <form id="patientForm" onsubmit="submitPatient(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>الاسم الكامل *</label>
+          <input type="text" id="fName" placeholder="مثال: أحمد محمود السيد" required>
+        </div>
+        <div class="form-group">
+          <label>رقم الهاتف *</label>
+          <input type="text" id="fPhone" placeholder="09xxxxxxxx" required>
+        </div>
+        <div class="form-group">
+          <label>تاريخ الميلاد</label>
+          <input type="date" id="fDob">
+        </div>
+        <div class="form-group">
+          <label>الجنس</label>
+          <select id="fGender">
+            <option value="">— اختر —</option>
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>حالة الدفع</label>
+          <select id="fPayment">
+            <option value="مسدّد">مسدّد</option>
+            <option value="متبقي">متبقي</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>حالة العلاج</label>
+          <select id="fStatus">
+            <option value="تحت العلاج">تحت العلاج</option>
+            <option value="مكتمل">مكتمل</option>
+            <option value="جديد">جديد</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>الحساسيات</label>
+          <input type="text" id="fAllergies" placeholder="مثال: بنسلين، لاتكس…">
+        </div>
+        <div class="form-group full">
+          <label>ملاحظات</label>
+          <textarea id="fNotes" placeholder="أي ملاحظات إضافية…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
+        <button type="submit" class="btn-save" id="saveBtn">حفظ المريض</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Data ───
+const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
+
+let patients = JSON.parse(localStorage.getItem('dentsyr_patients') || '[]');
+if (patients.length === 0) {
+  patients = [
+    { id:'P001', name:'أحمد محمود السيد',    phone:'0934567890', dob:'1985-03-12', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-04-15', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-01' },
+    { id:'P002', name:'سارة خالد العلي',     phone:'0987654321', dob:'1992-07-24', gender:'أنثى', payment:'متبقي', status:'تحت العلاج', lastVisit:'2026-04-20', allergies:'بنسلين',  notes:'حساسة من مخدر الأسنان', createdAt:'2026-04-05' },
+    { id:'P003', name:'محمد رامي الأتاسي',   phone:'0911223344', dob:'1978-11-03', gender:'ذكر',  payment:'مسدّد', status:'تحت العلاج', lastVisit:'2026-04-18', allergies:'لاتكس',   notes:'',            createdAt:'2026-04-10' },
+    { id:'P004', name:'ليلى فادي الحموي',    phone:'0944332211', dob:'2001-05-18', gender:'أنثى', payment:'متبقي', status:'جديد',       lastVisit:'2026-04-22', allergies:'لا يوجد',  notes:'مريضة جديدة', createdAt:'2026-04-22' },
+    { id:'P005', name:'عمر سامر جابر',       phone:'0933445566', dob:'1995-09-30', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-03-10', allergies:'لا يوجد',  notes:'',            createdAt:'2026-03-01' },
+    { id:'P006', name:'رنا وليد الزعبي',     phone:'0966778899', dob:'1988-02-14', gender:'أنثى', payment:'مسدّد', status:'تحت العلاج', lastVisit:'2026-04-21', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-08' },
+    { id:'P007', name:'كريم نادر عيسى',      phone:'0922334455', dob:'1970-12-25', gender:'ذكر',  payment:'متبقي', status:'تحت العلاج', lastVisit:'2026-04-19', allergies:'أسبرين',  notes:'ضغط دم',      createdAt:'2026-04-12' },
+    { id:'P008', name:'ديانا حسام الشريف',   phone:'0955667788', dob:'2003-06-08', gender:'أنثى', payment:'مسدّد', status:'جديد',       lastVisit:'2026-04-23', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-23' },
+  ];
+  save();
+}
+
+let filter     = 'all';
+let page       = 1;
+const PER_PAGE = 7;
+let editingId  = null;
+
+// ─── Utils ───
+function save() { localStorage.setItem('dentsyr_patients', JSON.stringify(patients)); }
+
+function initials(name) {
+  const p = name.trim().split(' ');
+  return p.length >= 2 ? p[0][0] + p[1][0] : p[0].slice(0,2);
+}
+
+function avatarColor(name) {
+  let h = 0;
+  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
+  return COLORS[h];
+}
+
+function formatDate(str) {
+  if (!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('ar-SY', { year:'numeric', month:'short', day:'numeric' });
+}
+
+function isThisMonth(str) {
+  if (!str) return false;
+  const d = new Date(str), now = new Date();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+function nextId() {
+  const nums = patients.map(p => parseInt(p.id.slice(1)));
+  return 'P' + String(Math.max(0, ...nums) + 1).padStart(3,'0');
+}
+
+// ─── Stats ───
+function updateStats() {
+  document.getElementById('statTotal').textContent   = patients.length;
+  document.getElementById('statNew').textContent     = patients.filter(p => isThisMonth(p.createdAt)).length;
+  document.getElementById('statPending').textContent = patients.filter(p => p.payment === 'متبقي').length;
+  document.getElementById('statActive').textContent  = patients.filter(p => p.status === 'تحت العلاج').length;
+}
+
+// ─── Filter ───
+function setFilter(f, btn) {
+  filter = f;
+  page   = 1;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+// ─── Search ───
+document.getElementById('searchInput').addEventListener('input', () => { page = 1; render(); });
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  return patients.filter(p => {
+    const matchQ = !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.phone.includes(q) ||
+      p.id.toLowerCase().includes(q);
+    const matchF =
+      filter === 'all'     ? true :
+      filter === 'active'  ? p.status === 'تحت العلاج' :
+      filter === 'pending' ? p.payment === 'متبقي' :
+      filter === 'new'     ? isThisMonth(p.createdAt) : true;
+    return matchQ && matchF;
+  });
+}
+
+// ─── Render ───
+function render() {
+  const filtered = getFiltered();
+  const total    = filtered.length;
+  const pages    = Math.max(1, Math.ceil(total / PER_PAGE));
+  page = Math.min(page, pages);
+  const slice    = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  document.getElementById('countBadge').textContent = total + ' مريض';
+
+  const tbody = document.getElementById('tableBody');
+  const empty = document.getElementById('emptyState');
+
+  if (slice.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    tbody.innerHTML = slice.map(p => `
+      <tr onclick="editPatient('${p.id}')">
+        <td>
+          <div class="patient-cell">
+            <div class="avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
+            <div>
+              <div class="patient-name">${p.name}</div>
+              <div class="patient-id">${p.id}</div>
+            </div>
+          </div>
+        </td>
+        <td class="text-muted">${p.phone}</td>
+        <td>
+          <span class="badge ${p.payment === 'مسدّد' ? 'green' : 'yellow'}">${p.payment}</span>
+        </td>
+        <td class="text-muted">${formatDate(p.lastVisit)}</td>
+        <td>
+          <span class="badge ${p.status === 'تحت العلاج' ? 'blue' : p.status === 'جديد' ? 'yellow' : 'green'}">${p.status}</span>
+        </td>
+        <td>
+          <div class="action-btns" onclick="event.stopPropagation()">
+            <button class="btn-sm outline" onclick="editPatient('${p.id}')">تعديل</button>
+            <button class="btn-sm outline danger" onclick="deletePatient('${p.id}')">حذف</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // Pagination
+  document.getElementById('pageInfo').textContent =
+    `عرض ${Math.min((page-1)*PER_PAGE+1, total)}–${Math.min(page*PER_PAGE, total)} من ${total}`;
+
+  const pb = document.getElementById('pageBtns');
+  pb.innerHTML = '';
+  for (let i = 1; i <= pages; i++) {
+    const b = document.createElement('button');
+    b.className = 'page-btn' + (i === page ? ' active' : '');
+    b.textContent = i;
+    b.onclick = () => { page = i; render(); };
+    pb.appendChild(b);
+  }
+
+  updateStats();
+}
+
+// ─── Modal ───
+function openModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'إضافة مريض جديد';
+  document.getElementById('saveBtn').textContent    = 'حفظ المريض';
+  document.getElementById('patientForm').reset();
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function editPatient(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'تعديل بيانات المريض';
+  document.getElementById('saveBtn').textContent    = 'حفظ التعديلات';
+  document.getElementById('fName').value      = p.name;
+  document.getElementById('fPhone').value     = p.phone;
+  document.getElementById('fDob').value       = p.dob || '';
+  document.getElementById('fGender').value    = p.gender || '';
+  document.getElementById('fPayment').value   = p.payment;
+  document.getElementById('fStatus').value    = p.status;
+  document.getElementById('fAllergies').value = p.allergies || '';
+  document.getElementById('fNotes').value     = p.notes || '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+function submitPatient(e) {
+  e.preventDefault();
+  const name     = document.getElementById('fName').value.trim();
+  const phone    = document.getElementById('fPhone').value.trim();
+  const dob      = document.getElementById('fDob').value;
+  const gender   = document.getElementById('fGender').value;
+  const payment  = document.getElementById('fPayment').value;
+  const status   = document.getElementById('fStatus').value;
+  const allergies= document.getElementById('fAllergies').value.trim();
+  const notes    = document.getElementById('fNotes').value.trim();
+
+  if (editingId) {
+    const i = patients.findIndex(p => p.id === editingId);
+    if (i > -1) {
+      patients[i] = { ...patients[i], name, phone, dob, gender, payment, status, allergies, notes };
+    }
+    showToast('✅ تم تعديل بيانات المريض');
+  } else {
+    patients.unshift({
+      id: nextId(), name, phone, dob, gender, payment, status,
+      allergies, notes, lastVisit: new Date().toISOString().slice(0,10),
+      createdAt: new Date().toISOString().slice(0,10)
+    });
+    showToast('✅ تمت إضافة المريض بنجاح');
+  }
+  save();
+  closeModal();
+  render();
+}
+
+function deletePatient(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا المريض؟')) return;
+  patients = patients.filter(p => p.id !== id);
+  save();
+  render();
+  showToast('🗑️ تم حذف المريض');
+}
+
+// ─── Toast ───
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── Init ───
+render();
+</script>
+</body>
+</html>
