@@ -255,16 +255,16 @@ function initPTR() {
   var s = document.createElement('style');
   s.textContent =
     '.ptr-bar{' +
+      'width:100%;overflow:hidden;height:0;' +
       'display:flex;align-items:center;justify-content:center;gap:8px;' +
-      'height:0;overflow:hidden;' +
       'background:#0a1628;' +
       'font-size:13px;font-weight:700;color:#2ee89e;' +
       'font-family:"Cairo",sans-serif;' +
-      'transition:height .3s ease;' +
+      'transition:height .25s ease;' +
       'border-bottom:1px solid transparent;}' +
-    '.ptr-bar.show{height:40px;border-bottom-color:rgba(46,232,158,0.2);}' +
+    '.ptr-bar.show{height:38px;border-bottom-color:rgba(46,232,158,0.2);}' +
     '.ptr-ring{' +
-      'width:16px;height:16px;' +
+      'width:15px;height:15px;' +
       'border:2px solid rgba(46,232,158,0.25);' +
       'border-top-color:#2ee89e;' +
       'border-radius:50%;flex-shrink:0;}' +
@@ -274,17 +274,20 @@ function initPTR() {
 
   function attachHTML() {
     if (document.getElementById('ptrBar')) return;
-    // أضفه في أول الـ body — فوق الـ topbar مباشرة
+
     var bar = document.createElement('div');
-    bar.id = 'ptrBar';
+    bar.id        = 'ptrBar';
     bar.className = 'ptr-bar';
     bar.innerHTML = '<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
-    // حقنه أول شيء في الـ main content
-    var main = document.getElementById('sbMainContent') || document.querySelector('.main');
-    if (main) {
-      main.insertBefore(bar, main.firstChild);
+
+    // ضعه قبل الـ topbar مباشرة داخل .main
+    var topbar = document.querySelector('.topbar');
+    if (topbar && topbar.parentNode) {
+      topbar.parentNode.insertBefore(bar, topbar);
     } else {
-      document.body.insertBefore(bar, document.body.firstChild);
+      var main = document.getElementById('sbMainContent') || document.querySelector('.main');
+      if (main) main.insertBefore(bar, main.firstChild);
+      else document.body.insertBefore(bar, document.body.firstChild);
     }
     startPTR();
   }
@@ -308,9 +311,7 @@ function initPTR() {
       if (!b) return;
       if (state === 'hide') {
         b.className = 'ptr-bar';
-        return;
-      }
-      if (state === 'pull') {
+      } else if (state === 'pull') {
         b.className = 'ptr-bar show';
         r.style.animation = 'none';
         r.style.transform = 'rotate(' + Math.round((pull / THRESHOLD) * 270) + 'deg)';
