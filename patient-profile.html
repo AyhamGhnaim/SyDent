@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ملف المريض — SyDent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="sidebar.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0a1628;
+  --bg2:     #0f2038;
+  --bg3:     #132840;
+  --border:  rgba(46,232,158,0.15);
+  --green:   #2ee89e;
+  --green-dim: rgba(46,232,158,0.10);
+  --red:     #ef5350;
+  --yellow:  #f5c842;
+  --blue:    #63b3ed;
+  --purple:  #a78bfa;
+  --text:    #e1f4ee;
+  --text2:   #8a9ab5;
+  --radius:  12px;
+}
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ─── Main Layout ─── */
+.main {
+  padding: 0;
+}
+
+/* ─── Topbar ─── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 12px;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all .2s;
+}
+.back-btn:hover { border-color: var(--green); color: var(--green); }
+
+.topbar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Page Content ─── */
+.page-content {
+  padding: 24px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* ─── Patient Header Card ─── */
+.patient-header {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.patient-avatar-lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--bg);
+  flex-shrink: 0;
+}
+.patient-header-info { flex: 1; min-width: 0; }
+.patient-header-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.patient-header-sub {
+  font-size: 13px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.patient-header-sub span { display: flex; align-items: center; gap: 4px; }
+.patient-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Stats Row ─── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  text-align: center;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.stat-value.green { color: var(--green); }
+.stat-value.red   { color: var(--red); }
+.stat-value.yellow { color: var(--yellow); }
+.stat-label { font-size: 12px; color: var(--text2); }
+
+/* ─── Two Column Layout ─── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* ─── Section Card ─── */
+.section-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(46,232,158,0.03);
+}
+.section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-body { padding: 0; }
+
+/* ─── Info List ─── */
+.info-list { padding: 4px 0; }
+.info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 20px;
+  border-bottom: 1px solid rgba(46,232,158,0.06);
+}
+.info-row:last-child { border-bottom: none; }
+.info-key { font-size: 13px; color: var(--text2); }
+.info-val { font-size: 13px; color: var(--text); font-weight: 600; }
+
+/* ─── Badge ─── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.badge.green  { background: rgba(46,232,158,0.15);  color: var(--green); }
+.badge.yellow { background: rgba(245,200,66,0.15);  color: var(--yellow); }
+.badge.blue   { background: rgba(99,179,237,0.15);  color: var(--blue); }
+.badge.red    { background: rgba(239,83,80,0.15);   color: var(--red); }
+
+/* ─── Btn ─── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all .2s;
+}
+.btn-primary { background: var(--green); color: var(--bg); }
+.btn-primary:hover { background: #26d48e; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn-outline:hover { border-color: var(--green); color: var(--green); }
+.btn-sm-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+}
+.btn-sm-icon:hover { border-color: var(--red); color: var(--red); }
+.btn-sm-icon.edit:hover { border-color: var(--blue); color: var(--blue); }
+
+/* ─── Ledger Table ─── */
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ledger-table th {
+  padding: 11px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 600;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,0,0,0.1);
+}
+.ledger-table td {
+  padding: 13px 16px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid rgba(46,232,158,0.06);
+  vertical-align: middle;
+}
+.ledger-table tr:last-child td { border-bottom: none; }
+.ledger-table tr:hover td { background: rgba(46,232,158,0.03); }
+.amount-credit { color: var(--green); font-weight: 700; }
+.amount-debit  { color: var(--red);   font-weight: 700; }
+.ledger-empty {
+  text-align: center;
+  padding: 36px;
+  color: var(--text2);
+  font-size: 13px;
+}
+
+/* ─── Balance Bar ─── */
+.balance-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--bg3);
+  border-top: 1px solid var(--border);
+}
+.balance-bar .bl-label { font-size: 13px; color: var(--text2); }
+.balance-bar .bl-amount {
+  font-size: 16px;
+  font-weight: 800;
+}
+.balance-bar .bl-amount.green  { color: var(--green); }
+.balance-bar .bl-amount.red    { color: var(--red); }
+.balance-bar .bl-amount.zero   { color: var(--text2); }
+
+/* ─── Treatment Tag ─── */
+.treat-tag {
+  display: inline-block;
+  background: rgba(99,179,237,0.12);
+  color: var(--blue);
+  border: 1px solid rgba(99,179,237,0.25);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ─── Modal ─── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp { from { opacity:0; transform: translateY(20px); } }
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: transparent; border: none;
+  color: var(--text2); font-size: 20px;
+  cursor: pointer; line-height: 1;
+}
+.modal-body { padding: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .2s;
+  direction: rtl;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  border-color: var(--green);
+}
+.form-group textarea { resize: vertical; min-height: 70px; }
+.modal-foot {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+.btn-cancel-m {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-save-m {
+  background: var(--green);
+  border: none;
+  color: var(--bg);
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s;
+}
+.btn-save-m:hover { background: #26d48e; }
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 999;
+  opacity: 0;
+  transition: all .3s ease;
+  white-space: nowrap;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 768px) {
+  .page-content { padding: 14px; }
+  .patient-header { flex-direction: column; text-align: center; }
+  .patient-header-sub { justify-content: center; }
+  .patient-header-actions { width: 100%; justify-content: center; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat-value { font-size: 18px; }
+  .two-col { grid-template-columns: 1fr; }
+  .ledger-table th:nth-child(3),
+  .ledger-table td:nth-child(3) { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="main" id="sbMainContent">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-right">
+      <a href="patients.html" class="back-btn">← العودة للمرضى</a>
+      <span class="topbar-title" id="pageTitle">ملف المريض</span>
+    </div>
+    <div class="topbar-left">
+      <button class="btn btn-outline" onclick="openPaymentModal()">💰 تسجيل دفعة</button>
+      <button class="btn btn-primary" onclick="openTreatmentModal()">＋ إضافة علاج</button>
+    </div>
+  </div>
+
+  <!-- Page Content -->
+  <div class="page-content">
+
+    <!-- Patient Header -->
+    <div class="patient-header" id="patientHeader">
+      <div class="patient-avatar-lg" id="avatarLg"></div>
+      <div class="patient-header-info">
+        <div class="patient-header-name" id="patientName">—</div>
+        <div class="patient-header-sub" id="patientSub"></div>
+      </div>
+      <div class="patient-header-actions">
+        <button class="btn btn-outline" onclick="editPatient()">✏️ تعديل البيانات</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value green" id="statTotalTreat">0</div>
+        <div class="stat-label">إجمالي تكلفة العلاج (ل.س)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green" id="statTotalPaid">0</div>
+        <div class="stat-label">إجمالي المدفوع (ل.س)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statBalance">0</div>
+        <div class="stat-label">الرصيد المتبقي (ل.س)</div>
+      </div>
+    </div>
+
+    <!-- Two Column -->
+    <div class="two-col">
+
+      <!-- Patient Info -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">👤 بيانات المريض</div>
+        </div>
+        <div class="section-body">
+          <div class="info-list" id="patientInfoList"></div>
+        </div>
+      </div>
+
+      <!-- Appointments quick view -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">📅 آخر المواعيد</div>
+          <a href="appointments.html" style="font-size:12px;color:var(--green);text-decoration:none;">عرض الكل</a>
+        </div>
+        <div class="section-body">
+          <div id="apptList" class="info-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Treatments Ledger -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title">🦷 الخدمات والعلاجات</div>
+        <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="openTreatmentModal()">＋ إضافة</button>
+      </div>
+      <div class="section-body">
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>الخدمة</th>
+              <th>التاريخ</th>
+              <th>الملاحظات</th>
+              <th style="text-align:left;">المبلغ (ل.س)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="treatmentsBody">
+            <tr><td colspan="5"><div class="ledger-empty">لا توجد خدمات مسجّلة</div></td></tr>
+          </tbody>
+        </table>
+        <div class="balance-bar">
+          <span class="bl-label">إجمالي تكلفة العلاج</span>
+          <span class="bl-amount green" id="treatTotal">0 ل.س</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payments Ledger -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-title">💰 كشف المدفوعات</div>
+        <button class="btn btn-outline" style="padding:6px 12px;font-size:12px;" onclick="openPaymentModal()">＋ تسجيل دفعة</button>
+      </div>
+      <div class="section-body">
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>التاريخ</th>
+              <th>طريقة الدفع</th>
+              <th>الملاحظات</th>
+              <th style="text-align:left;">المبلغ (ل.س)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="paymentsBody">
+            <tr><td colspan="5"><div class="ledger-empty">لا توجد مدفوعات مسجّلة</div></td></tr>
+          </tbody>
+        </table>
+        <div class="balance-bar">
+          <span class="bl-label">إجمالي المدفوع</span>
+          <span class="bl-amount green" id="payTotal">0 ل.س</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Final Balance -->
+    <div class="section-card">
+      <div class="balance-bar" style="padding:20px 24px;">
+        <span class="bl-label" style="font-size:15px;font-weight:700;color:var(--text);">الرصيد المتبقي</span>
+        <span class="bl-amount" id="finalBalance" style="font-size:22px;">0 ل.س</span>
+      </div>
+    </div>
+
+  </div><!-- /page-content -->
+</div><!-- /main -->
+
+<!-- ─── Modal: تسجيل دفعة ─── -->
+<div class="modal-overlay" id="payModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>💰 تسجيل دفعة جديدة</h3>
+      <button class="modal-close" onclick="closeModal('payModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>المبلغ (ل.س)</label>
+        <input type="number" id="payAmount" placeholder="مثال: 50000" min="0">
+      </div>
+      <div class="form-group">
+        <label>طريقة الدفع</label>
+        <select id="payMethod">
+          <option value="نقداً">نقداً</option>
+          <option value="تحويل بنكي">تحويل بنكي</option>
+          <option value="أونلاين">أونلاين</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>التاريخ</label>
+        <input type="date" id="payDate">
+      </div>
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="payNotes" placeholder="أي ملاحظات…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('payModal')">إلغاء</button>
+      <button class="btn-save-m" onclick="savePayment()">تسجيل الدفعة</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal: إضافة علاج ─── -->
+<div class="modal-overlay" id="treatModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="treatModalTitle">🦷 إضافة خدمة / علاج</h3>
+      <button class="modal-close" onclick="closeModal('treatModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>نوع الخدمة</label>
+        <select id="treatType">
+          <option value="">— اختر —</option>
+          <option>حشوة</option>
+          <option>قلع</option>
+          <option>تنظيف</option>
+          <option>تلبيس (تاج)</option>
+          <option>قناة جذر</option>
+          <option>تركيب طقم</option>
+          <option>تبييض</option>
+          <option>ترميم جمالي</option>
+          <option>أشعة</option>
+          <option>استشارة</option>
+          <option>أخرى</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>الوصف / التفاصيل</label>
+        <input type="text" id="treatDesc" placeholder="مثال: حشوة ضرس عقل علوي أيسر">
+      </div>
+      <div class="form-group">
+        <label>التكلفة (ل.س)</label>
+        <input type="number" id="treatCost" placeholder="مثال: 75000" min="0">
+      </div>
+      <div class="form-group">
+        <label>التاريخ</label>
+        <input type="date" id="treatDate">
+      </div>
+      <div class="form-group">
+        <label>ملاحظات</label>
+        <textarea id="treatNotes" placeholder="أي ملاحظات إضافية…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('treatModal')">إلغاء</button>
+      <button class="btn-save-m" onclick="saveTreatment()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Storage Keys ───
+const KEY_PATIENTS  = 'sydent_patients';
+const KEY_LEDGER    = 'sydent_ledger';    // { [patientId]: { treatments:[], payments:[] } }
+const KEY_APPTS     = 'sydent_appointments';
+
+// ─── Load Data ───
+const patients     = JSON.parse(localStorage.getItem(KEY_PATIENTS) || '[]');
+const allLedger    = JSON.parse(localStorage.getItem(KEY_LEDGER)   || '{}');
+const allAppts     = JSON.parse(localStorage.getItem(KEY_APPTS) || '[]');
+
+function saveLedger() {
+  localStorage.setItem(KEY_LEDGER, JSON.stringify(allLedger));
+}
+
+// ─── Get Patient ID from URL ───
+const params    = new URLSearchParams(location.search);
+const patientId = params.get('id');
+
+let patient = patients.find(p => p.id === patientId);
+
+if (!patient) {
+  document.body.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;color:var(--text2)">
+      <div style="font-size:48px">😶</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text)">لم يُعثر على المريض</div>
+      <a href="patients.html" style="color:var(--green)">← العودة للمرضى</a>
+    </div>`;
+} else {
+  init();
+}
+
+function getLedger() {
+  if (!allLedger[patientId]) allLedger[patientId] = { treatments: [], payments: [] };
+  return allLedger[patientId];
+}
+
+// ─── Helpers ───
+const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
+function avatarColor(name) {
+  let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))%COLORS.length;
+  return COLORS[h];
+}
+function initials(name) {
+  const p = name.trim().split(' ');
+  return p.length >= 2 ? p[0][0]+p[1][0] : p[0].slice(0,2);
+}
+function formatDate(ds) {
+  if (!ds) return '—';
+  const d = new Date(ds);
+  return d.toLocaleDateString('ar-SY', { year:'numeric', month:'short', day:'numeric' });
+}
+function formatNum(n) {
+  return Number(n || 0).toLocaleString('ar-SY');
+}
+function todayStr() {
+  return new Date().toISOString().slice(0,10);
+}
+function nextId(arr, prefix) {
+  const nums = arr.map(x => parseInt((x.id||'0').replace(prefix,'')));
+  return prefix + String(Math.max(0,...nums)+1).padStart(3,'0');
+}
+
+// ─── Init ───
+function init() {
+  renderHeader();
+  renderInfoList();
+  renderStats();
+  renderTreatments();
+  renderPayments();
+  renderAppointments();
+  // Default dates
+  document.getElementById('payDate').value   = todayStr();
+  document.getElementById('treatDate').value = todayStr();
+  // Auto-open payment modal if ?pay=1
+  if (params.get('pay') === '1') {
+    setTimeout(() => openPaymentModal(), 300);
+  }
+}
+
+// ─── Header ───
+function renderHeader() {
+  document.title = patient.name + ' — SyDent';
+  document.getElementById('pageTitle').textContent = patient.name;
+
+  const color = avatarColor(patient.name);
+  const av = document.getElementById('avatarLg');
+  av.style.background = color;
+  av.textContent = initials(patient.name);
+
+  document.getElementById('patientName').textContent = patient.name;
+
+  const statusMap = {
+    'تحت العلاج': 'blue',
+    'جديد': 'yellow',
+    'مكتمل': 'green'
+  };
+  const payMap = { 'مسدّد':'green', 'متبقي':'yellow' };
+
+  document.getElementById('patientSub').innerHTML = `
+    <span>🪪 ${patient.id}</span>
+    <span>📞 ${patient.phone || '—'}</span>
+    <span>🗓️ آخر زيارة: ${formatDate(patient.lastVisit)}</span>
+    <span><span class="badge ${statusMap[patient.status]||'blue'}">${patient.status}</span></span>
+  `;
+}
+
+// ─── Info List ───
+function renderInfoList() {
+  const age = patient.dob
+    ? Math.floor((Date.now() - new Date(patient.dob)) / (365.25*24*3600*1000)) + ' سنة'
+    : '—';
+
+  document.getElementById('patientInfoList').innerHTML = `
+    <div class="info-row"><span class="info-key">الاسم الكامل</span><span class="info-val">${patient.name}</span></div>
+    <div class="info-row"><span class="info-key">الجنس</span><span class="info-val">${patient.gender || '—'}</span></div>
+    <div class="info-row"><span class="info-key">العمر</span><span class="info-val">${age}</span></div>
+    <div class="info-row"><span class="info-key">تاريخ الميلاد</span><span class="info-val">${formatDate(patient.dob)}</span></div>
+    <div class="info-row"><span class="info-key">رقم الهاتف</span><span class="info-val">${patient.phone || '—'}</span></div>
+    <div class="info-row"><span class="info-key">الحساسيات</span><span class="info-val">${patient.allergies || 'لا يوجد'}</span></div>
+    <div class="info-row"><span class="info-key">تاريخ التسجيل</span><span class="info-val">${formatDate(patient.createdAt)}</span></div>
+    ${patient.notes ? `<div class="info-row"><span class="info-key">ملاحظات</span><span class="info-val">${patient.notes}</span></div>` : ''}
+  `;
+}
+
+// ─── Stats ───
+function renderStats() {
+  const ledger = getLedger();
+  const totalTreat = ledger.treatments.reduce((s,t) => s + Number(t.cost||0), 0);
+  const totalPaid  = ledger.payments.reduce((s,p)  => s + Number(p.amount||0), 0);
+  const balance    = totalTreat - totalPaid;
+
+  document.getElementById('statTotalTreat').textContent = formatNum(totalTreat);
+  document.getElementById('statTotalPaid').textContent  = formatNum(totalPaid);
+
+  const balEl = document.getElementById('statBalance');
+  balEl.textContent = formatNum(balance);
+  balEl.className   = 'stat-value ' + (balance > 0 ? 'red' : balance < 0 ? 'yellow' : 'green');
+
+  document.getElementById('treatTotal').textContent = formatNum(totalTreat) + ' ل.س';
+  document.getElementById('payTotal').textContent   = formatNum(totalPaid)  + ' ل.س';
+
+  const fb = document.getElementById('finalBalance');
+  fb.textContent = formatNum(Math.abs(balance)) + ' ل.س' + (balance < 0 ? ' (رصيد زائد)' : '');
+  fb.className   = 'bl-amount ' + (balance > 0 ? 'red' : balance === 0 ? 'zero' : 'yellow');
+}
+
+// ─── Treatments ───
+function renderTreatments() {
+  const ledger = getLedger();
+  const tbody = document.getElementById('treatmentsBody');
+  if (!ledger.treatments.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="ledger-empty">لا توجد خدمات مسجّلة بعد</div></td></tr>`;
+    return;
+  }
+  const sorted = [...ledger.treatments].sort((a,b) => b.date.localeCompare(a.date));
+  tbody.innerHTML = sorted.map(t => `
+    <tr>
+      <td>
+        <span class="treat-tag">${t.type}</span>
+        ${t.desc ? `<div style="font-size:12px;color:var(--text2);margin-top:3px;">${t.desc}</div>` : ''}
+      </td>
+      <td style="color:var(--text2);font-size:12px;">${formatDate(t.date)}</td>
+      <td style="color:var(--text2);font-size:12px;">${t.notes||'—'}</td>
+      <td class="amount-debit" style="text-align:left;">${formatNum(t.cost)}</td>
+      <td>
+        <button class="btn-sm-icon" onclick="deleteTreatment('${t.id}')" title="حذف">🗑</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ─── Payments ───
+function renderPayments() {
+  const ledger = getLedger();
+  const tbody = document.getElementById('paymentsBody');
+  if (!ledger.payments.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="ledger-empty">لا توجد مدفوعات مسجّلة بعد</div></td></tr>`;
+    return;
+  }
+  const sorted = [...ledger.payments].sort((a,b) => b.date.localeCompare(a.date));
+  tbody.innerHTML = sorted.map(p => `
+    <tr>
+      <td style="color:var(--text2);font-size:12px;">${formatDate(p.date)}</td>
+      <td><span class="badge green">${p.method}</span></td>
+      <td style="color:var(--text2);font-size:12px;">${p.notes||'—'}</td>
+      <td class="amount-credit" style="text-align:left;">${formatNum(p.amount)}</td>
+      <td>
+        <button class="btn-sm-icon" onclick="deletePayment('${p.id}')" title="حذف">🗑</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ─── Appointments ───
+function renderAppointments() {
+  const appts = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
+  const patAppts = appts
+    .filter(a => a.patient === patient.name)
+    .sort((a,b) => (b.date+b.time).localeCompare(a.date+a.time))
+    .slice(0, 5);
+
+  const el = document.getElementById('apptList');
+  if (!patAppts.length) {
+    el.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد مواعيد مسجّلة</div>`;
+    return;
+  }
+  el.innerHTML = patAppts.map(a => `
+    <div class="info-row">
+      <span class="info-key">${formatDate(a.date)} — ${a.time}</span>
+      <span class="info-val" style="font-size:12px;">${a.type || '—'}</span>
+    </div>
+  `).join('');
+}
+
+// ─── Save Payment ───
+function savePayment() {
+  const amount = parseFloat(document.getElementById('payAmount').value);
+  const method = document.getElementById('payMethod').value;
+  const date   = document.getElementById('payDate').value;
+  const notes  = document.getElementById('payNotes').value.trim();
+
+  if (!amount || amount <= 0) { showToast('⚠️ أدخل مبلغاً صحيحاً'); return; }
+  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+
+  const ledger = getLedger();
+  ledger.payments.push({
+    id: nextId(ledger.payments, 'PAY'),
+    amount, method, date, notes
+  });
+
+  // Update patient payment status
+  const totalTreat = ledger.treatments.reduce((s,t) => s + Number(t.cost||0), 0);
+  const totalPaid  = ledger.payments.reduce((s,p)  => s + Number(p.amount||0), 0);
+  const pidx = patients.findIndex(p => p.id === patientId);
+  if (pidx !== -1) {
+    patients[pidx].payment = totalPaid >= totalTreat && totalTreat > 0 ? 'مسدّد' : 'متبقي';
+    localStorage.setItem(KEY_PATIENTS, JSON.stringify(patients));
+    patient = patients[pidx];
+  }
+
+  saveLedger();
+  renderStats();
+  renderPayments();
+  renderHeader();
+  closeModal('payModal');
+  document.getElementById('payAmount').value = '';
+  document.getElementById('payNotes').value  = '';
+  document.getElementById('payDate').value   = todayStr();
+  showToast('✅ تم تسجيل الدفعة');
+}
+
+// ─── Save Treatment ───
+let editingTreatId = null;
+function saveTreatment() {
+  const type  = document.getElementById('treatType').value;
+  const desc  = document.getElementById('treatDesc').value.trim();
+  const cost  = parseFloat(document.getElementById('treatCost').value);
+  const date  = document.getElementById('treatDate').value;
+  const notes = document.getElementById('treatNotes').value.trim();
+
+  if (!type) { showToast('⚠️ اختر نوع الخدمة'); return; }
+  if (!cost || cost <= 0) { showToast('⚠️ أدخل تكلفة صحيحة'); return; }
+  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+
+  const ledger = getLedger();
+  if (editingTreatId) {
+    const i = ledger.treatments.findIndex(t => t.id === editingTreatId);
+    if (i !== -1) ledger.treatments[i] = { ...ledger.treatments[i], type, desc, cost, date, notes };
+    editingTreatId = null;
+  } else {
+    ledger.treatments.push({
+      id: nextId(ledger.treatments, 'TR'),
+      type, desc, cost, date, notes
+    });
+  }
+
+  // Update patient payment status
+  const totalTreat = ledger.treatments.reduce((s,t) => s + Number(t.cost||0), 0);
+  const totalPaid  = ledger.payments.reduce((s,p)  => s + Number(p.amount||0), 0);
+  const pidx = patients.findIndex(p => p.id === patientId);
+  if (pidx !== -1) {
+    patients[pidx].payment = totalPaid >= totalTreat && totalTreat > 0 ? 'مسدّد' : 'متبقي';
+    localStorage.setItem(KEY_PATIENTS, JSON.stringify(patients));
+    patient = patients[pidx];
+  }
+
+  saveLedger();
+  renderStats();
+  renderTreatments();
+  closeModal('treatModal');
+  document.getElementById('treatType').value  = '';
+  document.getElementById('treatDesc').value  = '';
+  document.getElementById('treatCost').value  = '';
+  document.getElementById('treatNotes').value = '';
+  document.getElementById('treatDate').value  = todayStr();
+  showToast('✅ تم حفظ الخدمة');
+}
+
+// ─── Delete ───
+function deleteTreatment(id) {
+  if (!confirm('حذف هذه الخدمة؟')) return;
+  const ledger = getLedger();
+  ledger.treatments = ledger.treatments.filter(t => t.id !== id);
+  saveLedger();
+  renderStats();
+  renderTreatments();
+  showToast('🗑️ تم حذف الخدمة');
+}
+function deletePayment(id) {
+  if (!confirm('حذف هذه الدفعة؟')) return;
+  const ledger = getLedger();
+  ledger.payments = ledger.payments.filter(p => p.id !== id);
+  saveLedger();
+  renderStats();
+  renderPayments();
+  showToast('🗑️ تم حذف الدفعة');
+}
+
+// ─── Edit Patient (redirect to patients modal) ───
+function editPatient() {
+  showToast('⬅️ افتح صفحة المرضى لتعديل البيانات');
+}
+
+// ─── Modals ───
+function openPaymentModal() {
+  document.getElementById('payDate').value = todayStr();
+  document.getElementById('payModal').classList.add('open');
+}
+function openTreatmentModal() {
+  editingTreatId = null;
+  document.getElementById('treatModalTitle').textContent = '🦷 إضافة خدمة / علاج';
+  document.getElementById('treatDate').value = todayStr();
+  document.getElementById('treatModal').classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', function(e) {
+    if (e.target === el) el.classList.remove('open');
+  });
+});
+
+// ─── Toast ───
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+
+<script>
+initSidebar('patients');
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.createElement('button');
+  btn.className = 'sb-hamburger';
+  btn.innerHTML = '<span></span><span></span><span></span>';
+  btn.onclick = function() { window.sbToggle(); };
+  window._sbBtn = btn;
+  var topbar = document.querySelector('.topbar');
+  if (topbar) topbar.insertBefore(btn, topbar.firstChild);
+});
+</script>
+</body>
+</html>

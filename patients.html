@@ -725,7 +725,7 @@ function render() {
   } else {
     empty.style.display = 'none';
     tbody.innerHTML = slice.map(p => `
-      <tr onclick="editPatient('${p.id}')">
+      <tr onclick="openProfile('${p.id}')" style="cursor:pointer;">
         <td>
           <div class="patient-cell">
             <div class="avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
@@ -745,8 +745,8 @@ function render() {
         </td>
         <td>
           <div class="action-btns" onclick="event.stopPropagation()">
-            <button class="btn-sm outline" onclick="editPatient('${p.id}')">تعديل</button>
-            <button class="btn-sm pay" onclick="markPaid('${p.id}')">💰 تسجيل دفعة</button>
+            <button class="btn-sm outline" onclick="event.stopPropagation();editPatient('${p.id}')">تعديل</button>
+            <button class="btn-sm pay" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&pay=1'">💰 تسجيل دفعة</button>
             <button class="dots-btn" onclick="toggleDotsMenu(this)">⋮</button>
             <div class="dots-menu">
               <button onclick="deletePatient('${p.id}')">🗑️ حذف المريض</button>
@@ -838,13 +838,8 @@ function submitPatient(e) {
   render();
 }
 
-function markPaid(id) {
-  const i = patients.findIndex(p => p.id === id);
-  if (i === -1) return;
-  if (patients[i].payment === 'مسدّد') { showToast('✅ الدفع مسجّل مسبقاً'); return; }
-  patients[i].payment = 'مسدّد';
-  save(); render();
-  showToast('💰 تم تسجيل الدفعة');
+function openProfile(id) {
+  location.href = 'patient-profile.html?id=' + id;
 }
 
 function toggleDotsMenu(btn) {
