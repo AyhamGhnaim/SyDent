@@ -256,7 +256,7 @@ function initPTR() {
   var ptrStyle = document.createElement('style');
   ptrStyle.textContent = [
     '.ptr-indicator{position:fixed;top:0;left:50%;',
-    'transform:translateX(-50%) translateY(-80px);',
+    'transform:translateX(-50%) translateY(-120px);',
     'background:#132840;border:1px solid rgba(46,232,158,0.15);',
     'border-top:none;border-radius:0 0 20px 20px;',
     'padding:10px 24px;display:flex;align-items:center;gap:10px;',
@@ -265,6 +265,7 @@ function initPTR() {
     'transition:transform .3s cubic-bezier(.175,.885,.32,1.275);',
     'white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.3);}',
     '.ptr-indicator.visible{transform:translateX(-50%) translateY(0);}',
+    'body{overflow-x:hidden;}',
     '.ptr-spinner{width:18px;height:18px;',
     'border:2px solid rgba(46,232,158,0.3);border-top-color:#2ee89e;',
     'border-radius:50%;flex-shrink:0;transition:transform .3s ease;}',
