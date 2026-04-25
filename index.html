@@ -31,70 +31,28 @@
     direction: rtl;
   }
 
-  .sidebar {
-    position: fixed;
-    right: 0; top: 0; bottom: 0;
-    width: 240px;
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 0;
-    z-index: 100;
-  }
 
-  .logo {
-    padding: 24px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
 
-  .logo-icon {
-    width: 40px; height: 40px;
-    background: linear-gradient(135deg, var(--accent), var(--accent2));
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
-  }
 
-  .logo-text { font-size: 20px; font-weight: 900; color: var(--text-primary); }
-  .logo-sub { font-size: 11px; color: var(--text-muted); }
 
-  .nav { padding: 16px 0; flex: 1; }
 
-  .nav-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 12px 20px;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: var(--text-muted);
-    font-size: 14px;
-    font-weight: 600;
-    border-right: 3px solid transparent;
-    text-decoration: none;
-  }
 
-  .nav-item:hover { background: rgba(46,232,158,0.05); color: var(--text-primary); }
-  .nav-item.active {
-    background: rgba(46,232,158,0.1);
-    color: var(--accent);
-    border-right-color: var(--accent);
-  }
 
-  .nav-icon { font-size: 18px; width: 24px; text-align: center; }
 
-  .nav-section {
-    padding: 16px 20px 8px;
-    font-size: 11px;
-    color: var(--text-muted);
-    font-weight: 700;
-    letter-spacing: 1px;
-  }
+
+
+
+
+
+
+
+
+
+
+
 
   .main {
-    margin-right: 240px;
+    margin-right: var(--sb-width, 240px);
     padding: 32px;
     min-height: 100vh;
   }
@@ -299,54 +257,22 @@
     font-weight: 700;
   }
 
-  .sidebar-footer {
-    padding: 16px 20px;
-    border-top: 1px solid var(--border);
-    font-size: 12px; color: var(--text-muted);
-  }
+
 
   @media (max-width: 1100px) {
     .stats-grid { grid-template-columns: repeat(2,1fr); }
     .grid-2, .grid-2b { grid-template-columns: 1fr; }
   }
   @media (max-width: 768px) {
-    .sidebar { display: none; }
+  
     .main { margin-right: 0; padding: 16px; }
   }
 </style>
+<script src="sidebar.js"></script>
 </head>
 <body>
 
-<div class="sidebar">
-  <div class="logo">
-    <div class="logo-icon">🦷</div>
-    <div>
-      <div class="logo-text">SyDent</div>
-      <div class="logo-sub">نظام إدارة العيادة</div>
-    </div>
-  </div>
-
-  <div class="nav">
-    <div class="nav-section">الرئيسية</div>
-    <a class="nav-item active" href="index.html"><span class="nav-icon">📊</span> لوحة التحكم</a>
-    <a class="nav-item" href="patients.html"><span class="nav-icon">👥</span> المرضى</a>
-    <a class="nav-item" href="#"><span class="nav-icon">📅</span> المواعيد</a>
-
-    <div class="nav-section">الإدارة</div>
-    <a class="nav-item" href="#"><span class="nav-icon">🧪</span> المخابر</a>
-    <a class="nav-item" href="#"><span class="nav-icon">💰</span> المدفوعات</a>
-    <a class="nav-item" href="#"><span class="nav-icon">📋</span> العلاجات</a>
-
-    <div class="nav-section">النظام</div>
-    <a class="nav-item" href="#"><span class="nav-icon">⚙️</span> الإعدادات</a>
-  </div>
-
-  <div class="sidebar-footer">
-    د. أيهم غنيم<br>طبيب أسنان
-  </div>
-</div>
-
-<div class="main">
+<div class="main" id="sbMainContent">
 
   <div class="header">
     <div>
@@ -568,5 +494,21 @@ if (recent.length === 0) {
 }
 </script>
 
+<script>
+// إضافة زر hamburger للـ topbar
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.createElement('button');
+  btn.className = 'sb-hamburger';
+  btn.id = 'sbHamburgerBtn';
+  btn.setAttribute('aria-label', 'القائمة');
+  btn.innerHTML = '<span></span><span></span><span></span>';
+  btn.onclick = function() { window.sbToggle(); };
+  window._sbBtn = btn;
+  var header = document.querySelector('.header');
+  if (header) header.insertBefore(btn, header.firstChild);
+});
+initSidebar('dashboard');
+</script>
 </body>
 </html>
+
