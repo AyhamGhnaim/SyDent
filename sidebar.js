@@ -188,6 +188,14 @@ function buildHTML(activeId) {
 
 // ─── JS ───
 function initSidebar(activeId) {
+  // انتظر DOM إذا لم يكن جاهزاً بعد
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initSidebar(activeId);
+    });
+    return;
+  }
+
   // 1. Inject CSS
   const style = document.createElement('style');
   style.textContent = css;

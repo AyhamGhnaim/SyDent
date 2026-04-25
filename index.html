@@ -495,8 +495,10 @@ if (recent.length === 0) {
 </script>
 
 <script>
-// إضافة زر hamburger للـ topbar
 document.addEventListener('DOMContentLoaded', function() {
+  initSidebar('dashboard');
+
+  // زر hamburger في الـ header
   var btn = document.createElement('button');
   btn.className = 'sb-hamburger';
   btn.id = 'sbHamburgerBtn';
@@ -507,7 +509,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var header = document.querySelector('.header');
   if (header) header.insertBefore(btn, header.firstChild);
 });
-initSidebar('dashboard');
 </script>
 </body>
 </html>
