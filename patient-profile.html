@@ -69,13 +69,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .jaw{display:flex;justify-content:center;gap:3px;margin:8px 0 2px;}
 .jaw-nums{display:flex;justify-content:center;gap:3px;margin-bottom:10px;}
 .jaw-num{width:26px;text-align:center;font-size:9px;color:var(--text2);}
-.tooth{width:26px;height:32px;background:#f5e6c8;border-radius:4px 4px 6px 6px;cursor:pointer;border:2px solid transparent;transition:all .15s;position:relative;}
-.tooth:hover{border-color:var(--green);transform:scale(1.08);}
-.tooth.treated{background:var(--green);opacity:.85;}
-.tooth.extracted{background:var(--red);opacity:.7;}
-.tooth.crown{background:var(--yellow);opacity:.85;}
-.tooth.root-canal{background:var(--purple);opacity:.85;}
-.tooth.implant{background:var(--blue);opacity:.85;}
+.tooth-svg{cursor:pointer;transition:all .18s;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3));}
+.tooth-svg:hover{transform:scale(1.12);}
+.tooth-svg .tooth-body{fill:#e8d5b0;stroke:#c4a87a;stroke-width:1.5;}
+.tooth-svg.treated  .tooth-body{fill:#2ee89e;stroke:#1fba7e;}
+.tooth-svg.extracted .tooth-body{fill:#ef5350;stroke:#c62828;opacity:.75;}
+.tooth-svg.crown    .tooth-body{fill:#f5c842;stroke:#d4a017;}
+.tooth-svg.root-canal .tooth-body{fill:#a78bfa;stroke:#7c5cbf;}
+.tooth-svg.implant  .tooth-body{fill:#63b3ed;stroke:#3a82c4;}
+.tooth-svg .tooth-mark{fill:rgba(0,0,0,.25);font-size:8px;text-anchor:middle;dominant-baseline:middle;}
+.jaw-divider{height:10px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:1px;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;justify-content:center;}
 .leg-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text2);}
 .leg-dot{width:10px;height:10px;border-radius:2px;}
@@ -222,11 +225,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <span>🦷 مخطط الأسنان</span>
         <span class="chart-hint">اضغط على السن لإضافة علاج</span>
       </div>
-      <div id="upperJawNums" class="jaw-nums"></div>
-      <div id="upperJaw" class="jaw"></div>
-      <div style="height:6px;"></div>
-      <div id="lowerJaw" class="jaw"></div>
-      <div id="lowerJawNums" class="jaw-nums"></div>
+      <div id="toothChart" style="overflow-x:auto;padding:4px 0;"></div>
       <div class="chart-legend">
         <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>حشوة</div>
         <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>قلع</div>
@@ -574,16 +573,62 @@ function renderPayments() {
 const UPPER = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
 const LOWER = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
 
+// tooth shape paths: upper (root down) / lower (root up)
+// W=24 H=38: crown ~22px, root ~14px
+function toothPath(isUpper, type) {
+  // molar vs premolar vs front
+  if (type === 'front') {
+    return isUpper
+      ? 'M4,2 Q12,0 20,2 L21,20 Q12,24 3,20 Z M8,20 L9,36 Q12,38 15,36 L16,20'
+      : 'M4,36 Q12,38 20,36 L21,18 Q12,14 3,18 Z M8,18 L9,2 Q12,0 15,2 L16,18';
+  } else if (type === 'premolar') {
+    return isUpper
+      ? 'M3,2 Q12,0 21,2 L22,19 Q12,23 2,19 Z M7,19 L7,34 Q12,37 17,34 L17,19'
+      : 'M3,36 Q12,38 21,36 L22,19 Q12,15 2,19 Z M7,19 L7,4 Q12,1 17,4 L17,19';
+  } else { // molar
+    return isUpper
+      ? 'M2,3 Q12,0 22,3 L23,20 Q12,25 1,20 Z M5,20 L4,33 Q12,37 20,33 L19,20'
+      : 'M2,35 Q12,38 22,35 L23,18 Q12,13 1,18 Z M5,18 L4,5 Q12,1 20,5 L19,18';
+  }
+}
+
+function getToothType(n) {
+  const abs = n % 10;
+  if (abs <= 2) return 'front';
+  if (abs <= 4) return 'premolar';
+  return 'molar';
+}
+
+const ICONS = { treated:'✦', extracted:'✕', crown:'◆', 'root-canal':'⊕', implant:'⊙' };
+
+function makeTooth(n, status, isUpper) {
+  const type = getToothType(n);
+  const iconChar = status ? (ICONS[status]||'') : '';
+  const cls = status ? status : '';
+  return `<svg class="tooth-svg ${cls}" width="24" height="40" viewBox="0 0 24 40"
+    onclick="openToothModal(${n})" style="display:block;">
+    <title>السن ${n}${status?' — '+status:''}</title>
+    <path class="tooth-body" d="${toothPath(isUpper, type)}"/>
+    ${iconChar ? `<text class="tooth-mark" x="12" y="${isUpper?13:27}">${iconChar}</text>` : ''}
+  </svg>
+  <div style="font-size:9px;color:var(--text2);text-align:center;margin-top:1px;">${n}</div>`;
+}
+
 function renderTeethChart() {
   const teeth = allTeeth[patientId] || {};
-  const ul = document.getElementById('upperJaw');
-  const ll = document.getElementById('lowerJaw');
-  const un = document.getElementById('upperJawNums');
-  const ln = document.getElementById('lowerJawNums');
-  ul.innerHTML = UPPER.map(n=>`<div class="tooth ${teeth[n]||''}" id="t${n}" onclick="openToothModal(${n})" title="السن ${n}"></div>`).join('');
-  ll.innerHTML = LOWER.map(n=>`<div class="tooth ${teeth[n]||''}" id="t${n}" onclick="openToothModal(${n})" title="السن ${n}"></div>`).join('');
-  un.innerHTML = UPPER.map(n=>`<div class="jaw-num">${n}</div>`).join('');
-  ln.innerHTML = LOWER.map(n=>`<div class="jaw-num">${n}</div>`).join('');
+  const wrap = document.getElementById('toothChart');
+
+  const upperHTML = `<div style="display:flex;justify-content:center;gap:2px;margin-bottom:2px;">
+    ${UPPER.map(n=>`<div style="width:24px;" id="t${n}">${makeTooth(n,teeth[n],true)}</div>`).join('')}
+  </div>`;
+
+  const divider = `<div class="jaw-divider">— خط اللثة —</div>`;
+
+  const lowerHTML = `<div style="display:flex;justify-content:center;gap:2px;margin-top:2px;">
+    ${LOWER.map(n=>`<div style="width:24px;" id="t${n}">${makeTooth(n,teeth[n],false)}</div>`).join('')}
+  </div>`;
+
+  wrap.innerHTML = upperHTML + divider + lowerHTML;
 }
 
 let currentTooth = null;
