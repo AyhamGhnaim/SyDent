@@ -638,10 +638,7 @@ function computePaymentStatus(patientId) {
   var total = 0, paid = 0;
   for (var i=0;i<sessions.length;i++) total += Number(sessions[i].cost||0);
   for (var j=0;j<payments.length;j++) paid  += Number(payments[j].amount||0);
-  if (total === 0)   return 'متبقي'; // new patient, no sessions yet
-  if (paid >= total) return 'مسدّد';
-  if (paid > 0)      return 'جزئي';
-  return 'متبقي';
+  return (total > 0 && paid >= total) ? 'مسدّد' : 'متبقي';
 }
 
 // Sync all patients' payment status from their ledgers on load
@@ -794,7 +791,7 @@ function render() {
         </td>
         <td class="text-muted">${p.phone}</td>
         <td>
-          <span class="badge ${p.payment === 'مسدّد' ? 'green' : p.payment === 'جزئي' ? 'blue' : 'yellow'}">${p.payment}</span>
+          <span class="badge ${p.payment === 'مسدّد' ? 'green' : 'yellow'}">${p.payment}</span>
         </td>
         <td class="text-muted">${formatDate(p.lastVisit)}</td>
         <td>
