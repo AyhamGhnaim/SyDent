@@ -340,17 +340,41 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <!-- Modal: السن -->
 <div class="modal-overlay" id="toothModal">
-  <div class="modal-box" style="max-width:400px;">
+  <div class="modal-box" style="max-width:440px;">
     <div class="modal-head"><h3 id="toothModalTitle">السن</h3><button class="modal-close" onclick="closeModal('toothModal')">✕</button></div>
     <div class="modal-body">
-      <div class="tooth-opts">
-        <button class="topt" style="border-color:var(--green)"  onclick="setTooth('treated')">🟢 حشوة</button>
-        <button class="topt" style="border-color:var(--red)"    onclick="setTooth('extracted')">🔴 قلع</button>
-        <button class="topt" style="border-color:var(--yellow)" onclick="setTooth('crown')">🟡 تاج</button>
-        <button class="topt" style="border-color:var(--purple)" onclick="setTooth('root-canal')">🟣 قناة جذر</button>
-        <button class="topt" style="border-color:var(--blue)"   onclick="setTooth('implant')">🔵 زراعة</button>
-        <button class="topt" style="border-color:var(--text2)"  onclick="setTooth('')">⬜ سليم</button>
+      <!-- Step 1: choose treatment -->
+      <div id="toothStep1">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">اختر نوع العلاج:</div>
+        <div class="tooth-opts">
+          <button class="topt" style="border-color:var(--green)"  onclick="pickToothTreatment('treated','حشوة')">🟢 حشوة</button>
+          <button class="topt" style="border-color:var(--red)"    onclick="pickToothTreatment('extracted','قلع')">🔴 قلع</button>
+          <button class="topt" style="border-color:var(--yellow)" onclick="pickToothTreatment('crown','تلبيس (تاج)')">🟡 تاج</button>
+          <button class="topt" style="border-color:var(--purple)" onclick="pickToothTreatment('root-canal','قناة جذر')">🟣 قناة جذر</button>
+          <button class="topt" style="border-color:var(--blue)"   onclick="pickToothTreatment('implant','زراعة')">🔵 زراعة</button>
+          <button class="topt" style="border-color:var(--text2)"  onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>
+        </div>
       </div>
+      <!-- Step 2: enter cost -->
+      <div id="toothStep2" style="display:none;">
+        <div id="toothStep2Title" style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:14px;text-align:center;"></div>
+        <div class="form-group">
+          <label>التكلفة (ل.س)</label>
+          <input type="number" id="toothCost" placeholder="مثال: 50000" min="0" inputmode="numeric" autofocus>
+        </div>
+        <div class="form-group">
+          <label>التاريخ</label>
+          <input type="date" id="toothDate">
+        </div>
+        <div class="form-group">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="toothNotes" placeholder="أي ملاحظات…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot" id="toothFoot" style="display:none;">
+      <button class="btn-cancel-m" onclick="backToStep1()">رجوع</button>
+      <button class="btn-save-m" onclick="saveToothTreatment()">حفظ كجلسة</button>
     </div>
   </div>
 </div>
@@ -525,20 +549,92 @@ function renderTeeth() {
 }
 
 var currentTooth = null;
+var pendingToothStatus = null;
+var pendingToothLabel = null;
+
 function openToothModal(n) {
   currentTooth = n;
   var teeth = allTeeth[patientId] || {};
   document.getElementById('toothModalTitle').textContent = 'السن ' + n + (teeth[n] ? ' — ' + teeth[n] : ' (سليم)');
+  // reset to step 1
+  document.getElementById('toothStep1').style.display = 'block';
+  document.getElementById('toothStep2').style.display = 'none';
+  document.getElementById('toothFoot').style.display = 'none';
   openModal('toothModal');
 }
-function setTooth(status) {
+
+function pickToothTreatment(status, label) {
+  pendingToothStatus = status;
+  pendingToothLabel  = label;
+  document.getElementById('toothStep1').style.display = 'none';
+  document.getElementById('toothStep2').style.display = 'block';
+  document.getElementById('toothFoot').style.display = 'flex';
+  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' للسن ' + currentTooth;
+  document.getElementById('toothCost').value = '';
+  document.getElementById('toothNotes').value = '';
+  document.getElementById('toothDate').value = toDay();
+  setTimeout(function(){ document.getElementById('toothCost').focus(); }, 100);
+}
+
+function backToStep1() {
+  document.getElementById('toothStep1').style.display = 'block';
+  document.getElementById('toothStep2').style.display = 'none';
+  document.getElementById('toothFoot').style.display = 'none';
+}
+
+function saveToothTreatment() {
+  var cost  = parseFloat(document.getElementById('toothCost').value);
+  var date  = document.getElementById('toothDate').value;
+  var notes = document.getElementById('toothNotes').value.trim();
+  if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
+  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+
+  // 1. Color the tooth
   if (!allTeeth[patientId]) allTeeth[patientId] = {};
-  if (status) allTeeth[patientId][currentTooth] = status;
-  else delete allTeeth[patientId][currentTooth];
+  allTeeth[patientId][currentTooth] = pendingToothStatus;
+  saveTeeth();
+
+  // 2. Add as a session in the ledger
+  var L = getLedger();
+  L.sessions.push({
+    id: nextId(L.sessions, 'SES'),
+    type: pendingToothLabel,
+    desc: 'السن رقم ' + currentTooth,
+    cost: cost,
+    date: date,
+    notes: notes,
+    tooth: currentTooth
+  });
+  saveLedger();
+
+  // 3. Update lastVisit
+  for (var i=0; i<patients.length; i++) {
+    if (patients[i].id === patientId && (!patients[i].lastVisit || date > patients[i].lastVisit)) {
+      patients[i].lastVisit = date;
+      localStorage.setItem(K_PAT, JSON.stringify(patients));
+      patient = patients[i];
+      break;
+    }
+  }
+
+  // 4. Re-render everything
+  renderTeeth();
+  renderStats();
+  renderInfo();
+  renderSessions();
+  renderPayments();
+
+  closeModal('toothModal');
+  showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth);
+}
+
+function clearToothStatus() {
+  if (!confirm('هل تريد إزالة العلاج من السن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
+  if (allTeeth[patientId]) delete allTeeth[patientId][currentTooth];
   saveTeeth();
   renderTeeth();
   closeModal('toothModal');
-  showToast('✅ تم تحديث السن ' + currentTooth);
+  showToast('🔄 السن ' + currentTooth + ' أصبح سليماً');
 }
 
 /* ══ Sessions ══ */
@@ -553,9 +649,10 @@ function renderSessions() {
   var rows = '';
   for (var i=0; i<sorted.length; i++) {
     var s = sorted[i];
+    var toothBadge = s.tooth ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth + '</span>' : '';
     rows += '<tr>'
       + '<td>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + s.type + '</span></td>'
+      + '<td><span class="tag tag-blue">' + s.type + '</span>' + toothBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.desc||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
@@ -660,8 +757,26 @@ function saveAppt() {
 function delSession(id) {
   if (!confirm('حذف هذه الجلسة؟')) return;
   var L = getLedger();
-  var s = []; for(var i=0;i<L.sessions.length;i++) if(L.sessions[i].id!==id) s.push(L.sessions[i]);
-  L.sessions = s; saveLedger(); renderStats(); renderSessions(); showToast('🗑️ تم حذف الجلسة');
+  // find the session being deleted to check if it has a tooth
+  var deletedSession = null;
+  for (var i=0; i<L.sessions.length; i++) if (L.sessions[i].id===id) { deletedSession = L.sessions[i]; break; }
+  // remove it
+  var s = []; for(var j=0;j<L.sessions.length;j++) if(L.sessions[j].id!==id) s.push(L.sessions[j]);
+  L.sessions = s;
+  // if this session was for a tooth, check if any remaining session targets the same tooth
+  if (deletedSession && deletedSession.tooth) {
+    var stillUsed = false;
+    for (var k=0; k<L.sessions.length; k++) {
+      if (L.sessions[k].tooth === deletedSession.tooth) { stillUsed = true; break; }
+    }
+    if (!stillUsed && allTeeth[patientId] && allTeeth[patientId][deletedSession.tooth]) {
+      delete allTeeth[patientId][deletedSession.tooth];
+      saveTeeth();
+      renderTeeth();
+    }
+  }
+  saveLedger(); renderStats(); renderInfo(); renderSessions(); renderPayments();
+  showToast('🗑️ تم حذف الجلسة');
 }
 function delPayment(id) {
   if (!confirm('حذف هذه الدفعة؟')) return;
