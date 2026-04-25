@@ -670,10 +670,11 @@ function saveToothTreatment() {
   });
   saveLedger();
 
-  // 3. Update lastVisit
+  // 3. Update lastVisit + auto-promote status
   for (var i=0; i<patients.length; i++) {
-    if (patients[i].id === patientId && (!patients[i].lastVisit || date > patients[i].lastVisit)) {
-      patients[i].lastVisit = date;
+    if (patients[i].id === patientId) {
+      if (!patients[i].lastVisit || date > patients[i].lastVisit) patients[i].lastVisit = date;
+      if (patients[i].status === 'جديد') patients[i].status = 'تحت العلاج';
       localStorage.setItem(K_PAT, JSON.stringify(patients));
       patient = patients[i];
       break;
@@ -784,8 +785,10 @@ function saveSession() {
   var L = getLedger();
   L.sessions.push({ id:nextId(L.sessions,'SES'), type:type, desc:desc, cost:cost, date:date, notes:notes });
   for (var i=0;i<patients.length;i++) {
-    if (patients[i].id===patientId && (!patients[i].lastVisit||date>patients[i].lastVisit)) {
-      patients[i].lastVisit = date;
+    if (patients[i].id===patientId) {
+      if (!patients[i].lastVisit || date > patients[i].lastVisit) patients[i].lastVisit = date;
+      // auto-promote 'جديد' → 'تحت العلاج' on first session
+      if (patients[i].status === 'جديد') patients[i].status = 'تحت العلاج';
       localStorage.setItem(K_PAT, JSON.stringify(patients));
       patient = patients[i]; break;
     }

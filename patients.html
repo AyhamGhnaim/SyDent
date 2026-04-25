@@ -239,6 +239,14 @@ td {
 }
 .dots-menu button:hover { background: rgba(239,83,80,0.1); }
 
+/* Row colors by status */
+tbody tr.row-new       td { background: rgba(245, 200, 66, 0.05) !important; }
+tbody tr.row-new:hover td { background: rgba(245, 200, 66, 0.10) !important; }
+tbody tr.row-active       td { background: rgba(99, 179, 237, 0.05) !important; }
+tbody tr.row-active:hover td { background: rgba(99, 179, 237, 0.10) !important; }
+tbody tr.row-done       td { background: rgba(46, 232, 158, 0.05) !important; }
+tbody tr.row-done:hover td { background: rgba(46, 232, 158, 0.10) !important; }
+
 /* ─── Empty State ─── */
 .empty {
   text-align: center; padding: 60px 20px;
@@ -640,10 +648,19 @@ function computePaymentStatus(patientId) {
 // Sync all patients' payment status from their ledgers on load
 function syncAllPaymentStatuses() {
   var changed = false;
+  var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
   for (var i=0; i<patients.length; i++) {
+    // payment status
     var s = computePaymentStatus(patients[i].id);
     if (s && patients[i].payment !== s) {
       patients[i].payment = s;
+      changed = true;
+    }
+    // auto-promote 'جديد' → 'تحت العلاج' if patient has any sessions
+    var L = ledger[patients[i].id];
+    var sessionsArr = L ? (L.sessions || L.treatments || []) : [];
+    if (patients[i].status === 'جديد' && sessionsArr.length > 0) {
+      patients[i].status = 'تحت العلاج';
       changed = true;
     }
   }
@@ -754,14 +771,23 @@ function render() {
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    tbody.innerHTML = slice.map(p => `
-      <tr onclick="openProfile('${p.id}')" style="cursor:pointer;">
+    // Build sequential numbers from oldest to newest
+    const sortedAsc = patients.slice().sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+    const seqMap = {};
+    sortedAsc.forEach((p, idx) => { seqMap[p.id] = idx + 1; });
+
+    tbody.innerHTML = slice.map(p => {
+      const rowCls = p.status === 'تحت العلاج' ? 'row-active'
+                   : p.status === 'مكتمل'      ? 'row-done'
+                   : 'row-new';
+      return `
+      <tr class="${rowCls}" onclick="openProfile('${p.id}')" style="cursor:pointer;">
         <td>
           <div class="patient-cell">
             <div class="avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
             <div>
               <div class="patient-name">${p.name}</div>
-              <div class="patient-id">${p.id}</div>
+              <div class="patient-id">#${seqMap[p.id]} · ${p.id}</div>
             </div>
           </div>
         </td>
@@ -784,7 +810,8 @@ function render() {
           </div>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   // Pagination
@@ -856,8 +883,9 @@ function submitPatient(e) {
     }
     showToast('✅ تم تعديل بيانات المريض');
   } else {
+    // New patients always start as 'جديد'
     patients.unshift({
-      id: nextId(), name, phone, dob, gender, payment, status,
+      id: nextId(), name, phone, dob, gender, payment, status: 'جديد',
       allergies, notes, lastVisit: new Date().toISOString().slice(0,10),
       createdAt: new Date().toISOString().slice(0,10)
     });
