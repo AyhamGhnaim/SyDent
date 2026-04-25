@@ -252,41 +252,48 @@ function initSidebar(activeId) {
 function initPTR() {
   if (!('ontouchstart' in window)) return;
 
-  // أضف CSS فوراً في الـ head
-  var ptrStyle = document.createElement('style');
-  ptrStyle.textContent = [
-    '.ptr-indicator{position:fixed;top:0;left:50%;',
-    'transform:translateX(-50%) translateY(-120px);',
-    'background:#132840;border:1px solid rgba(46,232,158,0.15);',
-    'border-top:none;border-radius:0 0 20px 20px;',
-    'padding:10px 24px;display:flex;align-items:center;gap:10px;',
-    'font-size:13px;font-weight:600;color:#2ee89e;',
-    'font-family:"Cairo",sans-serif;z-index:9999;',
-    'transition:transform .3s cubic-bezier(.175,.885,.32,1.275);',
-    'white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,0.3);}',
-    '.ptr-indicator.visible{transform:translateX(-50%) translateY(0);}',
-    'body{overflow-x:hidden;}',
-    '.ptr-spinner{width:18px;height:18px;',
-    'border:2px solid rgba(46,232,158,0.3);border-top-color:#2ee89e;',
-    'border-radius:50%;flex-shrink:0;transition:transform .3s ease;}',
-    '.ptr-indicator.loading .ptr-spinner{animation:ptrSpin .7s linear infinite;}',
-    '@keyframes ptrSpin{to{transform:rotate(360deg);}}'
-  ].join('');
-  document.head.appendChild(ptrStyle);
+  // CSS - indicator من الأسفل كـ toast بعيداً عن الـ topbar
+  var s = document.createElement('style');
+  s.textContent =
+    '.ptr-box{' +
+      'position:fixed;' +
+      'bottom:32px;' +
+      'left:50%;' +
+      'transform:translateX(-50%) translateY(120px);' +
+      'background:#0f2038;' +
+      'border:1px solid rgba(46,232,158,0.35);' +
+      'border-radius:30px;' +
+      'padding:10px 20px;' +
+      'display:flex;align-items:center;gap:10px;' +
+      'font-size:13px;font-weight:700;color:#2ee89e;' +
+      'font-family:"Cairo",sans-serif;' +
+      'z-index:99999;' +
+      'opacity:0;' +
+      'transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .25s ease;' +
+      'white-space:nowrap;' +
+      'box-shadow:0 4px 24px rgba(0,0,0,0.5);' +
+      'pointer-events:none;}' +
+    '.ptr-box.show{' +
+      'transform:translateX(-50%) translateY(0);' +
+      'opacity:1;}' +
+    '.ptr-ring{' +
+      'width:18px;height:18px;' +
+      'border:2.5px solid rgba(46,232,158,0.25);' +
+      'border-top-color:#2ee89e;' +
+      'border-radius:50%;' +
+      'flex-shrink:0;}' +
+    '.ptr-box.spinning .ptr-ring{animation:ptrSpin .65s linear infinite;}' +
+    '@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  document.head.appendChild(s);
 
-  // أضف HTML بعد ما DOM يكون جاهز
   function attachHTML() {
-    if (document.getElementById('ptrIndicator')) return;
-    // wrapper يحتوي الـ indicator ويكون fixed بعرض كامل وارتفاع صفر
-    var wrap = document.createElement('div');
-    wrap.className = 'ptr-wrap';
-    var el = document.createElement('div');
-    el.className = 'ptr-indicator';
-    el.id = 'ptrIndicator';
-    el.innerHTML = '<div class="ptr-spinner" id="ptrSpinner"></div><span id="ptrText">اسحب للتحديث</span>';
-    wrap.appendChild(el);
-    document.body.appendChild(wrap);
-    startListeners();
+    if (document.getElementById('ptrBox')) return;
+    var box = document.createElement('div');
+    box.id = 'ptrBox';
+    box.className = 'ptr-box';
+    box.innerHTML = '<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
+    document.body.appendChild(box);
+    startPTR();
   }
 
   if (document.readyState === 'loading') {
@@ -295,74 +302,70 @@ function initPTR() {
     attachHTML();
   }
 
-  function startListeners() {
-    var THRESHOLD = 72, MAX_PULL = 110;
-    var startY = 0, pulling = false, currentY = 0;
+  function startPTR() {
+    var THRESHOLD = 70, MAX = 100;
+    var sy = 0, cy = 0, active = false;
 
-    function indicator()  { return document.getElementById('ptrIndicator'); }
-    function ptrText()    { return document.getElementById('ptrText'); }
-    function ptrSpinner() { return document.getElementById('ptrSpinner'); }
+    function box()   { return document.getElementById('ptrBox'); }
+    function ring()  { return document.getElementById('ptrRing'); }
+    function label() { return document.getElementById('ptrLabel'); }
 
-    function show(state, progress) {
-      var ind = indicator(), txt = ptrText(), sp = ptrSpinner();
-      if (!ind) return;
-      ind.className = 'ptr-indicator visible ' + state;
-      if (state === 'pulling') {
-        sp.style.animation = 'none';
-        sp.style.transform = 'rotate(' + Math.round((progress/THRESHOLD)*270) + 'deg)';
-        txt.textContent = progress >= THRESHOLD ? '\u2191 أفلت للتحديث' : '\u2193 اسحب للتحديث';
-      } else if (state === 'loading') {
-        sp.style.transform = '';
-        sp.style.animation = '';
-        txt.textContent = 'جارٍ التحديث\u2026';
-      } else if (state === 'success') {
-        sp.style.animation   = 'none';
-        sp.style.borderColor = '#2ee89e';
-        txt.textContent = '\u2713 تم التحديث';
+    function setBox(state, pull) {
+      var b = box(), r = ring(), l = label();
+      if (!b) return;
+      if (state === 'hide') {
+        b.className = 'ptr-box';
+        return;
       }
-    }
-
-    function hide() {
-      var ind = indicator(), sp = ptrSpinner();
-      if (!ind) return;
-      ind.className = 'ptr-indicator';
-      if (sp) { sp.style.borderColor = ''; sp.style.animation = ''; }
+      b.className = 'ptr-box show' + (state === 'spin' ? ' spinning' : '');
+      if (state === 'pull') {
+        r.style.animation = 'none';
+        r.style.transform = 'rotate(' + Math.round((pull/THRESHOLD)*270) + 'deg)';
+        l.textContent = pull >= THRESHOLD ? '↑ أفلت للتحديث' : '↓ اسحب للتحديث';
+      } else if (state === 'spin') {
+        r.style.transform = '';
+        r.style.animation = '';
+        l.textContent = 'جارٍ التحديث…';
+      } else if (state === 'done') {
+        r.style.animation = 'none';
+        l.textContent = '✓ تم التحديث';
+      }
     }
 
     document.addEventListener('touchstart', function(e) {
       if (document.querySelector('.modal-overlay.open')) return;
       if (window.scrollY > 0) return;
-      startY = currentY = e.touches[0].clientY;
-      pulling = true;
-    }, { passive: true });
+      sy = cy = e.touches[0].clientY;
+      active = true;
+    }, {passive: true});
 
     document.addEventListener('touchmove', function(e) {
-      if (!pulling) return;
-      if (window.scrollY > 0) { pulling = false; hide(); return; }
-      currentY = e.touches[0].clientY;
-      var pull = Math.min(Math.max(0, currentY - startY) * 0.55, MAX_PULL);
-      if (pull > 0) show('pulling', pull);
-    }, { passive: true });
+      if (!active) return;
+      if (window.scrollY > 0) { active = false; setBox('hide'); return; }
+      cy = e.touches[0].clientY;
+      var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
+      if (pull > 4) setBox('pull', pull);
+    }, {passive: true});
 
     document.addEventListener('touchend', function() {
-      if (!pulling) return;
-      pulling = false;
-      var pull = Math.min(Math.max(0, currentY - startY) * 0.55, MAX_PULL);
+      if (!active) return;
+      active = false;
+      var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
       if (pull >= THRESHOLD) {
-        show('loading', pull);
+        setBox('spin');
         setTimeout(function() {
-          show('success', pull);
           if (typeof window.onPTRRefresh === 'function') {
             window.onPTRRefresh();
           } else {
             window.location.reload();
           }
-          setTimeout(hide, 1200);
+          setBox('done');
+          setTimeout(function() { setBox('hide'); }, 1400);
         }, 800);
       } else {
-        hide();
+        setBox('hide');
       }
-      currentY = 0;
+      cy = 0;
     });
   }
 }
