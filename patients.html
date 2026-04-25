@@ -349,10 +349,18 @@ input, select, textarea {
   font-family: 'Cairo', sans-serif; font-size: 14px;
   outline: none; transition: border-color .2s;
   width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a9ab5' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  padding-left: 36px;
 }
 input:focus, select:focus, textarea:focus { border-color: var(--green); }
 input::placeholder, textarea::placeholder { color: var(--text2); }
-select option { background: var(--bg2); }
+select option { background: var(--bg2); color: var(--text); }
 textarea { resize: vertical; min-height: 80px; }
 
 .modal-footer {
@@ -393,20 +401,78 @@ textarea { resize: vertical; min-height: 80px; }
 @media (max-width: 1100px) {
   .stats-strip { grid-template-columns: repeat(2, 1fr); }
 }
+
 @media (max-width: 820px) {
   .sidebar { display: none; }
   .main { margin-right: 0; }
-  .content { padding: 16px; }
-  .stats-strip { grid-template-columns: repeat(2, 1fr); }
+  .content { padding: 12px; }
+  .stats-strip { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .form-grid { grid-template-columns: 1fr; }
+
+  /* الجدول على الموبايل: إخفاء أعمدة غير ضرورية */
+  td:nth-child(2), th:nth-child(2),
   td:nth-child(4), th:nth-child(4),
   td:nth-child(5), th:nth-child(5) { display: none; }
+
+  /* تحسين عمود المريض */
+  .patient-name { font-size: 13px; white-space: nowrap; }
+  .patient-id   { font-size: 10px; }
+  .avatar       { width: 32px; height: 32px; font-size: 12px; }
+  td, th        { padding: 10px 10px; }
+
+  /* عمود حالة الدفع: أصغر */
+  td:nth-child(3) { padding: 10px 6px; }
+
+  /* عمود الإجراءات */
+  .action-btns  { flex-direction: column; gap: 5px; }
+  .btn-sm       { padding: 5px 8px; font-size: 11px; }
+
+  /* المودال */
+  .modal-overlay { align-items: flex-end; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-height: 92vh;
+    padding: 20px 16px;
+    width: 100%;
+    max-width: 100%;
+  }
 }
+
 @media (max-width: 480px) {
-  .stats-strip { grid-template-columns: 1fr 1fr; }
-  .topbar { flex-wrap: wrap; }
-  .search-wrap { max-width: 100%; width: 100%; order: 3; }
-  .modal { padding: 20px; }
+  .stats-strip { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-num    { font-size: 18px; }
+  .stat-lbl    { font-size: 11px; }
+  .stat-icon   { width: 38px; height: 38px; font-size: 16px; }
+
+  /* التوب بار */
+  .topbar             { padding: 12px 14px; gap: 8px; flex-wrap: wrap; }
+  .topbar-title       { font-size: 16px; }
+  .search-wrap        { max-width: 100%; width: 100%; order: 3; }
+  .btn-add            { padding: 9px 14px; font-size: 13px; }
+
+  /* الجدول */
+  .table-wrap         { border-radius: 10px; }
+  table               { font-size: 13px; }
+  td, th              { padding: 10px 8px; }
+
+  /* المودال من الأسفل كـ bottom sheet */
+  .modal-overlay      { align-items: flex-end; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-height: 95vh;
+    padding: 20px 16px 32px;
+    width: 100%;
+    max-width: 100%;
+  }
+  .modal-title        { font-size: 16px; }
+  label               { font-size: 12px; }
+  input, select, textarea { font-size: 14px; padding: 10px 12px; }
+  .modal-footer       { flex-direction: column; gap: 10px; }
+  .btn-cancel, .btn-save { width: 100%; text-align: center; padding: 12px; font-size: 15px; }
+
+  /* فلاتر */
+  .filters            { gap: 6px; }
+  .filter-btn         { padding: 6px 12px; font-size: 12px; }
 }
 </style>
 </head>
