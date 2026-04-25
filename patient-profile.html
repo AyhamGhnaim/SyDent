@@ -105,11 +105,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .jaw-row{display:flex;justify-content:center;gap:4px;}
 .tooth-cell{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;transition:transform .15s;}
 .tooth-cell:hover{transform:scale(1.12);}
-.tooth-crown{width:22px;height:22px;border-radius:4px;border:2px solid #b8956a;background:#e8d5b0;transition:all .15s;}
-.tooth-root-up{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin:0 4px;}
-.tooth-root-dn{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin:0 4px;}
-.tooth-num{font-size:9px;color:var(--text2);text-align:center;line-height:1.4;min-width:22px;}
-.tooth-lbl{font-size:9px;font-weight:800;text-align:center;line-height:22px;color:#0a1628;}
+.tooth-shape{
+  width:28px;height:36px;
+  border:2px solid #b8956a;background:#e8d5b0;
+  border-radius:6px 6px 10px 10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#0a1628;
+  transition:all .15s;
+  box-shadow:inset 0 -3px 6px rgba(0,0,0,.1);
+}
+.tooth-cell:hover .tooth-shape{transform:scale(1.15);box-shadow:0 0 0 2px var(--green),inset 0 -3px 6px rgba(0,0,0,.1);}
+.tooth-num{font-size:10px;color:var(--text2);text-align:center;line-height:1.6;min-width:28px;font-weight:600;}
 .jaw-gap{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:3px;margin:2px 0;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;justify-content:center;}
 .leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);}
@@ -489,30 +495,17 @@ function buildTooth(num, status, isUpper) {
   var lbl   = T_LABEL[st]  || '';
   var tCol  = (st===''||st==='treated'||st==='crown') ? '#0a1628' : '#ffffff';
 
-  // crown div
-  var crown = '<div class="tooth-crown" style="background:' + col + ';border-color:' + str + ';">'
-            + (lbl ? '<div style="font-size:9px;font-weight:800;text-align:center;line-height:22px;color:' + tCol + ';">' + lbl + '</div>' : '')
-            + '</div>';
-
-  // root triangle using CSS borders trick
-  var rootStyle = 'border-top:10px solid ' + col + ';border-bottom:none;'; // default upper
-  var rootDiv;
+  // single rectangle tooth shape
+  var html  = '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">';
   if (isUpper) {
-    // root below crown - triangle pointing down
-    rootStyle = 'width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid ' + col + ';margin:0 3px;';
-    rootDiv = '<div style="' + rootStyle + '"></div>';
-    return '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">'
-         + crown + rootDiv
-         + '<div class="tooth-num">' + num + '</div></div>';
+    html += '<div class="tooth-shape" style="background:' + col + ';border-color:' + str + ';color:' + tCol + ';">' + lbl + '</div>';
+    html += '<div class="tooth-num">' + num + '</div>';
   } else {
-    // root above crown - triangle pointing up
-    rootStyle = 'width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:12px solid ' + col + ';margin:0 3px;';
-    rootDiv = '<div style="' + rootStyle + '"></div>';
-    return '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">'
-         + '<div class="tooth-num">' + num + '</div>'
-         + rootDiv + crown
-         + '</div>';
+    html += '<div class="tooth-num">' + num + '</div>';
+    html += '<div class="tooth-shape" style="background:' + col + ';border-color:' + str + ';color:' + tCol + ';">' + lbl + '</div>';
   }
+  html += '</div>';
+  return html;
 }
 
 function renderTeeth() {
