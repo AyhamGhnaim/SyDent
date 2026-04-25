@@ -202,7 +202,7 @@ td {
 
 .text-muted { color: var(--text2); font-size: 13px; }
 
-.action-btns { display: flex; gap: 8px; align-items: center; }
+.action-btns { display: flex; gap: 8px; align-items: center; position: relative; }
 .btn-sm {
   padding: 6px 12px; border-radius: 7px; border: none;
   font-family: 'Cairo', sans-serif; font-size: 12px; font-weight: 600;
@@ -214,7 +214,30 @@ td {
   color: var(--text2);
 }
 .btn-sm.outline:hover { border-color: var(--green); color: var(--green); }
-.btn-sm.danger:hover  { border-color: var(--red); color: var(--red); }
+.btn-sm.pay { background: rgba(46,232,158,0.12); border: 1px solid rgba(46,232,158,0.3); color: var(--green); }
+.btn-sm.pay:hover { background: rgba(46,232,158,0.22); }
+.dots-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text2); border-radius: 7px;
+  width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 18px; line-height: 1; transition: all .2s;
+  font-family: 'Cairo', sans-serif; padding: 0;
+}
+.dots-btn:hover { border-color: var(--red); color: var(--red); }
+.dots-menu {
+  display: none; position: absolute; left: 0; top: 36px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; z-index: 100; min-width: 120px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4); overflow: hidden;
+}
+.dots-menu.open { display: block; }
+.dots-menu button {
+  display: block; width: 100%; padding: 9px 14px;
+  background: transparent; border: none; text-align: right;
+  color: var(--red); font-family: 'Cairo', sans-serif; font-size: 13px;
+  cursor: pointer; transition: background .15s;
+}
+.dots-menu button:hover { background: rgba(239,83,80,0.1); }
 
 /* ─── Empty State ─── */
 .empty {
@@ -723,7 +746,11 @@ function render() {
         <td>
           <div class="action-btns" onclick="event.stopPropagation()">
             <button class="btn-sm outline" onclick="editPatient('${p.id}')">تعديل</button>
-            <button class="btn-sm outline danger" onclick="deletePatient('${p.id}')">حذف</button>
+            <button class="btn-sm pay" onclick="markPaid('${p.id}')">💰 تسجيل دفعة</button>
+            <button class="dots-btn" onclick="toggleDotsMenu(this)">⋮</button>
+            <div class="dots-menu">
+              <button onclick="deletePatient('${p.id}')">🗑️ حذف المريض</button>
+            </div>
           </div>
         </td>
       </tr>
@@ -810,6 +837,28 @@ function submitPatient(e) {
   closeModal();
   render();
 }
+
+function markPaid(id) {
+  const i = patients.findIndex(p => p.id === id);
+  if (i === -1) return;
+  if (patients[i].payment === 'مسدّد') { showToast('✅ الدفع مسجّل مسبقاً'); return; }
+  patients[i].payment = 'مسدّد';
+  save(); render();
+  showToast('💰 تم تسجيل الدفعة');
+}
+
+function toggleDotsMenu(btn) {
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.classList.contains('open');
+  // close all open menus first
+  document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+  if (!isOpen) menu.classList.add('open');
+}
+
+// close dots menus on outside click
+document.addEventListener('click', function() {
+  document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
+});
 
 function deletePatient(id) {
   if (!confirm('هل أنت متأكد من حذف هذا المريض؟')) return;
