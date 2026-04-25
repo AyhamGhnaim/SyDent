@@ -634,9 +634,9 @@ let selectedColor = 'green';
 // ─── View switch ───────────────────────────────────
 function setView(v) {
   view = v;
-  document.getElementById('monthView').style.display = v==='month' ? '' : 'none';
-  document.getElementById('dayView').style.display   = v==='day'   ? '' : 'none';
-  document.getElementById('listView').style.display  = v==='list'  ? '' : 'none';
+  document.getElementById('monthView').style.display = v==='month' ? 'block' : 'none';
+  document.getElementById('dayView').style.display   = v==='day'   ? 'block' : 'none';
+  document.getElementById('listView').style.display  = v==='list'  ? 'block' : 'none';
   ['btnMonth','btnDay','btnList'].forEach(id => document.getElementById(id).classList.remove('active'));
   document.getElementById('btn'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
   render();
