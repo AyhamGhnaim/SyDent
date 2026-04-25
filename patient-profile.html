@@ -222,20 +222,27 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel active" id="tab-file">
     <div class="two-col">
       <div class="card">
-        <div class="card-head"><span class="card-title">👤 البيانات الشخصية</span></div>
+        <div class="card-head">
+          <span class="card-title">👤 معلومات المريض</span>
+          <button class="btn btn-outline btn-sm" onclick="openEditModal()">✏️ تعديل</button>
+        </div>
         <div class="irow"><span class="ikey">الاسم الكامل</span><span class="ival" id="iName">—</span></div>
         <div class="irow"><span class="ikey">الجنس</span><span class="ival" id="iGender">—</span></div>
         <div class="irow"><span class="ikey">العمر</span><span class="ival" id="iAge">—</span></div>
         <div class="irow"><span class="ikey">رقم الهاتف</span><span class="ival" id="iPhone">—</span></div>
-        <div class="irow"><span class="ikey">تاريخ التسجيل</span><span class="ival" id="iCreated">—</span></div>
-      </div>
-      <div class="card">
-        <div class="card-head"><span class="card-title">🩺 المعلومات الطبية</span></div>
         <div class="irow"><span class="ikey">الحساسيات</span><span class="ival" id="iAllergies" style="color:var(--yellow)">لا يوجد</span></div>
         <div class="irow"><span class="ikey">التاريخ المرضي</span><span class="ival" id="iHistory">لا يوجد</span></div>
         <div class="irow"><span class="ikey">حالة الدفع</span><span class="ival" id="iPayStatus">—</span></div>
         <div class="irow"><span class="ikey">الحالة</span><span class="ival" id="iStatus">—</span></div>
         <div class="irow"><span class="ikey">آخر زيارة</span><span class="ival" id="iLastVisit">—</span></div>
+        <div class="irow"><span class="ikey">تاريخ التسجيل</span><span class="ival" id="iCreated">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">🦷 آخر الجلسات</span>
+          <a href="javascript:void(0)" onclick="switchTabByName('sessions')" style="font-size:12px;color:var(--green);text-decoration:none;font-weight:600;">عرض الكل ←</a>
+        </div>
+        <div id="recentSessionsList"></div>
       </div>
     </div>
 
@@ -335,6 +342,30 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label>ملاحظات</label><textarea id="aNotes" placeholder="أي ملاحظات…"></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('apptModal')">إلغاء</button><button class="btn-save-m" onclick="saveAppt()">حفظ الموعد</button></div>
+  </div>
+</div>
+
+<!-- Modal: تعديل بيانات المريض -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box" style="max-width:540px;">
+    <div class="modal-head"><h3>✏️ تعديل بيانات المريض</h3><button class="modal-close" onclick="closeModal('editModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>الاسم الكامل</label><input type="text" id="eName" placeholder="الاسم الكامل"></div>
+        <div class="form-group"><label>الجنس</label><select id="eGender"><option value="">— اختر —</option><option>ذكر</option><option>أنثى</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>تاريخ الميلاد</label><input type="date" id="eDob"></div>
+        <div class="form-group"><label>رقم الهاتف</label><input type="tel" id="ePhone" placeholder="09XXXXXXXX"></div>
+      </div>
+      <div class="form-group"><label>الحساسيات</label><input type="text" id="eAllergies" placeholder="مثال: بنسلين، لاتكس، أو لا يوجد"></div>
+      <div class="form-group"><label>التاريخ المرضي / ملاحظات طبية</label><textarea id="eNotes" placeholder="أمراض مزمنة، أدوية، ملاحظات…"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>الحالة</label><select id="eStatus"><option>جديد</option><option>تحت العلاج</option><option>مكتمل</option></select></div>
+        <div class="form-group"><label>تاريخ التسجيل</label><input type="date" id="eCreated"></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('editModal')">إلغاء</button><button class="btn-save-m" onclick="saveEditedPatient()">حفظ التعديلات</button></div>
   </div>
 </div>
 
@@ -449,12 +480,13 @@ function safe(fn, label) {
 }
 function init() {
   document.title = (patient.name || 'مريض') + ' — SyDent';
-  safe(renderHeader,   'renderHeader');
-  safe(renderInfo,     'renderInfo');
-  safe(renderStats,    'renderStats');
-  safe(renderTeeth,    'renderTeeth');
-  safe(renderSessions, 'renderSessions');
-  safe(renderPayments, 'renderPayments');
+  safe(renderHeader,        'renderHeader');
+  safe(renderInfo,          'renderInfo');
+  safe(renderStats,         'renderStats');
+  safe(renderTeeth,         'renderTeeth');
+  safe(renderSessions,      'renderSessions');
+  safe(renderRecentSessions,'renderRecentSessions');
+  safe(renderPayments,      'renderPayments');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
@@ -644,6 +676,7 @@ function saveToothTreatment() {
   renderStats();
   renderInfo();
   renderSessions();
+  renderRecentSessions();
   renderPayments();
 
   closeModal('toothModal');
@@ -748,7 +781,7 @@ function saveSession() {
       patient = patients[i]; break;
     }
   }
-  saveLedger(); renderStats(); renderInfo(); renderSessions();
+  saveLedger(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions();
   closeModal('sessionModal');
   document.getElementById('sType').value=''; document.getElementById('sCost').value='';
   document.getElementById('sDesc').value=''; document.getElementById('sNotes').value='';
@@ -795,7 +828,7 @@ function delSession(id) {
       renderTeeth();
     }
   }
-  saveLedger(); renderStats(); renderInfo(); renderSessions(); renderPayments();
+  saveLedger(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
   showToast('🗑️ تم حذف الجلسة');
 }
 function delPayment(id) {
@@ -803,6 +836,82 @@ function delPayment(id) {
   var L = getLedger();
   var p = []; for(var i=0;i<L.payments.length;i++) if(L.payments[i].id!==id) p.push(L.payments[i]);
   L.payments = p; saveLedger(); renderStats(); renderPayments(); showToast('🗑️ تم حذف الدفعة');
+}
+
+
+// ── Recent sessions (last 5) for the file tab ──
+function renderRecentSessions() {
+  var L = getLedger();
+  var el = document.getElementById('recentSessionsList');
+  if (!el) return;
+  if (!L.sessions.length) {
+    el.innerHTML = '<div class="empty" style="padding:32px 16px;"><div style="font-size:32px;margin-bottom:8px;">🦷</div><div style="font-size:13px;color:var(--text2)">لا توجد جلسات بعد</div></div>';
+    return;
+  }
+  var sorted = L.sessions.slice().sort(function(a,b){ return b.date > a.date ? 1 : -1; }).slice(0, 5);
+  var html = '';
+  for (var i=0; i<sorted.length; i++) {
+    var s = sorted[i];
+    var toothBadge = s.tooth ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;">سن ' + s.tooth + '</span>' : '';
+    html += '<div class="irow" style="flex-direction:column;align-items:stretch;gap:4px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+        + '<span style="font-weight:700;color:var(--text);font-size:13px;">' + s.type + toothBadge + '</span>'
+        + '<span style="color:var(--red);font-weight:700;font-size:13px;white-space:nowrap;">' + fmt(s.cost) + ' ل.س</span>'
+      + '</div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
+        + '<span>' + (s.desc || '—') + '</span>'
+        + '<span>' + fmtD(s.date) + '</span>'
+      + '</div>'
+    + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+// ── Edit patient modal ──
+function openEditModal() {
+  document.getElementById('eName').value      = patient.name || '';
+  document.getElementById('eGender').value    = patient.gender || '';
+  document.getElementById('eDob').value       = patient.dob || '';
+  document.getElementById('ePhone').value     = patient.phone || '';
+  document.getElementById('eAllergies').value = patient.allergies || '';
+  document.getElementById('eNotes').value     = patient.notes || '';
+  document.getElementById('eStatus').value    = patient.status || 'جديد';
+  document.getElementById('eCreated').value   = patient.createdAt || toDay();
+  openModal('editModal');
+}
+
+function saveEditedPatient() {
+  var name = document.getElementById('eName').value.trim();
+  if (!name) { showToast('⚠️ الاسم مطلوب'); return; }
+  for (var i=0; i<patients.length; i++) {
+    if (patients[i].id === patientId) {
+      patients[i].name      = name;
+      patients[i].gender    = document.getElementById('eGender').value;
+      patients[i].dob       = document.getElementById('eDob').value;
+      patients[i].phone     = document.getElementById('ePhone').value.trim();
+      patients[i].allergies = document.getElementById('eAllergies').value.trim() || 'لا يوجد';
+      patients[i].notes     = document.getElementById('eNotes').value.trim();
+      patients[i].status    = document.getElementById('eStatus').value;
+      patients[i].createdAt = document.getElementById('eCreated').value;
+      patient = patients[i];
+      break;
+    }
+  }
+  localStorage.setItem(K_PAT, JSON.stringify(patients));
+  renderHeader(); renderInfo();
+  closeModal('editModal');
+  showToast('✅ تم حفظ التعديلات');
+}
+
+// ── Switch tab programmatically (used by 'view all' link) ──
+function switchTabByName(name) {
+  var tabs = document.querySelectorAll('.tab');
+  for (var i=0; i<tabs.length; i++) {
+    if (tabs[i].getAttribute('onclick') && tabs[i].getAttribute('onclick').indexOf("'"+name+"'") !== -1) {
+      tabs[i].click();
+      return;
+    }
+  }
 }
 
 function switchTab(name, btn) {
