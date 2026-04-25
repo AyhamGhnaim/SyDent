@@ -633,13 +633,12 @@ let patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
 function computePaymentStatus(patientId) {
   var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
   var L = ledger[patientId];
-  if (!L) return null;
-  var sessions = L.sessions || L.treatments || [];
-  var payments = L.payments || [];
+  var sessions = (L && (L.sessions || L.treatments)) || [];
+  var payments = (L && L.payments) || [];
   var total = 0, paid = 0;
   for (var i=0;i<sessions.length;i++) total += Number(sessions[i].cost||0);
   for (var j=0;j<payments.length;j++) paid  += Number(payments[j].amount||0);
-  if (total === 0) return null; // no data, keep existing
+  if (total === 0)   return 'متبقي'; // new patient, no sessions yet
   if (paid >= total) return 'مسدّد';
   if (paid > 0)      return 'جزئي';
   return 'متبقي';
@@ -652,7 +651,7 @@ function syncAllPaymentStatuses() {
   for (var i=0; i<patients.length; i++) {
     // payment status
     var s = computePaymentStatus(patients[i].id);
-    if (s && patients[i].payment !== s) {
+    if (patients[i].payment !== s) {
       patients[i].payment = s;
       changed = true;
     }
@@ -883,9 +882,9 @@ function submitPatient(e) {
     }
     showToast('✅ تم تعديل بيانات المريض');
   } else {
-    // New patients always start as 'جديد'
+    // New patients always start as 'جديد' status and 'متبقي' payment
     patients.unshift({
-      id: nextId(), name, phone, dob, gender, payment, status: 'جديد',
+      id: nextId(), name, phone, dob, gender, payment: 'متبقي', status: 'جديد',
       allergies, notes, lastVisit: new Date().toISOString().slice(0,10),
       createdAt: new Date().toISOString().slice(0,10)
     });
