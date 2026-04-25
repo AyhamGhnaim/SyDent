@@ -945,13 +945,13 @@ function showToast(msg) {
 // ─── Init ────────────────────────────────────────────
 render();
 
-// ربط PTR بإعادة تحميل البيانات
+initSidebar('appointments');
+
+// PTR refresh
 window.onPTRRefresh = function() {
   appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
   render();
 };
-
-initSidebar('appointments');
 
 document.addEventListener('DOMContentLoaded', function() {
   var btn = document.createElement('button');

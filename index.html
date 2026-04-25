@@ -495,15 +495,12 @@ if (recent.length === 0) {
 </script>
 
 <script>
+// PTR refresh
+window.onPTRRefresh = function() { location.reload(); };
+
 document.addEventListener('DOMContentLoaded', function() {
-  // ربط PTR بإعادة تحميل البيانات
-window.onPTRRefresh = function() {
-  location.reload();
-};
-
-initSidebar('dashboard');
-
-  // زر hamburger في الـ header
+  initSidebar('dashboard');
+  // زر hamburger
   var btn = document.createElement('button');
   btn.className = 'sb-hamburger';
   btn.id = 'sbHamburgerBtn';

@@ -252,47 +252,40 @@ function initSidebar(activeId) {
 function initPTR() {
   if (!('ontouchstart' in window)) return;
 
-  // CSS - indicator من الأسفل كـ toast بعيداً عن الـ topbar
   var s = document.createElement('style');
   s.textContent =
-    '.ptr-box{' +
-      'position:fixed;' +
-      'bottom:32px;' +
-      'left:50%;' +
-      'transform:translateX(-50%) translateY(120px);' +
-      'background:#0f2038;' +
-      'border:1px solid rgba(46,232,158,0.35);' +
-      'border-radius:30px;' +
-      'padding:10px 20px;' +
-      'display:flex;align-items:center;gap:10px;' +
+    '.ptr-bar{' +
+      'display:flex;align-items:center;justify-content:center;gap:8px;' +
+      'height:0;overflow:hidden;' +
+      'background:#0a1628;' +
       'font-size:13px;font-weight:700;color:#2ee89e;' +
       'font-family:"Cairo",sans-serif;' +
-      'z-index:99999;' +
-      'opacity:0;' +
-      'transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .25s ease;' +
-      'white-space:nowrap;' +
-      'box-shadow:0 4px 24px rgba(0,0,0,0.5);' +
-      'pointer-events:none;}' +
-    '.ptr-box.show{' +
-      'transform:translateX(-50%) translateY(0);' +
-      'opacity:1;}' +
+      'transition:height .3s ease;' +
+      'border-bottom:1px solid transparent;}' +
+    '.ptr-bar.show{height:40px;border-bottom-color:rgba(46,232,158,0.2);}' +
     '.ptr-ring{' +
-      'width:18px;height:18px;' +
-      'border:2.5px solid rgba(46,232,158,0.25);' +
+      'width:16px;height:16px;' +
+      'border:2px solid rgba(46,232,158,0.25);' +
       'border-top-color:#2ee89e;' +
-      'border-radius:50%;' +
-      'flex-shrink:0;}' +
-    '.ptr-box.spinning .ptr-ring{animation:ptrSpin .65s linear infinite;}' +
+      'border-radius:50%;flex-shrink:0;}' +
+    '.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}' +
     '@keyframes ptrSpin{to{transform:rotate(360deg);}}';
   document.head.appendChild(s);
 
   function attachHTML() {
-    if (document.getElementById('ptrBox')) return;
-    var box = document.createElement('div');
-    box.id = 'ptrBox';
-    box.className = 'ptr-box';
-    box.innerHTML = '<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
-    document.body.appendChild(box);
+    if (document.getElementById('ptrBar')) return;
+    // أضفه في أول الـ body — فوق الـ topbar مباشرة
+    var bar = document.createElement('div');
+    bar.id = 'ptrBar';
+    bar.className = 'ptr-bar';
+    bar.innerHTML = '<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
+    // حقنه أول شيء في الـ main content
+    var main = document.getElementById('sbMainContent') || document.querySelector('.main');
+    if (main) {
+      main.insertBefore(bar, main.firstChild);
+    } else {
+      document.body.insertBefore(bar, document.body.firstChild);
+    }
     startPTR();
   }
 
@@ -303,32 +296,34 @@ function initPTR() {
   }
 
   function startPTR() {
-    var THRESHOLD = 70, MAX = 100;
+    var THRESHOLD = 65, MAX = 95;
     var sy = 0, cy = 0, active = false;
 
-    function box()   { return document.getElementById('ptrBox'); }
+    function bar()   { return document.getElementById('ptrBar'); }
     function ring()  { return document.getElementById('ptrRing'); }
     function label() { return document.getElementById('ptrLabel'); }
 
-    function setBox(state, pull) {
-      var b = box(), r = ring(), l = label();
+    function setState(state, pull) {
+      var b = bar(), r = ring(), l = label();
       if (!b) return;
       if (state === 'hide') {
-        b.className = 'ptr-box';
+        b.className = 'ptr-bar';
         return;
       }
-      b.className = 'ptr-box show' + (state === 'spin' ? ' spinning' : '');
       if (state === 'pull') {
+        b.className = 'ptr-bar show';
         r.style.animation = 'none';
-        r.style.transform = 'rotate(' + Math.round((pull/THRESHOLD)*270) + 'deg)';
-        l.textContent = pull >= THRESHOLD ? '↑ أفلت للتحديث' : '↓ اسحب للتحديث';
+        r.style.transform = 'rotate(' + Math.round((pull / THRESHOLD) * 270) + 'deg)';
+        l.textContent = pull >= THRESHOLD ? '\u2191 أفلت للتحديث' : '\u2193 اسحب للتحديث';
       } else if (state === 'spin') {
+        b.className = 'ptr-bar show spin';
         r.style.transform = '';
         r.style.animation = '';
-        l.textContent = 'جارٍ التحديث…';
+        l.textContent = 'جارٍ التحديث\u2026';
       } else if (state === 'done') {
+        b.className = 'ptr-bar show';
         r.style.animation = 'none';
-        l.textContent = '✓ تم التحديث';
+        l.textContent = '\u2713 تم التحديث';
       }
     }
 
@@ -337,33 +332,34 @@ function initPTR() {
       if (window.scrollY > 0) return;
       sy = cy = e.touches[0].clientY;
       active = true;
-    }, {passive: true});
+    }, { passive: true });
 
     document.addEventListener('touchmove', function(e) {
       if (!active) return;
-      if (window.scrollY > 0) { active = false; setBox('hide'); return; }
+      if (window.scrollY > 0) { active = false; setState('hide'); return; }
       cy = e.touches[0].clientY;
       var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
-      if (pull > 4) setBox('pull', pull);
-    }, {passive: true});
+      if (pull > 4) setState('pull', pull);
+      else setState('hide');
+    }, { passive: true });
 
     document.addEventListener('touchend', function() {
       if (!active) return;
       active = false;
       var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
       if (pull >= THRESHOLD) {
-        setBox('spin');
+        setState('spin');
         setTimeout(function() {
           if (typeof window.onPTRRefresh === 'function') {
             window.onPTRRefresh();
           } else {
             window.location.reload();
           }
-          setBox('done');
-          setTimeout(function() { setBox('hide'); }, 1400);
+          setState('done');
+          setTimeout(function() { setState('hide'); }, 1400);
         }, 800);
       } else {
-        setBox('hide');
+        setState('hide');
       }
       cy = 0;
     });
