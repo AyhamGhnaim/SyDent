@@ -362,8 +362,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label>الحساسيات</label><input type="text" id="eAllergies" placeholder="مثال: بنسلين، لاتكس، أو لا يوجد"></div>
       <div class="form-group"><label>التاريخ المرضي / ملاحظات طبية</label><textarea id="eNotes" placeholder="أمراض مزمنة، أدوية، ملاحظات…"></textarea></div>
       <div class="form-row">
-        <div class="form-group"><label>الحالة</label><select id="eStatus"><option>جديد</option><option>تحت العلاج</option><option>مكتمل</option></select></div>
-        <div class="form-group"><label>تاريخ التسجيل</label><input type="date" id="eCreated"></div>
+        <div class="form-group"><label>حالة العلاج</label><select id="eStatus"><option>جديد</option><option>تحت العلاج</option><option>مكتمل</option></select></div>
+        <div class="form-group"><label>حالة الدفع</label><select id="ePayment"><option>متبقي</option><option>جزئي</option><option>مسدّد</option></select></div>
+      </div>
+      <div class="form-group"><label>تاريخ التسجيل</label><input type="date" id="eCreated"></div>
+      <div style="font-size:11px;color:var(--text2);background:rgba(99,179,237,0.05);border:1px solid rgba(99,179,237,0.15);border-radius:8px;padding:9px 12px;margin-top:6px;">
+        ℹ️ حالة الدفع تتحدّث تلقائياً عند تسجيل الدفعات أو الجلسات. يمكنك تعديلها يدوياً هنا للضرورة.
       </div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('editModal')">إلغاء</button><button class="btn-save-m" onclick="saveEditedPatient()">حفظ التعديلات</button></div>
@@ -539,14 +543,17 @@ function computeFinancials() {
 function syncPaymentStatus() {
   var f = computeFinancials();
   var newStatus;
-  if (f.total === 0)             newStatus = '—';
+  if (f.total === 0)             newStatus = 'متبقي';
   else if (f.paid >= f.total)    newStatus = 'مسدّد';
   else if (f.paid > 0)           newStatus = 'جزئي';
   else                            newStatus = 'متبقي';
   for (var k=0; k<patients.length; k++) {
     if (patients[k].id === patientId) {
-      patients[k].payment = newStatus;
-      localStorage.setItem(K_PAT, JSON.stringify(patients));
+      // Don't override if user manually set it AND no real activity changed it
+      if (!patients[k].paymentManual) {
+        patients[k].payment = newStatus;
+        localStorage.setItem(K_PAT, JSON.stringify(patients));
+      }
       patient = patients[k];
       return;
     }
@@ -765,6 +772,7 @@ function savePayment() {
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
   var L = getLedger();
   L.payments.push({ id:nextId(L.payments,'PAY'), amount:amount, method:method, date:date, notes:notes });
+  for (var p=0;p<patients.length;p++) if (patients[p].id===patientId) { patients[p].paymentManual = false; localStorage.setItem(K_PAT, JSON.stringify(patients)); patient = patients[p]; break; }
   saveLedger(); renderStats(); renderInfo(); renderPayments();
   closeModal('payModal');
   document.getElementById('payAmount').value = '';
@@ -888,6 +896,7 @@ function openEditModal() {
   document.getElementById('eAllergies').value = patient.allergies || '';
   document.getElementById('eNotes').value     = patient.notes || '';
   document.getElementById('eStatus').value    = patient.status || 'جديد';
+  document.getElementById('ePayment').value   = patient.payment || 'متبقي';
   document.getElementById('eCreated').value   = patient.createdAt || toDay();
   openModal('editModal');
 }
@@ -904,6 +913,9 @@ function saveEditedPatient() {
       patients[i].allergies = document.getElementById('eAllergies').value.trim() || 'لا يوجد';
       patients[i].notes     = document.getElementById('eNotes').value.trim();
       patients[i].status    = document.getElementById('eStatus').value;
+      var newPay = document.getElementById('ePayment').value;
+      if (newPay !== patients[i].payment) patients[i].paymentManual = true;
+      patients[i].payment   = newPay;
       patients[i].createdAt = document.getElementById('eCreated').value;
       patient = patients[i];
       break;

@@ -649,11 +649,13 @@ function syncAllPaymentStatuses() {
   var changed = false;
   var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
   for (var i=0; i<patients.length; i++) {
-    // payment status
-    var s = computePaymentStatus(patients[i].id);
-    if (patients[i].payment !== s) {
-      patients[i].payment = s;
-      changed = true;
+    // payment status — skip if user manually overrode
+    if (!patients[i].paymentManual) {
+      var s = computePaymentStatus(patients[i].id);
+      if (patients[i].payment !== s) {
+        patients[i].payment = s;
+        changed = true;
+      }
     }
     // auto-promote 'جديد' → 'تحت العلاج' if patient has any sessions
     var L = ledger[patients[i].id];
