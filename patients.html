@@ -334,40 +334,6 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .btn-save:hover { opacity: .88; }
 
-/* ─── Pull to Refresh ─── */
-.ptr-indicator {
-  position: fixed;
-  top: 0; left: 50%;
-  transform: translateX(-50%) translateY(-80px);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 20px 20px;
-  padding: 10px 24px;
-  display: flex; align-items: center; gap: 10px;
-  font-size: 13px; font-weight: 600; color: var(--green);
-  z-index: 500;
-  transition: transform .3s cubic-bezier(.175,.885,.32,1.275);
-  white-space: nowrap;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-}
-.ptr-indicator.pulling  { transform: translateX(-50%) translateY(0); }
-.ptr-indicator.loading  { transform: translateX(-50%) translateY(0); }
-.ptr-indicator.success  { transform: translateX(-50%) translateY(0); }
-
-.ptr-spinner {
-  width: 18px; height: 18px;
-  border: 2px solid rgba(46,232,158,0.3);
-  border-top-color: var(--green);
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: transform .3s ease;
-}
-.ptr-indicator.loading .ptr-spinner {
-  animation: spin .7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
 /* ─── Toast ─── */
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -620,9 +586,6 @@ textarea { resize: vertical; min-height: 80px; }
   </div>
 </div>
 
-<!-- Pull to Refresh Indicator -->
-<div class="ptr-indicator" id="ptrIndicator">
-  <div class="ptr-spinner" id="ptrSpinner"></div>
   <span id="ptrText">اسحب للتحديث</span>
 </div>
 
@@ -867,81 +830,11 @@ function showToast(msg) {
 // ─── Init ───
 render();
 
-// ─── Pull to Refresh ───
-(function() {
-  const THRESHOLD  = 72;
-  const MAX_PULL   = 110;
-  const indicator  = document.getElementById('ptrIndicator');
-  const ptrText    = document.getElementById('ptrText');
-  const ptrSpinner = document.getElementById('ptrSpinner');
-
-  let startY = 0, pulling = false, currentY = 0;
-
-  if (!('ontouchstart' in window)) return;
-
-  function setIndicator(state, progress) {
-    indicator.className = 'ptr-indicator ' + state;
-    if (state === 'pulling') {
-      const deg = Math.round((progress / THRESHOLD) * 270);
-      ptrSpinner.style.animation = 'none';
-      ptrSpinner.style.transform = 'rotate(' + deg + 'deg)';
-      ptrText.textContent = progress >= THRESHOLD ? '\u2191 أفلت للتحديث' : '\u2193 اسحب للتحديث';
-    } else if (state === 'loading') {
-      ptrSpinner.style.transform = '';
-      ptrSpinner.style.animation = '';
-      ptrText.textContent = 'جارٍ التحديث\u2026';
-    } else if (state === 'success') {
-      ptrSpinner.style.animation = 'none';
-      ptrSpinner.style.transform = 'rotate(360deg)';
-      ptrSpinner.style.borderColor = 'var(--green)';
-      ptrText.textContent = '\u2713 تم التحديث';
-    }
-  }
-
-  function hide() {
-    indicator.className = 'ptr-indicator';
-    ptrSpinner.style.borderColor = '';
-    ptrSpinner.style.borderTopColor = '';
-    ptrSpinner.style.animation = '';
-  }
-
-  document.addEventListener('touchstart', function(e) {
-    if (document.getElementById('modalOverlay').classList.contains('open')) return;
-    if (window.scrollY > 0) return;
-    startY  = e.touches[0].clientY;
-    pulling = true;
-    currentY = startY;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!pulling) return;
-    if (window.scrollY > 0) { pulling = false; hide(); return; }
-    currentY = e.touches[0].clientY;
-    const dist = Math.max(0, currentY - startY);
-    if (dist <= 0) return;
-    const pull = Math.min(dist * 0.55, MAX_PULL);
-    setIndicator('pulling', pull);
-  }, { passive: true });
-
-  document.addEventListener('touchend', function() {
-    if (!pulling) return;
-    pulling = false;
-    const dist = Math.max(0, currentY - startY);
-    const pull = Math.min(dist * 0.55, MAX_PULL);
-    if (pull >= THRESHOLD) {
-      setIndicator('loading', pull);
-      setTimeout(function() {
-        patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
-        render();
-        setIndicator('success', pull);
-        setTimeout(hide, 1200);
-      }, 900);
-    } else {
-      hide();
-    }
-    currentY = 0;
-  });
-})();
+// ربط PTR بإعادة تحميل البيانات
+window.onPTRRefresh = function() {
+  patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
+  render();
+};
 
 initSidebar('patients');
 

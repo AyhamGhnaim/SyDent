@@ -496,7 +496,12 @@ if (recent.length === 0) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  initSidebar('dashboard');
+  // ربط PTR بإعادة تحميل البيانات
+window.onPTRRefresh = function() {
+  location.reload();
+};
+
+initSidebar('dashboard');
 
   // زر hamburger في الـ header
   var btn = document.createElement('button');

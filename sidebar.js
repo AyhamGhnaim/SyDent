@@ -243,6 +243,125 @@ function initSidebar(activeId) {
   window.sbToggle = function() {
     sidebar.classList.contains('open') ? close() : open();
   };
+
+  // 5. Pull-to-Refresh
+  initPTR();
+}
+
+// ─── Pull to Refresh ───────────────────────────────
+function initPTR() {
+  if (!('ontouchstart' in window)) return;
+
+  // CSS
+  const ptrStyle = document.createElement('style');
+  ptrStyle.textContent = `
+    .ptr-indicator {
+      position: fixed;
+      top: 0; left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: #132840;
+      border: 1px solid rgba(46,232,158,0.15);
+      border-top: none;
+      border-radius: 0 0 20px 20px;
+      padding: 10px 24px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px; font-weight: 600; color: #2ee89e;
+      font-family: 'Cairo', sans-serif;
+      z-index: 500;
+      transition: transform .3s cubic-bezier(.175,.885,.32,1.275);
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .ptr-indicator.visible { transform: translateX(-50%) translateY(0); }
+    .ptr-spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(46,232,158,0.3);
+      border-top-color: #2ee89e;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: transform .3s ease;
+    }
+    .ptr-indicator.loading .ptr-spinner {
+      animation: ptrSpin .7s linear infinite;
+    }
+    @keyframes ptrSpin { to { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(ptrStyle);
+
+  // HTML
+  const el = document.createElement('div');
+  el.className = 'ptr-indicator';
+  el.id = 'ptrIndicator';
+  el.innerHTML = '<div class="ptr-spinner" id="ptrSpinner"></div><span id="ptrText">اسحب للتحديث</span>';
+  document.body.appendChild(el);
+
+  const THRESHOLD = 72, MAX_PULL = 110;
+  const indicator = el;
+  const ptrText   = document.getElementById('ptrText');
+  const ptrSpinner= document.getElementById('ptrSpinner');
+  let startY = 0, pulling = false, currentY = 0;
+
+  function show(state, progress) {
+    indicator.className = 'ptr-indicator visible ' + state;
+    if (state === 'pulling') {
+      ptrSpinner.style.animation  = 'none';
+      ptrSpinner.style.transform  = 'rotate(' + Math.round((progress/THRESHOLD)*270) + 'deg)';
+      ptrText.textContent = progress >= THRESHOLD ? '\u2191 أفلت للتحديث' : '\u2193 اسحب للتحديث';
+    } else if (state === 'loading') {
+      ptrSpinner.style.transform  = '';
+      ptrSpinner.style.animation  = '';
+      ptrText.textContent = 'جارٍ التحديث\u2026';
+    } else if (state === 'success') {
+      ptrSpinner.style.animation  = 'none';
+      ptrSpinner.style.borderColor= '#2ee89e';
+      ptrText.textContent = '\u2713 تم التحديث';
+    }
+  }
+
+  function hide() {
+    indicator.className = 'ptr-indicator';
+    ptrSpinner.style.borderColor = '';
+    ptrSpinner.style.animation   = '';
+  }
+
+  document.addEventListener('touchstart', function(e) {
+    const modal = document.querySelector('.modal-overlay.open, .modal.open');
+    if (modal) return;
+    if (window.scrollY > 0) return;
+    startY   = e.touches[0].clientY;
+    currentY = startY;
+    pulling  = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!pulling) return;
+    if (window.scrollY > 0) { pulling = false; hide(); return; }
+    currentY = e.touches[0].clientY;
+    const pull = Math.min(Math.max(0, currentY - startY) * 0.55, MAX_PULL);
+    if (pull > 0) show('pulling', pull);
+  }, { passive: true });
+
+  document.addEventListener('touchend', function() {
+    if (!pulling) return;
+    pulling = false;
+    const pull = Math.min(Math.max(0, currentY - startY) * 0.55, MAX_PULL);
+    if (pull >= THRESHOLD) {
+      show('loading', pull);
+      setTimeout(function() {
+        // إعادة تحميل الصفحة أو trigger custom event
+        if (typeof window.onPTRRefresh === 'function') {
+          window.onPTRRefresh();
+        } else {
+          window.location.reload();
+        }
+        show('success', pull);
+        setTimeout(hide, 1200);
+      }, 800);
+    } else {
+      hide();
+    }
+    currentY = 0;
+  });
 }
 
 window.initSidebar = initSidebar;
