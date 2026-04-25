@@ -144,7 +144,7 @@ const navItems = [
   { section: 'الرئيسية' },
   { icon: '📊', label: 'لوحة التحكم', href: 'index.html',    id: 'dashboard' },
   { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
-  { icon: '📅', label: 'المواعيد',    href: '#',             id: 'appointments', badge: '5' },
+  { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments', badge: '5' },
   { section: 'الإدارة' },
   { icon: '💊', label: 'قائمة العلاجات', href: '#',          id: 'treatments' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
