@@ -575,43 +575,50 @@ const LOWER = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
 
 // tooth shape paths: upper (root down) / lower (root up)
 // W=24 H=38: crown ~22px, root ~14px
-function toothPath(isUpper, type) {
-  // molar vs premolar vs front
-  if (type === 'front') {
-    return isUpper
-      ? 'M4,2 Q12,0 20,2 L21,20 Q12,24 3,20 Z M8,20 L9,36 Q12,38 15,36 L16,20'
-      : 'M4,36 Q12,38 20,36 L21,18 Q12,14 3,18 Z M8,18 L9,2 Q12,0 15,2 L16,18';
-  } else if (type === 'premolar') {
-    return isUpper
-      ? 'M3,2 Q12,0 21,2 L22,19 Q12,23 2,19 Z M7,19 L7,34 Q12,37 17,34 L17,19'
-      : 'M3,36 Q12,38 21,36 L22,19 Q12,15 2,19 Z M7,19 L7,4 Q12,1 17,4 L17,19';
-  } else { // molar
-    return isUpper
-      ? 'M2,3 Q12,0 22,3 L23,20 Q12,25 1,20 Z M5,20 L4,33 Q12,37 20,33 L19,20'
-      : 'M2,35 Q12,38 22,35 L23,18 Q12,13 1,18 Z M5,18 L4,5 Q12,1 20,5 L19,18';
-  }
-}
-
-function getToothType(n) {
-  const abs = n % 10;
-  if (abs <= 2) return 'front';
-  if (abs <= 4) return 'premolar';
-  return 'molar';
-}
-
-const ICONS = { treated:'✦', extracted:'✕', crown:'◆', 'root-canal':'⊕', implant:'⊙' };
+// ── Tooth colors per status ──
+const T_COLORS = {
+  '':           { fill:'#e8d5b0', stroke:'#b8956a', text:'#0a1628' },
+  treated:      { fill:'#2ee89e', stroke:'#1fba7e', text:'#0a1628' },
+  extracted:    { fill:'#ef5350', stroke:'#c62828', text:'#fff'     },
+  crown:        { fill:'#f5c842', stroke:'#c9962a', text:'#0a1628'  },
+  'root-canal': { fill:'#a78bfa', stroke:'#7c5cbf', text:'#fff'     },
+  implant:      { fill:'#63b3ed', stroke:'#2b7ab5', text:'#0a1628'  },
+};
+const T_LABELS = { treated:'ح', extracted:'✕', crown:'ت', 'root-canal':'ق', implant:'ز' };
 
 function makeTooth(n, status, isUpper) {
-  const type = getToothType(n);
-  const iconChar = status ? (ICONS[status]||'') : '';
-  const cls = status ? status : '';
-  return `<svg class="tooth-svg ${cls}" width="24" height="40" viewBox="0 0 24 40"
-    onclick="openToothModal(${n})" style="display:block;">
+  const c  = T_COLORS[status||''] || T_COLORS[''];
+  const lbl = status ? (T_LABELS[status]||'') : '';
+  // SVG: crown rect (top for upper, bottom for lower) + root trapezoid
+  // viewBox 0 0 22 44
+  // Upper: crown y=2..22, root y=22..42 (tapers down)
+  // Lower: crown y=22..42, root y=2..22 (tapers up)
+  let crownRect, rootPoly, textY;
+  if (isUpper) {
+    crownRect = `<rect x="1" y="2" width="20" height="20" rx="3" ry="3"
+      fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.5"/>`;
+    rootPoly  = `<polygon points="5,22 17,22 14,42 8,42"
+      fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.2" opacity="0.75"/>`;
+    textY = '14';
+  } else {
+    crownRect = `<rect x="1" y="22" width="20" height="20" rx="3" ry="3"
+      fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.5"/>`;
+    rootPoly  = `<polygon points="5,22 17,22 14,2 8,2"
+      fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.2" opacity="0.75"/>`;
+    textY = '34';
+  }
+  return `<svg width="22" height="44" viewBox="0 0 22 44"
+      style="display:block;cursor:pointer;transition:transform .15s;"
+      onclick="openToothModal(${n})"
+      onmouseover="this.style.transform='scale(1.15)'"
+      onmouseout="this.style.transform='scale(1)'">
     <title>السن ${n}${status?' — '+status:''}</title>
-    <path class="tooth-body" d="${toothPath(isUpper, type)}"/>
-    ${iconChar ? `<text class="tooth-mark" x="12" y="${isUpper?13:27}">${iconChar}</text>` : ''}
+    ${rootPoly}
+    ${crownRect}
+    ${lbl ? `<text x="11" y="${textY}" text-anchor="middle" dominant-baseline="middle"
+      font-size="9" font-weight="700" fill="${c.text}" font-family="Cairo,sans-serif">${lbl}</text>` : ''}
   </svg>
-  <div style="font-size:9px;color:var(--text2);text-align:center;margin-top:1px;">${n}</div>`;
+  <div style="font-size:9px;color:var(--text2);text-align:center;line-height:1.2;">${n}</div>`;
 }
 
 function renderTeethChart() {
