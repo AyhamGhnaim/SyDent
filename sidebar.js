@@ -276,12 +276,16 @@ function initPTR() {
 
   // أضف HTML بعد ما DOM يكون جاهز
   function attachHTML() {
-    if (document.getElementById('ptrIndicator')) return; // منع التكرار
+    if (document.getElementById('ptrIndicator')) return;
+    // wrapper يحتوي الـ indicator ويكون fixed بعرض كامل وارتفاع صفر
+    var wrap = document.createElement('div');
+    wrap.className = 'ptr-wrap';
     var el = document.createElement('div');
     el.className = 'ptr-indicator';
     el.id = 'ptrIndicator';
     el.innerHTML = '<div class="ptr-spinner" id="ptrSpinner"></div><span id="ptrText">اسحب للتحديث</span>';
-    document.body.appendChild(el);
+    wrap.appendChild(el);
+    document.body.appendChild(wrap);
     startListeners();
   }
 
