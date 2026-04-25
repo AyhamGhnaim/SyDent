@@ -1017,7 +1017,13 @@ function openTreatmentModal() {
   document.getElementById('treatModal').classList.add('open');
 }
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.remove('open');
+    el.style.display = 'none';
+    // re-enable CSS control
+    setTimeout(() => { el.style.display = ''; }, 50);
+  }
 }
 // Close on overlay click
 document.querySelectorAll('.modal-overlay').forEach(el => {
