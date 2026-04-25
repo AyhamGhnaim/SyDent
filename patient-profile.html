@@ -483,29 +483,51 @@ function renderInfo() {
   document.getElementById('iCreated').textContent   = fmtD(patient.createdAt);
   document.getElementById('iAllergies').textContent = patient.allergies || 'لا يوجد';
   document.getElementById('iHistory').textContent   = patient.notes     || 'لا يوجد';
-  document.getElementById('iPayStatus').textContent = patient.payment   || '—';
+  var payStatus = patient.payment || '—';
+  var iPS = document.getElementById('iPayStatus');
+  iPS.textContent = payStatus;
+  iPS.style.color = payStatus === 'مسدّد' ? 'var(--green)'
+                  : payStatus === 'جزئي'  ? 'var(--blue)'
+                  : payStatus === 'متبقي' ? 'var(--red)' : 'var(--text)';
   document.getElementById('iStatus').textContent    = patient.status    || '—';
   document.getElementById('iLastVisit').textContent = fmtD(patient.lastVisit);
 }
 
-function renderStats() {
-  var L       = getLedger();
-  var total   = 0; for (var i=0;i<L.sessions.length;i++) total += Number(L.sessions[i].cost||0);
-  var paid    = 0; for (var j=0;j<L.payments.length;j++) paid  += Number(L.payments[j].amount||0);
-  var balance = total - paid;
-  document.getElementById('sTotal').textContent   = fmt(total);
-  document.getElementById('sPaid').textContent    = fmt(paid);
-  var bEl = document.getElementById('sBalance');
-  bEl.textContent = fmt(balance);
-  bEl.className   = 'stat-val ' + (balance > 0 ? 'red' : balance < 0 ? 'yellow' : 'green');
+// ── Compute totals from ledger - single source of truth ──
+function computeFinancials() {
+  var L = getLedger();
+  var total = 0, paid = 0;
+  for (var i=0;i<L.sessions.length;i++) total += Number(L.sessions[i].cost||0);
+  for (var j=0;j<L.payments.length;j++) paid  += Number(L.payments[j].amount||0);
+  return { total: total, paid: paid, balance: total - paid };
+}
+
+// ── Sync patient.payment status across patients array ──
+function syncPaymentStatus() {
+  var f = computeFinancials();
+  var newStatus;
+  if (f.total === 0)             newStatus = '—';
+  else if (f.paid >= f.total)    newStatus = 'مسدّد';
+  else if (f.paid > 0)           newStatus = 'جزئي';
+  else                            newStatus = 'متبقي';
   for (var k=0; k<patients.length; k++) {
     if (patients[k].id === patientId) {
-      patients[k].payment = (paid >= total && total > 0) ? 'مسدّد' : 'متبقي';
+      patients[k].payment = newStatus;
       localStorage.setItem(K_PAT, JSON.stringify(patients));
       patient = patients[k];
-      break;
+      return;
     }
   }
+}
+
+function renderStats() {
+  syncPaymentStatus();
+  var f = computeFinancials();
+  document.getElementById('sTotal').textContent  = fmt(f.total);
+  document.getElementById('sPaid').textContent   = fmt(f.paid);
+  var bEl = document.getElementById('sBalance');
+  bEl.textContent = fmt(f.balance);
+  bEl.className   = 'stat-val ' + (f.balance > 0 ? 'red' : f.balance < 0 ? 'yellow' : 'green');
 }
 
 /* ══ TOOTH CHART ══ */
@@ -666,14 +688,12 @@ function renderSessions() {
 function renderPayments() {
   var L       = getLedger();
   var el      = document.getElementById('paymentsContent');
-  var total   = 0; for (var i=0;i<L.sessions.length;i++) total += Number(L.sessions[i].cost||0);
-  var paid    = 0; for (var j=0;j<L.payments.length;j++) paid  += Number(L.payments[j].amount||0);
-  var balance = total - paid;
-  var bColor  = balance > 0 ? 'var(--red)' : balance < 0 ? 'var(--yellow)' : 'var(--green)';
+  var f       = computeFinancials();
+  var bColor  = f.balance > 0 ? 'var(--red)' : f.balance < 0 ? 'var(--yellow)' : 'var(--green)';
   document.getElementById('balanceSummary').innerHTML =
-    '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(total)          + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
-  + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(paid)           + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
-  + '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(balance)) + ' ل.س</div><div class="bs-lbl">' + (balance<0?'رصيد زائد':'المتبقي') + '</div></div>';
+    '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total)          + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
+  + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)           + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
+  + '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>';
   if (!L.payments.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>لا توجد مدفوعات مسجّلة بعد</div>';
     return;
