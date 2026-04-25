@@ -393,12 +393,14 @@ function saveTeeth()  { localStorage.setItem(K_TEETH, JSON.stringify(allTeeth));
 
 var AV_COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
 function avatarColor(n) {
+  if (!n) return AV_COLORS[0];
   var h = 0;
   for (var i=0; i<n.length; i++) h = (h*31 + n.charCodeAt(i)) % AV_COLORS.length;
   return AV_COLORS[h];
 }
 function initials(n) {
-  var p = n.trim().split(' ');
+  if (!n) return '؟';
+  var p = String(n).trim().split(' ');
   return p.length >= 2 ? p[0][0]+p[1][0] : n.slice(0,2);
 }
 function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
@@ -420,14 +422,17 @@ function calcAge(dob) {
   return Math.floor((Date.now()-new Date(dob))/(365.25*864e5)) + ' سنة';
 }
 
+function safe(fn, label) {
+  try { fn(); } catch(e) { console.error('Error in ' + label + ':', e); }
+}
 function init() {
-  document.title = patient.name + ' — SyDent';
-  renderHeader();
-  renderInfo();
-  renderStats();
-  renderTeeth();
-  renderSessions();
-  renderPayments();
+  document.title = (patient.name || 'مريض') + ' — SyDent';
+  safe(renderHeader,   'renderHeader');
+  safe(renderInfo,     'renderInfo');
+  safe(renderStats,    'renderStats');
+  safe(renderTeeth,    'renderTeeth');
+  safe(renderSessions, 'renderSessions');
+  safe(renderPayments, 'renderPayments');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
@@ -435,11 +440,12 @@ function init() {
 }
 
 function renderHeader() {
-  var col = avatarColor(patient.name);
+  var name = patient.name || 'مريض بدون اسم';
+  var col = avatarColor(name);
   var av  = document.getElementById('avatarEl');
   av.style.background = col;
-  av.textContent = initials(patient.name);
-  document.getElementById('pName').textContent = patient.name;
+  av.textContent = initials(name);
+  document.getElementById('pName').textContent = name;
   var sub = '<span>' + (patient.gender||'—') + '</span><span>•</span><span>' + calcAge(patient.dob) + '</span>';
   if (patient.phone) sub += '<span>•</span><span>' + patient.phone + '</span>';
   if (patient.allergies && patient.allergies !== 'لا يوجد')
