@@ -102,11 +102,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .chart-card-title{font-size:14px;font-weight:700;color:var(--green);}
 .chart-hint{font-size:12px;color:var(--text2);}
 .jaw-wrap{overflow-x:auto;padding:6px 0;}
-.jaw-row{display:flex;justify-content:center;gap:3px;}
-.tooth-cell{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;}
-.tooth-cell:hover svg{transform:scale(1.13);}
-.tooth-cell svg{display:block;transition:transform .15s;}
-.tooth-num{font-size:9px;color:var(--text2);text-align:center;line-height:1.2;min-width:24px;text-align:center;}
+.jaw-row{display:flex;justify-content:center;gap:4px;}
+.tooth-cell{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;transition:transform .15s;}
+.tooth-cell:hover{transform:scale(1.12);}
+.tooth-crown{width:22px;height:22px;border-radius:4px;border:2px solid #b8956a;background:#e8d5b0;transition:all .15s;}
+.tooth-root-up{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin:0 4px;}
+.tooth-root-dn{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;margin:0 4px;}
+.tooth-num{font-size:9px;color:var(--text2);text-align:center;line-height:1.4;min-width:22px;}
+.tooth-lbl{font-size:9px;font-weight:800;text-align:center;line-height:22px;color:#0a1628;}
 .jaw-gap{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:3px;margin:2px 0;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;justify-content:center;}
 .leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);}
@@ -480,33 +483,36 @@ var T_STROKE = {'':      '#b8956a', treated:'#1fba7e', extracted:'#c62828', crow
 var T_LABEL  = {treated:'ح', extracted:'✕', crown:'ت', 'root-canal':'ق', implant:'ز'};
 
 function buildTooth(num, status, isUpper) {
-  var st  = status || '';
-  var col = T_FILL[st]   || T_FILL[''];
-  var str = T_STROKE[st] || T_STROKE[''];
-  var lbl = T_LABEL[st]  || '';
-  var tCol = (st===''||st==='treated'||st==='crown') ? '#0a1628' : '#ffffff';
+  var st    = status || '';
+  var col   = T_FILL[st]   || T_FILL[''];
+  var str   = T_STROKE[st] || T_STROKE[''];
+  var lbl   = T_LABEL[st]  || '';
+  var tCol  = (st===''||st==='treated'||st==='crown') ? '#0a1628' : '#ffffff';
 
-  /* viewBox 0 0 24 44
-     Upper: crown = rect y2..y22, root = trapezoid y22..y42 (narrows downward)
-     Lower: root  = trapezoid y2..y22 (narrows upward), crown = rect y22..y42  */
-  var crownY  = isUpper ? 2  : 22;
-  var textY   = isUpper ? 13 : 33;
-  var rT      = isUpper ? 22 : 2;   // root top y
-  var rB      = isUpper ? 42 : 20;  // root bottom y
-  var rootPts = isUpper
-    ? '5,22 19,22 16,42 8,42'
-    : '8,2 16,2 19,20 5,20';
+  // crown div
+  var crown = '<div class="tooth-crown" style="background:' + col + ';border-color:' + str + ';">'
+            + (lbl ? '<div style="font-size:9px;font-weight:800;text-align:center;line-height:22px;color:' + tCol + ';">' + lbl + '</div>' : '')
+            + '</div>';
 
-  var svg = '<svg width="24" height="44" viewBox="0 0 24 44" style="display:block;">'
-    + '<polygon points="' + rootPts + '" fill="' + col + '" stroke="' + str + '" stroke-width="1" opacity="0.75"/>'
-    + '<rect x="2" y="' + crownY + '" width="20" height="20" rx="3" fill="' + col + '" stroke="' + str + '" stroke-width="1.5"/>'
-    + (lbl ? '<text x="12" y="' + textY + '" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="700" fill="' + tCol + '" font-family="Cairo,sans-serif">' + lbl + '</text>' : '')
-    + '</svg>';
-
-  return '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + (st?' - '+st:'') + '">'
-       + svg
-       + '<div class="tooth-num">' + num + '</div>'
-       + '</div>';
+  // root triangle using CSS borders trick
+  var rootStyle = 'border-top:10px solid ' + col + ';border-bottom:none;'; // default upper
+  var rootDiv;
+  if (isUpper) {
+    // root below crown - triangle pointing down
+    rootStyle = 'width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid ' + col + ';margin:0 3px;';
+    rootDiv = '<div style="' + rootStyle + '"></div>';
+    return '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">'
+         + crown + rootDiv
+         + '<div class="tooth-num">' + num + '</div></div>';
+  } else {
+    // root above crown - triangle pointing up
+    rootStyle = 'width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:12px solid ' + col + ';margin:0 3px;';
+    rootDiv = '<div style="' + rootStyle + '"></div>';
+    return '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">'
+         + '<div class="tooth-num">' + num + '</div>'
+         + rootDiv + crown
+         + '</div>';
+  }
 }
 
 function renderTeeth() {
