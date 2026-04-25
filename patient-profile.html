@@ -375,8 +375,6 @@ for (var _i=0; _i<patients.length; _i++) {
 
 if (!patient) {
   document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px;color:var(--text2)"><div style="font-size:40px">😶</div><div style="font-size:18px;font-weight:700;color:var(--text)">لم يُعثر على المريض</div><a href="patients.html" style="color:var(--green)">العودة للمرضى</a></div>';
-} else {
-  init();
 }
 
 function getLedger() {
@@ -515,19 +513,15 @@ function buildTooth(num, status, isUpper) {
 }
 
 function renderTeeth() {
-  console.log('[renderTeeth] starting, UPPER_T:', typeof UPPER_T, UPPER_T ? UPPER_T.length : 'undef');
   var upperEl = document.getElementById('upperJaw');
   var lowerEl = document.getElementById('lowerJaw');
-  console.log('[renderTeeth] upperEl:', upperEl, 'lowerEl:', lowerEl);
-  if (!upperEl || !lowerEl) { console.error('jaw elements missing!'); return; }
+  if (!upperEl || !lowerEl) return;
   var teeth = allTeeth[patientId] || {};
   var uHtml = '', lHtml = '';
   for (var i=0; i<UPPER_T.length; i++) uHtml += buildTooth(UPPER_T[i], teeth[UPPER_T[i]], true);
   for (var j=0; j<LOWER_T.length; j++) lHtml += buildTooth(LOWER_T[j], teeth[LOWER_T[j]], false);
-  console.log('[renderTeeth] uHtml length:', uHtml.length, 'lHtml length:', lHtml.length);
   upperEl.innerHTML = uHtml;
   lowerEl.innerHTML = lHtml;
-  console.log('[renderTeeth] done');
 }
 
 var currentTooth = null;
@@ -709,6 +703,9 @@ function showToast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
 }
+
+// ── Run init AFTER all variables are defined ──
+if (patient) init();
 </script>
 
 <script>
