@@ -146,7 +146,7 @@ const navItems = [
   { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
   { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments', badge: '5' },
   { section: 'الإدارة' },
-  { icon: '💊', label: 'قائمة العلاجات', href: '#',          id: 'treatments' },
+  { icon: '💊', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
   { icon: '🧪', label: 'المخابر',     href: '#',             id: 'labs'      },
   { section: 'تحليل' },
