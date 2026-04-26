@@ -701,7 +701,8 @@ function syncAllPaymentStatuses() {
   if (changed) localStorage.setItem('sydent_patients', JSON.stringify(patients));
 }
 syncAllPaymentStatuses();
-if (patients.length === 0) {
+if (patients.length === 0 && !localStorage.getItem('sydent_seeded')) {
+  localStorage.setItem('sydent_seeded', '1');
   patients = [
     { id:'P001', name:'أحمد محمود السيد',    phone:'0934567890', dob:'1985-03-12', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-04-15', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-01' },
     { id:'P002', name:'سارة خالد العلي',     phone:'0987654321', dob:'1992-07-24', gender:'أنثى', payment:'متبقي', status:'تحت العلاج', lastVisit:'2026-04-20', allergies:'بنسلين',  notes:'حساسة من مخدر الأسنان', createdAt:'2026-04-05' },

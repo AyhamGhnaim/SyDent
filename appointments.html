@@ -642,7 +642,8 @@ const COLORS_MAP = {
 };
 
 let appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
-if (appointments.length === 0) {
+if (appointments.length === 0 && !localStorage.getItem('sydent_appts_seeded')) {
+  localStorage.setItem('sydent_appts_seeded', '1');
   const y = new Date().getFullYear();
   const m = String(new Date().getMonth()+1).padStart(2,'0');
   const today = new Date().getDate();
