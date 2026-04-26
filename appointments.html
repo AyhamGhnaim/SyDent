@@ -544,17 +544,7 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group">
           <label>نوع العلاج</label>
-          <select id="fType">
-            <option value="حشوة ضوئية">حشوة ضوئية</option>
-            <option value="علاج عصب">علاج عصب</option>
-            <option value="تلبيسة خزفية">تلبيسة خزفية</option>
-            <option value="قلع">قلع</option>
-            <option value="تقويم - متابعة">تقويم - متابعة</option>
-            <option value="تنظيف وتلميع">تنظيف وتلميع</option>
-            <option value="فحص دوري">فحص دوري</option>
-            <option value="زراعة">زراعة</option>
-            <option value="أخرى">أخرى</option>
-          </select>
+          <select id="fType"></select>
         </div>
         <div class="form-group">
           <label>الحالة</label>
@@ -857,7 +847,10 @@ function openModal(prefillDate) {
   document.getElementById('fDate').value     = prefillDate || dateStr(new Date());
   document.getElementById('fTime').value     = '';
   document.getElementById('fDuration').value = '60';
-  document.getElementById('fType').value     = 'حشوة ضوئية';
+  // Find treatment by stored name and set the id
+  var _foundT = null;
+  for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === e.type) { _foundT = TREATMENTS[_i]; break; }
+  document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   document.getElementById('fStatus').value   = 'confirmed';
   document.getElementById('fNotes').value    = '';
   document.querySelectorAll('.color-dot').forEach(d => {

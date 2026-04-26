@@ -328,7 +328,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-head"><h3>📅 موعد جديد</h3><button class="modal-close" onclick="closeModal('apptModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label>نوع الموعد</label><select id="aType"><option>حشوة</option><option>قلع</option><option>تنظيف</option><option>تلبيسة خزفية</option><option>علاج عصب</option><option>زراعة</option><option>فحص دوري</option><option>أخرى</option></select></div>
+        <div class="form-group"><label>نوع الموعد</label><select id="aType"></select></div>
         <div class="form-group"><label>المدة</label><select id="aDur"><option value="30">30 دقيقة</option><option value="45">45 دقيقة</option><option value="60" selected>ساعة</option><option value="90">ساعة ونصف</option><option value="120">ساعتان</option></select></div>
       </div>
       <div class="form-row">
@@ -912,7 +912,20 @@ function saveSession() {
 }
 
 function saveAppt() {
-  var type  = document.getElementById('aType').value;
+  var typeVal = document.getElementById('aType').value;
+  var _t = getTreatment(typeVal);
+  var type = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
+  function _fillToApptColor(f){
+    if (!f) return 'green';
+    f = f.toLowerCase();
+    if (f === '#2ee89e' || f === '#84cc16' || f === '#06b6d4') return 'green';
+    if (f === '#ef5350' || f === '#fb923c' || f === '#ec4899') return 'red';
+    if (f === '#f5c842')                                       return 'yellow';
+    if (f === '#63b3ed')                                       return 'blue';
+    if (f === '#a78bfa')                                       return 'purple';
+    return 'green';
+  }
+  var apptColor = _t ? _fillToApptColor(_t.fill) : 'green';
   var date  = document.getElementById('aDate').value;
   var time  = document.getElementById('aTime').value;
   var dur   = document.getElementById('aDur').value;
@@ -921,8 +934,7 @@ function saveAppt() {
   var appts = JSON.parse(localStorage.getItem(K_APPTS)||'[]');
   var max = 0;
   for (var i=0;i<appts.length;i++) { var n=parseInt((appts[i].id||'0').replace('A',''))||0; if(n>max)max=n; }
-  var colorMap = {حشوة:'green',قلع:'red',تنظيف:'green','تلبيسة خزفية':'blue','علاج عصب':'purple',زراعة:'blue','فحص دوري':'green'};
-  appts.push({ id:'A'+String(max+1).padStart(3,'0'), patient:patient.name, date:date, time:time, duration:parseInt(dur), type:type, status:'pending', color:colorMap[type]||'green', notes:notes });
+  appts.push({ id:'A'+String(max+1).padStart(3,'0'), patient:patient.name, date:date, time:time, duration:parseInt(dur), type:type, status:'pending', color:apptColor, notes:notes });
   localStorage.setItem(K_APPTS, JSON.stringify(appts));
   closeModal('apptModal');
   document.getElementById('aNotes').value='';
@@ -1059,7 +1071,27 @@ function closeModal(id) {
 }
 function openPayModal()     { document.getElementById('payDate').value=toDay(); openModal('payModal'); }
 function openSessionModal() { document.getElementById('sDate').value=toDay();   openModal('sessionModal'); }
-function openApptModal()    { document.getElementById('aDate').value=toDay();   openModal('apptModal'); }
+function populateApptTypes() {
+  var sel = document.getElementById('aType');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    var opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+  var other = document.createElement('option');
+  other.value = '_other';
+  other.textContent = 'أخرى';
+  sel.appendChild(other);
+}
+function openApptModal()    {
+  populateApptTypes();
+  document.getElementById('aDate').value=toDay();
+  openModal('apptModal');
+}
 
 var overlays = document.querySelectorAll('.modal-overlay');
 for (var _o=0; _o<overlays.length; _o++) {
