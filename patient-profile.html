@@ -612,21 +612,13 @@ var DEFAULT_TREATMENTS = [
   { id:'consult',     name:'استشارة',       label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false }
 ];
 var TREATMENTS = JSON.parse(localStorage.getItem(K_TREATMENTS) || 'null');
-if (!TREATMENTS || !Array.isArray(TREATMENTS) || TREATMENTS.length === 0) {
+if (!Array.isArray(TREATMENTS)) {
+  // First time ever
   TREATMENTS = DEFAULT_TREATMENTS.slice();
+  localStorage.setItem('sydent_treatments_seeded', '1');
   localStorage.setItem(K_TREATMENTS, JSON.stringify(TREATMENTS));
-} else {
-  // Merge: add any missing defaults
-  var _ids = TREATMENTS.map(function(t){ return t.id; });
-  var _changed = false;
-  for (var _i=0; _i<DEFAULT_TREATMENTS.length; _i++) {
-    if (_ids.indexOf(DEFAULT_TREATMENTS[_i].id) === -1) {
-      TREATMENTS.push(DEFAULT_TREATMENTS[_i]);
-      _changed = true;
-    }
-  }
-  if (_changed) localStorage.setItem(K_TREATMENTS, JSON.stringify(TREATMENTS));
 }
+// If user deleted all, respect that — don't re-seed
 function getTreatment(id) {
   for (var i=0; i<TREATMENTS.length; i++) if (TREATMENTS[i].id === id) return TREATMENTS[i];
   return null;

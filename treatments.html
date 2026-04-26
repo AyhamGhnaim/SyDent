@@ -262,10 +262,18 @@ var DEFAULT_TREATMENTS = [
 
 // ── Load treatments ──
 var treatments = JSON.parse(localStorage.getItem(K_TREATMENTS) || 'null');
-if (!treatments || !Array.isArray(treatments) || treatments.length === 0) {
+if (!Array.isArray(treatments)) {
+  // First time ever: seed defaults
   treatments = DEFAULT_TREATMENTS.slice();
+  localStorage.setItem('sydent_treatments_seeded', '1');
+  saveAll();
+} else if (treatments.length === 0 && !localStorage.getItem('sydent_treatments_seeded')) {
+  // First time and the array got initialized somehow as empty
+  treatments = DEFAULT_TREATMENTS.slice();
+  localStorage.setItem('sydent_treatments_seeded', '1');
   saveAll();
 }
+// Note: if user explicitly deleted all, stays empty (flag prevents re-seed)
 
 function saveAll() {
   localStorage.setItem(K_TREATMENTS, JSON.stringify(treatments));
