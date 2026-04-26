@@ -247,39 +247,40 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="toast" id="toast"></div>
 
 <script>
-var K_TREATMENTS = 'sydent_treatments';
+// ── Supabase-backed treatments ──
+var treatments = []; // populated from Supabase
+var currentDoctor = null;
 
-// ── Default treatments (seed data) ──
-var DEFAULT_TREATMENTS = [
-  { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
-  { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
-  { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
-  { id:'root-canal',  name:'قناة جذر',     label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
-  { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true },
-  { id:'cleaning',    name:'تنظيف',         label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false },
-  { id:'whitening',   name:'تبييض',         label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false },
-  { id:'xray',        name:'أشعة',          label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false },
-  { id:'consult',     name:'استشارة',       label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false }
-];
-
-// ── Load treatments ──
-var treatments = JSON.parse(localStorage.getItem(K_TREATMENTS) || 'null');
-if (!Array.isArray(treatments)) {
-  // First time ever: seed defaults
-  treatments = DEFAULT_TREATMENTS.slice();
-  localStorage.setItem('sydent_treatments_seeded', '1');
-  saveAll();
-} else if (treatments.length === 0 && !localStorage.getItem('sydent_treatments_seeded')) {
-  // First time and the array got initialized somehow as empty
-  treatments = DEFAULT_TREATMENTS.slice();
-  localStorage.setItem('sydent_treatments_seeded', '1');
-  saveAll();
+async function loadTreatments() {
+  const user = await sbRequireAuth();
+  if (!user) return;
+  currentDoctor = user;
+  const { data, error } = await window.sb
+    .from('treatments')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) {
+    console.error('Load error:', error);
+    showToast('⚠️ ' + error.message);
+    return;
+  }
+  treatments = (data || []).map(function(t){
+    return {
+      id: t.id,                        // DB UUID — used for edit/delete
+      treatment_key: t.treatment_key,  // human-readable key
+      name: t.name,
+      label: t.label,
+      fill: t.fill,
+      stroke: t.stroke,
+      price: t.price,
+      builtin: t.builtin,
+      sort_order: t.sort_order
+    };
+  });
+  render();
 }
-// Note: if user explicitly deleted all, stays empty (flag prevents re-seed)
 
-function saveAll() {
-  localStorage.setItem(K_TREATMENTS, JSON.stringify(treatments));
-}
+function saveAll() { /* no-op (Supabase writes happen per operation) */ }
 
 function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
 
@@ -305,7 +306,7 @@ function render() {
         + '<div class="treat-head">'
           + '<div>'
             + '<div class="treat-name">' + escapeHtml(t.name) + '</div>'
-            + '<div class="treat-key">المعرّف: ' + t.id + '</div>'
+            + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
           + '</div>'
           + '<div class="treat-icon" style="' + iconBg + 'color:' + textColor + ';border:2px solid ' + fg + ';">' + (t.label || '') + '</div>'
         + '</div>'
@@ -485,8 +486,6 @@ function showToast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
 }
-
-render();
 </script>
 
 <script>
