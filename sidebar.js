@@ -372,3 +372,14 @@ function initPTR() {
 window.initSidebar = initSidebar;
 
 })();
+
+// زر تسجيل خروج — معرّف على window عشان يقدر sidebar الـHTML يستدعيه
+window.doLogout = async function() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  try {
+    if (window.sb && window.sb.auth) {
+      await window.sb.auth.signOut();
+    }
+  } catch(e) { console.error('signOut error', e); }
+  window.location.href = 'auth.html';
+};
