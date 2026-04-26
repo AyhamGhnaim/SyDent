@@ -638,6 +638,22 @@ const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
 let patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
 
 // Compute payment status for a patient from their ledger
+// ── Ensure default treatments exist on first load ──
+(function seedTreatments(){
+  var raw = localStorage.getItem('sydent_treatments');
+  var arr = raw ? JSON.parse(raw) : null;
+  if (!arr || !Array.isArray(arr) || arr.length === 0) {
+    var defaults = [
+      { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
+      { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
+      { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
+      { id:'root-canal',  name:'قناة جذر',     label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
+      { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true }
+    ];
+    localStorage.setItem('sydent_treatments', JSON.stringify(defaults));
+  }
+})();
+
 function computePaymentStatus(patientId) {
   var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
   var L = ledger[patientId];

@@ -259,14 +259,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="jaw-gap">· · · · · · · · · خط اللثة · · · · · · · · ·</div>
         <div class="jaw-row" id="lowerJaw"></div>
       </div>
-      <div class="chart-legend">
-        <div class="leg"><div class="leg-dot" style="background:#e8d5b0;border:1px solid #b8956a;"></div>سليم</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>حشوة</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>قلع</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--yellow)"></div>تاج</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--purple)"></div>قناة جذر</div>
-        <div class="leg"><div class="leg-dot" style="background:var(--blue)"></div>زراعة</div>
-      </div>
+<div class="chart-legend" id="chartLegend"></div>
     </div>
   </div>
 
@@ -378,17 +371,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-head"><h3 id="toothModalTitle">السن</h3><button class="modal-close" onclick="closeModal('toothModal')">✕</button></div>
     <div class="modal-body">
-      <!-- Step 1: choose treatment -->
+      <!-- Step 1: choose treatment (populated dynamically) -->
       <div id="toothStep1">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;">اختر نوع العلاج:</div>
-        <div class="tooth-opts">
-          <button class="topt" style="border-color:var(--green)"  onclick="pickToothTreatment('treated','حشوة')">🟢 حشوة</button>
-          <button class="topt" style="border-color:var(--red)"    onclick="pickToothTreatment('extracted','قلع')">🔴 قلع</button>
-          <button class="topt" style="border-color:var(--yellow)" onclick="pickToothTreatment('crown','تلبيس (تاج)')">🟡 تاج</button>
-          <button class="topt" style="border-color:var(--purple)" onclick="pickToothTreatment('root-canal','قناة جذر')">🟣 قناة جذر</button>
-          <button class="topt" style="border-color:var(--blue)"   onclick="pickToothTreatment('implant','زراعة')">🔵 زراعة</button>
-          <button class="topt" style="border-color:var(--text2)"  onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+          <span>اختر نوع العلاج:</span>
+          <a href="treatments.html" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
         </div>
+        <div class="tooth-opts" id="toothOptsContainer"></div>
       </div>
       <!-- Step 2: enter cost -->
       <div id="toothStep2" style="display:none;">
@@ -482,8 +471,34 @@ function calcAge(dob) {
 function safe(fn, label) {
   try { fn(); } catch(e) { console.error('Error in ' + label + ':', e); }
 }
+function populateSessionTypes() {
+  var sel = document.getElementById('sType');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— اختر —</option>';
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    var opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+  // also add a free "أخرى" option for non-catalog items
+  var other = document.createElement('option');
+  other.value = '_other';
+  other.textContent = 'أخرى';
+  sel.appendChild(other);
+}
+
+function autofillSessionPrice() {
+  var sel = document.getElementById('sType');
+  var t = getTreatment(sel.value);
+  if (t) document.getElementById('sCost').value = t.price;
+  // if user picks "أخرى" or empty, leave cost as is
+}
+
 function init() {
   document.title = (patient.name || 'مريض') + ' — SyDent';
+  populateSessionTypes();
   safe(renderHeader,        'renderHeader');
   safe(renderInfo,          'renderInfo');
   safe(renderStats,         'renderStats');
@@ -581,9 +596,38 @@ function renderStats() {
 var UPPER_T = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
 var LOWER_T = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
 
-var T_FILL   = {'':      '#e8d5b0', treated:'#2ee89e', extracted:'#ef5350', crown:'#f5c842', 'root-canal':'#a78bfa', implant:'#63b3ed'};
-var T_STROKE = {'':      '#b8956a', treated:'#1fba7e', extracted:'#c62828', crown:'#c9962a', 'root-canal':'#7c5cbf', implant:'#2b7ab5'};
-var T_LABEL  = {treated:'ح', extracted:'✕', crown:'ت', 'root-canal':'ق', implant:'ز'};
+// ── Treatment catalog (dynamic from treatments.html) ──
+var K_TREATMENTS = 'sydent_treatments';
+var DEFAULT_TREATMENTS = [
+  { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
+  { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
+  { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
+  { id:'root-canal',  name:'قناة جذر',     label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
+  { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true }
+];
+var TREATMENTS = JSON.parse(localStorage.getItem(K_TREATMENTS) || 'null');
+if (!TREATMENTS || !Array.isArray(TREATMENTS) || TREATMENTS.length === 0) {
+  TREATMENTS = DEFAULT_TREATMENTS.slice();
+  localStorage.setItem(K_TREATMENTS, JSON.stringify(TREATMENTS));
+}
+function getTreatment(id) {
+  for (var i=0; i<TREATMENTS.length; i++) if (TREATMENTS[i].id === id) return TREATMENTS[i];
+  return null;
+}
+
+// Build legacy maps from catalog (for tooth chart rendering)
+function rebuildToothMaps() {
+  var fills = {'': '#e8d5b0'}, strokes = {'': '#b8956a'}, labels = {};
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    fills[t.id]   = t.fill;
+    strokes[t.id] = t.stroke;
+    labels[t.id]  = t.label;
+  }
+  return { fill: fills, stroke: strokes, label: labels };
+}
+var _T = rebuildToothMaps();
+var T_FILL = _T.fill, T_STROKE = _T.stroke, T_LABEL = _T.label;
 
 function buildTooth(num, status, isUpper) {
   var st    = status || '';
@@ -605,7 +649,22 @@ function buildTooth(num, status, isUpper) {
   return html;
 }
 
+function renderLegend() {
+  var leg = document.getElementById('chartLegend');
+  if (!leg) return;
+  var html = '<div class="leg"><div class="leg-dot" style="background:#e8d5b0;border:1px solid #b8956a;"></div>سليم</div>';
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    html += '<div class="leg"><div class="leg-dot" style="background:' + t.fill + '"></div>' + t.name + '</div>';
+  }
+  leg.innerHTML = html;
+}
+
 function renderTeeth() {
+  // refresh maps in case catalog changed
+  _T = rebuildToothMaps();
+  T_FILL = _T.fill; T_STROKE = _T.stroke; T_LABEL = _T.label;
+  renderLegend();
   var upperEl = document.getElementById('upperJaw');
   var lowerEl = document.getElementById('lowerJaw');
   if (!upperEl || !lowerEl) return;
@@ -632,12 +691,35 @@ var pendingToothLabel = null;
 function openToothModal(n) {
   currentTooth = n;
   var teeth = allTeeth[patientId] || {};
-  document.getElementById('toothModalTitle').textContent = 'السن ' + n + (teeth[n] ? ' — ' + teeth[n] : ' (سليم)');
+  document.getElementById('toothModalTitle').textContent = 'السن ' + n + (teeth[n] ? ' — ' + (getTreatment(teeth[n]) ? getTreatment(teeth[n]).name : teeth[n]) : ' (سليم)');
+  // populate options dynamically from catalog
+  var container = document.getElementById('toothOptsContainer');
+  var html = '';
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
+    html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
+         + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/\'/g, "\\'") + '\')">'
+         + '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:18px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
+         + t.name
+         + '</button>';
+  }
+  // sleep button last
+  html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+  container.innerHTML = html;
   // reset to step 1
   document.getElementById('toothStep1').style.display = 'block';
   document.getElementById('toothStep2').style.display = 'none';
   document.getElementById('toothFoot').style.display = 'none';
   openModal('toothModal');
+}
+
+function isLightColor(hex) {
+  var c = hex.replace('#','');
+  var r = parseInt(c.substr(0,2),16);
+  var g = parseInt(c.substr(2,2),16);
+  var b = parseInt(c.substr(4,2),16);
+  return (r*299 + g*587 + b*114)/1000 > 155;
 }
 
 function pickToothTreatment(status, label) {
@@ -647,10 +729,15 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display = 'flex';
   document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' للسن ' + currentTooth;
-  document.getElementById('toothCost').value = '';
+  // autofill price from catalog
+  var t = getTreatment(status);
+  document.getElementById('toothCost').value = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
   document.getElementById('toothDate').value = toDay();
-  setTimeout(function(){ document.getElementById('toothCost').focus(); }, 100);
+  setTimeout(function(){
+    document.getElementById('toothCost').focus();
+    document.getElementById('toothCost').select();
+  }, 100);
 }
 
 function backToStep1() {
@@ -789,12 +876,20 @@ function savePayment() {
 }
 
 function saveSession() {
-  var type  = document.getElementById('sType').value;
+  var typeVal  = document.getElementById('sType').value;
   var cost  = parseFloat(document.getElementById('sCost').value);
   var desc  = document.getElementById('sDesc').value.trim();
   var date  = document.getElementById('sDate').value;
   var notes = document.getElementById('sNotes').value.trim();
-  if (!type)          { showToast('⚠️ اختر نوع العلاج'); return; }
+  if (!typeVal)       { showToast('⚠️ اختر نوع العلاج'); return; }
+  // resolve type id → display name
+  var type;
+  if (typeVal === '_other') {
+    type = desc || 'أخرى';
+  } else {
+    var t = getTreatment(typeVal);
+    type = t ? t.name : typeVal;
+  }
   if (!cost||cost<=0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date)          { showToast('⚠️ اختر التاريخ'); return; }
   var L = getLedger();

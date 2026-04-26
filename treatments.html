@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>قائمة العلاجات — SyDent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="sidebar.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
+  --border:rgba(46,232,158,0.15);
+  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --blue:#63b3ed;--purple:#a78bfa;
+  --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
+}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── Topbar ── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;gap:12px;
+}
+.tb-title{font-size:18px;font-weight:800;color:var(--green);}
+.tb-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:9px;
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{background:var(--green);color:var(--bg);}
+.btn-primary:hover{background:#26d48e;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-outline:hover{border-color:var(--green);color:var(--green);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+
+.page{padding:24px 28px;max-width:1200px;margin:0 auto;}
+
+/* ── Info box ── */
+.info-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:12px;
+  font-size:13px;color:var(--text2);
+}
+.info-box .info-icon{font-size:24px;}
+
+/* ── Treatments grid ── */
+.treat-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+  gap:16px;
+  margin-bottom:20px;
+}
+.treat-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  transition:all .2s;
+  position:relative;
+}
+.treat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--green);}
+.treat-color-bar{height:5px;width:100%;}
+.treat-body{padding:16px 18px;}
+.treat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
+.treat-icon{
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;flex-shrink:0;
+}
+.treat-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.3;}
+.treat-key{font-size:11px;color:var(--text2);margin-top:2px;}
+.treat-price{
+  display:flex;align-items:baseline;gap:5px;
+  font-size:20px;font-weight:800;color:var(--green);
+  margin-top:10px;
+}
+.treat-price .currency{font-size:12px;color:var(--text2);font-weight:600;}
+.treat-actions{
+  display:flex;gap:6px;margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(46,232,158,0.06);
+}
+.treat-actions button{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.treat-actions .ed-btn:hover{border-color:var(--blue);color:var(--blue);}
+.treat-actions .del-btn:hover{border-color:var(--red);color:var(--red);}
+.treat-builtin-tag{
+  position:absolute;top:8px;left:8px;
+  background:rgba(99,179,237,0.15);color:var(--blue);
+  border:1px solid rgba(99,179,237,0.3);
+  border-radius:6px;padding:2px 8px;
+  font-size:10px;font-weight:700;
+}
+
+/* ── Modal ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:100%;max-width:520px;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-size:16px;font-weight:700;}
+.modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;}
+.modal-body{padding:20px;max-height:75vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
+.modal-body::-webkit-scrollbar{display:none;}
+.form-group{margin-bottom:15px;}
+.form-group label{display:block;font-size:12px;color:var(--text2);font-weight:600;margin-bottom:5px;}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:9px;padding:10px 13px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:14px;
+  outline:none;transition:border-color .2s;direction:rtl;
+}
+.form-group input:focus,.form-group select:focus{border-color:var(--green);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-foot{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);justify-content:flex-end;}
+.btn-cancel-m{padding:9px 22px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
+
+/* color picker */
+.color-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+.color-opt{
+  width:36px;height:36px;border-radius:9px;cursor:pointer;
+  border:3px solid transparent;transition:all .15s;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:#0a1628;
+}
+.color-opt:hover{transform:scale(1.1);}
+.color-opt.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg);}
+
+/* preview */
+.tooth-preview{
+  display:flex;align-items:center;gap:12px;
+  padding:14px;background:var(--bg3);border-radius:10px;
+  margin-bottom:10px;
+}
+.preview-tooth{
+  width:36px;height:46px;border-radius:6px 6px 10px 10px;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;
+  border:2px solid;
+  box-shadow:inset 0 -3px 6px rgba(0,0,0,.1);
+}
+.preview-text{font-size:12px;color:var(--text2);}
+
+/* toast */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media(max-width:900px){
+  .page{padding:16px;}
+  .topbar{padding:12px 16px;}
+  .treat-grid{grid-template-columns:1fr;}
+}
+@media(max-width:600px){
+  .form-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="main" id="sbMainContent">
+
+<div class="topbar">
+  <div>
+    <div class="tb-title">🦷 قائمة العلاجات</div>
+    <div class="tb-sub">إدارة الأنواع والأسعار والألوان</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-outline" onclick="resetToDefaults()">↺ استعادة الافتراضي</button>
+    <button class="btn btn-primary" onclick="openAddModal()">＋ علاج جديد</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="info-box">
+    <span class="info-icon">💡</span>
+    <span>عند إضافة جلسة لمريض أو الضغط على سن في المخطط، التكلفة تُعبأ تلقائياً من السعر المحدد هنا (مع إمكانية التعديل اليدوي). الألوان تظهر على المخطط وفي السجلات.</span>
+  </div>
+
+  <div class="treat-grid" id="treatGrid"></div>
+
+</div>
+</div>
+
+<!-- Modal: Add/Edit Treatment -->
+<div class="modal-overlay" id="treatModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">＋ إضافة علاج جديد</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>اسم العلاج</label>
+          <input type="text" id="tName" placeholder="مثال: حشوة كومبوزيت">
+        </div>
+        <div class="form-group">
+          <label>السعر (ل.س)</label>
+          <input type="number" id="tPrice" placeholder="50000" min="0" inputmode="numeric">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>الحرف داخل السن</label>
+        <input type="text" id="tLabel" placeholder="ح" maxlength="2" style="text-align:center;font-size:18px;font-weight:800;">
+      </div>
+
+      <div class="form-group">
+        <label>اللون</label>
+        <div class="color-picker" id="colorPicker">
+          <div class="color-opt" data-fill="#2ee89e" data-stroke="#1fba7e" style="background:#2ee89e;color:#0a1628;">A</div>
+          <div class="color-opt" data-fill="#63b3ed" data-stroke="#2b7ab5" style="background:#63b3ed;color:#0a1628;">A</div>
+          <div class="color-opt" data-fill="#f5c842" data-stroke="#c9962a" style="background:#f5c842;color:#0a1628;">A</div>
+          <div class="color-opt" data-fill="#ef5350" data-stroke="#c62828" style="background:#ef5350;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#a78bfa" data-stroke="#7c5cbf" style="background:#a78bfa;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#fb923c" data-stroke="#c2691f" style="background:#fb923c;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#ec4899" data-stroke="#a51a6e" style="background:#ec4899;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#06b6d4" data-stroke="#0a809a" style="background:#06b6d4;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#84cc16" data-stroke="#5a9410" style="background:#84cc16;color:#fff;">A</div>
+          <div class="color-opt" data-fill="#a3a3a3" data-stroke="#6b6b6b" style="background:#a3a3a3;color:#fff;">A</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>معاينة على السن</label>
+        <div class="tooth-preview">
+          <div class="preview-tooth" id="previewTooth">ح</div>
+          <div class="preview-text" id="previewText">هكذا سيظهر العلاج على المخطط</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal()">إلغاء</button>
+      <button class="btn-save-m" onclick="saveTreatment()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var K_TREATMENTS = 'sydent_treatments';
+
+// ── Default treatments (seed data) ──
+var DEFAULT_TREATMENTS = [
+  { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
+  { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
+  { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
+  { id:'root-canal',  name:'قناة جذر',     label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
+  { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true },
+  { id:'cleaning',    name:'تنظيف',         label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false },
+  { id:'whitening',   name:'تبييض',         label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false },
+  { id:'xray',        name:'أشعة',          label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false },
+  { id:'consult',     name:'استشارة',       label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false }
+];
+
+// ── Load treatments ──
+var treatments = JSON.parse(localStorage.getItem(K_TREATMENTS) || 'null');
+if (!treatments || !Array.isArray(treatments) || treatments.length === 0) {
+  treatments = DEFAULT_TREATMENTS.slice();
+  saveAll();
+}
+
+function saveAll() {
+  localStorage.setItem(K_TREATMENTS, JSON.stringify(treatments));
+}
+
+function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
+
+// ── Render grid ──
+function render() {
+  var grid = document.getElementById('treatGrid');
+  if (!treatments.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2);"><div style="font-size:48px;margin-bottom:12px;">🦷</div><div>لا توجد علاجات. أضف أول علاج للبدء.</div></div>';
+    return;
+  }
+  var html = '';
+  for (var i=0; i<treatments.length; i++) {
+    var t = treatments[i];
+    var bg = t.fill, fg = t.stroke;
+    var iconBg = 'background:' + bg + ';';
+    var bar = 'background:' + bg + ';';
+    var textColor = isLightColor(bg) ? '#0a1628' : '#fff';
+    var builtinTag = t.builtin ? '<div class="treat-builtin-tag">افتراضي</div>' : '';
+    html += '<div class="treat-card">'
+      + '<div class="treat-color-bar" style="' + bar + '"></div>'
+      + builtinTag
+      + '<div class="treat-body">'
+        + '<div class="treat-head">'
+          + '<div>'
+            + '<div class="treat-name">' + escapeHtml(t.name) + '</div>'
+            + '<div class="treat-key">المعرّف: ' + t.id + '</div>'
+          + '</div>'
+          + '<div class="treat-icon" style="' + iconBg + 'color:' + textColor + ';border:2px solid ' + fg + ';">' + (t.label || '') + '</div>'
+        + '</div>'
+        + '<div class="treat-price">' + fmt(t.price) + ' <span class="currency">ل.س</span></div>'
+        + '<div class="treat-actions">'
+          + '<button class="ed-btn" onclick="editTreatment(\'' + t.id + '\')">✏️ تعديل</button>'
+          + (t.builtin
+              ? '<button class="del-btn" onclick="alert(\'لا يمكن حذف العلاج الافتراضي\')" style="opacity:.5;cursor:not-allowed;">🗑 محمي</button>'
+              : '<button class="del-btn" onclick="deleteTreatment(\'' + t.id + '\')">🗑 حذف</button>')
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function isLightColor(hex) {
+  var c = hex.replace('#','');
+  var r = parseInt(c.substr(0,2),16);
+  var g = parseInt(c.substr(2,2),16);
+  var b = parseInt(c.substr(4,2),16);
+  // perceived brightness
+  return (r*299 + g*587 + b*114)/1000 > 155;
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+// ── Modal logic ──
+var editingId = null;
+var pickedFill = '#2ee89e', pickedStroke = '#1fba7e';
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '＋ إضافة علاج جديد';
+  document.getElementById('tName').value  = '';
+  document.getElementById('tPrice').value = '';
+  document.getElementById('tLabel').value = '';
+  pickColor('#2ee89e','#1fba7e');
+  updatePreview();
+  openModal();
+}
+
+function editTreatment(id) {
+  var t = null;
+  for (var i=0; i<treatments.length; i++) if (treatments[i].id === id) { t = treatments[i]; break; }
+  if (!t) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = '✏️ تعديل: ' + t.name;
+  document.getElementById('tName').value  = t.name;
+  document.getElementById('tPrice').value = t.price;
+  document.getElementById('tLabel').value = t.label;
+  pickColor(t.fill, t.stroke);
+  updatePreview();
+  openModal();
+}
+
+function deleteTreatment(id) {
+  if (!confirm('حذف هذا العلاج؟ الجلسات السابقة لن تتأثر.')) return;
+  treatments = treatments.filter(function(t){ return t.id !== id; });
+  saveAll();
+  render();
+  showToast('🗑️ تم الحذف');
+}
+
+function resetToDefaults() {
+  if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
+  treatments = DEFAULT_TREATMENTS.slice();
+  saveAll();
+  render();
+  showToast('↺ تم استعادة الافتراضي');
+}
+
+function saveTreatment() {
+  var name  = document.getElementById('tName').value.trim();
+  var price = parseFloat(document.getElementById('tPrice').value);
+  var label = document.getElementById('tLabel').value.trim();
+  if (!name)              { showToast('⚠️ الاسم مطلوب'); return; }
+  if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
+  if (!label)             { showToast('⚠️ ضع حرفاً واحداً للسن'); return; }
+
+  if (editingId) {
+    for (var i=0; i<treatments.length; i++) {
+      if (treatments[i].id === editingId) {
+        treatments[i].name   = name;
+        treatments[i].price  = price;
+        treatments[i].label  = label;
+        treatments[i].fill   = pickedFill;
+        treatments[i].stroke = pickedStroke;
+        break;
+      }
+    }
+  } else {
+    // generate unique id
+    var base = 'custom_' + Date.now();
+    treatments.push({
+      id: base, name:name, price:price, label:label,
+      fill:pickedFill, stroke:pickedStroke, builtin:false
+    });
+  }
+  saveAll();
+  closeModal();
+  render();
+  showToast(editingId ? '✅ تم التعديل' : '✅ تم إضافة العلاج');
+}
+
+function pickColor(fill, stroke) {
+  pickedFill = fill;
+  pickedStroke = stroke;
+  var opts = document.querySelectorAll('.color-opt');
+  for (var i=0; i<opts.length; i++) {
+    var o = opts[i];
+    if (o.getAttribute('data-fill') === fill) o.classList.add('selected');
+    else o.classList.remove('selected');
+  }
+}
+
+function updatePreview() {
+  var label = document.getElementById('tLabel').value.trim() || 'ح';
+  var p = document.getElementById('previewTooth');
+  p.style.background    = pickedFill;
+  p.style.borderColor   = pickedStroke;
+  p.style.color         = isLightColor(pickedFill) ? '#0a1628' : '#fff';
+  p.textContent         = label;
+}
+
+// wire up color picker
+document.querySelectorAll('.color-opt').forEach(function(o){
+  o.addEventListener('click', function(){
+    pickColor(o.getAttribute('data-fill'), o.getAttribute('data-stroke'));
+    updatePreview();
+  });
+});
+document.getElementById('tLabel').addEventListener('input', updatePreview);
+
+function openModal()  { document.getElementById('treatModal').classList.add('open'); }
+function closeModal() {
+  var el = document.getElementById('treatModal');
+  el.classList.remove('open');
+  el.style.display = 'none';
+  setTimeout(function(){ el.style.display = ''; }, 50);
+}
+document.getElementById('treatModal').addEventListener('click', function(e){
+  if (e.target === this) closeModal();
+});
+
+var toastT;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
+}
+
+render();
+</script>
+
+<script>
+initSidebar('treatments');
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.createElement('button');
+  btn.className = 'sb-hamburger';
+  btn.innerHTML = '<span></span><span></span><span></span>';
+  btn.onclick = function() { window.sbToggle(); };
+  var topbar = document.querySelector('.topbar');
+  if (topbar) topbar.insertBefore(btn, topbar.firstChild);
+});
+</script>
+</body>
+</html>
