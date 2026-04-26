@@ -494,6 +494,7 @@ function init() {
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
   if (params.get('pay') === '1') setTimeout(openPayModal, 350);
+  if (params.get('appt') === '1') setTimeout(openApptModal, 350);
 }
 
 function renderHeader() {

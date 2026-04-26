@@ -186,6 +186,14 @@ td {
   display: flex; align-items: center; justify-content: center;
   font-size: 15px; font-weight: 700; flex-shrink: 0;
 }
+.seq-badge {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; flex-shrink: 0;
+  background: rgba(46,232,158,0.10);
+  color: var(--green);
+  border: 1px solid rgba(46,232,158,0.25);
+}
 .patient-name { font-weight: 600; font-size: 14px; }
 .patient-id   { font-size: 11px; color: var(--text2); }
 
@@ -782,10 +790,10 @@ function render() {
       <tr class="${rowCls}" onclick="openProfile('${p.id}')" style="cursor:pointer;">
         <td>
           <div class="patient-cell">
-            <div class="avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
+            <div class="seq-badge">${seqMap[p.id]}</div>
             <div>
               <div class="patient-name">${p.name}</div>
-              <div class="patient-id">#${seqMap[p.id]} · ${p.id}</div>
+              <div class="patient-id">${p.id}</div>
             </div>
           </div>
         </td>
@@ -799,7 +807,7 @@ function render() {
         </td>
         <td>
           <div class="action-btns" onclick="event.stopPropagation()">
-            <button class="btn-sm outline" onclick="event.stopPropagation();editPatient('${p.id}')">تعديل</button>
+            <button class="btn-sm outline" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&appt=1'">📅 موعد جديد</button>
             <button class="btn-sm pay" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&pay=1'">💰 تسجيل دفعة</button>
             <button class="dots-btn" onclick="toggleDotsMenu(this)">⋮</button>
             <div class="dots-menu">
