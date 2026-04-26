@@ -837,40 +837,27 @@ function renderDay() {
   const dayEvts = apptsByDate(ds);
   document.getElementById('daySubtitle').textContent = dayEvts.length ? dayEvts.length+' موعد' : 'لا توجد مواعيد';
 
-  // Compute hour range based on actual appts (min..max) padded by 1 hour
-  var minH = 8, maxH = 19;
-  if (dayEvts.length > 0) {
-    var hrs = dayEvts.map(function(a){ return parseInt(a.time.split(':')[0]) || 0; });
-    minH = Math.min(minH, Math.min.apply(null, hrs));
-    maxH = Math.max(maxH, Math.max.apply(null, hrs) + 1);
-  }
-  const hours = [];
-  for (var _hh = minH; _hh <= maxH; _hh++) hours.push(_hh);
+  // Sort appts by time
+  var sorted = dayEvts.slice().sort(function(a,b){ return a.time.localeCompare(b.time); });
   let html = '';
-  hours.forEach(h => {
-    const timeStr = String(h).padStart(2,'0')+':00';
-    const half    = String(h).padStart(2,'0')+':30';
-    // find appts in this hour
-    const evts = dayEvts.filter(a => {
-      const ah = parseInt(a.time.split(':')[0]);
-      return ah === h;
-    });
-    let evHTML = '';
-    evts.forEach(e => {
+  if (sorted.length === 0) {
+    html = '<div style="text-align:center;padding:60px 20px;color:var(--text2);"><div style="font-size:48px;margin-bottom:12px;">📅</div><div>لا توجد مواعيد لهذا اليوم</div></div>';
+  } else {
+    sorted.forEach(function(e){
       var _bc = getApptColor(e);
-      evHTML += `
-        <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-          <div class="appt-name">${e.patient}</div>
-          <div class="appt-type">${e.time} — ${e.type} (${e.duration} د)</div>
-          <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
+      html += `
+        <div class="time-slot">
+          <div class="slot-time">${e.time}</div>
+          <div class="slot-content">
+            <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
+              <div class="appt-name">${e.patient}</div>
+              <div class="appt-type">${e.type} (${e.duration} د)</div>
+              <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
+            </div>
+          </div>
         </div>`;
     });
-    html += `
-      <div class="time-slot">
-        <div class="slot-time">${timeStr}</div>
-        <div class="slot-content${evts.length?'':' slot-empty'}">${evHTML}</div>
-      </div>`;
-  });
+  }
   document.getElementById('timeline').innerHTML = html;
 }
 
