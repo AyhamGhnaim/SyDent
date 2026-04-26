@@ -837,7 +837,15 @@ function renderDay() {
   const dayEvts = apptsByDate(ds);
   document.getElementById('daySubtitle').textContent = dayEvts.length ? dayEvts.length+' موعد' : 'لا توجد مواعيد';
 
-  const hours = [8,9,10,11,12,13,14,15,16,17,18];
+  // Compute hour range based on actual appts (min..max) padded by 1 hour
+  var minH = 8, maxH = 19;
+  if (dayEvts.length > 0) {
+    var hrs = dayEvts.map(function(a){ return parseInt(a.time.split(':')[0]) || 0; });
+    minH = Math.min(minH, Math.min.apply(null, hrs));
+    maxH = Math.max(maxH, Math.max.apply(null, hrs) + 1);
+  }
+  const hours = [];
+  for (var _hh = minH; _hh <= maxH; _hh++) hours.push(_hh);
   let html = '';
   hours.forEach(h => {
     const timeStr = String(h).padStart(2,'0')+':00';
