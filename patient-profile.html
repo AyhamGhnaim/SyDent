@@ -472,6 +472,8 @@ function safe(fn, label) {
   try { fn(); } catch(e) { console.error('Error in ' + label + ':', e); }
 }
 function populateSessionTypes() {
+  // Always re-read from localStorage
+  TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
   var sel = document.getElementById('sType');
   if (!sel) return;
   sel.innerHTML = '<option value="">— اختر —</option>';
@@ -689,6 +691,8 @@ var pendingToothStatus = null;
 var pendingToothLabel = null;
 
 function openToothModal(n) {
+  // Always re-read treatments from localStorage
+  TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
   currentTooth = n;
   var teeth = allTeeth[patientId] || {};
   document.getElementById('toothModalTitle').textContent = 'السن ' + n + (teeth[n] ? ' — ' + (getTreatment(teeth[n]) ? getTreatment(teeth[n]).name : teeth[n]) : ' (سليم)');
@@ -1072,6 +1076,8 @@ function closeModal(id) {
 function openPayModal()     { document.getElementById('payDate').value=toDay(); openModal('payModal'); }
 function openSessionModal() { document.getElementById('sDate').value=toDay();   openModal('sessionModal'); }
 function populateApptTypes() {
+  // Always re-read from localStorage to pick up changes from treatments.html
+  TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
   var sel = document.getElementById('aType');
   if (!sel) return;
   sel.innerHTML = '';

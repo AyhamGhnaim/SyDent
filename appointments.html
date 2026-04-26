@@ -602,6 +602,8 @@ function getTreatment(id) {
   return null;
 }
 function populateApptTypes() {
+  // Always re-read from localStorage to pick up changes from treatments.html
+  TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
   var sel = document.getElementById('fType');
   if (!sel) return;
   sel.innerHTML = '';
