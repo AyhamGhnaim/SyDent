@@ -164,8 +164,9 @@ function buildHTML(activeId) {
     }
     const isActive = item.id === activeId ? 'active' : '';
     const badge = item.badge ? `<span class="sb-badge">${item.badge}</span>` : '';
+    const clickAttr = item.onClick ? `onclick="event.preventDefault();window.${item.onClick}();"` : '';
     return `
-      <a class="sb-item ${isActive}" href="${item.href}">
+      <a class="sb-item ${isActive}" href="${item.href}" ${clickAttr}>
         <span class="sb-icon">${item.icon}</span>
         ${item.label}
         ${badge}
