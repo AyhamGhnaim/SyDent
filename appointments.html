@@ -659,6 +659,16 @@ function getApptColor(appt) {
   var fill = resolveColor(appt.color);
   return { fill: fill, stroke: appt.stroke || fill };
 }
+// Convert hex (#rrggbb) to rgba with alpha
+function hexA(hex, a) {
+  if (!hex || hex.charAt(0) !== '#') hex = '#2ee89e';
+  var h = hex.replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  var r = parseInt(h.substr(0,2),16),
+      g = parseInt(h.substr(2,2),16),
+      b = parseInt(h.substr(4,2),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
 
 let appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
 if (appointments.length === 0 && !localStorage.getItem('sydent_appts_seeded')) {
@@ -839,8 +849,9 @@ function renderDay() {
     });
     let evHTML = '';
     evts.forEach(e => {
+      var _bc = getApptColor(e);
       evHTML += `
-        <div class="appt-block" style="border-right-color:${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
+        <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
           <div class="appt-name">${e.patient}</div>
           <div class="appt-type">${e.time} — ${e.type} (${e.duration} د)</div>
           <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
@@ -889,7 +900,7 @@ function renderList() {
       </div>`;
     evts.forEach(e => {
       html += `
-        <div class="list-item" style="border-right-color:${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
+        <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${e.time}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient)}22;color:${avatarColor(e.patient)}">${initials(e.patient)}</div>
           <div class="list-info">
@@ -1015,6 +1026,9 @@ function submitAppt(e) {
     appointments.push(appt);
     showToast('✅ تمت إضافة الموعد');
   }
+  // sync selected date to the appt's date so the day view shows it
+  selectedDate = new Date(appt.date + 'T12:00:00');
+  currentDate  = new Date(appt.date + 'T12:00:00');
   save(); closeModal(); render();
 }
 
