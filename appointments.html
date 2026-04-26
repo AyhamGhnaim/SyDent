@@ -590,36 +590,41 @@ textarea { resize: vertical; min-height: 72px; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── Treatments catalog (shared with treatments.html) ───
-(function seedTreatments(){
-  var defaults = [
-    { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
-    { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
-    { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
-    { id:'root-canal',  name:'قناة جذر',      label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
-    { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true },
-    { id:'cleaning',    name:'تنظيف',         label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false },
-    { id:'whitening',   name:'تبييض',         label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false },
-    { id:'xray',        name:'أشعة',          label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false },
-    { id:'consult',     name:'استشارة',       label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false }
-  ];
-  var raw = localStorage.getItem('sydent_treatments');
-  var arr = raw ? JSON.parse(raw) : null;
-  if (!Array.isArray(arr)) {
-    // First time ever
-    localStorage.setItem('sydent_treatments', JSON.stringify(defaults));
-    localStorage.setItem('sydent_treatments_seeded', '1');
-  }
-  // If user deleted all, respect that — don't re-seed
-})();
-var TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
+// ─── Treatments catalog: load from Supabase ───
+var TREATMENTS = [];
+
+async function loadTreatmentsFromSupabase() {
+  if (!window.sb) return;
+  try {
+    const { data, error } = await window.sb
+      .from('treatments')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) { console.error('treatments load:', error); return; }
+    // map to UI format - use treatment_key as id for compatibility
+    TREATMENTS = (data || []).map(function(t){
+      return {
+        id: t.treatment_key,  // use key as id for backward-compat with stored sessions/teeth
+        dbId: t.id,
+        name: t.name,
+        label: t.label,
+        fill: t.fill,
+        stroke: t.stroke,
+        price: t.price,
+        builtin: t.builtin
+      };
+    });
+    // Cache to localStorage so legacy code still works as fallback
+    localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
+  } catch(e) { console.error(e); }
+}
+
 function getTreatment(id) {
   for (var i=0; i<TREATMENTS.length; i++) if (TREATMENTS[i].id === id) return TREATMENTS[i];
   return null;
 }
-function populateApptTypes() {
-  // Always re-read from localStorage to pick up changes from treatments.html
-  TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
+async function populateApptTypes() {
+  await loadTreatmentsFromSupabase();
   var sel = document.getElementById('fType');
   if (!sel) return;
   sel.innerHTML = '';
@@ -635,6 +640,11 @@ function populateApptTypes() {
   other.textContent = 'أخرى';
   sel.appendChild(other);
 }
+
+// Load treatments on page load too
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(loadTreatmentsFromSupabase, 200);
+});
 
 // ─── Data ───────────────────────────────────────────
 const COLORS_MAP = {
