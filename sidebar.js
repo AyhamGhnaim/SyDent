@@ -154,6 +154,7 @@ const navItems = [
   { icon: '📋', label: 'السجلات',     href: '#',             id: 'logs'      },
   { section: 'النظام' },
   { icon: '⚙️', label: 'الإعدادات',  href: '#',             id: 'settings'  },
+  { icon: '🚪', label: 'تسجيل خروج', href: '#',             id: 'logout', onClick: 'doLogout' },
 ];
 
 function buildHTML(activeId) {

@@ -472,6 +472,18 @@ textarea { resize: vertical; min-height: 80px; }
 <script src="sidebar.js"></script>
 </head>
 <body>
+<script>
+// SyDent auth guard
+(async function(){
+  await new Promise(r => setTimeout(r, 50));
+  if (!window.sb) { console.warn('Supabase not loaded'); return; }
+  const { data } = await window.sb.auth.getUser();
+  if (!data || !data.user) {
+    window.location.href = 'auth.html';
+  }
+})();
+</script>
+
 
 <!-- ═══ Main ═══ -->
 <div class="main" id="sbMainContent">

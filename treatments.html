@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
 <script src="sidebar.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -364,52 +366,70 @@ function editTreatment(id) {
   openModal();
 }
 
-function deleteTreatment(id) {
+async function deleteTreatment(id) {
   if (!confirm('حذف هذا العلاج؟ الجلسات السابقة لن تتأثر.')) return;
-  treatments = treatments.filter(function(t){ return t.id !== id; });
-  saveAll();
-  render();
+  const { error } = await window.sb.from('treatments').delete().eq('id', id);
+  if (error) { showToast('⚠️ ' + error.message); return; }
+  await loadTreatments();
   showToast('🗑️ تم الحذف');
 }
 
-function resetToDefaults() {
+async function resetToDefaults() {
   if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
-  treatments = DEFAULT_TREATMENTS.slice();
-  saveAll();
-  render();
+  const DEFAULTS = [
+    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  sort_order:1 },
+    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  sort_order:2 },
+    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  sort_order:3 },
+    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  sort_order:4 },
+    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  sort_order:5 },
+    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, sort_order:6 },
+    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, sort_order:7 },
+    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, sort_order:8 },
+    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, sort_order:9 }
+  ];
+  // delete all current
+  await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
+  // insert defaults
+  const rows = DEFAULTS.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
+  const { error } = await window.sb.from('treatments').insert(rows);
+  if (error) { showToast('⚠️ ' + error.message); return; }
+  await loadTreatments();
   showToast('↺ تم استعادة الافتراضي');
 }
 
-function saveTreatment() {
+async function saveTreatment() {
   var name  = document.getElementById('tName').value.trim();
   var price = parseFloat(document.getElementById('tPrice').value);
   var label = document.getElementById('tLabel').value.trim();
-  if (!name)              { showToast('⚠️ الاسم مطلوب'); return; }
+  if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
-  if (!label)             { showToast('⚠️ ضع حرفاً واحداً للسن'); return; }
+  if (!label)                { showToast('⚠️ ضع حرفاً واحداً للسن'); return; }
 
   if (editingId) {
-    for (var i=0; i<treatments.length; i++) {
-      if (treatments[i].id === editingId) {
-        treatments[i].name   = name;
-        treatments[i].price  = price;
-        treatments[i].label  = label;
-        treatments[i].fill   = pickedFill;
-        treatments[i].stroke = pickedStroke;
-        break;
-      }
-    }
+    // UPDATE existing
+    const { error } = await window.sb
+      .from('treatments')
+      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, updated_at: new Date().toISOString() })
+      .eq('id', editingId);
+    if (error) { showToast('⚠️ ' + error.message); return; }
   } else {
-    // generate unique id
-    var base = 'custom_' + Date.now();
-    treatments.push({
-      id: base, name:name, price:price, label:label,
-      fill:pickedFill, stroke:pickedStroke, builtin:false
-    });
+    // INSERT new
+    const key = 'custom_' + Date.now();
+    const maxOrder = treatments.length > 0 ? Math.max.apply(null, treatments.map(t=>t.sort_order||0)) : 0;
+    const { error } = await window.sb
+      .from('treatments')
+      .insert({
+        doctor_id: currentDoctor.id,
+        treatment_key: key,
+        name: name, price: price, label: label,
+        fill: pickedFill, stroke: pickedStroke,
+        builtin: false,
+        sort_order: maxOrder + 1
+      });
+    if (error) { showToast('⚠️ ' + error.message); return; }
   }
-  saveAll();
   closeModal();
-  render();
+  await loadTreatments();
   showToast(editingId ? '✅ تم التعديل' : '✅ تم إضافة العلاج');
 }
 
@@ -441,6 +461,11 @@ document.querySelectorAll('.color-opt').forEach(function(o){
   });
 });
 document.getElementById('tLabel').addEventListener('input', updatePreview);
+
+// Replace direct render() at bottom with auth-aware loader
+window.addEventListener('load', function(){
+  loadTreatments();
+});
 
 function openModal()  { document.getElementById('treatModal').classList.add('open'); }
 function closeModal() {

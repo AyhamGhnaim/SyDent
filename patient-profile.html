@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
 <script src="sidebar.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -189,6 +191,18 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 </style>
 </head>
 <body>
+<script>
+// SyDent auth guard
+(async function(){
+  await new Promise(r => setTimeout(r, 50));
+  if (!window.sb) { console.warn('Supabase not loaded'); return; }
+  const { data } = await window.sb.auth.getUser();
+  if (!data || !data.user) {
+    window.location.href = 'auth.html';
+  }
+})();
+</script>
+
 <div class="main" id="sbMainContent">
 
 <div class="topbar">
