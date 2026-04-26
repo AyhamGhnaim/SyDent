@@ -61,7 +61,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   font-size:26px;font-weight:800;color:#fff;flex-shrink:0;
 }
 .h-info{flex:1;min-width:0;}
-.h-name{font-size:24px;font-weight:800;margin-bottom:5px;}
+.h-name{font-size:24px;font-weight:800;margin-bottom:5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.seq-pill{font-size:13px;font-weight:800;color:var(--green);background:rgba(46,232,158,0.12);border:1px solid rgba(46,232,158,0.3);border-radius:8px;padding:2px 10px;}
 .h-sub{font-size:13px;color:var(--text2);display:flex;flex-wrap:wrap;gap:10px;align-items:center;}
 .allergy-tag{
   display:inline-flex;align-items:center;gap:4px;
@@ -497,13 +498,22 @@ function init() {
   if (params.get('appt') === '1') setTimeout(openApptModal, 350);
 }
 
+function getSeqNumber() {
+  var sorted = patients.slice().sort(function(a,b){
+    return (a.createdAt||'').localeCompare(b.createdAt||'');
+  });
+  for (var i=0; i<sorted.length; i++) if (sorted[i].id === patientId) return i+1;
+  return '?';
+}
+
 function renderHeader() {
   var name = patient.name || 'مريض بدون اسم';
   var col = avatarColor(name);
   var av  = document.getElementById('avatarEl');
   av.style.background = col;
   av.textContent = initials(name);
-  document.getElementById('pName').textContent = name;
+  var seq = getSeqNumber();
+  document.getElementById('pName').innerHTML = name + ' <span class="seq-pill">#' + seq + '</span>';
   var sub = '<span>' + (patient.gender||'—') + '</span><span>•</span><span>' + calcAge(patient.dob) + '</span>';
   if (patient.phone) sub += '<span>•</span><span>' + patient.phone + '</span>';
   if (patient.allergies && patient.allergies !== 'لا يوجد')
