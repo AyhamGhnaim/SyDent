@@ -847,10 +847,9 @@ function openModal(prefillDate) {
   document.getElementById('fDate').value     = prefillDate || dateStr(new Date());
   document.getElementById('fTime').value     = '';
   document.getElementById('fDuration').value = '60';
-  // Find treatment by stored name and set the id
-  var _foundT = null;
-  for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === e.type) { _foundT = TREATMENTS[_i]; break; }
-  document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
+  // default to first treatment
+  populateApptTypes();
+  if (TREATMENTS.length > 0) document.getElementById('fType').value = TREATMENTS[0].id;
   document.getElementById('fStatus').value   = 'confirmed';
   document.getElementById('fNotes').value    = '';
   document.querySelectorAll('.color-dot').forEach(d => {
@@ -876,7 +875,11 @@ function editAppt(id) {
   document.getElementById('fDate').value     = a.date;
   document.getElementById('fTime').value     = a.time;
   document.getElementById('fDuration').value = a.duration;
-  document.getElementById('fType').value     = a.type;
+  populateApptTypes();
+  // Find treatment by stored name and set the id
+  var _foundT = null;
+  for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === a.type) { _foundT = TREATMENTS[_i]; break; }
+  document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   document.getElementById('fStatus').value   = a.status;
   document.getElementById('fNotes').value    = a.notes||'';
   document.querySelectorAll('.color-dot').forEach(d => {
@@ -900,13 +903,17 @@ function selectColor(c, el) {
 
 function submitAppt(e) {
   e.preventDefault();
+  // resolve treatment id -> name
+  var typeVal = document.getElementById('fType').value;
+  var _t = getTreatment(typeVal);
+  var typeName = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
   const appt = {
     id:       editingId || nextId(),
     patient:  document.getElementById('fPatient').value.trim(),
     date:     document.getElementById('fDate').value,
     time:     document.getElementById('fTime').value,
     duration: parseInt(document.getElementById('fDuration').value),
-    type:     document.getElementById('fType').value,
+    type:     typeName,
     status:   document.getElementById('fStatus').value,
     notes:    document.getElementById('fNotes').value.trim(),
     color:    selectedColor,
