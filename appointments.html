@@ -581,6 +581,43 @@ textarea { resize: vertical; min-height: 72px; }
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── Treatments catalog (shared with treatments.html) ───
+(function seedTreatments(){
+  var raw = localStorage.getItem('sydent_treatments');
+  var arr = raw ? JSON.parse(raw) : null;
+  if (!arr || !Array.isArray(arr) || arr.length === 0) {
+    var defaults = [
+      { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
+      { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
+      { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
+      { id:'root-canal',  name:'قناة جذر',      label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
+      { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true }
+    ];
+    localStorage.setItem('sydent_treatments', JSON.stringify(defaults));
+  }
+})();
+var TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
+function getTreatment(id) {
+  for (var i=0; i<TREATMENTS.length; i++) if (TREATMENTS[i].id === id) return TREATMENTS[i];
+  return null;
+}
+function populateApptTypes() {
+  var sel = document.getElementById('fType');
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (var i=0; i<TREATMENTS.length; i++) {
+    var t = TREATMENTS[i];
+    var opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+  var other = document.createElement('option');
+  other.value = '_other';
+  other.textContent = 'أخرى';
+  sel.appendChild(other);
+}
+
 // ─── Data ───────────────────────────────────────────
 const COLORS_MAP = {
   green:  '#2ee89e',
