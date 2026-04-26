@@ -130,12 +130,17 @@ body{
 
 <script>
 // إذا الدكتور مسجّل دخول مسبقاً، انقله للـ dashboard
+// إلا إذا جاء من تسجيل خروج (logged_out=1)
 (async function(){
-  // wait briefly for supabase-init.js
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 150));
   if (!window.sb) return;
+  // إذا قادم من logout، تأكد من تنظيف الـsession
+  if (window.location.search.indexOf('logged_out=1') !== -1) {
+    try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e){}
+    return;
+  }
   const user = await sbGetUser();
-  if (user) window.location.href = 'index.html';
+  if (user) window.location.replace('index.html');
 })();
 
 function switchTab(which) {

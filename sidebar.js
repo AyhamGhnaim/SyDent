@@ -378,8 +378,17 @@ window.doLogout = async function() {
   if (!confirm('هل تريد تسجيل الخروج؟')) return;
   try {
     if (window.sb && window.sb.auth) {
-      await window.sb.auth.signOut();
+      await window.sb.auth.signOut({ scope: 'local' });
     }
   } catch(e) { console.error('signOut error', e); }
-  window.location.href = 'auth.html';
+  // Clear all Supabase auth storage manually as backup
+  try {
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf('sydent.auth') === 0 || k.indexOf('sb-') === 0 || k.indexOf('supabase') === 0) {
+        localStorage.removeItem(k);
+      }
+    });
+  } catch(e){}
+  // Hard redirect (replace prevents back button)
+  window.location.replace('auth.html?logged_out=1');
 };
