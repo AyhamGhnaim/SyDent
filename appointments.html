@@ -544,7 +544,7 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group">
           <label>نوع العلاج</label>
-          <select id="fType"></select>
+          <select id="fType" onchange="updateColorPreview()"></select>
         </div>
         <div class="form-group">
           <label>الحالة</label>
@@ -560,12 +560,9 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group full">
           <label>اللون</label>
-          <div class="color-row" id="colorPicker">
-            <div class="color-dot selected" data-color="green"  style="background:#2ee89e" onclick="selectColor('green',this)"></div>
-            <div class="color-dot"          data-color="blue"   style="background:#63b3ed" onclick="selectColor('blue',this)"></div>
-            <div class="color-dot"          data-color="yellow" style="background:#f5c842" onclick="selectColor('yellow',this)"></div>
-            <div class="color-dot"          data-color="red"    style="background:#ef5350" onclick="selectColor('red',this)"></div>
-            <div class="color-dot"          data-color="purple" style="background:#a78bfa" onclick="selectColor('purple',this)"></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
+            <div id="colorPreviewDot" style="width:24px;height:24px;border-radius:6px;background:#2ee89e;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>
+            <span style="font-size:12px;color:var(--text2);">يُحدَّد تلقائياً حسب نوع العلاج</span>
           </div>
         </div>
       </div>
@@ -635,6 +632,33 @@ const COLORS_MAP = {
   red:    '#ef5350',
   purple: '#a78bfa',
 };
+
+// Resolve appt color: if it's a hex code use directly, else look up the named color
+function resolveColor(c) {
+  if (!c) return '#2ee89e';
+  if (typeof c === 'string' && c.charAt(0) === '#') return c;
+  return COLORS_MAP[c] || '#2ee89e';
+}
+// Compatibility: legacy appts (before this change) may have stored a color BY TREATMENT NAME.
+// Try to look up the treatment by stored type name to get its actual color.
+function getApptColor(appt) {
+  // First, if treatmentId was stored, look it up directly
+  if (appt.treatmentId) {
+    var t = getTreatment(appt.treatmentId);
+    if (t) return { fill: t.fill, stroke: t.stroke };
+  }
+  // Otherwise, try by name
+  if (appt.type) {
+    for (var i=0; i<TREATMENTS.length; i++) {
+      if (TREATMENTS[i].name === appt.type) {
+        return { fill: TREATMENTS[i].fill, stroke: TREATMENTS[i].stroke };
+      }
+    }
+  }
+  // Fallback to legacy stored color
+  var fill = resolveColor(appt.color);
+  return { fill: fill, stroke: appt.stroke || fill };
+}
 
 let appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
 if (appointments.length === 0 && !localStorage.getItem('sydent_appts_seeded')) {
@@ -770,12 +794,13 @@ function cellHTML(day, ds, other, today, evts) {
   const MAX_SHOW = window.innerWidth < 820 ? 0 : 2;
   let evHTML = '';
   evts.slice(0, MAX_SHOW).forEach(e => {
-    evHTML += `<div class="cal-event ${e.color}" onclick="event.stopPropagation();editAppt('${e.id}')">${e.time} ${e.patient.split(' ')[0]}</div>`;
+    var _ec = getApptColor(e);
+    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${e.time} ${e.patient.split(' ')[0]}</div>`;
   });
   // Mobile dots
   let dotHTML = '<div class="cal-dot-row">';
   evts.slice(0,4).forEach(e => {
-    dotHTML += `<span class="cal-dot" style="background:${COLORS_MAP[e.color]}"></span>`;
+    dotHTML += `<span class="cal-dot" style="background:${getApptColor(e).fill}"></span>`;
   });
   dotHTML += '</div>';
   if (evts.length > MAX_SHOW && window.innerWidth >= 820) {
@@ -815,7 +840,7 @@ function renderDay() {
     let evHTML = '';
     evts.forEach(e => {
       evHTML += `
-        <div class="appt-block ${e.color}" onclick="editAppt('${e.id}')">
+        <div class="appt-block" style="border-right-color:${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="appt-name">${e.patient}</div>
           <div class="appt-type">${e.time} — ${e.type} (${e.duration} د)</div>
           <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
@@ -864,7 +889,7 @@ function renderList() {
       </div>`;
     evts.forEach(e => {
       html += `
-        <div class="list-item ${e.color}" onclick="editAppt('${e.id}')">
+        <div class="list-item" style="border-right-color:${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${e.time}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient)}22;color:${avatarColor(e.patient)}">${initials(e.patient)}</div>
           <div class="list-info">
@@ -899,9 +924,7 @@ function openModal(prefillDate) {
   if (TREATMENTS.length > 0) document.getElementById('fType').value = TREATMENTS[0].id;
   document.getElementById('fStatus').value   = 'confirmed';
   document.getElementById('fNotes').value    = '';
-  document.querySelectorAll('.color-dot').forEach(d => {
-    d.classList.toggle('selected', d.dataset.color==='green');
-  });
+  updateColorPreview();
 
   // تعبئة قائمة المرضى
   const patients = JSON.parse(localStorage.getItem('sydent_patients')||'[]');
@@ -927,11 +950,10 @@ function editAppt(id) {
   var _foundT = null;
   for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === a.type) { _foundT = TREATMENTS[_i]; break; }
   document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
+  updateColorPreview();
   document.getElementById('fStatus').value   = a.status;
   document.getElementById('fNotes').value    = a.notes||'';
-  document.querySelectorAll('.color-dot').forEach(d => {
-    d.classList.toggle('selected', d.dataset.color===a.color);
-  });
+
   document.getElementById('modalOverlay').classList.add('open');
 }
 
@@ -948,12 +970,30 @@ function selectColor(c, el) {
   el.classList.add('selected');
 }
 
+function updateColorPreview() {
+  var sel = document.getElementById('fType');
+  if (!sel) return;
+  var t = getTreatment(sel.value);
+  var dot = document.getElementById('colorPreviewDot');
+  if (!dot) return;
+  if (t) {
+    dot.style.background   = t.fill;
+    dot.style.borderColor  = t.stroke;
+  } else {
+    dot.style.background   = '#2ee89e';
+    dot.style.borderColor  = 'rgba(255,255,255,0.15)';
+  }
+}
+
 function submitAppt(e) {
   e.preventDefault();
   // resolve treatment id -> name
   var typeVal = document.getElementById('fType').value;
   var _t = getTreatment(typeVal);
   var typeName = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
+  // Color is derived from the treatment - store the actual color hex
+  const apptColor = _t ? _t.fill : '#2ee89e';
+  const apptStroke = _t ? _t.stroke : '#1fba7e';
   const appt = {
     id:       editingId || nextId(),
     patient:  document.getElementById('fPatient').value.trim(),
@@ -961,9 +1001,11 @@ function submitAppt(e) {
     time:     document.getElementById('fTime').value,
     duration: parseInt(document.getElementById('fDuration').value),
     type:     typeName,
+    treatmentId: typeVal !== '_other' ? typeVal : null,
     status:   document.getElementById('fStatus').value,
     notes:    document.getElementById('fNotes').value.trim(),
-    color:    selectedColor,
+    color:    apptColor,
+    stroke:   apptStroke,
   };
   if (editingId) {
     const i = appointments.findIndex(a=>a.id===editingId);

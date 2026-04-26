@@ -926,17 +926,8 @@ function saveAppt() {
   var typeVal = document.getElementById('aType').value;
   var _t = getTreatment(typeVal);
   var type = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
-  function _fillToApptColor(f){
-    if (!f) return 'green';
-    f = f.toLowerCase();
-    if (f === '#2ee89e' || f === '#84cc16' || f === '#06b6d4') return 'green';
-    if (f === '#ef5350' || f === '#fb923c' || f === '#ec4899') return 'red';
-    if (f === '#f5c842')                                       return 'yellow';
-    if (f === '#63b3ed')                                       return 'blue';
-    if (f === '#a78bfa')                                       return 'purple';
-    return 'green';
-  }
-  var apptColor = _t ? _fillToApptColor(_t.fill) : 'green';
+  var apptColor  = _t ? _t.fill   : '#2ee89e';
+  var apptStroke = _t ? _t.stroke : '#1fba7e';
   var date  = document.getElementById('aDate').value;
   var time  = document.getElementById('aTime').value;
   var dur   = document.getElementById('aDur').value;
@@ -945,7 +936,18 @@ function saveAppt() {
   var appts = JSON.parse(localStorage.getItem(K_APPTS)||'[]');
   var max = 0;
   for (var i=0;i<appts.length;i++) { var n=parseInt((appts[i].id||'0').replace('A',''))||0; if(n>max)max=n; }
-  appts.push({ id:'A'+String(max+1).padStart(3,'0'), patient:patient.name, date:date, time:time, duration:parseInt(dur), type:type, status:'pending', color:apptColor, notes:notes });
+  appts.push({
+    id:'A'+String(max+1).padStart(3,'0'),
+    patient: patient.name,
+    date: date, time: time,
+    duration: parseInt(dur),
+    type: type,
+    treatmentId: typeVal !== '_other' ? typeVal : null,
+    status: 'pending',
+    color: apptColor,
+    stroke: apptStroke,
+    notes: notes
+  });
   localStorage.setItem(K_APPTS, JSON.stringify(appts));
   closeModal('apptModal');
   document.getElementById('aNotes').value='';
