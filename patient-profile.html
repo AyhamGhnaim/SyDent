@@ -658,7 +658,7 @@ async function openToothModal(n) {
     var t = TREATMENTS[i];
     var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
     html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
-         + 'onclick="pickToothTreatment('' + t.id + '', '' + t.name.replace(/'/g, "\'") + '')">'
+         + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
          + '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:18px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
          + t.name + '</button>';
   }
