@@ -644,133 +644,50 @@ textarea { resize: vertical; min-height: 80px; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── Data ───
-const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
-
-let patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
-
-// Compute payment status for a patient from their ledger
-// ── Ensure default treatments exist on first load ──
-(function seedTreatments(){
-  var defaults = [
-    { id:'treated',     name:'حشوة',          label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true },
-    { id:'extracted',   name:'قلع',           label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true },
-    { id:'crown',       name:'تلبيس (تاج)',   label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true },
-    { id:'root-canal',  name:'قناة جذر',      label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true },
-    { id:'implant',     name:'زراعة',         label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true },
-    { id:'cleaning',    name:'تنظيف',         label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false },
-    { id:'whitening',   name:'تبييض',         label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false },
-    { id:'xray',        name:'أشعة',          label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false },
-    { id:'consult',     name:'استشارة',       label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false }
-  ];
-  var raw = localStorage.getItem('sydent_treatments');
-  var arr = raw ? JSON.parse(raw) : null;
-  if (!Array.isArray(arr)) {
-    // First time ever
-    localStorage.setItem('sydent_treatments', JSON.stringify(defaults));
-    localStorage.setItem('sydent_treatments_seeded', '1');
-  }
-  // If user deleted all, respect that — don't re-seed
-})();
-
-function computePaymentStatus(patientId) {
-  var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
-  var L = ledger[patientId];
-  var sessions = (L && (L.sessions || L.treatments)) || [];
-  var payments = (L && L.payments) || [];
-  var total = 0, paid = 0;
-  for (var i=0;i<sessions.length;i++) total += Number(sessions[i].cost||0);
-  for (var j=0;j<payments.length;j++) paid  += Number(payments[j].amount||0);
-  return (total > 0 && paid >= total) ? 'مسدّد' : 'متبقي';
-}
-
-// Sync all patients' payment status from their ledgers on load
-function syncAllPaymentStatuses() {
-  var changed = false;
-  var ledger = JSON.parse(localStorage.getItem('sydent_ledger') || '{}');
-  for (var i=0; i<patients.length; i++) {
-    // payment status — skip if user manually overrode
-    if (!patients[i].paymentManual) {
-      var s = computePaymentStatus(patients[i].id);
-      if (patients[i].payment !== s) {
-        patients[i].payment = s;
-        changed = true;
-      }
-    }
-    // auto-promote 'جديد' → 'تحت العلاج' if patient has any sessions
-    var L = ledger[patients[i].id];
-    var sessionsArr = L ? (L.sessions || L.treatments || []) : [];
-    if (patients[i].status === 'جديد' && sessionsArr.length > 0) {
-      patients[i].status = 'تحت العلاج';
-      changed = true;
-    }
-  }
-  if (changed) localStorage.setItem('sydent_patients', JSON.stringify(patients));
-}
-syncAllPaymentStatuses();
-if (patients.length === 0 && !localStorage.getItem('sydent_seeded')) {
-  localStorage.setItem('sydent_seeded', '1');
-  patients = [
-    { id:'P001', name:'أحمد محمود السيد',    phone:'0934567890', dob:'1985-03-12', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-04-15', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-01' },
-    { id:'P002', name:'سارة خالد العلي',     phone:'0987654321', dob:'1992-07-24', gender:'أنثى', payment:'متبقي', status:'تحت العلاج', lastVisit:'2026-04-20', allergies:'بنسلين',  notes:'حساسة من مخدر الأسنان', createdAt:'2026-04-05' },
-    { id:'P003', name:'محمد رامي الأتاسي',   phone:'0911223344', dob:'1978-11-03', gender:'ذكر',  payment:'مسدّد', status:'تحت العلاج', lastVisit:'2026-04-18', allergies:'لاتكس',   notes:'',            createdAt:'2026-04-10' },
-    { id:'P004', name:'ليلى فادي الحموي',    phone:'0944332211', dob:'2001-05-18', gender:'أنثى', payment:'متبقي', status:'جديد',       lastVisit:'2026-04-22', allergies:'لا يوجد',  notes:'مريضة جديدة', createdAt:'2026-04-22' },
-    { id:'P005', name:'عمر سامر جابر',       phone:'0933445566', dob:'1995-09-30', gender:'ذكر',  payment:'مسدّد', status:'مكتمل',    lastVisit:'2026-03-10', allergies:'لا يوجد',  notes:'',            createdAt:'2026-03-01' },
-    { id:'P006', name:'رنا وليد الزعبي',     phone:'0966778899', dob:'1988-02-14', gender:'أنثى', payment:'مسدّد', status:'تحت العلاج', lastVisit:'2026-04-21', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-08' },
-    { id:'P007', name:'كريم نادر عيسى',      phone:'0922334455', dob:'1970-12-25', gender:'ذكر',  payment:'متبقي', status:'تحت العلاج', lastVisit:'2026-04-19', allergies:'أسبرين',  notes:'ضغط دم',      createdAt:'2026-04-12' },
-    { id:'P008', name:'ديانا حسام الشريف',   phone:'0955667788', dob:'2003-06-08', gender:'أنثى', payment:'مسدّد', status:'جديد',       lastVisit:'2026-04-23', allergies:'لا يوجد',  notes:'',            createdAt:'2026-04-23' },
-  ];
-  save();
-}
-
+// ─── State ───
+let patients   = [];
 let filter     = 'all';
 let page       = 1;
 const PER_PAGE = 7;
 let editingId  = null;
+let currentUser = null;
 
 // ─── Utils ───
-function save() { localStorage.setItem('sydent_patients', JSON.stringify(patients)); }
-
-function initials(name) {
-  const p = name.trim().split(' ');
-  return p.length >= 2 ? p[0][0] + p[1][0] : p[0].slice(0,2);
-}
-
-function avatarColor(name) {
-  let h = 0;
-  for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
-  return COLORS[h];
-}
-
 function formatDate(str) {
   if (!str) return '—';
   const d = new Date(str);
   return d.toLocaleDateString('ar-SY', { year:'numeric', month:'short', day:'numeric' });
 }
-
 function isThisMonth(str) {
   if (!str) return false;
   const d = new Date(str), now = new Date();
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 }
 
-function nextId() {
-  const nums = patients.map(p => parseInt(p.id.slice(1)));
-  return 'P' + String(Math.max(0, ...nums) + 1).padStart(3,'0');
+// ─── Supabase: Load Patients ───
+async function loadPatients() {
+  if (!currentUser) return;
+  const { data, error } = await window.sb
+    .from('patients')
+    .select('*')
+    .eq('doctor_id', currentUser.id)
+    .order('created_at', { ascending: true });
+  if (error) { showToast('❌ خطأ في تحميل المرضى'); return; }
+  patients = data || [];
+  render();
 }
 
 // ─── Stats ───
 function updateStats() {
   document.getElementById('statTotal').textContent   = patients.length;
-  document.getElementById('statNew').textContent     = patients.filter(p => isThisMonth(p.createdAt)).length;
+  document.getElementById('statNew').textContent     = patients.filter(p => isThisMonth(p.created_at)).length;
   document.getElementById('statPending').textContent = patients.filter(p => p.payment === 'متبقي').length;
   document.getElementById('statActive').textContent  = patients.filter(p => p.status === 'تحت العلاج').length;
 }
 
 // ─── Filter ───
 function setFilter(f, btn) {
-  filter = f;
-  page   = 1;
+  filter = f; page = 1;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   render();
@@ -784,13 +701,13 @@ function getFiltered() {
   return patients.filter(p => {
     const matchQ = !q ||
       p.name.toLowerCase().includes(q) ||
-      p.phone.includes(q) ||
-      p.id.toLowerCase().includes(q);
+      (p.phone || '').includes(q) ||
+      (p.local_id || '').toLowerCase().includes(q);
     const matchF =
       filter === 'all'     ? true :
       filter === 'active'  ? p.status === 'تحت العلاج' :
       filter === 'pending' ? p.payment === 'متبقي' :
-      filter === 'new'     ? isThisMonth(p.createdAt) : true;
+      filter === 'new'     ? isThisMonth(p.created_at) : true;
     return matchQ && matchF;
   });
 }
@@ -804,7 +721,6 @@ function render() {
   const slice    = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   document.getElementById('countBadge').textContent = total + ' مريض';
-
   const tbody = document.getElementById('tableBody');
   const empty = document.getElementById('emptyState');
 
@@ -813,10 +729,8 @@ function render() {
     empty.style.display = 'block';
   } else {
     empty.style.display = 'none';
-    // Build sequential numbers from oldest to newest
-    const sortedAsc = patients.slice().sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
     const seqMap = {};
-    sortedAsc.forEach((p, idx) => { seqMap[p.id] = idx + 1; });
+    patients.forEach((p, idx) => { seqMap[p.id] = idx + 1; });
 
     tbody.innerHTML = slice.map(p => {
       const rowCls = p.status === 'تحت العلاج' ? 'row-active'
@@ -829,15 +743,15 @@ function render() {
             <div class="seq-badge">${seqMap[p.id]}</div>
             <div>
               <div class="patient-name">${p.name}</div>
-              <div class="patient-id">${p.id}</div>
+              <div class="patient-id">${p.local_id || ''}</div>
             </div>
           </div>
         </td>
-        <td class="text-muted">${p.phone}</td>
+        <td class="text-muted">${p.phone || '—'}</td>
         <td>
           <span class="badge ${p.payment === 'مسدّد' ? 'green' : 'yellow'}">${p.payment}</span>
         </td>
-        <td class="text-muted">${formatDate(p.lastVisit)}</td>
+        <td class="text-muted">${formatDate(p.last_visit)}</td>
         <td>
           <span class="badge ${p.status === 'تحت العلاج' ? 'blue' : p.status === 'جديد' ? 'yellow' : 'green'}">${p.status}</span>
         </td>
@@ -851,14 +765,12 @@ function render() {
             </div>
           </div>
         </td>
-      </tr>
-    `;
+      </tr>`;
     }).join('');
   }
 
-  // Pagination
   document.getElementById('pageInfo').textContent =
-    `عرض ${Math.min((page-1)*PER_PAGE+1, total)}–${Math.min(page*PER_PAGE, total)} من ${total}`;
+    total === 0 ? '' : `عرض ${Math.min((page-1)*PER_PAGE+1, total)}–${Math.min(page*PER_PAGE, total)} من ${total}`;
 
   const pb = document.getElementById('pageBtns');
   pb.innerHTML = '';
@@ -869,7 +781,6 @@ function render() {
     b.onclick = () => { page = i; render(); };
     pb.appendChild(b);
   }
-
   updateStats();
 }
 
@@ -882,60 +793,53 @@ function openModal() {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function editPatient(id) {
-  const p = patients.find(x => x.id === id);
-  if (!p) return;
-  editingId = id;
-  document.getElementById('modalTitle').textContent = 'تعديل بيانات المريض';
-  document.getElementById('saveBtn').textContent    = 'حفظ التعديلات';
-  document.getElementById('fName').value      = p.name;
-  document.getElementById('fPhone').value     = p.phone;
-  document.getElementById('fDob').value       = p.dob || '';
-  document.getElementById('fGender').value    = p.gender || '';
-  document.getElementById('fPayment').value   = p.payment;
-  document.getElementById('fStatus').value    = p.status;
-  document.getElementById('fAllergies').value = p.allergies || '';
-  document.getElementById('fNotes').value     = p.notes || '';
-  document.getElementById('modalOverlay').classList.add('open');
-}
-
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
 }
-
 function handleOverlayClick(e) {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 }
 
-function submitPatient(e) {
+async function submitPatient(e) {
   e.preventDefault();
-  const name     = document.getElementById('fName').value.trim();
-  const phone    = document.getElementById('fPhone').value.trim();
-  const dob      = document.getElementById('fDob').value;
-  const gender   = document.getElementById('fGender').value;
-  const payment  = document.getElementById('fPayment').value;
-  const status   = document.getElementById('fStatus').value;
-  const allergies= document.getElementById('fAllergies').value.trim();
-  const notes    = document.getElementById('fNotes').value.trim();
+  const name      = document.getElementById('fName').value.trim();
+  const phone     = document.getElementById('fPhone').value.trim();
+  const dob       = document.getElementById('fDob').value || null;
+  const gender    = document.getElementById('fGender').value;
+  const allergies = document.getElementById('fAllergies').value.trim();
+  const notes     = document.getElementById('fNotes').value.trim();
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
   if (editingId) {
-    const i = patients.findIndex(p => p.id === editingId);
-    if (i > -1) {
-      patients[i] = { ...patients[i], name, phone, dob, gender, payment, status, allergies, notes };
-    }
-    showToast('✅ تم تعديل بيانات المريض');
+    const { error } = await window.sb
+      .from('patients')
+      .update({ name, phone, dob, gender, allergies, notes })
+      .eq('id', editingId)
+      .eq('doctor_id', currentUser.id);
+    if (error) { showToast('❌ خطأ في التعديل'); }
+    else { showToast('✅ تم تعديل بيانات المريض'); closeModal(); await loadPatients(); }
   } else {
-    // New patients always start as 'جديد' status and 'متبقي' payment
-    patients.unshift({
-      id: nextId(), name, phone, dob, gender, payment: 'متبقي', status: 'جديد',
-      allergies, notes, lastVisit: new Date().toISOString().slice(0,10),
-      createdAt: new Date().toISOString().slice(0,10)
+    const maxSeq = patients.reduce((mx, p) => {
+      const n = parseInt((p.local_id || 'P000').slice(1));
+      return isNaN(n) ? mx : Math.max(mx, n);
+    }, 0);
+    const local_id = 'P' + String(maxSeq + 1).padStart(3, '0');
+    const today = new Date().toISOString().slice(0, 10);
+
+    const { error } = await window.sb.from('patients').insert({
+      doctor_id: currentUser.id,
+      local_id, name, phone, dob, gender,
+      payment: 'متبقي', status: 'جديد',
+      allergies, notes, last_visit: today
     });
-    showToast('✅ تمت إضافة المريض بنجاح');
+    if (error) { showToast('❌ خطأ في الإضافة'); }
+    else { showToast('✅ تمت إضافة المريض بنجاح'); closeModal(); await loadPatients(); }
   }
-  save();
-  closeModal();
-  render();
+
+  btn.disabled = false;
+  btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ المريض';
 }
 
 function openProfile(id) {
@@ -945,22 +849,23 @@ function openProfile(id) {
 function toggleDotsMenu(btn) {
   const menu = btn.nextElementSibling;
   const isOpen = menu.classList.contains('open');
-  // close all open menus first
   document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
   if (!isOpen) menu.classList.add('open');
 }
-
-// close dots menus on outside click
 document.addEventListener('click', function() {
   document.querySelectorAll('.dots-menu.open').forEach(m => m.classList.remove('open'));
 });
 
-function deletePatient(id) {
-  if (!confirm('هل أنت متأكد من حذف هذا المريض؟')) return;
-  patients = patients.filter(p => p.id !== id);
-  save();
-  render();
+async function deletePatient(id) {
+  if (!confirm('هل أنت متأكد من حذف هذا المريض؟ سيتم حذف جميع بياناته.')) return;
+  const { error } = await window.sb
+    .from('patients')
+    .delete()
+    .eq('id', id)
+    .eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الحذف'); return; }
   showToast('🗑️ تم حذف المريض');
+  await loadPatients();
 }
 
 // ─── Toast ───
@@ -972,14 +877,15 @@ function showToast(msg) {
 }
 
 // ─── Init ───
-render();
+(async function init() {
+  await new Promise(r => setTimeout(r, 80));
+  const { data } = await window.sb.auth.getUser();
+  if (!data || !data.user) { window.location.href = 'auth.html'; return; }
+  currentUser = data.user;
+  await loadPatients();
+})();
 
-// ربط PTR بإعادة تحميل البيانات
-window.onPTRRefresh = function() {
-  patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
-  syncAllPaymentStatuses();
-  render();
-};
+window.onPTRRefresh = function() { loadPatients(); };
 
 initSidebar('patients');
 
