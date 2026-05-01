@@ -671,13 +671,16 @@ footer{
   <a href="auth.html" class="footer-link">تسجيل الدخول</a>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
 <script>
-function submitRequest() {
+async function submitRequest() {
   const name = document.getElementById('fname').value.trim();
   const phone = document.getElementById('fphone').value.trim();
   const city = document.getElementById('fcity').value;
   const notes = document.getElementById('fnotes').value.trim();
   const msgBox = document.getElementById('msgBox');
+  const btn = document.querySelector('.btn-form');
 
   msgBox.className = 'msg-box';
   msgBox.style.display = 'none';
@@ -685,13 +688,25 @@ function submitRequest() {
   if (!name) { showMsg('error', 'يرجى إدخال الاسم الكامل'); return; }
   if (!phone) { showMsg('error', 'يرجى إدخال رقم الهاتف'); return; }
 
-  // Save to localStorage
-  const requests = JSON.parse(localStorage.getItem('sydent_trial_requests') || '[]');
-  requests.push({
-    name, phone, city, notes,
-    date: new Date().toISOString()
+  if (!window.sb) { showMsg('error', 'تعذّر الاتصال بالخادم'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'جارٍ الإرسال...';
+
+  const { error } = await window.sb.from('trial_requests').insert({
+    name: name,
+    phone: phone,
+    city: city || null,
+    notes: notes || null,
+    status: 'new'
   });
-  localStorage.setItem('sydent_trial_requests', JSON.stringify(requests));
+
+  if (error) {
+    showMsg('error', 'حدث خطأ: ' + error.message);
+    btn.disabled = false;
+    btn.textContent = 'أرسل الطلب ←';
+    return;
+  }
 
   // Show success
   document.getElementById('formContent').style.display = 'none';
