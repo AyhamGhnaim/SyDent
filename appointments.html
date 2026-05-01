@@ -820,7 +820,7 @@ function cellHTML(day, ds, other, today, evts) {
   let evHTML = '';
   evts.slice(0, MAX_SHOW).forEach(e => {
     var _ec = getApptColor(e);
-    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${e.time} ${e.patient.split(' ')[0]}</div>`;
+    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${(e.time||'').slice(0,5)} ${(e.patient_name||'').split(' ')[0]}</div>`;
   });
   // Mobile dots
   let dotHTML = '<div class="cal-dot-row">';
@@ -853,7 +853,7 @@ function renderDay() {
   document.getElementById('daySubtitle').textContent = dayEvts.length ? dayEvts.length+' موعد' : 'لا توجد مواعيد';
 
   // Sort appts by time
-  var sorted = dayEvts.slice().sort(function(a,b){ return a.time.localeCompare(b.time); });
+  var sorted = dayEvts.slice().sort(function(a,b){ return (a.time||'').localeCompare(b.time||''); });
   let html = '';
   if (sorted.length === 0) {
     html = '<div style="text-align:center;padding:60px 20px;color:var(--text2);"><div style="font-size:48px;margin-bottom:12px;">📅</div><div>لا توجد مواعيد لهذا اليوم</div></div>';
@@ -862,11 +862,11 @@ function renderDay() {
       var _bc = getApptColor(e);
       html += `
         <div class="time-slot">
-          <div class="slot-time">${e.time}</div>
+          <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${e.patient}</div>
-              <div class="appt-type">${e.type} (${e.duration} د)</div>
+              <div class="appt-name">${e.patient_name||'—'}</div>
+              <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
               <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
             </div>
           </div>
@@ -883,7 +883,7 @@ function renderList() {
   const groups = {};
   appointments
     .filter(a => new Date(a.date) >= today)
-    .sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time))
+    .sort((a,b) => (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))
     .forEach(a => {
       if (!groups[a.date]) groups[a.date] = [];
       groups[a.date].push(a);
@@ -911,11 +911,11 @@ function renderList() {
     evts.forEach(e => {
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
-          <div class="list-time">${e.time}</div>
-          <div class="list-avatar" style="background:${avatarColor(e.patient)}22;color:${avatarColor(e.patient)}">${initials(e.patient)}</div>
+          <div class="list-time">${(e.time||'').slice(0,5)}</div>
+          <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${initials(e.patient_name||'؟')}</div>
           <div class="list-info">
-            <div class="list-name">${e.patient}</div>
-            <div class="list-type">${e.type} — ${e.duration} دقيقة</div>
+            <div class="list-name">${e.patient_name||'—'}</div>
+            <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
           </div>
           <span class="list-badge ${statusClass(e.status)}">${statusLabel(e.status)}</span>
           <div class="list-actions" onclick="event.stopPropagation()">
