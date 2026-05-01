@@ -469,10 +469,11 @@ async function loadAll() {
   if (!currentUser || !patientId) return;
 
   // patient info
-  const { data: pd } = await window.sb.from('patients').select('*')
+  const { data: pd, error: pErr } = await window.sb.from('patients').select('*')
     .eq('id', patientId).eq('doctor_id', currentUser.id).single();
-  if (!pd) {
-    document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px;color:var(--text2)"><div style="font-size:40px">😶</div><div style="font-size:18px;font-weight:700;color:var(--text)">لم يُعثر على المريض</div><a href="patients.html" style="color:var(--green)">العودة للمرضى</a></div>';
+  if (pErr || !pd) {
+    console.error('Patient load error:', pErr);
+    document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:12px;color:var(--text2);text-align:center;padding:20px;"><div style="font-size:40px">😶</div><div style="font-size:18px;font-weight:700;color:var(--text)">لم يُعثر على المريض</div><div style="font-size:13px;color:var(--text2)">قد يكون المريض محذوفاً أو غير متاح لحسابك</div><a href="patients.html" style="color:var(--green);margin-top:8px;">← العودة لقائمة المرضى</a></div>';
     return;
   }
   patient = pd;
