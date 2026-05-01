@@ -951,7 +951,7 @@ async function openModal(prefillDate) {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function editAppt(id) {
+async function editAppt(id) {
   const a = appointments.find(x=>x.id===id);
   if (!a) return;
   editingId = id;
@@ -962,16 +962,20 @@ function editAppt(id) {
   document.getElementById('fDate').value     = a.date;
   document.getElementById('fTime').value     = a.time || '';
   document.getElementById('fDuration').value = a.duration;
-  populateApptTypes();
+  // أظهر المودال أولاً
+  document.getElementById('deleteApptBtn').style.display = 'inline-block';
+  document.getElementById('modalOverlay').classList.add('open');
+  // ثم انتظر تحميل العلاجات قبل ضبط النوع
+  await populateApptTypes();
   var _foundT = null;
   for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === a.type) { _foundT = TREATMENTS[_i]; break; }
   document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   updateColorPreview();
-  document.getElementById('fStatus').value   = a.status;
-  document.getElementById('fNotes').value    = a.notes||'';
-  // إظهار زر الحذف عند تعديل موعد موجود
-  document.getElementById('deleteApptBtn').style.display = 'inline-block';
-  document.getElementById('modalOverlay').classList.add('open');
+  document.getElementById('fStatus').value = a.status;
+  document.getElementById('fNotes').value  = a.notes||'';
+  // كذلك تعبئة قائمة المرضى للـ datalist
+  const names = await loadPatientNames();
+  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
 }
 
 // حذف الموعد من داخل المودال
