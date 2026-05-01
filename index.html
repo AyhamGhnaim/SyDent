@@ -311,6 +311,7 @@
     <div>
       <div class="header-title">لوحة التحكم</div>
       <div class="header-sub" id="dateDisplay">جارٍ التحميل...</div>
+      <div class="header-sub" id="dateDisplayDoctor" style="margin-top:4px;color:var(--accent);font-weight:600"></div>
     </div>
     <div class="header-actions">
       <input class="search-bar" placeholder="🔍  بحث عن مريض..." onclick="window.location.href='patients.html'" readonly />
@@ -403,6 +404,12 @@ async function loadDashboard() {
   const { data: u } = await window.sb.auth.getUser();
   if (!u || !u.user) return;
   const uid = u.user.id;
+
+  // اسم الدكتور تحت التاريخ
+  const meta = u.user.user_metadata || {};
+  const docName = meta.full_name || meta.name || u.user.email || '';
+  const elDoc = document.getElementById('dateDisplayDoctor');
+  if (elDoc && docName) elDoc.textContent = docName;
 
   // ── المرضى ──
   const { data: patients } = await window.sb.from('patients').select('*').eq('doctor_id', uid);

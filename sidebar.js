@@ -144,7 +144,7 @@ const navItems = [
   { section: 'الرئيسية' },
   { icon: '📊', label: 'لوحة التحكم', href: 'index.html',    id: 'dashboard' },
   { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
-  { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments', badge: '5' },
+  { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
   { section: 'الإدارة' },
   { icon: '💊', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
@@ -184,8 +184,44 @@ function buildHTML(activeId) {
         </div>
       </a>
       <nav class="sb-nav">${navHTML}</nav>
-      <div class="sb-footer">د. أيهم غنيم<br>طبيب أسنان</div>
+      <div class="sb-footer" id="sbDoctorFooter">جارٍ التحميل…</div>
     </aside>`;
+}
+
+// تحديث اسم الدكتور وعدد مواعيد اليوم بشكل ديناميكي
+async function refreshSidebarDynamic() {
+  if (!window.sb) return;
+  const { data: u } = await window.sb.auth.getUser();
+  if (!u || !u.user) return;
+  const uid = u.user.id;
+
+  // اسم الدكتور
+  const meta = u.user.user_metadata || {};
+  const name = meta.full_name || meta.name || u.user.email || 'دكتور';
+  const role = meta.role || 'طبيب أسنان';
+  const footer = document.getElementById('sbDoctorFooter');
+  if (footer) footer.innerHTML = name + '<br>' + role;
+
+  // badge المواعيد = عدد مواعيد اليوم
+  const today = new Date();
+  const todayStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const { data: appts } = await window.sb.from('appointments').select('id')
+    .eq('doctor_id', uid).eq('date', todayStr);
+  const count = (appts || []).length;
+  const apptLink = document.querySelector('.sb-item[href="appointments.html"]');
+  if (apptLink) {
+    let badge = apptLink.querySelector('.sb-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'sb-badge';
+        apptLink.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
 }
 
 // ─── JS ───
@@ -245,6 +281,9 @@ function initSidebar(activeId) {
   window.sbToggle = function() {
     sidebar.classList.contains('open') ? close() : open();
   };
+
+  // 4.5 Dynamic refresh: doctor name + appointments badge
+  setTimeout(refreshSidebarDynamic, 200);
 
   // 5. Pull-to-Refresh
   initPTR();
