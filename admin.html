@@ -186,7 +186,10 @@ header{
       <span class="name">SyDent</span>
       <span class="badge">Admin</span>
     </div>
-    <button class="btn-logout" onclick="doLogout()">خروج</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-logout" onclick="updateServiceKey()" style="border-color:var(--border2);color:var(--green);">🔑 المفتاح</button>
+      <button class="btn-logout" onclick="doLogout()">خروج</button>
+    </div>
   </header>
 
   <div class="main">
@@ -233,6 +236,16 @@ async function doLogout() {
     try { await window.sb.auth.signOut(); } catch(e){}
   }
   window.location.href = 'auth.html?logged_out=1';
+}
+
+function updateServiceKey() {
+  var current = localStorage.getItem('sydent_sk') || '';
+  var sk = prompt('أدخل Service Key الجديد:', current);
+  if (sk && sk.trim()) {
+    localStorage.setItem('sydent_sk', sk.trim());
+    SERVICE_KEY = sk.trim();
+    alert('✅ تم تحديث المفتاح');
+  }
 }
 
 // Auth guard — يُنفّذ عند تحميل الصفحة
