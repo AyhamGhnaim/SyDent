@@ -144,7 +144,10 @@ body{
     return;
   }
   const user = await sbGetUser();
-  if (user) window.location.replace('index.html');
+  if (user) {
+    var dest = (user.email === 'drayhamghnaim@gmail.com') ? 'admin.html' : 'index.html';
+    window.location.replace(dest);
+  }
 })();
 
 function switchTab(which) {
@@ -176,7 +179,8 @@ async function doLogin(e) {
     const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
     showMsg('✅ تم تسجيل الدخول، جارٍ التحويل...', 'success');
-    setTimeout(() => { window.location.href = 'index.html'; }, 600);
+    var dest = (email === 'drayhamghnaim@gmail.com') ? 'admin.html' : 'index.html';
+    setTimeout(() => { window.location.href = dest; }, 600);
   } catch (err) {
     let msg = err.message || 'فشل تسجيل الدخول';
     if (msg.toLowerCase().includes('invalid')) msg = 'البريد أو كلمة المرور غير صحيحة';

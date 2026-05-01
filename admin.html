@@ -176,26 +176,6 @@ header{
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="loginScreen">
-  <div class="login-card">
-    <div class="login-logo">
-      <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/>
-      </svg>
-      <div class="name">SyDent</div>
-      <div class="sub">لوحة إدارة الطلبات</div>
-    </div>
-    <div class="login-title">تسجيل دخول المدير</div>
-    <div class="login-err" id="loginErr">كلمة المرور غلط</div>
-    <div class="field">
-      <label>كلمة المرور</label>
-      <input type="password" id="passInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button class="btn-login" onclick="doLogin()">دخول</button>
-  </div>
-</div>
-
 <!-- ADMIN -->
 <div id="adminScreen">
   <header>
@@ -242,43 +222,52 @@ header{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js"></script>
 <script>
-var PASS = 'sydent2026';
+var ADMIN_EMAIL = 'drayhamghnaim@gmail.com';
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = localStorage.getItem('sydent_sk') || '';
 var currentFilter = 'all';
 var allRequests = [];
 
-function doLogin() {
-  var p = document.getElementById('passInput').value;
-  if (p === PASS) {
-    if (!localStorage.getItem('sydent_sk')) {
-      var sk = prompt('أدخل Service Key (مرة وحدة فقط):');
-      if (sk && sk.trim()) { localStorage.setItem('sydent_sk', sk.trim()); SERVICE_KEY = sk.trim(); }
-    } else { SERVICE_KEY = localStorage.getItem('sydent_sk'); }
-    localStorage.setItem('sydent_admin_logged', '1');
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminScreen').style.display = 'block';
-    loadAndRender();
+async function doLogout() {
+  if (window.sb) {
+    try { await window.sb.auth.signOut(); } catch(e){}
+  }
+  window.location.href = 'auth.html?logged_out=1';
+}
+
+// Auth guard — يُنفّذ عند تحميل الصفحة
+window.addEventListener('DOMContentLoaded', async function() {
+  // نطر تحميل Supabase
+  var tries = 0;
+  while (!window.sb && tries < 50) {
+    await new Promise(function(r){ setTimeout(r, 100); });
+    tries++;
+  }
+  if (!window.sb) {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ef9a9a">تعذّر تحميل Supabase</div>';
+    return;
+  }
+  var { data: { session } } = await window.sb.auth.getSession();
+  if (!session || !session.user) {
+    window.location.replace('auth.html');
+    return;
+  }
+  if (session.user.email !== ADMIN_EMAIL) {
+    window.location.replace('index.html');
+    return;
+  }
+  // طلب الـ service key لو ما موجود
+  if (!localStorage.getItem('sydent_sk')) {
+    var sk = prompt('أدخل Service Key (مرة وحدة فقط):');
+    if (sk && sk.trim()) {
+      localStorage.setItem('sydent_sk', sk.trim());
+      SERVICE_KEY = sk.trim();
+    }
   } else {
-    document.getElementById('loginErr').className = 'login-err show';
-    document.getElementById('passInput').value = '';
+    SERVICE_KEY = localStorage.getItem('sydent_sk');
   }
-}
-
-function doLogout() {
-  localStorage.removeItem('sydent_admin_logged');
-  document.getElementById('adminScreen').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('passInput').value = '';
-}
-
-window.addEventListener('DOMContentLoaded', function() {
-  if (localStorage.getItem('sydent_admin_logged') === '1') {
-    SERVICE_KEY = localStorage.getItem('sydent_sk') || '';
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('adminScreen').style.display = 'block';
-    loadAndRender();
-  }
+  document.getElementById('adminScreen').style.display = 'block';
+  loadAndRender();
 });
 
 async function loadAndRender() {
