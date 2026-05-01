@@ -44,7 +44,15 @@ body {
 }
 .topbar-title { font-size: 20px; font-weight: 700; flex: 1; }
 .topbar-title span { color: var(--green); }
-.content { padding: 28px; flex: 1; max-width: 720px; width: 100%; }
+.content { padding: 28px; flex: 1; }
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 1100px;
+}
+.settings-grid .danger-section { grid-column: 1 / -1; }
 
 .section {
   background: var(--bg2);
@@ -159,6 +167,9 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 }
 .btn-cancel:hover { border-color: var(--text2); color: var(--text); }
 
+@media (max-width: 1100px) {
+  .settings-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 820px) {
   .main { margin-right: 0; }
   .content { padding: 16px 14px; }
@@ -180,6 +191,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   </div>
 
   <div class="content">
+   <div class="settings-grid">
 
     <!-- 1. المعلومات الشخصية -->
     <div class="section">
@@ -233,12 +245,13 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
     </div>
 
     <!-- 4. حذف الحساب -->
-    <div class="section danger">
+    <div class="section danger danger-section">
       <div class="section-title danger">⚠️ حذف الحساب</div>
       <div class="section-sub">حذف الحساب نهائي — لا يمكن استرجاع البيانات بعد الحذف</div>
       <button type="button" class="btn btn-danger" onclick="openDeleteModal()">حذف حسابي نهائياً</button>
     </div>
 
+   </div>
   </div>
 </div>
 
