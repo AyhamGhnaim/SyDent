@@ -263,12 +263,33 @@
     .stats-grid { grid-template-columns: repeat(2,1fr); }
     .grid-2, .grid-2b { grid-template-columns: 1fr; }
   }
-  @media (max-width: 768px) {
-  
-    .main { margin-right: 0; padding: 16px; }
+  @media (max-width: 820px) {
+    .main { margin-right: 0; padding: 16px 14px; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .header-actions { width: 100%; flex-direction: column; gap: 8px; align-items: stretch; }
+    .search-bar { width: 100%; }
+    .header-actions .btn { width: 100%; text-align: center; }
+    .stats-grid { grid-template-columns: repeat(2,1fr); gap: 10px; }
+    .stat-card { padding: 14px 12px; }
+    .stat-value { font-size: 22px; }
+    .stat-label { font-size: 12px; }
+    .stat-icon { font-size: 22px; }
+    .card { padding: 16px; }
+    .card-title { font-size: 14px; }
+  }
+  @media (max-width: 480px) {
+    .header-title { font-size: 20px; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .stat-value { font-size: 20px; }
+    .patient-name { font-size: 13px; }
+    .patient-info { font-size: 11px; }
+    .appt-name { font-size: 13px; }
+    .appt-type { font-size: 11px; }
   }
 </style>
 <script src="sidebar.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
 </head>
 <body>
 <script>
@@ -304,17 +325,17 @@
       <div class="stat-value" id="statPatients">—</div>
       <div class="stat-change up" id="statPatientsNew"></div>
     </a>
-    <div class="stat-card">
+    <a class="stat-card" href="appointments.html">
       <span class="stat-icon">📅</span>
       <div class="stat-label">مواعيد اليوم</div>
-      <div class="stat-value">8</div>
-      <div class="stat-change up">3 متبقية</div>
-    </div>
+      <div class="stat-value" id="statApptToday">—</div>
+      <div class="stat-change up" id="statApptUpcoming"></div>
+    </a>
     <div class="stat-card">
       <span class="stat-icon">💵</span>
       <div class="stat-label">دخل هذا الشهر</div>
-      <div class="stat-value">4.2M</div>
-      <div class="stat-change up">↑ ل.س</div>
+      <div class="stat-value" id="statIncome">—</div>
+      <div class="stat-change up">ل.س</div>
     </div>
     <a class="stat-card" href="patients.html">
       <span class="stat-icon">⚠️</span>
@@ -340,116 +361,11 @@
         <span class="today-badge" id="dayName">—</span>
       </div>
 
-      <div class="appt-item">
-        <div class="appt-time">9:00</div>
-        <div><div class="appt-name">أحمد الخطيب</div><div class="appt-type">حشوة ضوئية</div></div>
-        <div class="appt-dot" style="background:#2ee89e"></div>
-      </div>
-      <div class="appt-item">
-        <div class="appt-time">10:30</div>
-        <div><div class="appt-name">سمر حسين</div><div class="appt-type">تلبيسة خزفية</div></div>
-        <div class="appt-dot" style="background:#2ee89e"></div>
-      </div>
-      <div class="appt-item">
-        <div class="appt-time">12:00</div>
-        <div><div class="appt-name">محمود سالم</div><div class="appt-type">علاج عصب</div></div>
-        <div class="appt-dot" style="background:#f5c842"></div>
-      </div>
-      <div class="appt-item">
-        <div class="appt-time">2:00</div>
-        <div><div class="appt-name">رنا مصطفى</div><div class="appt-type">تقويم - متابعة</div></div>
-        <div class="appt-dot" style="background:#7cb3ff"></div>
-      </div>
-      <div class="appt-item">
-        <div class="appt-time">3:30</div>
-        <div><div class="appt-name">عمر الدندشي</div><div class="appt-type">قلع جراحي</div></div>
-        <div class="appt-dot" style="background:#ef5350"></div>
-      </div>
+      <div id="todayAppts"></div>
     </div>
   </div>
 
-  <div class="grid-2b">
-
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">الملخص المالي — أبريل</div>
-        <span class="card-action">تفاصيل ←</span>
-      </div>
-      <div class="finance-row">
-        <span class="finance-label">إجمالي الفواتير</span>
-        <span class="finance-value">5,090,000 ل.س</span>
-      </div>
-      <div class="finance-row">
-        <span class="finance-label">المحصّل من المرضى</span>
-        <span class="finance-value" style="color:var(--accent)">4,200,000 ل.س</span>
-      </div>
-      <div class="finance-row">
-        <span class="finance-label">المستحق</span>
-        <span class="finance-value" style="color:var(--red)">890,000 ل.س</span>
-      </div>
-      <div class="finance-row">
-        <span class="finance-label">تكاليف المخابر</span>
-        <span class="finance-value" style="color:var(--yellow)">620,000 ل.س</span>
-      </div>
-      <div class="finance-row">
-        <span class="finance-label" style="font-weight:700;color:var(--text-primary)">الربح الصافي</span>
-        <span class="finance-value" style="color:var(--accent);font-size:16px">3,580,000 ل.س</span>
-      </div>
-      <div style="margin-top:12px">
-        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);margin-bottom:4px">
-          <span>نسبة التحصيل</span><span style="color:var(--accent)">82%</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" style="width:82%"></div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">طلبات المخابر</div>
-        <span class="card-action">عرض الكل ←</span>
-      </div>
-      <div class="lab-item">
-        <div class="lab-dot" style="background:#7cb3ff"></div>
-        <div class="lab-name">
-          <div>تلبيسة خزفية — سمر حسين</div>
-          <div style="font-size:11px;color:var(--text-muted)">مخبر النور — سن 21</div>
-        </div>
-        <span class="lab-status lab-s3">قيد العمل</span>
-      </div>
-      <div class="lab-item">
-        <div class="lab-dot" style="background:#f5c842"></div>
-        <div class="lab-name">
-          <div>جسر أمامي — خالد عيسى</div>
-          <div style="font-size:11px;color:var(--text-muted)">مخبر الشفاء — سن 12-14</div>
-        </div>
-        <span class="lab-status lab-s1">جاهز</span>
-      </div>
-      <div class="lab-item">
-        <div class="lab-dot" style="background:#2ee89e"></div>
-        <div class="lab-name">
-          <div>طقم أسنان — أم محمد</div>
-          <div style="font-size:11px;color:var(--text-muted)">مخبر النور — طقم كامل</div>
-        </div>
-        <span class="lab-status lab-s2">مستلم</span>
-      </div>
-      <div class="lab-item">
-        <div class="lab-dot" style="background:#ef5350"></div>
-        <div class="lab-name">
-          <div>فينير — ليلى كمال</div>
-          <div style="font-size:11px;color:var(--text-muted)">مخبر الشفاء — سن 11-13</div>
-        </div>
-        <span class="lab-status lab-s3">مرسل</span>
-      </div>
-      <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);display:flex;justify-content:space-between;font-size:12px">
-        <span style="color:var(--text-muted)">مستحق للمخابر</span>
-        <span style="color:var(--red);font-weight:700">320,000 ل.س</span>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script>
+  <script>
 // ─── التاريخ ───
 const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -458,52 +374,107 @@ document.getElementById('dateDisplay').textContent =
   days[now.getDay()] + '، ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
 document.getElementById('dayName').textContent = days[now.getDay()];
 
-// ─── بيانات من localStorage ───
 const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
-
 function avatarColor(name) {
   let h = 0;
   for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
   return COLORS[h];
 }
 function initials(name) {
+  if (!name) return '؟';
   const p = name.trim().split(' ');
   return p.length >= 2 ? p[0][0] + p[1][0] : p[0].slice(0,2);
 }
-function isThisMonth(str) {
-  if (!str) return false;
-  const d = new Date(str);
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+function todayStr() {
+  return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+}
+function thisMonthRange() {
+  const y = now.getFullYear(), m = now.getMonth();
+  const start = y+'-'+String(m+1).padStart(2,'0')+'-01';
+  const last  = new Date(y, m+1, 0).getDate();
+  const end   = y+'-'+String(m+1).padStart(2,'0')+'-'+String(last).padStart(2,'0');
+  return { start, end };
 }
 
-const patients = JSON.parse(localStorage.getItem('sydent_patients') || '[]');
+async function loadDashboard() {
+  // wait for sb to be ready
+  await new Promise(r => setTimeout(r, 80));
+  if (!window.sb) return;
+  const { data: u } = await window.sb.auth.getUser();
+  if (!u || !u.user) return;
+  const uid = u.user.id;
 
-// إحصائيات
-document.getElementById('statPatients').textContent = patients.length || '—';
-const newCount = patients.filter(p => isThisMonth(p.createdAt)).length;
-document.getElementById('statPatientsNew').textContent = newCount ? '↑ ' + newCount + ' هذا الشهر' : '';
+  // ── المرضى ──
+  const { data: patients } = await window.sb.from('patients').select('*').eq('doctor_id', uid);
+  const list = patients || [];
+  document.getElementById('statPatients').textContent = list.length || '—';
+  const newCount = list.filter(p => {
+    if (!p.created_at) return false;
+    const d = new Date(p.created_at);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  document.getElementById('statPatientsNew').textContent = newCount ? '↑ ' + newCount + ' هذا الشهر' : '';
+  const pendingCount = list.filter(p => p.payment === 'متبقي').length;
+  document.getElementById('statPending').textContent = pendingCount || '0';
+  document.getElementById('statPendingCount').textContent = pendingCount ? pendingCount + ' مرضى' : 'لا توجد مستحقات';
 
-const pendingCount = patients.filter(p => p.payment === 'متبقي').length;
-document.getElementById('statPending').textContent = pendingCount || '0';
-document.getElementById('statPendingCount').textContent = pendingCount ? pendingCount + ' مرضى' : 'لا توجد مستحقات';
+  // آخر 5 مرضى (الأحدث أولاً)
+  const recent = list.slice().sort((a,b) => (b.created_at||'').localeCompare(a.created_at||'')).slice(0, 5);
+  const container = document.getElementById('recentPatients');
+  if (recent.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد بيانات — <a href="patients.html" style="color:var(--accent)">أضف مريضاً</a></div>';
+  } else {
+    container.innerHTML = recent.map(p => `
+      <a class="patient-item" href="patient-profile.html?id=${p.id}">
+        <div class="patient-avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
+        <div>
+          <div class="patient-name">${p.name}</div>
+          <div class="patient-info">${p.status||'—'} — ${p.local_id||''}</div>
+        </div>
+        <span class="patient-status ${p.payment === 'مسدّد' ? 'status-paid' : 'status-due'}">${p.payment||'—'}</span>
+      </a>
+    `).join('');
+  }
 
-// آخر 5 مرضى
-const recent = [...patients].slice(0, 5);
-const container = document.getElementById('recentPatients');
-if (recent.length === 0) {
-  container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد بيانات — <a href="patients.html" style="color:var(--accent)">أضف مريضاً</a></div>';
-} else {
-  container.innerHTML = recent.map(p => `
-    <a class="patient-item" href="patients.html">
-      <div class="patient-avatar" style="background:${avatarColor(p.name)}22;color:${avatarColor(p.name)}">${initials(p.name)}</div>
-      <div>
-        <div class="patient-name">${p.name}</div>
-        <div class="patient-info">${p.status} — ${p.id}</div>
+  // ── مواعيد اليوم ──
+  const today = todayStr();
+  const { data: appts } = await window.sb.from('appointments').select('*')
+    .eq('doctor_id', uid).eq('date', today).order('time', { ascending: true });
+  const apptsToday = appts || [];
+  document.getElementById('statApptToday').textContent = apptsToday.length;
+  const nowTime = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const upcoming = apptsToday.filter(a => (a.time||'') >= nowTime).length;
+  document.getElementById('statApptUpcoming').textContent = upcoming ? upcoming + ' متبقية' : '';
+
+  const apptsEl = document.getElementById('todayAppts');
+  if (apptsToday.length === 0) {
+    apptsEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد مواعيد اليوم</div>';
+  } else {
+    apptsEl.innerHTML = apptsToday.map(a => `
+      <div class="appt-item">
+        <div class="appt-time">${(a.time||'').slice(0,5) || '—'}</div>
+        <div style="flex:1;min-width:0">
+          <div class="appt-name">${a.patient_name||'—'}</div>
+          <div class="appt-type">${a.type||'—'}</div>
+        </div>
+        <div class="appt-dot" style="background:${a.color||'#2ee89e'}"></div>
       </div>
-      <span class="patient-status ${p.payment === 'مسدّد' ? 'status-paid' : 'status-due'}">${p.payment}</span>
-    </a>
-  `).join('');
+    `).join('');
+  }
+
+  // ── دخل الشهر ──
+  const { start, end } = thisMonthRange();
+  const { data: pays } = await window.sb.from('ledger_payments').select('amount,date')
+    .eq('doctor_id', uid).gte('date', start).lte('date', end);
+  const total = (pays||[]).reduce((s,p) => s + Number(p.amount||0), 0);
+  let label;
+  if (total >= 1000000) label = (total/1000000).toFixed(1) + 'M';
+  else if (total >= 1000) label = (total/1000).toFixed(0) + 'K';
+  else label = String(total);
+  document.getElementById('statIncome').textContent = label;
 }
+
+loadDashboard();
 </script>
 
 <script>
