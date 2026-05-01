@@ -692,29 +692,28 @@ function hexA(hex, a) {
   return 'rgba('+r+','+g+','+b+','+a+')';
 }
 
-let appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
-if (appointments.length === 0 && !localStorage.getItem('sydent_appts_seeded')) {
-  localStorage.setItem('sydent_appts_seeded', '1');
-  const y = new Date().getFullYear();
-  const m = String(new Date().getMonth()+1).padStart(2,'0');
-  const today = new Date().getDate();
-  appointments = [
-    { id:'A001', patient:'أحمد محمود السيد',  date:`${y}-${m}-${String(today).padStart(2,'0')}`,   time:'09:00', duration:60,  type:'حشوة ضوئية',    status:'confirmed', color:'green',  notes:'' },
-    { id:'A002', patient:'سارة خالد العلي',   date:`${y}-${m}-${String(today).padStart(2,'0')}`,   time:'10:30', duration:45,  type:'تلبيسة خزفية',  status:'confirmed', color:'blue',   notes:'حساسة من بنسلين' },
-    { id:'A003', patient:'محمد رامي الأتاسي', date:`${y}-${m}-${String(today).padStart(2,'0')}`,   time:'12:00', duration:90,  type:'علاج عصب',      status:'pending',   color:'yellow', notes:'' },
-    { id:'A004', patient:'ليلى فادي الحموي',  date:`${y}-${m}-${String(today+1).padStart(2,'0')}`, time:'09:30', duration:30,  type:'تقويم - متابعة',status:'confirmed', color:'purple', notes:'' },
-    { id:'A005', patient:'عمر سامر جابر',     date:`${y}-${m}-${String(today+1).padStart(2,'0')}`, time:'11:00', duration:60,  type:'قلع',            status:'confirmed', color:'red',    notes:'ضغط دم مرتفع' },
-    { id:'A006', patient:'رنا وليد الزعبي',   date:`${y}-${m}-${String(today+2).padStart(2,'0')}`, time:'10:00', duration:60,  type:'فحص دوري',      status:'confirmed', color:'green',  notes:'' },
-    { id:'A007', patient:'كريم نادر عيسى',    date:`${y}-${m}-${String(today+3).padStart(2,'0')}`, time:'14:00', duration:120, type:'زراعة',          status:'pending',   color:'blue',   notes:'جلسة أولى' },
-    { id:'A008', patient:'ديانا حسام الشريف', date:`${y}-${m}-${String(today).padStart(2,'0')}`,   time:'15:30', duration:45,  type:'تنظيف وتلميع',  status:'confirmed', color:'green',  notes:'' },
-  ];
-  save();
+let appointments = [];
+let currentUser  = null;
+
+// ─── Load from Supabase ──────────────────────────────
+async function loadAppointments() {
+  if (!currentUser) return;
+  const { data, error } = await window.sb
+    .from('appointments')
+    .select('*')
+    .eq('doctor_id', currentUser.id)
+    .order('date', { ascending: true })
+    .order('time', { ascending: true });
+  if (error) { showToast('❌ خطأ في تحميل المواعيد'); return; }
+  appointments = data || [];
+  render();
 }
 
-function save() { localStorage.setItem('sydent_appointments', JSON.stringify(appointments)); }
-function nextId() {
-  const nums = appointments.map(a => parseInt(a.id.slice(1)));
-  return 'A' + String(Math.max(0,...nums)+1).padStart(3,'0');
+async function loadPatientNames() {
+  if (!currentUser) return [];
+  const { data } = await window.sb.from('patients').select('name')
+    .eq('doctor_id', currentUser.id).order('name', { ascending: true });
+  return (data || []).map(p => p.name);
 }
 
 // ─── State ───────────────────────────────────────────
@@ -746,11 +745,7 @@ function nextPeriod() {
   else { currentDate.setDate(currentDate.getDate()+1); selectedDate = new Date(currentDate); }
   render();
 }
-function goToday() {
-  currentDate  = new Date();
-  selectedDate = new Date();
-  render();
-}
+function goToday() { currentDate = new Date(); selectedDate = new Date(); render(); }
 
 // ─── Helpers ─────────────────────────────────────────
 const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -770,12 +765,8 @@ function initials(name) {
   const p=name.trim().split(' ');
   return p.length>=2?p[0][0]+p[1][0]:p[0].slice(0,2);
 }
-function statusLabel(s) {
-  return s==='confirmed'?'مؤكد':s==='pending'?'معلّق':'ملغى';
-}
-function statusClass(s) {
-  return s==='confirmed'?'status-confirmed':s==='pending'?'status-pending':'status-cancelled';
-}
+function statusLabel(s) { return s==='confirmed'?'مؤكد':s==='pending'?'معلّق':'ملغى'; }
+function statusClass(s)  { return s==='confirmed'?'status-confirmed':s==='pending'?'status-pending':'status-cancelled'; }
 
 // ─── Render ──────────────────────────────────────────
 function render() {
@@ -937,27 +928,26 @@ function renderList() {
 }
 
 // ─── Modal ───────────────────────────────────────────
-function openModal(prefillDate) {
+
+async function openModal(prefillDate) {
   editingId = null;
   selectedColor = 'green';
   document.getElementById('modalTitle').textContent = 'موعد جديد';
   document.getElementById('saveBtn').textContent    = 'حفظ الموعد';
-  document.querySelector('#patientForm, form').reset && document.querySelector('form').reset();
+  document.querySelector('form').reset();
   document.getElementById('fPatient').value  = '';
   document.getElementById('fDate').value     = prefillDate || dateStr(new Date());
   document.getElementById('fTime').value     = '';
   document.getElementById('fDuration').value = '60';
-  // default to first treatment
   populateApptTypes();
   if (TREATMENTS.length > 0) document.getElementById('fType').value = TREATMENTS[0].id;
   document.getElementById('fStatus').value   = 'confirmed';
   document.getElementById('fNotes').value    = '';
   updateColorPreview();
 
-  // تعبئة قائمة المرضى
-  const patients = JSON.parse(localStorage.getItem('sydent_patients')||'[]');
-  document.getElementById('patientsList').innerHTML =
-    patients.map(p => `<option value="${p.name}">`).join('');
+  // تعبئة قائمة المرضى من Supabase
+  const names = await loadPatientNames();
+  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
 
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -969,25 +959,21 @@ function editAppt(id) {
   selectedColor = a.color;
   document.getElementById('modalTitle').textContent = 'تعديل الموعد';
   document.getElementById('saveBtn').textContent    = 'حفظ التعديلات';
-  document.getElementById('fPatient').value  = a.patient;
+  document.getElementById('fPatient').value  = a.patient_name || '';
   document.getElementById('fDate').value     = a.date;
-  document.getElementById('fTime').value     = a.time;
+  document.getElementById('fTime').value     = a.time || '';
   document.getElementById('fDuration').value = a.duration;
   populateApptTypes();
-  // Find treatment by stored name and set the id
   var _foundT = null;
   for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === a.type) { _foundT = TREATMENTS[_i]; break; }
   document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   updateColorPreview();
   document.getElementById('fStatus').value   = a.status;
   document.getElementById('fNotes').value    = a.notes||'';
-
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-}
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target===this) closeModal();
 });
@@ -1004,55 +990,55 @@ function updateColorPreview() {
   var t = getTreatment(sel.value);
   var dot = document.getElementById('colorPreviewDot');
   if (!dot) return;
-  if (t) {
-    dot.style.background   = t.fill;
-    dot.style.borderColor  = t.stroke;
-  } else {
-    dot.style.background   = '#2ee89e';
-    dot.style.borderColor  = 'rgba(255,255,255,0.15)';
-  }
+  if (t) { dot.style.background = t.fill; dot.style.borderColor = t.stroke; }
+  else   { dot.style.background = '#2ee89e'; dot.style.borderColor = 'rgba(255,255,255,0.15)'; }
 }
 
-function submitAppt(e) {
+async function submitAppt(e) {
   e.preventDefault();
-  // resolve treatment id -> name
-  var typeVal = document.getElementById('fType').value;
-  var _t = getTreatment(typeVal);
-  var typeName = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
-  // Color is derived from the treatment - store the actual color hex
-  const apptColor = _t ? _t.fill : '#2ee89e';
+  var typeVal   = document.getElementById('fType').value;
+  var _t        = getTreatment(typeVal);
+  var typeName  = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
+  const apptColor  = _t ? _t.fill   : '#2ee89e';
   const apptStroke = _t ? _t.stroke : '#1fba7e';
-  const appt = {
-    id:       editingId || nextId(),
-    patient:  document.getElementById('fPatient').value.trim(),
-    date:     document.getElementById('fDate').value,
-    time:     document.getElementById('fTime').value,
-    duration: parseInt(document.getElementById('fDuration').value),
-    type:     typeName,
-    treatmentId: typeVal !== '_other' ? typeVal : null,
-    status:   document.getElementById('fStatus').value,
-    notes:    document.getElementById('fNotes').value.trim(),
-    color:    apptColor,
-    stroke:   apptStroke,
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+
+  const apptData = {
+    doctor_id:    currentUser.id,
+    patient_name: document.getElementById('fPatient').value.trim(),
+    date:         document.getElementById('fDate').value,
+    time:         document.getElementById('fTime').value || null,
+    duration:     parseInt(document.getElementById('fDuration').value),
+    type:         typeName,
+    status:       document.getElementById('fStatus').value,
+    notes:        document.getElementById('fNotes').value.trim(),
+    color:        apptColor,
+    stroke:       apptStroke,
   };
+
   if (editingId) {
-    const i = appointments.findIndex(a=>a.id===editingId);
-    if (i>-1) appointments[i] = appt;
-    showToast('✅ تم تعديل الموعد');
+    const { error } = await window.sb.from('appointments').update(apptData)
+      .eq('id', editingId).eq('doctor_id', currentUser.id);
+    if (error) { showToast('❌ خطأ في التعديل'); }
+    else { showToast('✅ تم تعديل الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
   } else {
-    appointments.push(appt);
-    showToast('✅ تمت إضافة الموعد');
+    const { error } = await window.sb.from('appointments').insert(apptData);
+    if (error) { showToast('❌ خطأ في الإضافة'); }
+    else { showToast('✅ تمت إضافة الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
   }
-  // sync selected date to the appt's date so the day view shows it
-  selectedDate = new Date(appt.date + 'T12:00:00');
-  currentDate  = new Date(appt.date + 'T12:00:00');
-  save(); closeModal(); render();
+
+  btn.disabled = false; btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ الموعد';
 }
 
-function deleteAppt(id) {
+async function deleteAppt(id) {
   if (!confirm('حذف هذا الموعد؟')) return;
-  appointments = appointments.filter(a=>a.id!==id);
-  save(); render(); showToast('🗑️ تم حذف الموعد');
+  const { error } = await window.sb.from('appointments').delete()
+    .eq('id', id).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الحذف'); return; }
+  showToast('🗑️ تم حذف الموعد');
+  await loadAppointments();
 }
 
 // ─── Toast ───────────────────────────────────────────
@@ -1063,15 +1049,17 @@ function showToast(msg) {
 }
 
 // ─── Init ────────────────────────────────────────────
-render();
+(async function init() {
+  await new Promise(r => setTimeout(r, 80));
+  const { data } = await window.sb.auth.getUser();
+  if (!data || !data.user) { window.location.href = 'auth.html'; return; }
+  currentUser = data.user;
+  await loadAppointments();
+})();
 
 initSidebar('appointments');
 
-// PTR refresh
-window.onPTRRefresh = function() {
-  appointments = JSON.parse(localStorage.getItem('sydent_appointments') || '[]');
-  render();
-};
+window.onPTRRefresh = function() { loadAppointments(); };
 
 document.addEventListener('DOMContentLoaded', function() {
   var btn = document.createElement('button');
