@@ -299,7 +299,7 @@
   if (!window.sb) { console.warn('Supabase not loaded'); return; }
   const { data } = await window.sb.auth.getUser();
   if (!data || !data.user) {
-    window.location.href = 'auth.html';
+    window.location.href = 'landing.html';
   }
 })();
 </script>
