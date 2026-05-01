@@ -241,7 +241,188 @@ header{
 
 <script>
 var PASS = 'sydent2026';
+var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
+var SERVICE_KEY = localStorage.getItem('sydent_sk') || '';
 var currentFilter = 'all';
+
+function doLogin() {
+  var p = document.getElementById('passInput').value;
+  if (p === PASS) {
+    if (!localStorage.getItem('sydent_sk')) {
+      var sk = prompt('أدخل Service Key (مرة وحدة فقط):');
+      if (sk && sk.trim()) { localStorage.setItem('sydent_sk', sk.trim()); SERVICE_KEY = sk.trim(); }
+    } else { SERVICE_KEY = localStorage.getItem('sydent_sk'); }
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminScreen').style.display = 'block';
+    renderAll();
+  } else {
+    document.getElementById('loginErr').className = 'login-err show';
+    document.getElementById('passInput').value = '';
+  }
+}
+
+function doLogout() {
+  document.getElementById('adminScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('passInput').value = '';
+}
+
+function getRequests() {
+  return JSON.parse(localStorage.getItem('sydent_trial_requests') || '[]');
+}
+function saveRequests(reqs) {
+  localStorage.setItem('sydent_trial_requests', JSON.stringify(reqs));
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.tab').forEach(function(t){ t.className = 'tab'; });
+  el.className = 'tab active';
+  renderList();
+}
+
+async function accept(idx) {
+  var reqs = getRequests();
+  var r = reqs[idx];
+  var phone = r.phone.trim();
+
+  // إيميل وهمي من رقم الموبايل
+  var emailNum = phone.replace(/\D/g,'');
+  var email = emailNum + '@sydent.com';
+
+  // إظهار loading
+  var btn = document.querySelector('[data-idx="' + idx + '"].btn-accept');
+  if (btn) { btn.textContent = '⏳ جارٍ...'; btn.disabled = true; }
+
+  try {
+    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SERVICE_KEY,
+        'Authorization': 'Bearer ' + SERVICE_KEY
+      },
+      body: JSON.stringify({
+        email: email,
+        password: '0000',
+        email_confirm: true,
+        user_metadata: { full_name: r.name }
+      })
+    });
+    var data = await res.json();
+    if (data.id) {
+      reqs[idx].status = 'accepted';
+      reqs[idx].email = email;
+      saveRequests(reqs);
+      // فتح واتساب تلقائياً
+      var waUrl = waLink(phone, r.name, email);
+      window.open(waUrl, '_blank');
+      renderAll();
+    } else {
+      var errMsg = data.msg || data.message || JSON.stringify(data);
+      // لو الحساب موجود مسبقاً
+      if (errMsg.includes('already') || errMsg.includes('exists')) {
+        reqs[idx].status = 'accepted';
+        reqs[idx].email = email;
+        saveRequests(reqs);
+        window.open(waLink(phone, r.name, email), '_blank');
+        renderAll();
+      } else {
+        alert('خطأ: ' + errMsg);
+        renderAll();
+      }
+    }
+  } catch(e) {
+    alert('خطأ في الاتصال: ' + e.message);
+    renderAll();
+  }
+}
+
+function reject(idx) {
+  var reqs = getRequests();
+  reqs[idx].status = 'rejected';
+  saveRequests(reqs);
+  renderAll();
+}
+
+function waLink(phone, name, email) {
+  var num = phone.replace(/\D/g,'');
+  if (num.startsWith('0')) num = '963' + num.substring(1);
+  var msg = encodeURIComponent(
+    'مرحباً د. ' + name + '،\n' +
+    'تم قبول طلبك في SyDent 🦷\n\n' +
+    'بيانات الدخول:\n' +
+    '🔗 الرابط: https://ayhamghnaim.github.io/SyDent\n' +
+    '👤 البريد: ' + (email || phone.replace(/\D/g,'') + '@sydent.com') + '\n' +
+    '🔑 كلمة المرور: 0000\n\n' +
+    '⚠️ يمكنك تغيير كلمة المرور من صفحة الإعدادات.\n\n' +
+    'شكراً لاختيارك SyDent!'
+  );
+  return 'https://wa.me/' + num + '?text=' + msg;
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleDateString('ar-SY') + ' — ' + d.toLocaleTimeString('ar-SY', {hour:'2-digit',minute:'2-digit'});
+}
+
+function renderAll() {
+  var reqs = getRequests();
+  var nNew = reqs.filter(function(r){ return !r.status || r.status === 'new'; }).length;
+  var nAcc = reqs.filter(function(r){ return r.status === 'accepted'; }).length;
+  var nRej = reqs.filter(function(r){ return r.status === 'rejected'; }).length;
+  document.getElementById('countNew').textContent = nNew;
+  document.getElementById('countAccepted').textContent = nAcc;
+  document.getElementById('countRejected').textContent = nRej;
+  renderList();
+}
+
+function renderList() {
+  var reqs = getRequests();
+  var list = document.getElementById('reqList');
+  var filtered = [];
+  for (var i = 0; i < reqs.length; i++) {
+    var r = reqs[i];
+    r._idx = i;
+    var st = r.status || 'new';
+    if (currentFilter === 'all' || st === currentFilter) filtered.push(r);
+  }
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div>📭</div>لا توجد طلبات</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(function(r) {
+    var st = r.status || 'new';
+    var stLabel = st === 'new' ? 'جديد' : st === 'accepted' ? 'مقبول' : 'مرفوض';
+    var idx = r._idx;
+    var actions = '';
+    if (st === 'new') {
+      actions = '<button class="btn-accept" data-idx="' + idx + '" onclick="accept(' + idx + ')">✅ قبول وإنشاء حساب</button>' +
+                '<button class="btn-reject" onclick="reject(' + idx + ')">❌ رفض</button>';
+    } else if (st === 'accepted') {
+      actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 إعادة إرسال واتساب</a>' +
+                '<button class="btn-reject" onclick="reject(' + idx + ')">❌ رفض</button>';
+    } else {
+      actions = '<button class="btn-accept" data-idx="' + idx + '" onclick="accept(' + idx + ')">✅ قبول وإنشاء حساب</button>';
+    }
+    return '<div class="req-card ' + st + '">' +
+      '<div class="req-top">' +
+        '<div class="req-name">' + (r.name || '—') + '</div>' +
+        '<span class="req-status ' + st + '">' + stLabel + '</span>' +
+      '</div>' +
+      '<div class="req-info">' +
+        '<div class="req-info-row">📱 <span>' + (r.phone || '—') + '</span></div>' +
+        (r.email ? '<div class="req-info-row">📧 <span>' + r.email + '</span></div>' : '') +
+        (r.city ? '<div class="req-info-row">📍 <span>' + r.city + '</span></div>' : '') +
+        (r.notes ? '<div class="req-info-row">📝 <span>' + r.notes + '</span></div>' : '') +
+        '<div class="req-info-row">🕐 <span>' + formatDate(r.date) + '</span></div>' +
+      '</div>' +
+      '<div class="req-actions">' + actions + '</div>' +
+    '</div>';
+  }).join('');
+}
+
 
 function doLogin() {
   var p = document.getElementById('passInput').value;
