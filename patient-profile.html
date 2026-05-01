@@ -733,8 +733,7 @@ async function saveToothTreatment() {
 }
 
 async function clearToothStatus() {
-  if (!confirm('هل تريد إزالة العلاج من السن ' + currentTooth + '؟
-(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
+  if (!confirm('هل تريد إزالة العلاج من السن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
   await window.sb.from('teeth_status').delete()
     .eq('patient_id', patientId).eq('tooth_num', String(currentTooth));
   delete teethMap[String(currentTooth)];
@@ -759,7 +758,7 @@ function renderSessions() {
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
-      + '<td><button class="del-btn" onclick="delSession('' + s.id + '')">🗑</button></td>'
+      + '<td><button class="del-btn" onclick="delSession(\'' + s.id + '\')">🗑</button></td>'
       + '</tr>';
   });
   el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>ملاحظات</th><th style="text-align:left;">التكلفة</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -785,7 +784,7 @@ function renderPayments() {
       + '<td><span class="tag tag-green">' + (p.method||'—') + '</span></td>'
       + '<td style="color:var(--text2)">' + (p.notes||'—') + '</td>'
       + '<td class="amount-green" style="text-align:left;">' + fmt(p.amount) + ' ل.س</td>'
-      + '<td><button class="del-btn" onclick="delPayment('' + p.id + '')">🗑</button></td>'
+      + '<td><button class="del-btn" onclick="delPayment(\'' + p.id + '\')">🗑</button></td>'
       + '</tr>';
   });
   el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>طريقة الدفع</th><th>ملاحظات</th><th style="text-align:left;">المبلغ</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
