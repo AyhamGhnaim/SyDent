@@ -572,16 +572,11 @@ textarea { resize: vertical; min-height: 72px; }
           <label>ملاحظات</label>
           <textarea id="fNotes" placeholder="أي ملاحظات إضافية…"></textarea>
         </div>
-        <div class="form-group full">
-          <label>اللون</label>
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;">
-            <div id="colorPreviewDot" style="width:24px;height:24px;border-radius:6px;background:#2ee89e;border:2px solid rgba(255,255,255,0.15);flex-shrink:0;"></div>
-            <span style="font-size:12px;color:var(--text2);">يُحدَّد تلقائياً حسب نوع العلاج</span>
-          </div>
-        </div>
       </div>
-      <div class="modal-footer">
+      <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
+        <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">🗑️ حذف</button>
+        <span style="flex:1;"></span>
         <button type="submit" class="btn-save" id="saveBtn">حفظ الموعد</button>
       </div>
     </form>
@@ -945,6 +940,8 @@ async function openModal(prefillDate) {
   if (TREATMENTS.length > 0) document.getElementById('fType').value = TREATMENTS[0].id;
   document.getElementById('fStatus').value   = 'confirmed';
   document.getElementById('fNotes').value    = '';
+  // إخفاء زر الحذف عند إضافة موعد جديد
+  document.getElementById('deleteApptBtn').style.display = 'none';
   updateColorPreview();
 
   // تعبئة قائمة المرضى من Supabase
@@ -972,7 +969,21 @@ function editAppt(id) {
   updateColorPreview();
   document.getElementById('fStatus').value   = a.status;
   document.getElementById('fNotes').value    = a.notes||'';
+  // إظهار زر الحذف عند تعديل موعد موجود
+  document.getElementById('deleteApptBtn').style.display = 'inline-block';
   document.getElementById('modalOverlay').classList.add('open');
+}
+
+// حذف الموعد من داخل المودال
+async function deleteApptFromModal() {
+  if (!editingId) return;
+  if (!confirm('هل أنت متأكد من حذف هذا الموعد؟')) return;
+  const { error } = await window.sb.from('appointments').delete()
+    .eq('id', editingId).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الحذف'); return; }
+  closeModal();
+  showToast('🗑️ تم حذف الموعد');
+  await loadAppointments();
 }
 
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
