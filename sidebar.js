@@ -34,10 +34,11 @@ const css = `
   }
   .sb-logo-icon {
     width: 38px; height: 38px;
-    background: linear-gradient(135deg, var(--green), #1ac5a8);
+    background: rgba(46,232,158,0.12);
+    border: 1.5px solid rgba(46,232,158,0.3);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
+    flex-shrink: 0;
   }
   .sb-logo-name { font-size: 18px; font-weight: 900; color: var(--text); font-family: 'Cairo', sans-serif; }
   .sb-logo-sub  { font-size: 10px; color: var(--text2); font-family: 'Cairo', sans-serif; }
@@ -177,7 +178,7 @@ function buildHTML(activeId) {
     <div class="sb-overlay" id="sbOverlay"></div>
     <aside class="sb-sidebar" id="sbSidebar">
       <a href="index.html" class="sb-logo">
-        <div class="sb-logo-icon">🦷</div>
+        <div class="sb-logo-icon"><svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg></div>
         <div>
           <div class="sb-logo-name">SyDent</div>
           <div class="sb-logo-sub">نظام إدارة العيادة</div>
