@@ -225,7 +225,6 @@ header{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js"></script>
 <script>
-var ADMIN_EMAIL = 'drayhamghnaim@gmail.com';
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = localStorage.getItem('sydent_sk') || '';
 var currentFilter = 'all';
@@ -265,7 +264,8 @@ window.addEventListener('DOMContentLoaded', async function() {
     window.location.replace('auth.html');
     return;
   }
-  if (session.user.email !== ADMIN_EMAIL) {
+  var isAdmin = session.user.user_metadata && session.user.user_metadata.is_admin;
+  if (!isAdmin) {
     window.location.replace('index.html');
     return;
   }
