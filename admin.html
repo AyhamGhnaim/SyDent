@@ -321,13 +321,23 @@ async function accept(id) {
         loadAndRender();
         return;
       }
+      // الحساب موجود مسبقاً — احتفظ بالـ user_id القديم
+      userId = r.user_id;
     }
 
-    var trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 30);
-
-    var updateData = { status: 'accepted', email: email, trial_end: trialEnd.toISOString() };
+    var updateData = { status: 'accepted', email: email };
     if (userId) updateData.user_id = userId;
+
+    // إذا كان حساب موقوف لـ trial_end بالماضي، نعطيه 30 يوم جديد
+    // إذا كان دائم (NULL) أو مستقبلي، ما نلمسه
+    var hadFutureTrial = r.trial_end && new Date(r.trial_end) > new Date();
+    var wasPermanent = r.trial_end === null && r.status === 'accepted';
+
+    if (!hadFutureTrial && !wasPermanent) {
+      var trialEnd = new Date();
+      trialEnd.setDate(trialEnd.getDate() + 30);
+      updateData.trial_end = trialEnd.toISOString();
+    }
 
     await window.sb.from('trial_requests').update(updateData).eq('id', id);
     window.open(waLink(phone, r.name, email), '_blank');
@@ -361,7 +371,7 @@ async function suspendAccount(id, email) {
   var uid = r ? r.user_id : null;
 
   await window.sb.from('trial_requests')
-    .update({ status: 'rejected', trial_end: new Date('2000-01-01').toISOString() })
+    .update({ status: 'rejected' })
     .eq('id', id);
 
   if (uid && SERVICE_KEY) {
