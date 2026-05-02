@@ -422,6 +422,10 @@ async function confirmDelete() {
     await window.sb.from('appointments').delete().eq('doctor_id', uid);
     await window.sb.from('patients').delete().eq('doctor_id', uid);
     await window.sb.from('trial_requests').delete().eq('user_id', uid);
+    // احتياط: حذف بالإيميل إذا user_id كان NULL
+    if (currentUser.email) {
+      await window.sb.from('trial_requests').delete().eq('email', currentUser.email);
+    }
   } catch(e) { console.error('Delete data error:', e); }
 
   // 3. حذف الحساب نفسه عبر RPC (انظر ملاحظة الإعداد أدناه)
