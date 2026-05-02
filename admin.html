@@ -345,13 +345,12 @@ async function reject(id) {
   loadAndRender();
 }
 
-async function extend(id) {
+async function activatePermanent(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
-  var base = r.trial_end && new Date(r.trial_end) > new Date() ? new Date(r.trial_end) : new Date();
-  base.setDate(base.getDate() + 30);
+  if (!confirm('هل تريد تفعيل حساب ' + r.name + ' كحساب دائم؟')) return;
   await window.sb.from('trial_requests')
-    .update({ trial_end: base.toISOString() })
+    .update({ trial_end: null })
     .eq('id', id);
   loadAndRender();
 }
@@ -447,9 +446,9 @@ function renderList() {
                 '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
     } else if (st === 'accepted') {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
-      var trialBadge = daysLeft !== null ? ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>') : '';
+      var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
       actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 واتساب</a>' +
-                '<button class="btn-accept" onclick="extend(\'' + id + '\')">⏰ تمديد</button>' +
+                '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
                 '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + (r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
                 '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
     } else if (st === 'rejected') {
