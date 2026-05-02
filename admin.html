@@ -187,7 +187,6 @@ header{
       <span class="badge">Admin</span>
     </div>
     <div style="display:flex;gap:8px;">
-      <button class="btn-logout" onclick="updateServiceKey()" style="border-color:var(--border2);color:var(--green);">🔑 المفتاح</button>
       <button class="btn-logout" onclick="doLogout()">خروج</button>
     </div>
   </header>
@@ -226,7 +225,7 @@ header{
 <script src="supabase-init.js"></script>
 <script>
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
-var SERVICE_KEY = localStorage.getItem('sydent_sk') || '';
+var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
 var currentFilter = 'all';
 var allRequests = [];
 
@@ -235,16 +234,6 @@ async function doLogout() {
     try { await window.sb.auth.signOut(); } catch(e){}
   }
   window.location.href = 'auth.html?logged_out=1';
-}
-
-function updateServiceKey() {
-  var current = localStorage.getItem('sydent_sk') || '';
-  var sk = prompt('أدخل Service Key الجديد:', current);
-  if (sk && sk.trim()) {
-    localStorage.setItem('sydent_sk', sk.trim());
-    SERVICE_KEY = sk.trim();
-    alert('✅ تم تحديث المفتاح');
-  }
 }
 
 // Auth guard — يُنفّذ عند تحميل الصفحة
@@ -268,16 +257,6 @@ window.addEventListener('DOMContentLoaded', async function() {
   if (!roleData || roleData.role !== 'admin') {
     window.location.replace('index.html');
     return;
-  }
-  // طلب الـ service key لو ما موجود
-  if (!localStorage.getItem('sydent_sk')) {
-    var sk = prompt('أدخل Service Key (مرة وحدة فقط):');
-    if (sk && sk.trim()) {
-      localStorage.setItem('sydent_sk', sk.trim());
-      SERVICE_KEY = sk.trim();
-    }
-  } else {
-    SERVICE_KEY = localStorage.getItem('sydent_sk');
   }
   document.getElementById('adminScreen').style.display = 'block';
   loadAndRender();
