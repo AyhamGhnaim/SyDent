@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="manifest" href="manifest.json">
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -448,6 +454,31 @@ document.addEventListener('DOMContentLoaded', function() {
   var topbar = document.querySelector('.topbar');
   if (topbar) topbar.insertBefore(btn, topbar.firstChild);
 });
+</script>
+<script>
+(function(){
+  if(!('ontouchstart' in window)) return;
+  var s=document.createElement('style');
+  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:#2ee89e;font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:9999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(46,232,158,0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(46,232,158,0.25);border-top-color:#2ee89e;border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  document.head.appendChild(s);
+  var bar=document.createElement('div');
+  bar.id='ptrBar';bar.className='ptr-bar';
+  bar.innerHTML='<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
+  document.body.insertBefore(bar,document.body.firstChild);
+  var THRESHOLD=65,MAX=95,sy=0,cy=0,active=false;
+  function b(){return document.getElementById('ptrBar');}
+  function r(){return document.getElementById('ptrRing');}
+  function l(){return document.getElementById('ptrLabel');}
+  function setState(st,pull){
+    var bv=b(),rv=r(),lv=l();if(!bv)return;
+    if(st==='hide'){bv.className='ptr-bar';}
+    else if(st==='pull'){bv.className='ptr-bar show';rv.style.animation='none';rv.style.transform='rotate('+Math.round((pull/THRESHOLD)*270)+'deg)';lv.textContent=pull>=THRESHOLD?'↑ أفلت للتحديث':'↓ اسحب للتحديث';}
+    else if(st==='spin'){bv.className='ptr-bar show spin';rv.style.transform='';rv.style.animation='';lv.textContent='جارٍ التحديث…';}
+  }
+  document.addEventListener('touchstart',function(e){if(window.scrollY>0)return;sy=cy=e.touches[0].clientY;active=true;},{passive:true});
+  document.addEventListener('touchmove',function(e){if(!active)return;if(window.scrollY>0){active=false;setState('hide');return;}cy=e.touches[0].clientY;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>4)setState('pull',pull);else setState('hide');},{passive:true});
+  document.addEventListener('touchend',function(){if(!active)return;active=false;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>=THRESHOLD){setState('spin');setTimeout(function(){window.location.reload();},800);}else{setState('hide');}cy=0;});
+})();
 </script>
 </body>
 </html>
