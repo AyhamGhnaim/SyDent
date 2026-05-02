@@ -195,6 +195,30 @@ async function refreshSidebarDynamic() {
   if (!u || !u.user) return;
   const uid = u.user.id;
 
+  // فحص حالة الحساب — إذا موقوف يحجب الصفحة
+  const { data: trialData } = await window.sb.from('trial_requests')
+    .select('status, trial_end')
+    .eq('email', u.user.email)
+    .maybeSingle();
+
+  if (trialData && trialData.status === 'rejected') {
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+        <div style="font-size:60px;margin-bottom:16px;">🚫</div>
+        <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">تم إيقاف حسابك</div>
+        <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">للاستفسار أو تجديد الاشتراك، تواصل معنا عبر واتساب.</div>
+        <a href="https://wa.me/963934012433?text=${encodeURIComponent('مرحباً، حسابي في SyDent موقوف وأريد الاستفسار')}" target="_blank"
+          style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+          💬 تواصل معنا عبر واتساب
+        </a>
+        <button onclick="window.doLogout()"
+          style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
+          تسجيل الخروج
+        </button>
+      </div>`;
+    return;
+  }
+
   // اسم الدكتور
   const meta = u.user.user_metadata || {};
   const name = meta.full_name || meta.name || u.user.email || 'دكتور';
