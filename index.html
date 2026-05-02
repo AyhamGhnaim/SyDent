@@ -297,9 +297,50 @@
 (async function(){
   await new Promise(r => setTimeout(r, 50));
   if (!window.sb) { console.warn('Supabase not loaded'); return; }
-  const { data } = await window.sb.auth.getUser();
-  if (!data || !data.user) {
+  const { data: { session } } = await window.sb.auth.getSession();
+  if (!session || !session.user) {
     window.location.href = 'landing.html';
+    return;
+  }
+  // تجاهل حساب الأدمن
+  if (session.user.email === 'drayhamghnaim@gmail.com') return;
+
+  // فحص التجربة
+  const userEmail = session.user.email;
+  const { data: trialData } = await window.sb.from('trial_requests')
+    .select('trial_end')
+    .eq('email', userEmail)
+    .eq('status', 'accepted')
+    .maybeSingle();
+
+  if (trialData && trialData.trial_end) {
+    const daysLeft = Math.ceil((new Date(trialData.trial_end) - new Date()) / (1000*60*60*24));
+    if (daysLeft <= 0) {
+      // انتهت التجربة — احجب الداشبورد
+      document.body.innerHTML = `
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+          <div style="font-size:60px;margin-bottom:16px;">⏰</div>
+          <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">انتهت فترة التجربة</div>
+          <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، تواصل معنا عبر واتساب.</div>
+          <a href="https://wa.me/963934012433?text=${encodeURIComponent('مرحباً، أريد تجديد اشتراكي في SyDent')}" target="_blank"
+            style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+            💬 تواصل معنا عبر واتساب
+          </a>
+          <button onclick="window.sb.auth.signOut().then(()=>window.location.href='landing.html')"
+            style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
+            تسجيل الخروج
+          </button>
+        </div>`;
+      return;
+    }
+    // أضف بانر الأيام المتبقية
+    window.addEventListener('DOMContentLoaded', function() {
+      var color = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
+      var banner = document.createElement('div');
+      banner.style.cssText = 'background:rgba(10,22,40,0.95);border-bottom:1px solid ' + color + '33;padding:8px 16px;text-align:center;font-family:Cairo,sans-serif;font-size:12px;font-weight:700;color:' + color + ';position:sticky;top:0;z-index:200;';
+      banner.textContent = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — تواصل معنا للتجديد';
+      document.body.insertBefore(banner, document.body.firstChild);
+    });
   }
 })();
 </script>

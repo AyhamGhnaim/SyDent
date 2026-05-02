@@ -346,8 +346,12 @@ async function accept(id) {
       }
     }
     // Update Supabase status
+    // حساب تاريخ انتهاء التجربة (30 يوم)
+    var trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + 30);
+
     await window.sb.from('trial_requests')
-      .update({ status: 'accepted', email: email })
+      .update({ status: 'accepted', email: email, trial_end: trialEnd.toISOString() })
       .eq('id', id);
     window.open(waLink(phone, r.name, email), '_blank');
     loadAndRender();
@@ -360,6 +364,17 @@ async function accept(id) {
 async function reject(id) {
   await window.sb.from('trial_requests')
     .update({ status: 'rejected' })
+    .eq('id', id);
+  loadAndRender();
+}
+
+async function extend(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var base = r.trial_end && new Date(r.trial_end) > new Date() ? new Date(r.trial_end) : new Date();
+  base.setDate(base.getDate() + 30);
+  await window.sb.from('trial_requests')
+    .update({ trial_end: base.toISOString() })
     .eq('id', id);
   loadAndRender();
 }
@@ -415,10 +430,11 @@ function renderList() {
       actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
                 '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
     } else if (st === 'accepted') {
-      actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 إعادة إرسال واتساب</a>' +
+      var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
+      var trialBadge = daysLeft !== null ? ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>') : '';
+      actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 واتساب</a>' +
+                '<button class="btn-accept" onclick="extend(\'' + id + '\')">⏰ تمديد 30 يوم</button>' +
                 '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
-    } else {
-      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>';
     }
     return '<div class="req-card ' + st + '">' +
       '<div class="req-top">' +
@@ -431,6 +447,7 @@ function renderList() {
         (r.city ? '<div class="req-info-row">📍 <span>' + r.city + '</span></div>' : '') +
         (r.notes ? '<div class="req-info-row">📝 <span>' + r.notes + '</span></div>' : '') +
         '<div class="req-info-row">🕐 <span>' + formatDate(r.created_at) + '</span></div>' +
+        (typeof trialBadge !== 'undefined' ? trialBadge : '') +
       '</div>' +
       '<div class="req-actions">' + actions + '</div>' +
     '</div>';
