@@ -333,14 +333,15 @@
         </div>`;
       return;
     }
-    // أضف بانر الأيام المتبقية
-    window.addEventListener('DOMContentLoaded', function() {
-      var color = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
-      var banner = document.createElement('div');
-      banner.style.cssText = 'background:rgba(10,22,40,0.95);border-bottom:1px solid ' + color + '33;padding:8px 16px;text-align:center;font-family:Cairo,sans-serif;font-size:12px;font-weight:700;color:' + color + ';position:sticky;top:0;z-index:200;';
-      banner.textContent = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — تواصل معنا للتجديد';
-      document.body.insertBefore(banner, document.body.firstChild);
-    });
+    // أضف بانر الأيام المتبقية مباشرة
+    var color = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
+    var banner = document.createElement('div');
+    banner.id = 'trialBanner';
+    banner.style.cssText = 'background:rgba(10,22,40,0.97);border-bottom:2px solid ' + color + ';padding:10px 16px;text-align:center;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;color:' + color + ';position:fixed;top:0;left:0;right:0;z-index:9999;';
+    banner.innerHTML = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
+    document.body.insertBefore(banner, document.body.firstChild);
+    // أضف padding للصفحة عشان البانر ما يغطي المحتوى
+    document.body.style.paddingTop = '40px';
   }
 })();
 </script>
