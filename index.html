@@ -303,7 +303,8 @@
     return;
   }
   // تجاهل حساب الأدمن
-  if (session.user.user_metadata && session.user.user_metadata.is_admin) return;
+  const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', session.user.id).maybeSingle();
+  if (roleData && roleData.role === 'admin') return;
 
   // فحص التجربة
   const userEmail = session.user.email;

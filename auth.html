@@ -145,7 +145,8 @@ body{
   }
   const user = await sbGetUser();
   if (user) {
-    var dest = (user.user_metadata && user.user_metadata.is_admin) ? 'admin.html' : 'index.html';
+    const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', user.id).maybeSingle();
+    var dest = (roleData && roleData.role === 'admin') ? 'admin.html' : 'index.html';
     window.location.replace(dest);
   }
 })();
@@ -179,8 +180,8 @@ async function doLogin(e) {
     const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
     showMsg('✅ تم تسجيل الدخول، جارٍ التحويل...', 'success');
-    var isAdmin = data.user && data.user.user_metadata && data.user.user_metadata.is_admin;
-    var dest = isAdmin ? 'admin.html' : 'index.html';
+    const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', data.user.id).maybeSingle();
+    var dest = (roleData && roleData.role === 'admin') ? 'admin.html' : 'index.html';
     setTimeout(() => { window.location.href = dest; }, 600);
   } catch (err) {
     let msg = err.message || 'فشل تسجيل الدخول';
