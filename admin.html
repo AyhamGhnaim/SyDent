@@ -333,26 +333,24 @@ async function accept(id) {
       })
     });
     var data = await res.json();
-    var success = !!data.id;
-    var alreadyExists = false;
-    if (!success) {
+    var userId = data.id || null;
+
+    if (!userId) {
       var errMsg = data.msg || data.message || JSON.stringify(data);
-      if (errMsg.includes('already') || errMsg.includes('exists') || errMsg.includes('registered')) {
-        alreadyExists = true;
-      } else {
+      if (!errMsg.includes('already') && !errMsg.includes('exists') && !errMsg.includes('registered')) {
         alert('خطأ: ' + errMsg);
         loadAndRender();
         return;
       }
     }
-    // Update Supabase status
-    // حساب تاريخ انتهاء التجربة (30 يوم)
+
     var trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 30);
 
-    await window.sb.from('trial_requests')
-      .update({ status: 'accepted', email: email, trial_end: trialEnd.toISOString() })
-      .eq('id', id);
+    var updateData = { status: 'accepted', email: email, trial_end: trialEnd.toISOString() };
+    if (userId) updateData.user_id = userId;
+
+    await window.sb.from('trial_requests').update(updateData).eq('id', id);
     window.open(waLink(phone, r.name, email), '_blank');
     loadAndRender();
   } catch(e) {
@@ -380,51 +378,40 @@ async function extend(id) {
 }
 
 async function suspendAccount(id, email) {
-  if (!confirm('هل تريد إيقاف حساب ' + email + '؟')) return;
-  // إيقاف الحساب: تعيين trial_end للماضي + تغيير الحالة
+  if (!confirm('هل تريد إيقاف حساب ' + (email||id) + '؟')) return;
+  var r = allRequests.find(function(x){ return x.id === id; });
+  var uid = r ? r.user_id : null;
+
   await window.sb.from('trial_requests')
     .update({ status: 'rejected', trial_end: new Date('2000-01-01').toISOString() })
     .eq('id', id);
-  // إيقاف المستخدم عبر Admin API
-  if (email && SERVICE_KEY) {
+
+  if (uid && SERVICE_KEY) {
     try {
-      // نبحث عن الـ user_id أولاً
-      var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email), {
-        headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY },
+        body: JSON.stringify({ ban_duration: '876600h' })
       });
-      var data = await res.json();
-      var uid = data.users && data.users[0] ? data.users[0].id : null;
-      if (uid) {
-        await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY },
-          body: JSON.stringify({ ban_duration: '876600h' }) // 100 سنة
-        });
-      }
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error('Suspend error:', e); }
   }
   loadAndRender();
 }
 
 async function deleteAccount(id, email) {
-  if (!confirm('هل تريد حذف حساب ' + email + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
-  // حذف من trial_requests
+  if (!confirm('هل تريد حذف حساب ' + (email||id) + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
+  var r = allRequests.find(function(x){ return x.id === id; });
+  var uid = r ? r.user_id : null;
+
   await window.sb.from('trial_requests').delete().eq('id', id);
-  // حذف المستخدم من Supabase Auth
-  if (email && SERVICE_KEY) {
+
+  if (uid && SERVICE_KEY) {
     try {
-      var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email), {
+      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+        method: 'DELETE',
         headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
       });
-      var data = await res.json();
-      var uid = data.users && data.users[0] ? data.users[0].id : null;
-      if (uid) {
-        await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-          method: 'DELETE',
-          headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
-        });
-      }
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error('Delete error:', e); }
   }
   loadAndRender();
 }
