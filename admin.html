@@ -379,6 +379,56 @@ async function extend(id) {
   loadAndRender();
 }
 
+async function suspendAccount(id, email) {
+  if (!confirm('هل تريد إيقاف حساب ' + email + '؟')) return;
+  // إيقاف الحساب: تعيين trial_end للماضي + تغيير الحالة
+  await window.sb.from('trial_requests')
+    .update({ status: 'rejected', trial_end: new Date('2000-01-01').toISOString() })
+    .eq('id', id);
+  // إيقاف المستخدم عبر Admin API
+  if (email && SERVICE_KEY) {
+    try {
+      // نبحث عن الـ user_id أولاً
+      var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email), {
+        headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+      });
+      var data = await res.json();
+      var uid = data.users && data.users[0] ? data.users[0].id : null;
+      if (uid) {
+        await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY },
+          body: JSON.stringify({ ban_duration: '876600h' }) // 100 سنة
+        });
+      }
+    } catch(e) { console.error(e); }
+  }
+  loadAndRender();
+}
+
+async function deleteAccount(id, email) {
+  if (!confirm('هل تريد حذف حساب ' + email + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
+  // حذف من trial_requests
+  await window.sb.from('trial_requests').delete().eq('id', id);
+  // حذف المستخدم من Supabase Auth
+  if (email && SERVICE_KEY) {
+    try {
+      var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email), {
+        headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+      });
+      var data = await res.json();
+      var uid = data.users && data.users[0] ? data.users[0].id : null;
+      if (uid) {
+        await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+          method: 'DELETE',
+          headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+        });
+      }
+    } catch(e) { console.error(e); }
+  }
+  loadAndRender();
+}
+
 function waLink(phone, name, email) {
   var num = phone.replace(/\D/g,'');
   if (num.startsWith('0')) num = '963' + num.substring(1);
@@ -433,8 +483,13 @@ function renderList() {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
       var trialBadge = daysLeft !== null ? ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>') : '';
       actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 واتساب</a>' +
-                '<button class="btn-accept" onclick="extend(\'' + id + '\')">⏰ تمديد 30 يوم</button>' +
-                '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
+                '<button class="btn-accept" onclick="extend(\'' + id + '\')">⏰ تمديد</button>' +
+                '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + (r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
+                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
+    } else if (st === 'rejected') {
+      var trialBadge = '';
+      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
+                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
     }
     return '<div class="req-card ' + st + '">' +
       '<div class="req-top">' +
