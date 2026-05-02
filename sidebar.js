@@ -219,6 +219,20 @@ async function refreshSidebarDynamic() {
     return;
   }
 
+  if (trialData && trialData.status === 'new') {
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+        <div style="font-size:60px;margin-bottom:16px;">⏳</div>
+        <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">طلبك قيد المراجعة</div>
+        <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">شكراً لتسجيلك في SyDent. سيتم مراجعة طلبك وتفعيل حسابك قريباً.</div>
+        <button onclick="window.doLogout()"
+          style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+          تسجيل الخروج
+        </button>
+      </div>`;
+    return;
+  }
+
   // اسم الدكتور
   const meta = u.user.user_metadata || {};
   const name = meta.full_name || meta.name || u.user.email || 'دكتور';

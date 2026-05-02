@@ -346,7 +346,6 @@ async function accept(id) {
     }
 
     await window.sb.from('trial_requests').update(updateData).eq('id', id);
-    window.open(waLink(phone, r.name, email), '_blank');
     loadAndRender();
   } catch(e) {
     alert('خطأ في الاتصال: ' + e.message);
@@ -458,13 +457,12 @@ function renderList() {
     var id = r.id;
     var actions = '';
     if (st === 'new') {
-      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
+      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وتفعيل التجربة</button>' +
                 '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
     } else if (st === 'accepted') {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
       var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
-      actions = '<a class="btn-whatsapp" href="' + waLink(r.phone, r.name, r.email) + '" target="_blank">💬 واتساب</a>' +
-                '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
+      actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
                 '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + (r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
                 '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
     } else if (st === 'rejected') {

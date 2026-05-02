@@ -127,14 +127,24 @@ body{
       <input type="text" id="regName" placeholder="د. أيهم غنيم" required>
     </div>
     <div class="form-group">
-      <label>البريد الإلكتروني</label>
-      <input type="email" id="regEmail" placeholder="doctor@example.com" autocomplete="email" required>
+      <label>رقم الموبايل</label>
+      <input type="tel" id="regPhone" placeholder="09xxxxxxxx" required>
+    </div>
+    <div class="form-group">
+      <label>المدينة</label>
+      <select id="regCity">
+        <option value="">اختر مدينتك</option>
+        <option>دمشق</option><option>حلب</option><option>حمص</option>
+        <option>حماة</option><option>اللاذقية</option><option>طرطوس</option>
+        <option>دير الزور</option><option>الرقة</option><option>إدلب</option>
+        <option>درعا</option><option>أخرى</option>
+      </select>
     </div>
     <div class="form-group">
       <label>كلمة المرور (6 أحرف على الأقل)</label>
       <input type="password" id="regPass" placeholder="••••••••" autocomplete="new-password" minlength="6" required>
     </div>
-    <button type="submit" class="btn-submit" id="regBtn">إنشاء الحساب</button>
+    <button type="submit" class="btn-submit" id="regBtn">إرسال طلب التجربة</button>
   </form>
 </div>
 
@@ -203,29 +213,47 @@ async function doRegister(e) {
   hideMsg();
   const btn = document.getElementById('regBtn');
   const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim().toLowerCase();
+  const phone = document.getElementById('regPhone').value.trim();
+  const city = document.getElementById('regCity').value;
   const password = document.getElementById('regPass').value;
-  if (password.length < 6) {
-    showMsg('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error');
-    return;
-  }
+
+  if (!phone) { showMsg('❌ يرجى إدخال رقم الموبايل', 'error'); return; }
+  if (password.length < 6) { showMsg('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
+
+  // إنشاء إيميل من رقم الموبايل
+  const emailNum = phone.replace(/\D/g, '');
+  const email = emailNum + '@sydent.com';
+
   btn.disabled = true;
   btn.innerHTML = 'جارٍ الإنشاء<span class="spinner"></span>';
+
   try {
+    // إنشاء حساب Supabase
     const { data, error } = await window.sb.auth.signUp({
       email, password,
-      options: { data: { name: name } }
+      options: { data: { full_name: name, phone: phone } }
     });
     if (error) throw error;
-    showMsg('✅ تم إنشاء الحساب! جارٍ التحويل...', 'success');
-    setTimeout(() => { window.location.href = 'index.html'; }, 800);
+
+    // حفظ طلب تجربة بحالة new
+    await window.sb.from('trial_requests').insert({
+      name: name,
+      phone: phone,
+      city: city || null,
+      status: 'new',
+      email: email,
+      user_id: data.user ? data.user.id : null
+    });
+
+    showMsg('✅ تم إنشاء حسابك! سيتم مراجعة طلبك وتفعيله قريباً.', 'success');
+    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
   } catch (err) {
     let msg = err.message || 'فشل إنشاء الحساب';
-    if (msg.toLowerCase().includes('already')) msg = 'هذا البريد مسجّل مسبقاً';
-    if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة';
+    if (msg.toLowerCase().includes('already')) msg = 'هذا الرقم مسجّل مسبقاً';
+    if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة جداً';
     showMsg('❌ ' + msg, 'error');
     btn.disabled = false;
-    btn.textContent = 'إنشاء الحساب';
+    btn.textContent = 'إرسال طلب التجربة';
   }
 }
 </script>
