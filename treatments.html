@@ -157,6 +157,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
+/* Lab toggle switch */
+.lab-toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg);border:1px solid var(--border);border-radius:24px;transition:.25s;}
+.lab-toggle-slider:before{position:absolute;content:"";height:18px;width:18px;right:2px;top:2px;background:var(--text2);border-radius:50%;transition:.25s;}
+.lab-toggle-switch input:checked + .lab-toggle-slider{background:rgba(46,232,158,.18);border-color:var(--green);}
+.lab-toggle-switch input:checked + .lab-toggle-slider:before{transform:translateX(-22px);background:var(--green);}
+
+/* Lab tag on treatment card */
+.treat-lab-tag{display:inline-flex;align-items:center;gap:3px;background:rgba(99,179,237,.15);color:#63b3ed;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-right:5px;vertical-align:middle;}
+
 @media(max-width:900px){
   .page{padding:16px;}
   .topbar{padding:12px 16px;}
@@ -216,6 +225,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group">
         <label>الحرف داخل السن</label>
         <input type="text" id="tLabel" placeholder="ح" maxlength="2" style="text-align:center;font-size:18px;font-weight:800;">
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;margin-bottom:0;">
+          <span style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--text);font-size:14px;">
+            <span style="font-size:18px;">🧪</span>
+            هذا العلاج يحتاج إرسال للمخبر
+          </span>
+          <label class="lab-toggle-switch" style="position:relative;display:inline-block;width:46px;height:24px;flex-shrink:0;">
+            <input type="checkbox" id="tNeedsLab" style="opacity:0;width:0;height:0;">
+            <span class="lab-toggle-slider"></span>
+          </label>
+        </label>
       </div>
 
       <div class="form-group">
@@ -280,6 +302,7 @@ async function loadTreatments() {
       stroke: t.stroke,
       price: t.price,
       builtin: t.builtin,
+      needs_lab: !!t.needs_lab,
       sort_order: t.sort_order
     };
   });
@@ -305,13 +328,14 @@ function render() {
     var bar = 'background:' + bg + ';';
     var textColor = isLightColor(bg) ? '#0a1628' : '#fff';
     var builtinTag = t.builtin ? '<div class="treat-builtin-tag">افتراضي</div>' : '';
+    var labTag = t.needs_lab ? '<span class="treat-lab-tag">🧪 مخبر</span>' : '';
     html += '<div class="treat-card">'
       + '<div class="treat-color-bar" style="' + bar + '"></div>'
       + builtinTag
       + '<div class="treat-body">'
         + '<div class="treat-head">'
           + '<div>'
-            + '<div class="treat-name">' + escapeHtml(t.name) + '</div>'
+            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
           + '</div>'
           + '<div class="treat-icon" style="' + iconBg + 'color:' + textColor + ';border:2px solid ' + fg + ';">' + (t.label || '') + '</div>'
@@ -354,6 +378,7 @@ function openAddModal() {
   document.getElementById('tName').value  = '';
   document.getElementById('tPrice').value = '';
   document.getElementById('tLabel').value = '';
+  document.getElementById('tNeedsLab').checked = false;
   pickColor('#2ee89e','#1fba7e');
   updatePreview();
   openModal();
@@ -368,6 +393,7 @@ function editTreatment(id) {
   document.getElementById('tName').value  = t.name;
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
+  document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   pickColor(t.fill, t.stroke);
   updatePreview();
   openModal();
@@ -384,15 +410,15 @@ async function deleteTreatment(id) {
 async function resetToDefaults() {
   if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
   const DEFAULTS = [
-    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  sort_order:1 },
-    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  sort_order:2 },
-    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  sort_order:3 },
-    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  sort_order:4 },
-    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  sort_order:5 },
-    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, sort_order:6 },
-    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, sort_order:7 },
-    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, sort_order:8 },
-    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, sort_order:9 }
+    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, sort_order:1 },
+    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, sort_order:2 },
+    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  sort_order:3 },
+    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, sort_order:4 },
+    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  sort_order:5 },
+    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, sort_order:6 },
+    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, sort_order:7 },
+    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, sort_order:8 },
+    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, sort_order:9 }
   ];
   // delete all current
   await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
@@ -408,6 +434,7 @@ async function saveTreatment() {
   var name  = document.getElementById('tName').value.trim();
   var price = parseFloat(document.getElementById('tPrice').value);
   var label = document.getElementById('tLabel').value.trim();
+  var needsLab = document.getElementById('tNeedsLab').checked;
   if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
   if (!label)                { showToast('⚠️ ضع حرفاً واحداً للسن'); return; }
@@ -416,7 +443,7 @@ async function saveTreatment() {
     // UPDATE existing
     const { error } = await window.sb
       .from('treatments')
-      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, updated_at: new Date().toISOString() })
+      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, updated_at: new Date().toISOString() })
       .eq('id', editingId);
     if (error) { showToast('⚠️ ' + error.message); return; }
   } else {
@@ -430,6 +457,7 @@ async function saveTreatment() {
         treatment_key: key,
         name: name, price: price, label: label,
         fill: pickedFill, stroke: pickedStroke,
+        needs_lab: needsLab,
         builtin: false,
         sort_order: maxOrder + 1
       });

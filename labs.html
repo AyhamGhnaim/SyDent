@@ -717,11 +717,19 @@ var currentFilter = 'all';
 var searchQuery   = '';
 
 /* Constants */
+// Fallback list — used only if treatment doesn't have needs_lab set in DB
 var LAB_REQUIRED_KEYS = ['crown', 'bridge', 'denture', 'denture_full', 'denture_partial', 'veneer', 'ortho_plate'];
 var LAB_OPTIONAL_KEYS = ['implant', 'ortho_fixed'];
 
 function needsLab(key) {
   if (!key) return false;
+  if (typeof TREATMENTS !== 'undefined' && TREATMENTS && TREATMENTS.length) {
+    for (var i = 0; i < TREATMENTS.length; i++) {
+      if (TREATMENTS[i].id === key && typeof TREATMENTS[i].needs_lab === 'boolean') {
+        return TREATMENTS[i].needs_lab;
+      }
+    }
+  }
   return LAB_REQUIRED_KEYS.indexOf(key) !== -1 || LAB_OPTIONAL_KEYS.indexOf(key) !== -1;
 }
 
@@ -793,7 +801,7 @@ async function loadAll() {
     const { data: tr } = await window.sb.from('treatments')
       .select('*').order('sort_order', { ascending: true });
     TREATMENTS = (tr || []).map(function(t){
-      return { id: t.treatment_key, name: t.name, label: t.label, fill: t.fill, stroke: t.stroke, price: t.price };
+      return { id: t.treatment_key, name: t.name, label: t.label, fill: t.fill, stroke: t.stroke, price: t.price, needs_lab: !!t.needs_lab };
     });
   } catch(e) { console.warn(e); TREATMENTS = []; }
 
