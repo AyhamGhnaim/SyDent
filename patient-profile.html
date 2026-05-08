@@ -472,8 +472,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
       <div class="form-group">
-        <label>اسم المخبر</label>
-        <input type="text" id="labOrderLabName" placeholder="مثال: مخبر النور">
+        <label>المخبر</label>
+        <div style="display:flex;gap:8px;align-items:stretch;">
+          <select id="labOrderLabSelect" style="flex:1;"></select>
+          <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(46,232,158,0.12);border:1px solid var(--green);color:var(--green);border-radius:9px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
+        </div>
+        <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:#f5c842;padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
+          ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -502,7 +508,35 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeModal('labOrderModal')">إلغاء</button>
-      <button class="btn-save-m" onclick="saveLabOrder()">حفظ</button>
+      <button class="btn-save-m" id="labOrderSaveBtn" onclick="saveLabOrder()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: مخبر سريع -->
+<div class="modal-overlay" id="ppLabModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🏭 مخبر جديد</h3>
+      <button class="modal-close" onclick="closeModal('ppLabModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>اسم المخبر *</label>
+        <input type="text" id="ppLabName" placeholder="مثال: مخبر النور للأسنان">
+      </div>
+      <div class="form-group">
+        <label>رقم الهاتف</label>
+        <input type="tel" id="ppLabPhone" placeholder="مثال: 0934012433">
+      </div>
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="ppLabNotes" placeholder="عنوان، تخصص، أوقات العمل…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('ppLabModal')">إلغاء</button>
+      <button class="btn-save-m" onclick="ppSaveLab()">حفظ</button>
     </div>
   </div>
 </div>
@@ -518,6 +552,7 @@ var sessions  = [];
 var payments  = [];
 var teethMap  = {};   // { tooth_num: treatment_key }
 var labOrders = [];   // lab orders for current patient
+var allLabs   = [];   // all labs for the doctor
 var currentUser = null;
 
 /* ── Lab Orders Constants ── */
@@ -621,6 +656,14 @@ async function loadAll() {
     if (loErr) { console.warn('lab_orders load error:', loErr); labOrders = []; }
     else labOrders = lo || [];
   } catch(e) { console.warn('lab_orders fetch failed:', e); labOrders = []; }
+
+  // labs (for select picker)
+  try {
+    const { data: lbs, error: lbsErr } = await window.sb.from('labs').select('*')
+      .eq('is_active', true).order('name', { ascending: true });
+    if (lbsErr) { console.warn('labs load error:', lbsErr); allLabs = []; }
+    else allLabs = lbs || [];
+  } catch(e) { console.warn('labs fetch failed:', e); allLabs = []; }
 
   init();
 }
@@ -1174,11 +1217,16 @@ function renderLabOrders() {
     }
     actions += '<button class="lab-action-btn" onclick="editLabOrder(\'' + lo.id + '\')">✏️</button>';
     actions += '<button class="del-btn" onclick="delLabOrder(\'' + lo.id + '\')">🗑</button>';
+    var labDisplay = lo.lab_name || '—';
+    if (lo.lab_id) {
+      var lObj = allLabs.find(function(x){ return x.id === lo.lab_id; });
+      if (lObj) labDisplay = lObj.name;
+    }
     rows += '<tr>'
       + '<td>' + fmtD(lo.date_sent) + '</td>'
       + '<td>' + (lo.tooth_num ? '<span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:11px;font-weight:700;">سن ' + lo.tooth_num + '</span>' : '—') + '</td>'
       + '<td>' + (lo.work_type || '—') + '</td>'
-      + '<td style="color:var(--text2)">' + (lo.lab_name || '—') + '</td>'
+      + '<td style="color:var(--text2)">' + labDisplay + '</td>'
       + '<td style="color:var(--text2)">' + (lo.shade || '—') + '</td>'
       + '<td style="text-align:left;color:var(--text2)">' + fmt(lo.cost) + ' ل.س</td>'
       + '<td>' + pill + '</td>'
@@ -1221,6 +1269,34 @@ function populateLabWorkTypes(selectedKey) {
   if (selectedKey) sel.value = selectedKey;
 }
 
+function populateLabSelect(selectedLabId) {
+  var sel = document.getElementById('labOrderLabSelect');
+  var hint = document.getElementById('labOrderEmptyHint');
+  var saveBtn = document.getElementById('labOrderSaveBtn');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (!allLabs.length) {
+    var opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '— لا توجد مخابر —';
+    sel.appendChild(opt);
+    if (hint) hint.style.display = 'block';
+    if (saveBtn) saveBtn.disabled = true;
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+  if (saveBtn) saveBtn.disabled = false;
+  var ph = document.createElement('option');
+  ph.value = ''; ph.textContent = '— اختر مخبراً —';
+  sel.appendChild(ph);
+  allLabs.forEach(function(l){
+    var opt = document.createElement('option');
+    opt.value = l.id;
+    opt.textContent = l.name + (l.phone ? ' — ' + l.phone : '');
+    sel.appendChild(opt);
+  });
+  if (selectedLabId) sel.value = selectedLabId;
+}
+
 async function openLabOrderModal(prefill) {
   await loadTreatmentsFromSupabase();
   prefill = prefill || {};
@@ -1228,8 +1304,8 @@ async function openLabOrderModal(prefill) {
   document.getElementById('labOrderId').value = '';
   document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
   populateLabWorkTypes(prefill.treatment_key);
+  populateLabSelect();
   document.getElementById('labOrderTooth').value = prefill.tooth_num || '';
-  document.getElementById('labOrderLabName').value = '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
   document.getElementById('labOrderDateSent').value = toDay();
@@ -1246,8 +1322,8 @@ async function editLabOrder(id) {
   document.getElementById('labOrderId').value = lo.id;
   document.getElementById('labOrderTreatmentKey').value = lo.treatment_key || '';
   populateLabWorkTypes(lo.treatment_key);
+  populateLabSelect(lo.lab_id);
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
-  document.getElementById('labOrderLabName').value = lo.lab_name || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
   document.getElementById('labOrderDateSent').value = lo.date_sent ? lo.date_sent.slice(0,10) : toDay();
@@ -1269,14 +1345,16 @@ async function saveLabOrder() {
     var t = getTreatment(workKey);
     workName = t ? t.name : workKey;
   }
-  var labName = document.getElementById('labOrderLabName').value.trim();
-  var shade = document.getElementById('labOrderShade').value.trim();
-  var cost = parseFloat(document.getElementById('labOrderCost').value) || 0;
+  var labId   = document.getElementById('labOrderLabSelect').value;
+  var labObj  = allLabs.find(function(x){ return x.id === labId; });
+  var labName = labObj ? labObj.name : null;
+  var shade   = document.getElementById('labOrderShade').value.trim();
+  var cost    = parseFloat(document.getElementById('labOrderCost').value) || 0;
   var dateSent = document.getElementById('labOrderDateSent').value;
   var dateDue = document.getElementById('labOrderDateDue').value;
   var notes = document.getElementById('labOrderNotes').value.trim();
 
-  if (!labName) { showToast('⚠️ أدخل اسم المخبر'); return; }
+  if (!labId || !labName) { showToast('⚠️ اختر المخبر'); return; }
   if (!workName || workName === '—') { showToast('⚠️ اختر نوع العمل'); return; }
   if (!dateSent) { showToast('⚠️ اختر تاريخ الإرسال'); return; }
 
@@ -1285,6 +1363,7 @@ async function saveLabOrder() {
     patient_id: patientId,
     tooth_num: toothRaw ? parseInt(toothRaw, 10) : null,
     treatment_key: workKey,
+    lab_id: labId,
     lab_name: labName,
     work_type: workName,
     shade: shade || null,
@@ -1295,7 +1374,6 @@ async function saveLabOrder() {
   };
 
   if (id) {
-    // Update
     const { data, error } = await window.sb.from('lab_orders')
       .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
     if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
@@ -1305,7 +1383,6 @@ async function saveLabOrder() {
     }
     showToast('✅ تم تحديث الطلب');
   } else {
-    // Insert
     payload.status = 'sent';
     const { data, error } = await window.sb.from('lab_orders')
       .insert(payload).select().single();
@@ -1316,6 +1393,39 @@ async function saveLabOrder() {
 
   renderLabOrders();
   closeModal('labOrderModal');
+}
+
+/* Quick-add lab from within order modal */
+function ppOpenLabModal() {
+  document.getElementById('ppLabName').value = '';
+  document.getElementById('ppLabPhone').value = '';
+  document.getElementById('ppLabNotes').value = '';
+  openModal('ppLabModal');
+  setTimeout(function(){ document.getElementById('ppLabName').focus(); }, 100);
+}
+
+async function ppSaveLab() {
+  var name  = document.getElementById('ppLabName').value.trim();
+  var phone = document.getElementById('ppLabPhone').value.trim();
+  var notes = document.getElementById('ppLabNotes').value.trim();
+  if (!name) { showToast('⚠️ أدخل اسم المخبر'); return; }
+
+  const { data, error } = await window.sb.from('labs').insert({
+    doctor_id: currentUser.id,
+    name: name,
+    phone: phone || null,
+    notes: notes || null,
+    is_active: true
+  }).select().single();
+
+  if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
+  if (data) {
+    allLabs.push(data);
+    allLabs.sort(function(a,b){ return a.name.localeCompare(b.name, 'ar'); });
+    populateLabSelect(data.id);
+  }
+  closeModal('ppLabModal');
+  showToast('✅ تمت إضافة المخبر');
 }
 
 async function advanceLabOrder(id) {

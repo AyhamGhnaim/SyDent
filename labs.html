@@ -46,6 +46,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 .topbar {
@@ -99,7 +100,7 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 .stat-card {
   background: var(--bg2);
@@ -120,9 +121,48 @@ body {
 .stat-num { font-size: 22px; font-weight: 800; line-height: 1; }
 .stat-lbl { font-size: 12px; color: var(--text2); margin-top: 3px; }
 
+/* Section */
+.section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.section-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
+.section-title {
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.count-badge {
+  background: var(--green-dim);
+  color: var(--green);
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.btn-sm-add {
+  padding: 7px 14px;
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  color: var(--green);
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-sm-add:hover { background: rgba(46,232,158,0.22); }
+
 /* Filters */
 .filters {
-  display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+  display: flex; gap: 10px; margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 .filter-btn {
   padding: 7px 16px; border-radius: 8px;
@@ -131,6 +171,7 @@ body {
   color: var(--text2);
   font-family: 'Cairo', sans-serif; font-size: 13px;
   cursor: pointer; transition: all .2s;
+  white-space: nowrap;
 }
 .filter-btn:hover, .filter-btn.active {
   background: var(--green-dim);
@@ -139,27 +180,8 @@ body {
 }
 
 /* Table */
-.table-wrap {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.table-head {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 10px;
-}
-.table-head-title { font-size: 15px; font-weight: 700; }
-.count-badge {
-  background: var(--green-dim);
-  color: var(--green);
-  padding: 3px 10px; border-radius: 20px;
-  font-size: 12px; font-weight: 600;
-}
 .table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 900px; }
+table { width: 100%; border-collapse: collapse; }
 thead th {
   padding: 12px 16px;
   text-align: right;
@@ -246,14 +268,53 @@ td.patient-link a:hover { text-decoration: underline; }
   margin-right: 4px;
 }
 
+/* Mobile cards (hidden on desktop) */
+.cards-list { display: none; padding: 12px; gap: 10px; flex-direction: column; }
+.order-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.order-card.overdue { border-color: rgba(239,83,80,0.4); background: rgba(239,83,80,0.04); }
+.oc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px;
+}
+.oc-patient { font-weight: 700; color: var(--green); font-size: 14px; }
+.oc-patient a { color: inherit; text-decoration: none; }
+.oc-info { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12px; }
+.oc-info .lbl { color: var(--text2); margin-left: 4px; }
+.oc-info .val { color: var(--text); font-weight: 600; }
+.oc-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Lab list */
+.lab-list-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  gap: 10px;
+}
+.lab-list-row:last-child { border-bottom: none; }
+.lab-list-info { flex: 1; min-width: 0; }
+.lab-list-name { font-weight: 700; color: var(--text); font-size: 14px; }
+.lab-list-phone { color: var(--text2); font-size: 12px; margin-top: 2px; }
+.lab-list-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
 /* Empty */
 .empty {
-  text-align: center; padding: 60px 20px;
+  text-align: center; padding: 50px 20px;
   color: var(--text2);
 }
-.empty-icon { font-size: 48px; margin-bottom: 12px; }
-.empty-text { font-size: 16px; margin-bottom: 6px; color: var(--text); }
-.empty-sub { font-size: 13px; }
+.empty-icon { font-size: 44px; margin-bottom: 10px; }
+.empty-text { font-size: 15px; margin-bottom: 4px; color: var(--text); }
+.empty-sub { font-size: 12px; }
 
 /* Modal */
 .modal-overlay {
@@ -269,6 +330,9 @@ td.patient-link a:hover { text-decoration: underline; }
   border-radius: 16px;
   width: 100%;
   max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   animation: fadeUp .2s ease;
 }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } }
@@ -276,6 +340,7 @@ td.patient-link a:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .modal-head h3 { font-size: 16px; font-weight: 700; }
 .modal-close {
@@ -284,12 +349,9 @@ td.patient-link a:hover { text-decoration: underline; }
 }
 .modal-body {
   padding: 20px;
-  max-height: 75vh;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  flex: 1;
 }
-.modal-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .form-group { margin-bottom: 15px; }
 .form-group label {
   display: block; font-size: 12px;
@@ -317,11 +379,41 @@ td.patient-link a:hover { text-decoration: underline; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+.lab-select-row {
+  display: flex; gap: 8px; align-items: stretch;
+}
+.lab-select-row select { flex: 1; }
+.btn-quick-add {
+  background: var(--green-dim);
+  border: 1px solid var(--green);
+  color: var(--green);
+  border-radius: 9px;
+  padding: 0 14px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.btn-quick-add:hover { background: rgba(46,232,158,0.22); }
+
+.empty-hint {
+  background: rgba(245,200,66,0.1);
+  border: 1px solid rgba(245,200,66,0.3);
+  color: var(--yellow);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
 .modal-foot {
   display: flex; gap: 10px;
   padding: 14px 20px;
   border-top: 1px solid var(--border);
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 .btn-cancel-m {
   padding: 9px 22px;
@@ -345,6 +437,7 @@ td.patient-link a:hover { text-decoration: underline; }
   transition: background .2s;
 }
 .btn-save-m:hover { background: #26d48e; }
+.btn-save-m:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Toast */
 .toast {
@@ -368,24 +461,39 @@ td.patient-link a:hover { text-decoration: underline; }
   .stats-strip { grid-template-columns: repeat(2, 1fr); }
   .content { padding: 18px; }
 }
+
+@media (max-width: 700px) {
+  .table-scroll { display: none; }
+  .cards-list { display: flex; }
+}
+
 @media (max-width: 600px) {
   .topbar { padding: 12px 14px; gap: 8px; flex-wrap: wrap; }
-  .topbar-title { font-size: 16px; }
+  .topbar-title { font-size: 16px; flex: 1 1 auto; }
   .search-wrap { max-width: 100%; width: 100%; order: 3; }
   .btn-add { padding: 9px 14px; font-size: 13px; }
   .stat-num { font-size: 18px; }
   .stat-lbl { font-size: 11px; }
   .stat-icon { width: 38px; height: 38px; font-size: 16px; }
+  .content { padding: 14px; }
+  .section-head { padding: 12px 14px; }
+  .filters { gap: 6px; margin-bottom: 12px; }
+  .filter-btn { padding: 6px 11px; font-size: 12px; }
   .form-row { grid-template-columns: 1fr; }
-  .modal-overlay { align-items: flex-end; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {
     border-radius: 20px 20px 0 0;
-    max-height: 95vh;
+    max-height: 92vh;
     width: 100%;
     max-width: 100%;
   }
   .modal-foot { flex-direction: column; gap: 10px; }
   .btn-cancel-m, .btn-save-m { width: 100%; text-align: center; padding: 12px; font-size: 15px; }
+  .lab-list-row { padding: 12px 14px; }
+}
+
+@media (max-width: 480px) {
+  .stats-strip { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
 </style>
 <script src="sidebar.js"></script>
@@ -394,7 +502,6 @@ td.patient-link a:hover { text-decoration: underline; }
 </head>
 <body>
 <script>
-// SyDent auth guard
 (async function(){
   await new Promise(r => setTimeout(r, 50));
   if (!window.sb) { console.warn('Supabase not loaded'); return; }
@@ -405,7 +512,6 @@ td.patient-link a:hover { text-decoration: underline; }
 
 <div class="main" id="sbMainContent">
 
-  <!-- Top Bar -->
   <div class="topbar">
     <div class="topbar-title">إدارة <span>المخابر</span></div>
     <div class="search-wrap">
@@ -415,7 +521,6 @@ td.patient-link a:hover { text-decoration: underline; }
     <button class="btn-add" onclick="openLabOrderModal()">＋ طلب جديد</button>
   </div>
 
-  <!-- Content -->
   <div class="content">
 
     <!-- Stats -->
@@ -450,6 +555,15 @@ td.patient-link a:hover { text-decoration: underline; }
       </div>
     </div>
 
+    <!-- Labs Management -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">🏭 المخابر المسجّلة <span class="count-badge" id="labsCount">0</span></div>
+        <button class="btn-sm-add" onclick="openLabModal()">＋ مخبر جديد</button>
+      </div>
+      <div id="labsList"></div>
+    </div>
+
     <!-- Filters -->
     <div class="filters">
       <button class="filter-btn active" data-filter="all" onclick="applyFilter('all', this)">الكل</button>
@@ -460,11 +574,10 @@ td.patient-link a:hover { text-decoration: underline; }
       <button class="filter-btn" data-filter="rejected" onclick="applyFilter('rejected', this)">🔴 مرفوض</button>
     </div>
 
-    <!-- Table -->
-    <div class="table-wrap">
-      <div class="table-head">
-        <div class="table-head-title">طلبات المخابر</div>
-        <span class="count-badge" id="resultCount">0</span>
+    <!-- Orders -->
+    <div class="section">
+      <div class="section-head">
+        <div class="section-title">📋 طلبات المخابر <span class="count-badge" id="resultCount">0</span></div>
       </div>
       <div class="table-scroll">
         <table id="ordersTable">
@@ -475,7 +588,7 @@ td.patient-link a:hover { text-decoration: underline; }
               <th>نوع العمل</th>
               <th>المخبر</th>
               <th>اللون</th>
-              <th>تاريخ الإرسال</th>
+              <th>الإرسال</th>
               <th>الاستحقاق</th>
               <th style="text-align:left;">التكلفة</th>
               <th>الحالة</th>
@@ -485,10 +598,11 @@ td.patient-link a:hover { text-decoration: underline; }
           <tbody id="ordersBody"></tbody>
         </table>
       </div>
+      <div class="cards-list" id="ordersCards"></div>
       <div id="emptyState" style="display:none;" class="empty">
         <div class="empty-icon">🧪</div>
         <div class="empty-text">لا توجد طلبات مخابر</div>
-        <div class="empty-sub">ابدأ بإضافة أول طلب مخبر من بطاقة مريض أو من زر "طلب جديد"</div>
+        <div class="empty-sub">ابدأ بإضافة أول طلب من زر "طلب جديد"</div>
       </div>
     </div>
 
@@ -504,6 +618,9 @@ td.patient-link a:hover { text-decoration: underline; }
     </div>
     <div class="modal-body">
       <input type="hidden" id="labOrderId">
+      <div id="labOrderEmptyHint" class="empty-hint" style="display:none;">
+        ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ بجانب حقل المخبر لإضافة أول مخبر.
+      </div>
       <div class="form-group">
         <label>المريض</label>
         <select id="labOrderPatient"></select>
@@ -519,8 +636,11 @@ td.patient-link a:hover { text-decoration: underline; }
         </div>
       </div>
       <div class="form-group">
-        <label>اسم المخبر</label>
-        <input type="text" id="labOrderLabName" placeholder="مثال: مخبر النور">
+        <label>المخبر</label>
+        <div class="lab-select-row">
+          <select id="labOrderLabSelect"></select>
+          <button type="button" class="btn-quick-add" onclick="openLabModal(null, true)" title="إضافة مخبر جديد">＋</button>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -549,7 +669,37 @@ td.patient-link a:hover { text-decoration: underline; }
     </div>
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeModal('labOrderModal')">إلغاء</button>
-      <button class="btn-save-m" onclick="saveLabOrder()">حفظ</button>
+      <button class="btn-save-m" id="labOrderSaveBtn" onclick="saveLabOrder()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: مخبر -->
+<div class="modal-overlay" id="labModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="labModalTitle">🏭 مخبر جديد</h3>
+      <button class="modal-close" onclick="closeLabModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="labModalId">
+      <input type="hidden" id="labModalReturnToOrder" value="0">
+      <div class="form-group">
+        <label>اسم المخبر *</label>
+        <input type="text" id="labModalName" placeholder="مثال: مخبر النور للأسنان">
+      </div>
+      <div class="form-group">
+        <label>رقم الهاتف</label>
+        <input type="tel" id="labModalPhone" placeholder="مثال: 0934012433">
+      </div>
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="labModalNotes" placeholder="عنوان، تخصص، أوقات العمل…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeLabModal()">إلغاء</button>
+      <button class="btn-save-m" onclick="saveLab()">حفظ</button>
     </div>
   </div>
 </div>
@@ -557,15 +707,16 @@ td.patient-link a:hover { text-decoration: underline; }
 <div class="toast" id="toast"></div>
 
 <script>
-/* ─── State ─── */
+/* State */
 var currentUser = null;
 var allOrders   = [];
 var allPatients = [];
+var allLabs     = [];
 var TREATMENTS  = [];
 var currentFilter = 'all';
 var searchQuery   = '';
 
-/* ─── Constants ─── */
+/* Constants */
 var LAB_REQUIRED_KEYS = ['crown', 'bridge', 'denture', 'denture_full', 'denture_partial', 'veneer', 'ortho_plate'];
 var LAB_OPTIONAL_KEYS = ['implant', 'ortho_fixed'];
 
@@ -588,7 +739,7 @@ var LAB_NEXT_STATUS = {
   'checked':  { next: 'delivered', label: '🤝 سُلِّم' }
 };
 
-/* ─── Utils ─── */
+/* Utils */
 function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
 function fmtD(ds) {
   if (!ds) return '—';
@@ -616,38 +767,59 @@ function showToast(msg) {
   toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
 }
 
-/* ─── Load Data ─── */
+function getPatientName(id) {
+  var p = allPatients.find(function(x){ return x.id === id; });
+  return p ? p.name : '—';
+}
+function getLabName(id, fallbackName) {
+  var l = allLabs.find(function(x){ return x.id === id; });
+  if (l) return l.name;
+  return fallbackName || '—';
+}
+
+/* Load */
 async function loadAll() {
   if (!currentUser) return;
 
-  // Patients (for select + name lookup)
-  const { data: pats } = await window.sb.from('patients')
-    .select('id, name, local_id')
-    .eq('doctor_id', currentUser.id)
-    .order('name', { ascending: true });
-  allPatients = pats || [];
-
-  // Treatments
-  const { data: tr } = await window.sb.from('treatments')
-    .select('*').order('sort_order', { ascending: true });
-  TREATMENTS = (tr || []).map(function(t){
-    return { id: t.treatment_key, name: t.name, label: t.label, fill: t.fill, stroke: t.stroke, price: t.price };
-  });
-
-  // Lab orders
   try {
-    const { data: lo, error: loErr } = await window.sb.from('lab_orders')
+    const { data: pats } = await window.sb.from('patients')
+      .select('id, name, local_id')
+      .eq('doctor_id', currentUser.id)
+      .order('name', { ascending: true });
+    allPatients = pats || [];
+  } catch(e) { console.warn(e); allPatients = []; }
+
+  try {
+    const { data: tr } = await window.sb.from('treatments')
+      .select('*').order('sort_order', { ascending: true });
+    TREATMENTS = (tr || []).map(function(t){
+      return { id: t.treatment_key, name: t.name, label: t.label, fill: t.fill, stroke: t.stroke, price: t.price };
+    });
+  } catch(e) { console.warn(e); TREATMENTS = []; }
+
+  try {
+    const { data: ld, error } = await window.sb.from('labs')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (error) { console.warn('labs:', error); allLabs = []; }
+    else allLabs = ld || [];
+  } catch(e) { console.warn(e); allLabs = []; }
+
+  try {
+    const { data: lo, error } = await window.sb.from('lab_orders')
       .select('*')
       .order('date_sent', { ascending: false });
-    if (loErr) { console.warn('lab_orders error:', loErr); allOrders = []; }
+    if (error) { console.warn('lab_orders:', error); allOrders = []; }
     else allOrders = lo || [];
   } catch(e) { console.warn(e); allOrders = []; }
 
+  renderLabs();
   renderStats();
   renderTable();
 }
 
-/* ─── Render Stats ─── */
+/* Render Stats */
 function renderStats() {
   var inProgress = 0, ready = 0, thisMonth = 0, due = 0;
   var now = new Date();
@@ -657,7 +829,6 @@ function renderStats() {
     if (lo.status === 'sent' || lo.status === 'received') inProgress++;
     if (lo.status === 'checked') ready++;
     if (lo.date_sent && lo.date_sent.slice(0,7) === thisMonthStr) thisMonth++;
-    // Due = cost of orders not yet delivered
     if (lo.status !== 'delivered' && lo.status !== 'rejected') {
       due += Number(lo.cost || 0);
     }
@@ -669,19 +840,38 @@ function renderStats() {
   document.getElementById('statDue').textContent        = fmt(due);
 }
 
-/* ─── Render Table ─── */
-function getPatientName(id) {
-  var p = allPatients.find(function(x){ return x.id === id; });
-  return p ? p.name : '—';
+/* Render Labs */
+function renderLabs() {
+  var el = document.getElementById('labsList');
+  document.getElementById('labsCount').textContent = allLabs.length;
+  if (!allLabs.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🏭</div><div class="empty-text">لا توجد مخابر مسجّلة</div><div class="empty-sub">ابدأ بإضافة مخبر لتتمكن من إنشاء طلبات</div></div>';
+    return;
+  }
+  var html = '';
+  allLabs.forEach(function(l){
+    html += '<div class="lab-list-row">'
+      + '<div class="lab-list-info">'
+      +   '<div class="lab-list-name">' + escapeHtml(l.name) + '</div>'
+      +   (l.phone ? '<div class="lab-list-phone">📞 ' + escapeHtml(l.phone) + '</div>' : '')
+      + '</div>'
+      + '<div class="lab-list-actions">'
+      +   '<button class="lab-action-btn" onclick="editLab(\'' + l.id + '\')">✏️ تعديل</button>'
+      +   '<button class="del-btn" onclick="delLab(\'' + l.id + '\')">🗑</button>'
+      + '</div>'
+      + '</div>';
+  });
+  el.innerHTML = html;
 }
 
+/* Render Orders */
 function getFilteredOrders() {
   var q = searchQuery.trim().toLowerCase();
   return allOrders.filter(function(lo){
     if (currentFilter !== 'all' && lo.status !== currentFilter) return false;
     if (q) {
       var pname = (getPatientName(lo.patient_id) || '').toLowerCase();
-      var lname = (lo.lab_name || '').toLowerCase();
+      var lname = (getLabName(lo.lab_id, lo.lab_name) || '').toLowerCase();
       var wtype = (lo.work_type || '').toLowerCase();
       if (pname.indexOf(q) === -1 && lname.indexOf(q) === -1 && wtype.indexOf(q) === -1) return false;
     }
@@ -691,18 +881,24 @@ function getFilteredOrders() {
 
 function renderTable() {
   var orders = getFilteredOrders();
-  var tbody = document.getElementById('ordersBody');
-  var empty = document.getElementById('emptyState');
   document.getElementById('resultCount').textContent = orders.length;
+
+  var tbody  = document.getElementById('ordersBody');
+  var cards  = document.getElementById('ordersCards');
+  var empty  = document.getElementById('emptyState');
+  var tableScroll = document.querySelector('.table-scroll');
 
   if (!orders.length) {
     tbody.innerHTML = '';
+    cards.innerHTML = '';
     empty.style.display = 'block';
+    if (tableScroll) tableScroll.style.display = 'none';
     return;
   }
   empty.style.display = 'none';
+  if (tableScroll) tableScroll.style.display = '';
 
-  var rows = '';
+  var rows = '', cardHtml = '';
   orders.forEach(function(lo){
     var st = LAB_STATUSES[lo.status] || LAB_STATUSES['sent'];
     var pill = '<span class="lab-pill" style="background:' + st.bg + ';color:' + st.color + ';">' + st.ar + '</span>';
@@ -715,8 +911,9 @@ function renderTable() {
     actions += '<button class="lab-action-btn" onclick="editLabOrder(\'' + lo.id + '\')">✏️</button>';
     actions += '<button class="del-btn" onclick="delLabOrder(\'' + lo.id + '\')">🗑</button>';
 
-    var pname = getPatientName(lo.patient_id);
-    var pLink = lo.patient_id
+    var pname  = getPatientName(lo.patient_id);
+    var labNm  = getLabName(lo.lab_id, lo.lab_name);
+    var pLink  = lo.patient_id
       ? '<a href="patient-profile.html?id=' + lo.patient_id + '">' + escapeHtml(pname) + '</a>'
       : escapeHtml(pname);
     var overdue = isOverdue(lo);
@@ -727,7 +924,7 @@ function renderTable() {
       + '<td class="patient-link">' + pLink + '</td>'
       + '<td>' + (lo.tooth_num ? '<span class="tooth-badge">سن ' + lo.tooth_num + '</span>' : '—') + '</td>'
       + '<td>' + escapeHtml(lo.work_type || '—') + '</td>'
-      + '<td style="color:var(--text2)">' + escapeHtml(lo.lab_name || '—') + '</td>'
+      + '<td style="color:var(--text2)">' + escapeHtml(labNm) + '</td>'
       + '<td style="color:var(--text2)">' + escapeHtml(lo.shade || '—') + '</td>'
       + '<td>' + fmtD(lo.date_sent) + '</td>'
       + '<td>' + overdueTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</td>'
@@ -735,11 +932,29 @@ function renderTable() {
       + '<td>' + pill + '</td>'
       + '<td style="white-space:nowrap;">' + actions + '</td>'
       + '</tr>';
+
+    cardHtml += '<div class="order-card' + (overdue ? ' overdue' : '') + '">'
+      + '<div class="oc-row">'
+      +   '<div class="oc-patient">' + pLink + '</div>'
+      +   pill
+      + '</div>'
+      + '<div class="oc-info">'
+      +   '<div><span class="lbl">السن:</span><span class="val">' + (lo.tooth_num || '—') + '</span></div>'
+      +   '<div><span class="lbl">العمل:</span><span class="val">' + escapeHtml(lo.work_type || '—') + '</span></div>'
+      +   '<div><span class="lbl">المخبر:</span><span class="val">' + escapeHtml(labNm) + '</span></div>'
+      +   '<div><span class="lbl">اللون:</span><span class="val">' + escapeHtml(lo.shade || '—') + '</span></div>'
+      +   '<div><span class="lbl">الإرسال:</span><span class="val">' + fmtD(lo.date_sent) + '</span></div>'
+      +   '<div><span class="lbl">الاستحقاق:</span><span class="val">' + overdueTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</span></div>'
+      +   '<div style="grid-column:1/-1;"><span class="lbl">التكلفة:</span><span class="val">' + fmt(lo.cost) + ' ل.س</span></div>'
+      + '</div>'
+      + '<div class="oc-actions">' + actions + '</div>'
+      + '</div>';
   });
   tbody.innerHTML = rows;
+  cards.innerHTML = cardHtml;
 }
 
-/* ─── Filters & Search ─── */
+/* Filters */
 function applyFilter(f, btn) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
@@ -752,14 +967,12 @@ document.getElementById('searchInput').addEventListener('input', function(e){
   renderTable();
 });
 
-/* ─── Modal Helpers ─── */
+/* Modal */
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
 function closeModal(id) {
   var el = document.getElementById(id);
   if (!el) return;
   el.classList.remove('open');
-  el.style.display = 'none';
-  setTimeout(function(){ el.style.display = ''; }, 50);
 }
 
 var overlays = document.querySelectorAll('.modal-overlay');
@@ -767,7 +980,7 @@ for (var _o = 0; _o < overlays.length; _o++) {
   (function(el){ el.addEventListener('click', function(e){ if (e.target === el) closeModal(el.id); }); })(overlays[_o]);
 }
 
-/* ─── Populate selects ─── */
+/* Selects */
 function populatePatientSelect(selectedId) {
   var sel = document.getElementById('labOrderPatient');
   sel.innerHTML = '<option value="">— اختر مريضاً —</option>';
@@ -797,14 +1010,41 @@ function populateWorkTypeSelect(selectedKey) {
   if (selectedKey) sel.value = selectedKey;
 }
 
-/* ─── CRUD ─── */
+function populateLabSelect(selectedLabId) {
+  var sel = document.getElementById('labOrderLabSelect');
+  var hint = document.getElementById('labOrderEmptyHint');
+  var saveBtn = document.getElementById('labOrderSaveBtn');
+  sel.innerHTML = '';
+  if (!allLabs.length) {
+    var opt = document.createElement('option');
+    opt.value = ''; opt.textContent = '— لا توجد مخابر —';
+    sel.appendChild(opt);
+    hint.style.display = 'block';
+    saveBtn.disabled = true;
+    return;
+  }
+  hint.style.display = 'none';
+  saveBtn.disabled = false;
+  var ph = document.createElement('option');
+  ph.value = ''; ph.textContent = '— اختر مخبراً —';
+  sel.appendChild(ph);
+  allLabs.forEach(function(l){
+    var opt = document.createElement('option');
+    opt.value = l.id;
+    opt.textContent = l.name + (l.phone ? ' — ' + l.phone : '');
+    sel.appendChild(opt);
+  });
+  if (selectedLabId) sel.value = selectedLabId;
+}
+
+/* CRUD: Lab Orders */
 function openLabOrderModal() {
   document.getElementById('labOrderTitle').textContent = '🧪 طلب مخبر جديد';
   document.getElementById('labOrderId').value = '';
   populatePatientSelect();
   populateWorkTypeSelect();
+  populateLabSelect();
   document.getElementById('labOrderTooth').value = '';
-  document.getElementById('labOrderLabName').value = '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
   document.getElementById('labOrderDateSent').value = toDay();
@@ -820,8 +1060,8 @@ function editLabOrder(id) {
   document.getElementById('labOrderId').value = lo.id;
   populatePatientSelect(lo.patient_id);
   populateWorkTypeSelect(lo.treatment_key);
+  populateLabSelect(lo.lab_id);
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
-  document.getElementById('labOrderLabName').value = lo.lab_name || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
   document.getElementById('labOrderDateSent').value = lo.date_sent ? lo.date_sent.slice(0,10) : toDay();
@@ -843,7 +1083,10 @@ async function saveLabOrder() {
     var t = TREATMENTS.find(function(x){ return x.id === workKey; });
     workName = t ? t.name : workKey;
   }
-  var labName  = document.getElementById('labOrderLabName').value.trim();
+  var labId    = document.getElementById('labOrderLabSelect').value;
+  var labObj   = allLabs.find(function(x){ return x.id === labId; });
+  var labName  = labObj ? labObj.name : null;
+
   var shade    = document.getElementById('labOrderShade').value.trim();
   var cost     = parseFloat(document.getElementById('labOrderCost').value) || 0;
   var dateSent = document.getElementById('labOrderDateSent').value;
@@ -851,22 +1094,23 @@ async function saveLabOrder() {
   var notes    = document.getElementById('labOrderNotes').value.trim();
 
   if (!patientId) { showToast('⚠️ اختر المريض'); return; }
-  if (!labName)   { showToast('⚠️ أدخل اسم المخبر'); return; }
+  if (!labId || !labName) { showToast('⚠️ اختر المخبر'); return; }
   if (!workName || workName === '—') { showToast('⚠️ اختر نوع العمل'); return; }
   if (!dateSent)  { showToast('⚠️ اختر تاريخ الإرسال'); return; }
 
   var payload = {
-    doctor_id:    currentUser.id,
-    patient_id:   patientId,
-    tooth_num:    toothRaw ? parseInt(toothRaw, 10) : null,
+    doctor_id:     currentUser.id,
+    patient_id:    patientId,
+    tooth_num:     toothRaw ? parseInt(toothRaw, 10) : null,
     treatment_key: workKey,
-    lab_name:     labName,
-    work_type:    workName,
-    shade:        shade || null,
-    cost:         cost,
-    notes:        notes || null,
-    date_sent:    dateSent,
-    date_due:     dateDue || null
+    lab_id:        labId,
+    lab_name:      labName,
+    work_type:     workName,
+    shade:         shade || null,
+    cost:          cost,
+    notes:         notes || null,
+    date_sent:     dateSent,
+    date_due:      dateDue || null
   };
 
   if (id) {
@@ -912,7 +1156,7 @@ async function advanceLabOrder(id) {
   }
   renderStats();
   renderTable();
-  showToast('✅ تم التحديث إلى: ' + LAB_STATUSES[nx.next].ar);
+  showToast('✅ ' + LAB_STATUSES[nx.next].ar);
 }
 
 async function rejectLabOrder(id) {
@@ -940,7 +1184,100 @@ async function delLabOrder(id) {
   showToast('🗑 تم حذف الطلب');
 }
 
-/* ─── Bootstrap ─── */
+/* CRUD: Labs */
+function openLabModal(id, returnToOrder) {
+  document.getElementById('labModalReturnToOrder').value = returnToOrder ? '1' : '0';
+  if (id) {
+    var lab = allLabs.find(function(x){ return x.id === id; });
+    if (!lab) return;
+    document.getElementById('labModalTitle').textContent = '🏭 تعديل المخبر';
+    document.getElementById('labModalId').value = lab.id;
+    document.getElementById('labModalName').value = lab.name || '';
+    document.getElementById('labModalPhone').value = lab.phone || '';
+    document.getElementById('labModalNotes').value = lab.notes || '';
+  } else {
+    document.getElementById('labModalTitle').textContent = '🏭 مخبر جديد';
+    document.getElementById('labModalId').value = '';
+    document.getElementById('labModalName').value = '';
+    document.getElementById('labModalPhone').value = '';
+    document.getElementById('labModalNotes').value = '';
+  }
+  openModal('labModal');
+}
+
+function closeLabModal() {
+  closeModal('labModal');
+  document.getElementById('labModalReturnToOrder').value = '0';
+}
+
+function editLab(id) { openLabModal(id, false); }
+
+async function saveLab() {
+  var id    = document.getElementById('labModalId').value;
+  var name  = document.getElementById('labModalName').value.trim();
+  var phone = document.getElementById('labModalPhone').value.trim();
+  var notes = document.getElementById('labModalNotes').value.trim();
+  var returnToOrder = document.getElementById('labModalReturnToOrder').value === '1';
+
+  if (!name) { showToast('⚠️ أدخل اسم المخبر'); return; }
+
+  var payload = {
+    doctor_id: currentUser.id,
+    name:      name,
+    phone:     phone || null,
+    notes:     notes || null,
+    is_active: true
+  };
+
+  var savedLab = null;
+  if (id) {
+    const { data, error } = await window.sb.from('labs')
+      .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
+    if (data) {
+      var idx = allLabs.findIndex(function(x){ return x.id === id; });
+      if (idx !== -1) allLabs[idx] = data;
+      savedLab = data;
+    }
+    showToast('✅ تم تحديث المخبر');
+  } else {
+    const { data, error } = await window.sb.from('labs')
+      .insert(payload).select().single();
+    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
+    if (data) {
+      allLabs.push(data);
+      allLabs.sort(function(a,b){ return a.name.localeCompare(b.name, 'ar'); });
+      savedLab = data;
+    }
+    showToast('✅ تمت إضافة المخبر');
+  }
+
+  renderLabs();
+  renderTable();
+  closeLabModal();
+
+  if (returnToOrder && savedLab) {
+    populateLabSelect(savedLab.id);
+  }
+}
+
+async function delLab(id) {
+  var lab = allLabs.find(function(x){ return x.id === id; });
+  if (!lab) return;
+  var hasOrders = allOrders.some(function(o){ return o.lab_id === id; });
+  var msg = hasOrders
+    ? 'يوجد طلبات مرتبطة بهذا المخبر. الحذف سيُلغي الربط (الطلبات تبقى موجودة). متابعة؟'
+    : 'هل تريد حذف هذا المخبر نهائياً؟';
+  if (!confirm(msg)) return;
+  const { error } = await window.sb.from('labs')
+    .delete().eq('id', id).eq('doctor_id', currentUser.id);
+  if (error) { showToast('⚠️ فشل الحذف'); return; }
+  allLabs = allLabs.filter(function(x){ return x.id !== id; });
+  await loadAll();
+  showToast('🗑 تم حذف المخبر');
+}
+
+/* Bootstrap */
 (async function bootstrap(){
   await new Promise(r => setTimeout(r, 80));
   const { data } = await window.sb.auth.getUser();
