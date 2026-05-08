@@ -114,18 +114,36 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .jaw-wrap{overflow-x:auto;padding:6px 0;}
 .jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;}
 .midline{width:2px;background:linear-gradient(to bottom,transparent,var(--border) 15%,var(--border) 85%,transparent);margin:0 6px;align-self:stretch;border-radius:2px;}
-.tooth-cell{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;transition:transform .15s;}
-.tooth-cell:hover{transform:scale(1.12);}
+.tooth-cell{display:flex;flex-direction:column;align-items:center;gap:1px;transition:transform .15s;position:relative;}
+.tooth-cell:hover{transform:scale(1.12);z-index:5;}
 .tooth-shape{
-  width:28px;height:36px;
-  border:2px solid #b8956a;background:#e8d5b0;
-  border-radius:6px 6px 10px 10px;
-  display:flex;align-items:center;justify-content:center;
-  font-size:11px;font-weight:800;color:#0a1628;
-  transition:all .15s;
-  box-shadow:inset 0 -3px 6px rgba(0,0,0,.1);
+  width:32px;height:40px;
+  display:block;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.15));
+  transition:filter .15s;
 }
-.tooth-cell:hover .tooth-shape{transform:scale(1.15);box-shadow:0 0 0 2px var(--green),inset 0 -3px 6px rgba(0,0,0,.1);}
+.tooth-cell:hover .tooth-shape{filter:drop-shadow(0 0 4px var(--green));}
+.tooth-shape .surface{
+  cursor:pointer;
+  stroke:#b8956a;stroke-width:1.2;
+  transition:stroke-width .12s, fill .15s;
+}
+.tooth-shape .surface:hover{stroke:var(--green);stroke-width:2.2;}
+.tooth-tip{
+  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:#0a1628;color:#fff;padding:6px 10px;border-radius:8px;
+  font-size:11px;white-space:nowrap;pointer-events:none;
+  border:1px solid var(--green);box-shadow:0 4px 12px rgba(0,0,0,.4);
+  display:none;z-index:50;
+}
+.tooth-tip::after{
+  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top-color:var(--green);
+}
+.tooth-cell:hover .tooth-tip{display:block;}
+.tip-row{display:flex;align-items:center;gap:6px;padding:2px 0;}
+.tip-row b{color:var(--green);font-weight:700;}
+.tip-dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
 .tooth-num{font-size:10px;color:var(--text2);text-align:center;line-height:1.6;min-width:28px;font-weight:600;}
 .jaw-gap{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:3px;margin:2px 0;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;justify-content:center;}
@@ -288,7 +306,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="chart-card">
       <div class="chart-card-head">
         <span class="chart-card-title">🦷 مخطط الأسنان</span>
-        <span class="chart-hint">اضغط على أي سن لتحديد حالته</span>
+        <span class="chart-hint">اضغط على المنطقة المحددة من السن لتسجيل العلاج</span>
       </div>
       <div class="jaw-wrap">
         <div class="jaw-row" id="upperJaw"></div>
@@ -550,7 +568,7 @@ var patient   = null;
 var patients  = [];   // all doctor's patients (for seq numbering)
 var sessions  = [];
 var payments  = [];
-var teethMap  = {};   // { tooth_num: treatment_key }
+var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: null, L: null, I: null } }
 var labOrders = [];   // lab orders for current patient
 var allLabs   = [];   // all labs for the doctor
 var currentUser = null;
@@ -654,11 +672,16 @@ async function loadAll() {
     .eq('patient_id', patientId).order('date', { ascending: false });
   payments = pd2 || [];
 
-  // teeth
+  // teeth — group by tooth_num then by surface
   const { data: td } = await window.sb.from('teeth_status').select('*')
     .eq('patient_id', patientId);
   teethMap = {};
-  (td || []).forEach(function(t){ teethMap[t.tooth_num] = t.treatment_key; });
+  (td || []).forEach(function(t){
+    var n = String(t.tooth_num);
+    var s = t.surface || 'O';
+    if (!teethMap[n]) teethMap[n] = {};
+    teethMap[n][s] = t.treatment_key;
+  });
 
   // lab orders (defensive: fail silently if table missing or RLS blocks)
   try {
@@ -769,19 +792,75 @@ function rebuildToothMaps() {
 var _T = rebuildToothMaps();
 var T_FILL = _T.fill, T_STROKE = _T.stroke, T_LABEL = _T.label;
 
-function buildTooth(num, status, isUpper) {
-  var st   = status || '';
-  var col  = T_FILL[st]   || T_FILL[''];
-  var str  = T_STROKE[st] || T_STROKE[''];
-  var lbl  = T_LABEL[st]  || '';
-  var tCol = (st===''||st==='treated'||st==='crown') ? '#0a1628' : '#ffffff';
-  var html = '<div class="tooth-cell" onclick="openToothModal(' + num + ')" title="السن ' + num + '">';
+/* Anterior teeth (incisors + canines) use Incisal Edge instead of Occlusal */
+var ANTERIOR_TEETH = [11,12,13,21,22,23,31,32,33,41,42,43];
+function isAnterior(num){ return ANTERIOR_TEETH.indexOf(parseInt(num,10)) !== -1; }
+
+/* Surface labels in Arabic */
+var SURFACE_LABELS = {
+  'O': 'إطباقي',
+  'I': 'قاطع',
+  'M': 'إنسي',
+  'D': 'وحشي',
+  'B': 'دهليزي',
+  'L': 'لساني'
+};
+
+/* Get the center surface key for a given tooth (O for posterior, I for anterior) */
+function centerSurface(num){ return isAnterior(num) ? 'I' : 'O'; }
+
+/* Get all valid surface keys for a tooth */
+function surfacesFor(num){
+  return isAnterior(num) ? ['I','M','D','B','L'] : ['O','M','D','B','L'];
+}
+
+function buildTooth(num, surfaceMap, isUpper) {
+  var sm = surfaceMap || {};
+  var centerKey = centerSurface(num); // 'O' or 'I'
+
+  // Surface fills
+  var fO = T_FILL[sm[centerKey] || ''] || T_FILL[''];
+  var fM = T_FILL[sm.M || ''] || T_FILL[''];
+  var fD = T_FILL[sm.D || ''] || T_FILL[''];
+  var fB = T_FILL[sm.B || ''] || T_FILL[''];
+  var fL = T_FILL[sm.L || ''] || T_FILL[''];
+
+  // Build tooltip rows (only show surfaces that have a treatment)
+  var tipRows = '';
+  var keys = surfacesFor(num);
+  for (var k = 0; k < keys.length; k++) {
+    var sk = keys[k];
+    var tk = sm[sk];
+    if (tk) {
+      var tobj = getTreatment(tk);
+      var tname = tobj ? tobj.name : tk;
+      var tcolor = T_FILL[tk] || '#888';
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + SURFACE_LABELS[sk] + ':</b> ' + tname + '</div>';
+    }
+  }
+  if (!tipRows) tipRows = '<div class="tip-row" style="color:#7a8a9a">سليم — اضغط أي منطقة</div>';
+
+  // For lower teeth: flip vertically so "B" (buccal/labial) appears at the bottom
+  // (anatomically correct: outer surface faces away from gum line)
+  var transform = isUpper ? '' : 'transform="translate(0,125) scale(1,-1)"';
+
+  var svg = '<svg class="tooth-shape" viewBox="0 0 100 125" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
+          + '<g ' + transform + '>'
+          + '<path class="surface" data-tooth="' + num + '" data-surface="B" d="M 8 8 L 92 8 L 72 38 L 28 38 Z" fill="' + fB + '"></path>'
+          + '<path class="surface" data-tooth="' + num + '" data-surface="L" d="M 28 87 L 72 87 L 92 117 L 8 117 Z" fill="' + fL + '"></path>'
+          + '<path class="surface" data-tooth="' + num + '" data-surface="M" d="M 8 8 L 28 38 L 28 87 L 8 117 Z" fill="' + fM + '"></path>'
+          + '<path class="surface" data-tooth="' + num + '" data-surface="D" d="M 92 8 L 92 117 L 72 87 L 72 38 Z" fill="' + fD + '"></path>'
+          + '<rect class="surface" data-tooth="' + num + '" data-surface="' + centerKey + '" x="28" y="38" width="44" height="49" fill="' + fO + '"></rect>'
+          + '</g></svg>';
+
+  var num_html = '<div class="tooth-num">' + num + '</div>';
+  var tip_html = '<div class="tooth-tip">' + tipRows + '</div>';
+
+  var html = '<div class="tooth-cell" title="السن ' + num + '">';
   if (isUpper) {
-    html += '<div class="tooth-shape" style="background:' + col + ';border-color:' + str + ';color:' + tCol + ';">' + lbl + '</div>';
-    html += '<div class="tooth-num">' + num + '</div>';
+    html += tip_html + svg + num_html;
   } else {
-    html += '<div class="tooth-num">' + num + '</div>';
-    html += '<div class="tooth-shape" style="background:' + col + ';border-color:' + str + ';color:' + tCol + ';">' + lbl + '</div>';
+    html += num_html + svg + tip_html;
   }
   html += '</div>';
   return html;
@@ -816,19 +895,37 @@ function renderTeeth() {
   }
   upperEl.innerHTML = uHtml;
   lowerEl.innerHTML = lHtml;
+  attachSurfaceClicks();
+}
+
+/* Attach click handlers to all .surface elements (event delegation) */
+function attachSurfaceClicks() {
+  var surfaces = document.querySelectorAll('.tooth-shape .surface');
+  for (var i = 0; i < surfaces.length; i++) {
+    surfaces[i].addEventListener('click', function(e){
+      e.stopPropagation();
+      var tooth = this.getAttribute('data-tooth');
+      var surf  = this.getAttribute('data-surface');
+      openToothModal(parseInt(tooth, 10), surf);
+    });
+  }
 }
 
 /* ── Tooth Modal ── */
 var currentTooth = null;
+var currentSurface = null;
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
 
-async function openToothModal(n) {
+async function openToothModal(n, surface) {
   await loadTreatmentsFromSupabase();
   currentTooth = n;
-  var st = teethMap[String(n)];
+  currentSurface = surface || centerSurface(n);
+  var sm = teethMap[String(n)] || {};
+  var st = sm[currentSurface];
+  var surfLabel = SURFACE_LABELS[currentSurface] || currentSurface;
   document.getElementById('toothModalTitle').textContent =
-    'السن ' + n + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
+    'السن ' + n + ' — السطح ' + surfLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
   var container = document.getElementById('toothOptsContainer');
   var html = '';
   for (var i=0; i<TREATMENTS.length; i++) {
@@ -859,7 +956,7 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
-  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' للسن ' + currentTooth;
+  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + (SURFACE_LABELS[currentSurface] || currentSurface) + ')';
   var t = getTreatment(status);
   document.getElementById('toothCost').value  = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
@@ -882,18 +979,19 @@ async function saveToothTreatment() {
   if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
-  // 1. Save tooth status
+  // 1. Save tooth status (per surface)
   await window.sb.from('teeth_status').upsert({
     doctor_id: currentUser.id, patient_id: patientId,
-    tooth_num: String(currentTooth), treatment_key: pendingToothStatus
-  }, { onConflict: 'doctor_id,patient_id,tooth_num' });
-  teethMap[String(currentTooth)] = pendingToothStatus;
+    tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
+  }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+  if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+  teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
 
   // 2. Save session
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth,
-    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth)
+    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + (SURFACE_LABELS[currentSurface] || currentSurface),
+    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
   if (newSess) sessions.unshift(newSess);
 
@@ -908,17 +1006,26 @@ async function saveToothTreatment() {
 
   renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
   closeModal('toothModal');
-  showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth);
+  showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + (SURFACE_LABELS[currentSurface] || currentSurface) + ')');
 }
 
 async function clearToothStatus() {
-  if (!confirm('هل تريد إزالة العلاج من السن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
+  var surfLabel = SURFACE_LABELS[currentSurface] || currentSurface;
+  if (!confirm('هل تريد إزالة العلاج من السطح ' + surfLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
   await window.sb.from('teeth_status').delete()
-    .eq('patient_id', patientId).eq('tooth_num', String(currentTooth));
-  delete teethMap[String(currentTooth)];
+    .eq('patient_id', patientId)
+    .eq('tooth_num', String(currentTooth))
+    .eq('surface', currentSurface);
+  if (teethMap[String(currentTooth)]) {
+    delete teethMap[String(currentTooth)][currentSurface];
+    // If no surfaces left, remove the tooth entry entirely
+    if (Object.keys(teethMap[String(currentTooth)]).length === 0) {
+      delete teethMap[String(currentTooth)];
+    }
+  }
   renderTeeth();
   closeModal('toothModal');
-  showToast('🔄 السن ' + currentTooth + ' أصبح سليماً');
+  showToast('🔄 السطح ' + surfLabel + ' للسن ' + currentTooth + ' أصبح سليماً');
 }
 
 /* ── Sessions ── */
@@ -1037,17 +1144,27 @@ async function saveEditedPatient() {
 /* ── Delete Session / Payment ── */
 async function delSession(id) {
   if (!confirm('حذف هذه الجلسة؟')) return;
-  // find session to check tooth
+  // find session to check tooth+surface
   var sess = sessions.find(function(s){ return s.id === id; });
   await window.sb.from('ledger_sessions').delete().eq('id', id);
   sessions = sessions.filter(function(s){ return s.id !== id; });
-  // if tooth had no other session, clear tooth
+  // if no other session uses this tooth+surface, clear that surface's status
   if (sess && sess.tooth_num) {
-    var stillUsed = sessions.some(function(s){ return s.tooth_num === sess.tooth_num; });
+    var sessSurface = sess.surface || centerSurface(sess.tooth_num);
+    var stillUsed = sessions.some(function(s){
+      var sSurf = s.surface || centerSurface(s.tooth_num);
+      return s.tooth_num === sess.tooth_num && sSurf === sessSurface;
+    });
     if (!stillUsed) {
       await window.sb.from('teeth_status').delete()
-        .eq('patient_id', patientId).eq('tooth_num', sess.tooth_num);
-      delete teethMap[sess.tooth_num];
+        .eq('patient_id', patientId)
+        .eq('tooth_num', sess.tooth_num)
+        .eq('surface', sessSurface);
+      var tn = String(sess.tooth_num);
+      if (teethMap[tn]) {
+        delete teethMap[tn][sessSurface];
+        if (Object.keys(teethMap[tn]).length === 0) delete teethMap[tn];
+      }
       renderTeeth();
     }
   }
@@ -1494,14 +1611,15 @@ async function saveToothAndOpenLab() {
   // Save tooth status + session (same logic as saveToothTreatment)
   await window.sb.from('teeth_status').upsert({
     doctor_id: currentUser.id, patient_id: patientId,
-    tooth_num: String(currentTooth), treatment_key: pendingToothStatus
-  }, { onConflict: 'doctor_id,patient_id,tooth_num' });
-  teethMap[String(currentTooth)] = pendingToothStatus;
+    tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
+  }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+  if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+  teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
 
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth,
-    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth)
+    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + (SURFACE_LABELS[currentSurface] || currentSurface),
+    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
   if (newSess) sessions.unshift(newSess);
 
