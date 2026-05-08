@@ -415,6 +415,14 @@
     </div>
   </div>
 
+  <div class="card" style="margin-top:20px;">
+    <div class="card-header">
+      <div class="card-title">🧪 طلبات المخابر <span id="labsOverdueBadge" style="display:none;background:rgba(239,83,80,0.18);color:#ef5350;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;">0 متأخر</span></div>
+      <a class="card-action" href="labs.html">عرض الكل ←</a>
+    </div>
+    <div id="dashLabsList"></div>
+  </div>
+
   <script>
 // ─── التاريخ ───
 const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
@@ -528,6 +536,85 @@ async function loadDashboard() {
   else if (total >= 1000) label = (total/1000).toFixed(0) + 'K';
   else label = String(total);
   document.getElementById('statIncome').textContent = label;
+
+  // ── طلبات المخابر العاجلة ──
+  await loadLabOrdersCard(uid, list);
+}
+
+const LAB_DASH_STATUSES = {
+  'sent':      { ar: 'قيد العمل',     cls: 'lab-s3' },
+  'received':  { ar: 'مستلَم',         cls: 'lab-s1' },
+  'checked':   { ar: 'جاهز',          cls: 'lab-s2' }
+};
+
+async function loadLabOrdersCard(uid, patientsList) {
+  const el = document.getElementById('dashLabsList');
+  if (!el) return;
+
+  let orders = [];
+  try {
+    const { data, error } = await window.sb.from('lab_orders')
+      .select('*')
+      .eq('doctor_id', uid)
+      .in('status', ['sent','received','checked'])
+      .order('date_due', { ascending: true, nullsFirst: false })
+      .limit(5);
+    if (!error) orders = data || [];
+  } catch(e) { console.warn('lab_orders dashboard:', e); }
+
+  // عدد المتأخرات (لا يقتصر على أول 5 — نحسبها بشكل منفصل)
+  let overdueCount = 0;
+  try {
+    const todayIso = todayStr();
+    const { data: ovd } = await window.sb.from('lab_orders')
+      .select('id', { count: 'exact', head: false })
+      .eq('doctor_id', uid)
+      .in('status', ['sent','received'])
+      .lt('date_due', todayIso);
+    overdueCount = (ovd || []).length;
+  } catch(e) {}
+
+  const badge = document.getElementById('labsOverdueBadge');
+  if (badge) {
+    if (overdueCount > 0) {
+      badge.textContent = overdueCount + ' متأخر';
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  if (!orders.length) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد طلبات مخابر قيد العمل — <a href="labs.html" style="color:var(--accent)">إضافة طلب</a></div>';
+    return;
+  }
+
+  // Map patient_id → name
+  const pMap = {};
+  (patientsList || []).forEach(function(p){ pMap[p.id] = { name: p.name, local_id: p.local_id }; });
+
+  const todayIso = todayStr();
+  el.innerHTML = orders.map(function(lo){
+    const st = LAB_DASH_STATUSES[lo.status] || LAB_DASH_STATUSES['sent'];
+    const p = pMap[lo.patient_id] || { name: '—' };
+    const overdue = lo.date_due && lo.date_due < todayIso && (lo.status === 'sent' || lo.status === 'received');
+    const dueText = lo.date_due
+      ? '<span style="font-size:11px;color:' + (overdue ? '#ef5350' : 'var(--text-muted)') + ';">' + (overdue ? '⚠️ ' : '') + 'استحقاق: ' + lo.date_due.slice(0,10) + '</span>'
+      : '';
+    return '<a class="lab-item" href="patient-profile.html?id=' + lo.patient_id + '" style="text-decoration:none;color:inherit;">'
+      +   '<div class="lab-dot" style="background:' + (overdue ? '#ef5350' : '#63b3ed') + ';"></div>'
+      +   '<div style="flex:1;min-width:0;">'
+      +     '<div class="lab-name">' + (p.name || '—') + '</div>'
+      +     '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">'
+      +       (lo.work_type || '—')
+      +       (lo.tooth_num ? ' — سن ' + lo.tooth_num : '')
+      +       (lo.lab_name ? ' — ' + lo.lab_name : '')
+      +     '</div>'
+      +     (dueText ? '<div style="margin-top:3px;">' + dueText + '</div>' : '')
+      +   '</div>'
+      +   '<span class="lab-status ' + st.cls + '">' + st.ar + '</span>'
+      + '</a>';
+  }).join('');
 }
 
 loadDashboard();
