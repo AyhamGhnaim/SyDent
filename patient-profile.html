@@ -174,6 +174,20 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tooth-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
+
+/* ── Lab Orders ── */
+.lab-badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;min-width:18px;text-align:center;margin-right:4px;vertical-align:middle;}
+.tab .lab-badge{margin-right:6px;}
+.lab-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.lab-icon-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:4px;}
+.lab-icon-btn:hover{color:#63b3ed;background:rgba(99,179,237,.1);}
+.lab-action-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;margin-left:3px;}
+.lab-action-btn:hover{border-color:var(--green);color:var(--green);}
+.lab-action-btn.next{border-color:rgba(46,232,158,.4);color:var(--green);}
+.lab-action-btn.reject{border-color:rgba(239,83,80,.3);color:var(--red);}
+.lab-action-btn.reject:hover{background:rgba(239,83,80,.1);}
+.btn-lab{padding:9px 18px;background:transparent;border:1px solid #63b3ed;color:#63b3ed;border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-lab:hover{background:rgba(99,179,237,.12);}
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -239,6 +253,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab active" onclick="switchTab('file',this)">📋 الملف</button>
     <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
+    <button class="tab" onclick="switchTab('labs',this)">🧪 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
   </div>
 
   <!-- Tab: الملف -->
@@ -303,6 +318,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div id="paymentsContent"></div>
       <div class="balance-summary" id="balanceSummary"></div>
+    </div>
+  </div>
+
+  <!-- Tab: المخابر -->
+  <div class="panel" id="tab-labs">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">🧪 طلبات المخابر</span>
+        <button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ طلب جديد</button>
+      </div>
+      <div id="labOrdersContent"></div>
     </div>
   </div>
 
@@ -418,7 +444,64 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot" id="toothFoot" style="display:none;">
       <button class="btn-cancel-m" onclick="backToStep1()">رجوع</button>
+      <button class="btn-lab" id="toothLabBtn" onclick="saveToothAndOpenLab()" style="display:none;">🧪 حفظ + إرسال لمخبر</button>
       <button class="btn-save-m" onclick="saveToothTreatment()">حفظ كجلسة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: طلب مخبر -->
+<div class="modal-overlay" id="labOrderModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="labOrderTitle">🧪 طلب مخبر جديد</h3>
+      <button class="modal-close" onclick="closeModal('labOrderModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="labOrderId">
+      <input type="hidden" id="labOrderTreatmentKey">
+      <div class="form-row">
+        <div class="form-group">
+          <label>رقم السن</label>
+          <input type="number" id="labOrderTooth" placeholder="مثال: 36" min="11" max="48">
+        </div>
+        <div class="form-group">
+          <label>نوع العمل</label>
+          <select id="labOrderWorkType"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>اسم المخبر</label>
+        <input type="text" id="labOrderLabName" placeholder="مثال: مخبر النور">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>اللون (Shade)</label>
+          <input type="text" id="labOrderShade" placeholder="مثال: A2">
+        </div>
+        <div class="form-group">
+          <label>التكلفة (ل.س)</label>
+          <input type="number" id="labOrderCost" placeholder="مثال: 80000" min="0" inputmode="numeric">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>تاريخ الإرسال</label>
+          <input type="date" id="labOrderDateSent">
+        </div>
+        <div class="form-group">
+          <label>تاريخ الاستحقاق</label>
+          <input type="date" id="labOrderDateDue">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="labOrderNotes" placeholder="أي ملاحظات للمخبر…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('labOrderModal')">إلغاء</button>
+      <button class="btn-save-m" onclick="saveLabOrder()">حفظ</button>
     </div>
   </div>
 </div>
@@ -433,7 +516,32 @@ var patients  = [];   // all doctor's patients (for seq numbering)
 var sessions  = [];
 var payments  = [];
 var teethMap  = {};   // { tooth_num: treatment_key }
+var labOrders = [];   // lab orders for current patient
 var currentUser = null;
+
+/* ── Lab Orders Constants ── */
+var LAB_REQUIRED_KEYS = ['crown', 'bridge', 'denture', 'denture_full', 'denture_partial', 'veneer', 'ortho_plate'];
+var LAB_OPTIONAL_KEYS = ['implant', 'ortho_fixed'];
+
+function needsLab(treatmentKey) {
+  if (!treatmentKey) return false;
+  return LAB_REQUIRED_KEYS.indexOf(treatmentKey) !== -1
+      || LAB_OPTIONAL_KEYS.indexOf(treatmentKey) !== -1;
+}
+
+var LAB_STATUSES = {
+  'sent':      { ar: 'قيد العمل',     color: '#63b3ed', bg: 'rgba(99,179,237,0.15)' },
+  'received':  { ar: 'مستلَم',         color: '#f5c842', bg: 'rgba(245,200,66,0.15)' },
+  'checked':   { ar: 'جاهز للتركيب',  color: '#2ee89e', bg: 'rgba(46,232,158,0.15)' },
+  'delivered': { ar: 'سُلِّم للمريض',   color: '#a3a3a3', bg: 'rgba(163,163,163,0.15)' },
+  'rejected':  { ar: 'مرفوض',         color: '#ef5350', bg: 'rgba(239,83,80,0.15)' }
+};
+
+var LAB_NEXT_STATUS = {
+  'sent':     { next: 'received',  label: '📦 وصل من المخبر' },
+  'received': { next: 'checked',   label: '✓ تم الفحص' },
+  'checked':  { next: 'delivered', label: '🤝 سُلِّم للمريض' }
+};
 
 /* ── Utils ── */
 function fmt(n)  { return Number(n||0).toLocaleString('ar-SY'); }
@@ -504,6 +612,11 @@ async function loadAll() {
     .eq('patient_id', patientId);
   teethMap = {};
   (td || []).forEach(function(t){ teethMap[t.tooth_num] = t.treatment_key; });
+
+  // lab orders
+  const { data: lo } = await window.sb.from('lab_orders').select('*')
+    .eq('patient_id', patientId).order('date_sent', { ascending: false });
+  labOrders = lo || [];
 
   init();
 }
@@ -693,6 +806,8 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothCost').value  = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
   document.getElementById('toothDate').value  = toDay();
+  // Show lab button only for treatments that need a lab
+  document.getElementById('toothLabBtn').style.display = needsLab(status) ? 'inline-block' : 'none';
   setTimeout(function(){ document.getElementById('toothCost').focus(); document.getElementById('toothCost').select(); }, 100);
 }
 
@@ -1013,6 +1128,283 @@ async function populateApptTypes() {
   sel.appendChild(other);
 }
 
+/* ── LAB ORDERS ── */
+
+function getLabPendingCount() {
+  return labOrders.filter(function(lo){
+    return lo.status === 'sent' || lo.status === 'received';
+  }).length;
+}
+
+function updateLabsBadge() {
+  var n = getLabPendingCount();
+  var b = document.getElementById('labsBadge');
+  if (!b) return;
+  if (n > 0) {
+    b.textContent = n;
+    b.style.display = 'inline-block';
+  } else {
+    b.style.display = 'none';
+  }
+}
+
+function renderLabOrders() {
+  var el = document.getElementById('labOrdersContent');
+  if (!el) return;
+  if (!labOrders.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🧪</div>لا توجد طلبات مخابر مسجّلة بعد<br><br><button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ إضافة أول طلب</button></div>';
+    updateLabsBadge();
+    return;
+  }
+  var rows = '';
+  labOrders.forEach(function(lo){
+    var st = LAB_STATUSES[lo.status] || LAB_STATUSES['sent'];
+    var pill = '<span class="lab-pill" style="background:' + st.bg + ';color:' + st.color + ';">' + st.ar + '</span>';
+    var actions = '';
+    var nx = LAB_NEXT_STATUS[lo.status];
+    if (nx) {
+      actions += '<button class="lab-action-btn next" onclick="advanceLabOrder(\'' + lo.id + '\')">' + nx.label + '</button>';
+    }
+    if (lo.status !== 'rejected' && lo.status !== 'delivered') {
+      actions += '<button class="lab-action-btn reject" onclick="rejectLabOrder(\'' + lo.id + '\')">رفض</button>';
+    }
+    actions += '<button class="lab-action-btn" onclick="editLabOrder(\'' + lo.id + '\')">✏️</button>';
+    actions += '<button class="del-btn" onclick="delLabOrder(\'' + lo.id + '\')">🗑</button>';
+    rows += '<tr>'
+      + '<td>' + fmtD(lo.date_sent) + '</td>'
+      + '<td>' + (lo.tooth_num ? '<span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:11px;font-weight:700;">سن ' + lo.tooth_num + '</span>' : '—') + '</td>'
+      + '<td>' + (lo.work_type || '—') + '</td>'
+      + '<td style="color:var(--text2)">' + (lo.lab_name || '—') + '</td>'
+      + '<td style="color:var(--text2)">' + (lo.shade || '—') + '</td>'
+      + '<td style="text-align:left;color:var(--text2)">' + fmt(lo.cost) + ' ل.س</td>'
+      + '<td>' + pill + '</td>'
+      + '<td style="white-space:nowrap;">' + actions + '</td>'
+      + '</tr>';
+  });
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+    + '<thead><tr><th>تاريخ الإرسال</th><th>السن</th><th>نوع العمل</th><th>المخبر</th><th>اللون</th><th style="text-align:left;">التكلفة</th><th>الحالة</th><th></th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+  updateLabsBadge();
+}
+
+function getLabTreatments() {
+  return TREATMENTS.filter(function(t){ return needsLab(t.id); });
+}
+
+function populateLabWorkTypes(selectedKey) {
+  var sel = document.getElementById('labOrderWorkType');
+  if (!sel) return;
+  sel.innerHTML = '';
+  var labTreatments = getLabTreatments();
+  if (labTreatments.length === 0) {
+    // Fallback: all treatments
+    TREATMENTS.forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  } else {
+    labTreatments.forEach(function(t){
+      var opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  }
+  // Add "other" option
+  var other = document.createElement('option');
+  other.value = '_other'; other.textContent = 'أخرى';
+  sel.appendChild(other);
+  if (selectedKey) sel.value = selectedKey;
+}
+
+async function openLabOrderModal(prefill) {
+  await loadTreatmentsFromSupabase();
+  prefill = prefill || {};
+  document.getElementById('labOrderTitle').textContent = '🧪 طلب مخبر جديد';
+  document.getElementById('labOrderId').value = '';
+  document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
+  populateLabWorkTypes(prefill.treatment_key);
+  document.getElementById('labOrderTooth').value = prefill.tooth_num || '';
+  document.getElementById('labOrderLabName').value = '';
+  document.getElementById('labOrderShade').value = '';
+  document.getElementById('labOrderCost').value = '';
+  document.getElementById('labOrderDateSent').value = toDay();
+  document.getElementById('labOrderDateDue').value = '';
+  document.getElementById('labOrderNotes').value = prefill.notes || '';
+  openModal('labOrderModal');
+}
+
+async function editLabOrder(id) {
+  await loadTreatmentsFromSupabase();
+  var lo = labOrders.find(function(x){ return x.id === id; });
+  if (!lo) return;
+  document.getElementById('labOrderTitle').textContent = '🧪 تعديل طلب المخبر';
+  document.getElementById('labOrderId').value = lo.id;
+  document.getElementById('labOrderTreatmentKey').value = lo.treatment_key || '';
+  populateLabWorkTypes(lo.treatment_key);
+  document.getElementById('labOrderTooth').value = lo.tooth_num || '';
+  document.getElementById('labOrderLabName').value = lo.lab_name || '';
+  document.getElementById('labOrderShade').value = lo.shade || '';
+  document.getElementById('labOrderCost').value = lo.cost || '';
+  document.getElementById('labOrderDateSent').value = lo.date_sent ? lo.date_sent.slice(0,10) : toDay();
+  document.getElementById('labOrderDateDue').value = lo.date_due ? lo.date_due.slice(0,10) : '';
+  document.getElementById('labOrderNotes').value = lo.notes || '';
+  openModal('labOrderModal');
+}
+
+async function saveLabOrder() {
+  var id = document.getElementById('labOrderId').value;
+  var toothRaw = document.getElementById('labOrderTooth').value.trim();
+  var workSel = document.getElementById('labOrderWorkType');
+  var workKey = workSel.value;
+  var workName;
+  if (workKey === '_other' || !workKey) {
+    workName = 'أخرى';
+    workKey = null;
+  } else {
+    var t = getTreatment(workKey);
+    workName = t ? t.name : workKey;
+  }
+  var labName = document.getElementById('labOrderLabName').value.trim();
+  var shade = document.getElementById('labOrderShade').value.trim();
+  var cost = parseFloat(document.getElementById('labOrderCost').value) || 0;
+  var dateSent = document.getElementById('labOrderDateSent').value;
+  var dateDue = document.getElementById('labOrderDateDue').value;
+  var notes = document.getElementById('labOrderNotes').value.trim();
+
+  if (!labName) { showToast('⚠️ أدخل اسم المخبر'); return; }
+  if (!workName || workName === '—') { showToast('⚠️ اختر نوع العمل'); return; }
+  if (!dateSent) { showToast('⚠️ اختر تاريخ الإرسال'); return; }
+
+  var payload = {
+    doctor_id: currentUser.id,
+    patient_id: patientId,
+    tooth_num: toothRaw ? parseInt(toothRaw, 10) : null,
+    treatment_key: workKey,
+    lab_name: labName,
+    work_type: workName,
+    shade: shade || null,
+    cost: cost,
+    notes: notes || null,
+    date_sent: dateSent,
+    date_due: dateDue || null
+  };
+
+  if (id) {
+    // Update
+    const { data, error } = await window.sb.from('lab_orders')
+      .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
+    if (data) {
+      var idx = labOrders.findIndex(function(x){ return x.id === id; });
+      if (idx !== -1) labOrders[idx] = data;
+    }
+    showToast('✅ تم تحديث الطلب');
+  } else {
+    // Insert
+    payload.status = 'sent';
+    const { data, error } = await window.sb.from('lab_orders')
+      .insert(payload).select().single();
+    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
+    if (data) labOrders.unshift(data);
+    showToast('✅ تم إرسال الطلب للمخبر');
+  }
+
+  renderLabOrders();
+  closeModal('labOrderModal');
+}
+
+async function advanceLabOrder(id) {
+  var lo = labOrders.find(function(x){ return x.id === id; });
+  if (!lo) return;
+  var nx = LAB_NEXT_STATUS[lo.status];
+  if (!nx) return;
+  var nowIso = new Date().toISOString();
+  var update = { status: nx.next };
+  if (nx.next === 'received')  update.date_received  = nowIso;
+  if (nx.next === 'checked')   update.date_checked   = nowIso;
+  if (nx.next === 'delivered') update.date_delivered = nowIso;
+  const { data, error } = await window.sb.from('lab_orders')
+    .update(update).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+  if (error) { showToast('⚠️ فشل التحديث'); return; }
+  if (data) {
+    var idx = labOrders.findIndex(function(x){ return x.id === id; });
+    if (idx !== -1) labOrders[idx] = data;
+  }
+  renderLabOrders();
+  showToast('✅ تم تحديث الحالة إلى: ' + LAB_STATUSES[nx.next].ar);
+}
+
+async function rejectLabOrder(id) {
+  if (!confirm('هل أنت متأكد من رفض هذا الطلب وإعادته للمخبر؟')) return;
+  const { data, error } = await window.sb.from('lab_orders')
+    .update({ status: 'rejected' }).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+  if (error) { showToast('⚠️ فشل التحديث'); return; }
+  if (data) {
+    var idx = labOrders.findIndex(function(x){ return x.id === id; });
+    if (idx !== -1) labOrders[idx] = data;
+  }
+  renderLabOrders();
+  showToast('🔴 تم رفض الطلب');
+}
+
+async function delLabOrder(id) {
+  if (!confirm('هل تريد حذف هذا الطلب نهائياً؟')) return;
+  const { error } = await window.sb.from('lab_orders')
+    .delete().eq('id', id).eq('doctor_id', currentUser.id);
+  if (error) { showToast('⚠️ فشل الحذف'); return; }
+  labOrders = labOrders.filter(function(x){ return x.id !== id; });
+  renderLabOrders();
+  showToast('🗑 تم حذف الطلب');
+}
+
+async function saveToothAndOpenLab() {
+  // First save the tooth treatment as session
+  var cost  = parseFloat(document.getElementById('toothCost').value);
+  var date  = document.getElementById('toothDate').value;
+  var notes = document.getElementById('toothNotes').value.trim();
+  if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
+  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+
+  // Save tooth status + session (same logic as saveToothTreatment)
+  await window.sb.from('teeth_status').upsert({
+    doctor_id: currentUser.id, patient_id: patientId,
+    tooth_num: String(currentTooth), treatment_key: pendingToothStatus
+  }, { onConflict: 'doctor_id,patient_id,tooth_num' });
+  teethMap[String(currentTooth)] = pendingToothStatus;
+
+  const { data: newSess } = await window.sb.from('ledger_sessions').insert({
+    doctor_id: currentUser.id, patient_id: patientId,
+    type: pendingToothLabel, description: 'السن رقم ' + currentTooth,
+    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth)
+  }).select().single();
+  if (newSess) sessions.unshift(newSess);
+
+  var updates = {};
+  if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
+  if (patient.status === 'جديد') updates.status = 'تحت العلاج';
+  if (Object.keys(updates).length) {
+    await window.sb.from('patients').update(updates).eq('id', patientId).eq('doctor_id', currentUser.id);
+    Object.assign(patient, updates);
+  }
+  await syncPaymentStatus();
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
+
+  // Now close tooth modal and open lab modal with prefilled data
+  var toothNum = currentTooth;
+  var treatmentKey = pendingToothStatus;
+  var sessionNotes = notes;
+  closeModal('toothModal');
+
+  openLabOrderModal({
+    tooth_num: toothNum,
+    treatment_key: treatmentKey,
+    notes: sessionNotes
+  });
+
+  showToast('✅ تم حفظ الجلسة — أكمل بيانات المخبر');
+}
+
 /* ── Modal helpers ── */
 function switchTabByName(name) {
   var tabs = document.querySelectorAll('.tab');
@@ -1065,6 +1457,7 @@ async function init() {
   safe(renderSessions,       'renderSessions');
   safe(renderRecentSessions, 'renderRecentSessions');
   safe(renderPayments,       'renderPayments');
+  safe(renderLabOrders,      'renderLabOrders');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
