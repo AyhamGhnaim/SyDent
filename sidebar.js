@@ -149,7 +149,7 @@ const navItems = [
   { section: 'الإدارة' },
   { icon: '💊', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
-  { icon: '🧪', label: 'المخابر',     href: '#',             id: 'labs'      },
+  { icon: '🧪', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },
   { icon: '📈', label: 'التقارير',    href: '#',             id: 'reports'   },
   { icon: '📋', label: 'السجلات',     href: '#',             id: 'logs'      },
