@@ -696,6 +696,7 @@ function hexA(hex, a) {
 }
 
 let appointments = [];
+let labOrdersByPatient = {};   // { patient_id: [lab_orders] } — for lab status icons
 let currentUser  = null;
 
 // ─── Load from Supabase ──────────────────────────────
@@ -709,6 +710,23 @@ async function loadAppointments() {
     .order('time', { ascending: true });
   if (error) { showToast('❌ خطأ في تحميل المواعيد'); return; }
   appointments = data || [];
+
+  // Load active lab orders (for icons on appointments)
+  labOrdersByPatient = {};
+  try {
+    const { data: lo, error: loErr } = await window.sb.from('lab_orders')
+      .select('patient_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
+      .eq('doctor_id', currentUser.id)
+      .in('status', ['sent','received','checked']);
+    if (!loErr && lo) {
+      lo.forEach(function(o){
+        if (!o.patient_id) return;
+        if (!labOrdersByPatient[o.patient_id]) labOrdersByPatient[o.patient_id] = [];
+        labOrdersByPatient[o.patient_id].push(o);
+      });
+    }
+  } catch(e) { console.warn('lab_orders for appts:', e); }
+
   render();
 }
 
@@ -725,6 +743,50 @@ let currentDate = new Date();
 let selectedDate= new Date();
 let editingId   = null;
 let selectedColor = 'green';
+
+// ─── Lab badge helper ──────────────────────────────
+// Returns { icon, color, title } for an appointment based on patient's active lab orders, or null
+function getApptLabBadge(appt) {
+  if (!appt || !appt.patient_id) return null;
+  var orders = labOrdersByPatient[appt.patient_id];
+  if (!orders || !orders.length) return null;
+  var apptDate = appt.date;
+  if (!apptDate) return null;
+
+  var hasReady   = false;   // status checked
+  var hasOverdue = false;   // status sent/received & date_due < apptDate
+  var hasPending = false;   // status sent/received
+
+  orders.forEach(function(o){
+    if (o.status === 'checked') {
+      hasReady = true;
+    } else if (o.status === 'sent' || o.status === 'received') {
+      hasPending = true;
+      // Overdue = the order is supposed to be ready BEFORE the appointment, but not received/checked yet
+      if (o.date_due && o.date_due.slice(0,10) <= apptDate) {
+        hasOverdue = true;
+      }
+    }
+  });
+
+  // Priority: overdue (red) > ready (green) > pending (no badge unless soon)
+  if (hasOverdue) {
+    return { icon: '⚠️', color: '#ef5350', title: 'تنبيه: طلب مخبر لم يصل قبل الموعد' };
+  }
+  if (hasReady) {
+    return { icon: '🧪', color: '#2ee89e', title: 'يوجد شغل جاهز للتركيب من المخبر' };
+  }
+  // Pending but not overdue → subtle blue dot only if appt is within 3 days
+  if (hasPending) {
+    var apptT = new Date(apptDate).getTime();
+    var nowT  = new Date().setHours(0,0,0,0);
+    var diffDays = Math.floor((apptT - nowT) / 86400000);
+    if (diffDays >= 0 && diffDays <= 3) {
+      return { icon: '🧪', color: '#63b3ed', title: 'طلب مخبر قيد العمل' };
+    }
+  }
+  return null;
+}
 
 // ─── View switch ───────────────────────────────────
 function setView(v) {
@@ -821,7 +883,9 @@ function cellHTML(day, ds, other, today, evts) {
   let evHTML = '';
   evts.slice(0, MAX_SHOW).forEach(e => {
     var _ec = getApptColor(e);
-    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${(e.time||'').slice(0,5)} ${(e.patient_name||'').split(' ')[0]}</div>`;
+    var lb = getApptLabBadge(e);
+    var lbHtml = lb ? `<span style="margin-left:3px;" title="${lb.title}">${lb.icon}</span>` : '';
+    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${lbHtml}${(e.time||'').slice(0,5)} ${(e.patient_name||'').split(' ')[0]}</div>`;
   });
   // Mobile dots
   let dotHTML = '<div class="cal-dot-row">';
@@ -861,12 +925,16 @@ function renderDay() {
   } else {
     sorted.forEach(function(e){
       var _bc = getApptColor(e);
+      var lb = getApptLabBadge(e);
+      var lbHtml = lb
+        ? `<span style="display:inline-block;background:${lb.color}22;color:${lb.color};border:1px solid ${lb.color}55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${lb.title}">${lb.icon} ${lb.title.split(':')[0] || 'مخبر'}</span>`
+        : '';
       html += `
         <div class="time-slot">
           <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${e.patient_name||'—'}</div>
+              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}</div>
               <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
               <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
             </div>
@@ -910,12 +978,16 @@ function renderList() {
         ${isToday ? '<span class="date-badge">اليوم</span>' : ''}
       </div>`;
     evts.forEach(e => {
+      var lb = getApptLabBadge(e);
+      var lbHtml = lb
+        ? `<span style="display:inline-block;background:${lb.color}22;color:${lb.color};border:1px solid ${lb.color}55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${lb.title}">${lb.icon}</span>`
+        : '';
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${(e.time||'').slice(0,5)}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${initials(e.patient_name||'؟')}</div>
           <div class="list-info">
-            <div class="list-name">${e.patient_name||'—'}</div>
+            <div class="list-name">${e.patient_name||'—'} ${lbHtml}</div>
             <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
           </div>
           <span class="list-badge ${statusClass(e.status)}">${statusLabel(e.status)}</span>
