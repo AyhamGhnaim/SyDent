@@ -861,14 +861,8 @@ function rootsCount(num) {
   return isUpper ? 3 : 2;
 }
 
-/* Cell width in px — narrower for lower anteriors */
+/* Cell width in px — uniform 50px for all teeth */
 function cellWidth(num) {
-  var n = parseInt(num, 10);
-  var quad = Math.floor(n / 10);
-  var pos = n % 10;
-  var isLower = (quad === 3 || quad === 4);
-  var isAnt = (pos <= 3);
-  if (isLower && isAnt) return 38;
   return 50;
 }
 
