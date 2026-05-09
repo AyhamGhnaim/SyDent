@@ -860,13 +860,9 @@ function rootsCount(num) {
   return isUpper ? 3 : 2;
 }
 
-/* Cell width in px — realistic crown widths */
+/* Cell width in px — all teeth use molar width for consistent spacing */
 function cellWidth(num) {
-  var t = toothType(num);
-  if (t === 'incisor')  return 30;
-  if (t === 'canine')   return 34;
-  if (t === 'premolar') return 38;
-  return 50; // molar
+  return 50;
 }
 
 /* Anatomically realistic tooth drawing.
