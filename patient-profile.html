@@ -633,7 +633,8 @@ async function loadTreatmentsFromSupabase() {
     TREATMENTS = (data || []).map(function(t){
       return { id:t.treatment_key, dbId:t.id, name:t.name, label:t.label,
                fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin,
-               needs_lab: !!t.needs_lab };
+               needs_lab: !!t.needs_lab,
+               target_part: t.target_part || 'crown' };
     });
     localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
   } catch(e){ console.error(e); }
@@ -803,7 +804,11 @@ var SURFACE_LABELS = {
   'M': 'إنسي',
   'D': 'وحشي',
   'B': 'دهليزي',
-  'L': 'لساني'
+  'L': 'لساني',
+  'R1': 'جذر 1',
+  'R2': 'جذر 2',
+  'R3': 'جذر 3',
+  'WHOLE': 'السن كاملاً'
 };
 
 /* Get the center surface key for a given tooth (O for posterior, I for anterior) */
@@ -924,24 +929,67 @@ async function openToothModal(n, surface) {
   var sm = teethMap[String(n)] || {};
   var st = sm[currentSurface];
   var surfLabel = SURFACE_LABELS[currentSurface] || currentSurface;
+
+  // Determine which treatments to show based on the clicked region
+  // currentSurface is one of: O,M,D,B,L,I (crown surfaces) or R1,R2,R3 (roots) or WHOLE
+  var isRootClick = /^R[123]$/.test(currentSurface);
+  var isWholeClick = currentSurface === 'WHOLE';
+
+  // Title
+  var clickedAreaLabel;
+  if (isWholeClick) clickedAreaLabel = 'السن كاملاً';
+  else if (isRootClick) clickedAreaLabel = 'الجذر ' + currentSurface.replace('R','');
+  else clickedAreaLabel = 'السطح ' + surfLabel;
+
   document.getElementById('toothModalTitle').textContent =
-    'السن ' + n + ' — السطح ' + surfLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
+    'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
+
+  // Filter treatments: crown surface clicks show crown+both; root clicks show root+both; whole clicks show whole+both
+  function isAllowed(t) {
+    var tp = t.target_part || 'crown';
+    if (isRootClick)  return tp === 'root'  || tp === 'both';
+    if (isWholeClick) return tp === 'whole' || tp === 'both';
+    // crown surface click
+    return tp === 'crown' || tp === 'both';
+  }
+
   var container = document.getElementById('toothOptsContainer');
   var html = '';
+  var matched = 0;
   for (var i=0; i<TREATMENTS.length; i++) {
     var t = TREATMENTS[i];
+    if (!isAllowed(t)) continue;
+    matched++;
     var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
     html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
          + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
          + '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:18px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
          + t.name + '</button>';
   }
+
+  // If clicking a crown surface, add a "treat whole tooth" shortcut at the bottom
+  if (!isRootClick && !isWholeClick) {
+    html += '<button class="topt" style="border-color:#06b6d4;background:#06b6d422;color:var(--text);font-weight:700;" onclick="switchToWholeTooth()">'
+         + '<span style="font-size:14px;margin-left:6px;">🦷</span>'
+         + 'علاج على السن كاملاً (تلبيسة، قلع، زرعة...)</button>';
+  }
+
+  if (matched === 0) {
+    html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
+  }
+
   html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
   container.innerHTML = html;
   document.getElementById('toothStep1').style.display = 'block';
   document.getElementById('toothStep2').style.display = 'none';
   document.getElementById('toothFoot').style.display  = 'none';
   openModal('toothModal');
+}
+
+/* Switch the modal to "whole tooth" mode without closing */
+function switchToWholeTooth() {
+  currentSurface = 'WHOLE';
+  openToothModal(currentTooth, 'WHOLE');
 }
 
 function isLightColor(hex) {
@@ -956,7 +1004,12 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
-  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + (SURFACE_LABELS[currentSurface] || currentSurface) + ')';
+  // Build a label that reflects the area type (surface / root / whole)
+  var areaLabel;
+  if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
+  else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + areaLabel + ')';
   var t = getTreatment(status);
   document.getElementById('toothCost').value  = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
@@ -987,10 +1040,16 @@ async function saveToothTreatment() {
   if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
   teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
 
+  // Build description that reflects the area type
+  var areaForDesc;
+  if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
+  else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
+  else areaForDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+
   // 2. Save session
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + (SURFACE_LABELS[currentSurface] || currentSurface),
+    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForDesc,
     cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
   if (newSess) sessions.unshift(newSess);
@@ -1006,12 +1065,21 @@ async function saveToothTreatment() {
 
   renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
   closeModal('toothModal');
-  showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + (SURFACE_LABELS[currentSurface] || currentSurface) + ')');
+  // Build area label that reflects the type
+  var areaLabelToast;
+  if (currentSurface === 'WHOLE') areaLabelToast = 'السن كاملاً';
+  else if (/^R[123]$/.test(currentSurface)) areaLabelToast = 'الجذر ' + currentSurface.replace('R','');
+  else areaLabelToast = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + areaLabelToast + ')');
 }
 
 async function clearToothStatus() {
-  var surfLabel = SURFACE_LABELS[currentSurface] || currentSurface;
-  if (!confirm('هل تريد إزالة العلاج من السطح ' + surfLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
+  // Build area label that reflects the type
+  var areaLabel;
+  if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
+  else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  if (!confirm('هل تريد إزالة العلاج من ' + areaLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
   await window.sb.from('teeth_status').delete()
     .eq('patient_id', patientId)
     .eq('tooth_num', String(currentTooth))
@@ -1025,7 +1093,7 @@ async function clearToothStatus() {
   }
   renderTeeth();
   closeModal('toothModal');
-  showToast('🔄 السطح ' + surfLabel + ' للسن ' + currentTooth + ' أصبح سليماً');
+  showToast('🔄 ' + areaLabel + ' للسن ' + currentTooth + ' أصبح سليماً');
 }
 
 /* ── Sessions ── */
@@ -1616,9 +1684,15 @@ async function saveToothAndOpenLab() {
   if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
   teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
 
+  // Build description that reflects the area type
+  var areaForLabDesc;
+  if (currentSurface === 'WHOLE') areaForLabDesc = 'السن كاملاً';
+  else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
+  else areaForLabDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + (SURFACE_LABELS[currentSurface] || currentSurface),
+    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForLabDesc,
     cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
   if (newSess) sessions.unshift(newSess);
