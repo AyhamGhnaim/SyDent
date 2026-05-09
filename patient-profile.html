@@ -884,10 +884,22 @@ function toothAnatomy(num) {
   var mesialOnRight = (quad === 1 || quad === 4);
 
   var cx = 50;
+  // Lower anteriors are anatomically smaller/narrower than upper
+  var quad_n = Math.floor(parseInt(num,10) / 10);
+  var isLowerJaw = (quad_n === 3 || quad_n === 4);
+  var isAntTooth = (t === 'incisor' || t === 'canine');
+  var lowerAnt = isLowerJaw && isAntTooth;
+
   // Crown dimensions per tooth type
   var crownW, crownH, crownTopW;
-  if (t === 'incisor')      { crownW = 60; crownH = 70; crownTopW = 54; }
-  else if (t === 'canine')  { crownW = 60; crownH = 74; crownTopW = 40; }
+  if (t === 'incisor') {
+    if (lowerAnt) { crownW = 44; crownH = 64; crownTopW = 38; }
+    else          { crownW = 60; crownH = 70; crownTopW = 54; }
+  }
+  else if (t === 'canine') {
+    if (lowerAnt) { crownW = 50; crownH = 70; crownTopW = 32; }
+    else          { crownW = 60; crownH = 74; crownTopW = 40; }
+  }
   else if (t === 'premolar'){ crownW = 68; crownH = 56; crownTopW = 60; }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
