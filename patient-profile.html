@@ -886,8 +886,8 @@ function toothAnatomy(num) {
   var cx = 50;
   // Crown dimensions per tooth type
   var crownW, crownH, crownTopW;
-  if (t === 'incisor')      { crownW = 56; crownH = 60; crownTopW = 48; }
-  else if (t === 'canine')  { crownW = 58; crownH = 64; crownTopW = 30; }
+  if (t === 'incisor')      { crownW = 60; crownH = 70; crownTopW = 54; }
+  else if (t === 'canine')  { crownW = 60; crownH = 74; crownTopW = 40; }
   else if (t === 'premolar'){ crownW = 68; crownH = 56; crownTopW = 60; }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
@@ -904,29 +904,47 @@ function toothAnatomy(num) {
   // curves down each side with a slight equatorial bulge, ending at the gum line.
   var outlineD;
   if (t === 'incisor') {
-    // Trapezoid with rounded incisal corners and slight equatorial bulge
+    // Natural incisor: rounded incisal edge, bulging body, narrowing toward cervix
+    // (egg-shape inverted) — incisal edge is gently curved, sides are convex
+    var incEdgeY = crownTop + 1;
     outlineD =
-      'M ' + crownTL + ' ' + crownTop +
-      ' L ' + crownTR + ' ' + crownTop +
-      ' Q ' + (crownR + bulge*0.5) + ' ' + (crownTop + crownH*0.4) +
-      ' '   + crownR + ' ' + crownBot +
-      ' L ' + crownL + ' ' + crownBot +
-      ' Q ' + (crownL - bulge*0.5) + ' ' + (crownTop + crownH*0.4) +
-      ' '   + crownTL + ' ' + crownTop + ' Z';
+      'M ' + crownTL + ' ' + (crownTop + 4) +
+      // Smooth curved incisal edge
+      ' Q ' + (cx - crownTopW*0.25) + ' ' + incEdgeY +
+      ' '   + cx + ' ' + crownTop +
+      ' Q ' + (cx + crownTopW*0.25) + ' ' + incEdgeY +
+      ' '   + crownTR + ' ' + (crownTop + 4) +
+      // Right side: bulges out then curves back to cervical (narrower at gum line)
+      ' C ' + (crownR + bulge*1.6) + ' ' + (crownTop + crownH*0.30) +
+      ' '   + (crownR + bulge*1.2) + ' ' + (crownTop + crownH*0.55) +
+      ' '   + (crownR - 2) + ' ' + crownBot +
+      // Left side: mirror the curve back to start
+      ' L ' + (crownL + 2) + ' ' + crownBot +
+      ' C ' + (crownL - bulge*1.2) + ' ' + (crownTop + crownH*0.55) +
+      ' '   + (crownL - bulge*1.6) + ' ' + (crownTop + crownH*0.30) +
+      ' '   + crownTL + ' ' + (crownTop + 4) + ' Z';
   } else if (t === 'canine') {
-    // Pointed cusp at the top, narrow upper portion, wider at the equator
-    var cuspY = crownTop - 2;
+    // Natural canine: prominent rounded cusp tip slightly off-center,
+    // wider/more bulging body than incisor, tapers more toward cervix
+    // The cusp tip is slightly toward the mesial side (anatomically standard)
+    var canineCuspX = cx + (mesialOnRight ? 2 : -2);  // cusp tip slightly mesial
+    var canineCuspY = crownTop - 1;
     outlineD =
-      'M ' + crownTL + ' ' + (crownTop + 6) +
-      ' Q ' + (cx - 4) + ' ' + (crownTop + 1) +
-      ' '   + cx + ' ' + cuspY +
-      ' Q ' + (cx + 4) + ' ' + (crownTop + 1) +
-      ' '   + crownTR + ' ' + (crownTop + 6) +
-      ' Q ' + (crownR + bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownR + ' ' + crownBot +
-      ' L ' + crownL + ' ' + crownBot +
-      ' Q ' + (crownL - bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownTL + ' ' + (crownTop + 6) + ' Z';
+      'M ' + (crownTL - 1) + ' ' + (crownTop + 8) +
+      // Slope up to the cusp tip (mesial slope is shorter, distal slope is longer)
+      ' Q ' + (canineCuspX - 6) + ' ' + (crownTop + 1) +
+      ' '   + canineCuspX + ' ' + canineCuspY +
+      ' Q ' + (canineCuspX + 7) + ' ' + (crownTop + 2) +
+      ' '   + (crownTR + 1) + ' ' + (crownTop + 8) +
+      // Right side: more pronounced bulge than incisor
+      ' C ' + (crownR + bulge*2) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownR + bulge*1.4) + ' ' + (crownTop + crownH*0.58) +
+      ' '   + (crownR - 3) + ' ' + crownBot +
+      // Left side: mirror
+      ' L ' + (crownL + 3) + ' ' + crownBot +
+      ' C ' + (crownL - bulge*1.4) + ' ' + (crownTop + crownH*0.58) +
+      ' '   + (crownL - bulge*2) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else if (t === 'premolar') {
     // Two cusps (buccal + lingual) — but in 2D facial view we see mostly the buccal
     // Show two small bumps on top (mesio-buccal and disto-buccal cusps)
