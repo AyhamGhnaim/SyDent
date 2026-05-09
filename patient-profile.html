@@ -958,38 +958,67 @@ function toothAnatomy(num) {
       ' '   + (crownL - bulge*2) + ' ' + (crownTop + crownH*0.32) +
       ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else if (t === 'premolar') {
-    // Two cusps (buccal + lingual) — but in 2D facial view we see mostly the buccal
-    // Show two small bumps on top (mesio-buccal and disto-buccal cusps)
+    // Two rounded cusps (buccal + lingual seen as two bumps on top)
+    // Body bulges outward and tapers to cervical
+    var pCusp1X = cx - crownTopW*0.22;
+    var pCusp2X = cx + crownTopW*0.22;
+    var pValleyY = crownTop + 7;
     outlineD =
-      'M ' + crownTL + ' ' + (crownTop + 4) +
-      ' Q ' + (cx - crownTopW*0.25) + ' ' + (crownTop - 1) +
-      ' '   + (cx - crownTopW*0.1) + ' ' + (crownTop + 3) +
-      ' Q ' + cx + ' ' + (crownTop + 5) +
-      ' '   + (cx + crownTopW*0.1) + ' ' + (crownTop + 3) +
-      ' Q ' + (cx + crownTopW*0.25) + ' ' + (crownTop - 1) +
-      ' '   + crownTR + ' ' + (crownTop + 4) +
-      ' Q ' + (crownR + bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownR + ' ' + crownBot +
-      ' L ' + crownL + ' ' + crownBot +
-      ' Q ' + (crownL - bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownTL + ' ' + (crownTop + 4) + ' Z';
+      'M ' + (crownTL - 1) + ' ' + (crownTop + 8) +
+      // First cusp (rounded)
+      ' Q ' + (pCusp1X - 6) + ' ' + (crownTop + 2) +
+      ' '   + pCusp1X + ' ' + (crownTop + 1) +
+      ' Q ' + (pCusp1X + 5) + ' ' + (crownTop + 3) +
+      ' '   + cx + ' ' + pValleyY +
+      // Valley between cusps
+      ' Q ' + (pCusp2X - 5) + ' ' + (crownTop + 3) +
+      ' '   + pCusp2X + ' ' + (crownTop + 1) +
+      // Second cusp (rounded)
+      ' Q ' + (pCusp2X + 6) + ' ' + (crownTop + 2) +
+      ' '   + (crownTR + 1) + ' ' + (crownTop + 8) +
+      // Right side: convex bulge tapering to cervical
+      ' C ' + (crownR + bulge*1.8) + ' ' + (crownTop + crownH*0.30) +
+      ' '   + (crownR + bulge*1.3) + ' ' + (crownTop + crownH*0.60) +
+      ' '   + (crownR - 2) + ' ' + crownBot +
+      ' L ' + (crownL + 2) + ' ' + crownBot +
+      // Left side: mirror
+      ' C ' + (crownL - bulge*1.3) + ' ' + (crownTop + crownH*0.60) +
+      ' '   + (crownL - bulge*1.8) + ' ' + (crownTop + crownH*0.30) +
+      ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else {
-    // Molar: 4 cusps visible from facial view as gentle wave on top
+    // Molar: 4-5 rounded cusps with deeper occlusal valleys
+    // Two prominent cusps visible (mesial + distal) with central groove
+    var mCusp1X = cx - crownTopW*0.30;
+    var mCusp2X = cx + crownTopW*0.30;
+    var mCusp1Y = crownTop + 1;
+    var mCusp2Y = crownTop + 1;
+    var mGrooveY = crownTop + 8;
     outlineD =
-      'M ' + crownTL + ' ' + (crownTop + 5) +
-      ' Q ' + (cx - crownTopW*0.32) + ' ' + (crownTop - 1) +
-      ' '   + (cx - crownTopW*0.18) + ' ' + (crownTop + 4) +
-      ' Q ' + (cx - crownTopW*0.06) + ' ' + (crownTop + 6) +
-      ' '   + cx + ' ' + (crownTop + 4) +
-      ' Q ' + (cx + crownTopW*0.06) + ' ' + (crownTop + 6) +
-      ' '   + (cx + crownTopW*0.18) + ' ' + (crownTop + 4) +
-      ' Q ' + (cx + crownTopW*0.32) + ' ' + (crownTop - 1) +
-      ' '   + crownTR + ' ' + (crownTop + 5) +
-      ' Q ' + (crownR + bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownR + ' ' + crownBot +
-      ' L ' + crownL + ' ' + crownBot +
-      ' Q ' + (crownL - bulge) + ' ' + (crownTop + crownH*0.45) +
-      ' '   + crownTL + ' ' + (crownTop + 5) + ' Z';
+      'M ' + (crownTL - 1) + ' ' + (crownTop + 9) +
+      // Mesial cusp
+      ' Q ' + (mCusp1X - 8) + ' ' + (crownTop + 2) +
+      ' '   + mCusp1X + ' ' + mCusp1Y +
+      ' Q ' + (mCusp1X + 6) + ' ' + (crownTop + 3) +
+      // Inner cusp ridge near center
+      ' '   + (cx - crownTopW*0.10) + ' ' + (crownTop + 5) +
+      // Central groove dip
+      ' Q ' + cx + ' ' + mGrooveY +
+      ' '   + (cx + crownTopW*0.10) + ' ' + (crownTop + 5) +
+      // Distal cusp ridge
+      ' Q ' + (mCusp2X - 6) + ' ' + (crownTop + 3) +
+      ' '   + mCusp2X + ' ' + mCusp2Y +
+      // Distal cusp peak
+      ' Q ' + (mCusp2X + 8) + ' ' + (crownTop + 2) +
+      ' '   + (crownTR + 1) + ' ' + (crownTop + 9) +
+      // Right side bulge
+      ' C ' + (crownR + bulge*1.5) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownR + bulge*1.1) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + (crownR - 2) + ' ' + crownBot +
+      ' L ' + (crownL + 2) + ' ' + crownBot +
+      // Left side mirror
+      ' C ' + (crownL - bulge*1.1) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + (crownL - bulge*1.5) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownTL - 1) + ' ' + (crownTop + 9) + ' Z';
   }
 
   // ── Surface overlay rectangles (clickable) ──
