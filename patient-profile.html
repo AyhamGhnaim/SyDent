@@ -838,7 +838,8 @@ function surfacesFor(num){
  *   y = 65..75 → cervical/gum line
  *   y = 70..155 → root(s)
  *
- * Lower teeth are flipped vertically (transform scale 1,-1).
+ * Upper teeth are flipped vertically (roots point up toward palate).
+ * Lower teeth stay normal (roots point down toward mandible).
  */
 
 function toothType(num) {
@@ -1091,7 +1092,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   var crownStroke = '#a8825a';
   var rootStroke  = '#967048';
 
-  var transform = isUpper ? '' : 'transform="translate(0,160) scale(1,-1)"';
+  var transform = isUpper ? 'transform="translate(0,160) scale(1,-1)"' : '';
   var W = anat.cellW;
   var H = Math.round(W * 1.6);
 
