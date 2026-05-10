@@ -911,14 +911,7 @@ function toothAnatomy(num) {
   }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
-  // Occlusal/incisal surface lip height (visible from semi-occlusal viewing angle)
-  var occlH;
-  if (t === 'incisor' || t === 'canine') occlH = 7;   // thin incisal edge
-  else if (t === 'premolar')              occlH = 11; // 2 cusps visible
-  else                                    occlH = 15; // 4 cusps visible (molar)
-
-  var crownTop = 6 + occlH;               // crown body starts below the occlusal surface
-  var occlTop = 6;                         // top of occlusal surface
+  var crownTop = 6;
   var crownBot = crownTop + crownH;       // gum line
   var crownL = cx - crownW/2;
   var crownR = cx + crownW/2;
@@ -1253,106 +1246,102 @@ function toothAnatomy(num) {
     roots.push({ key:'R2', d: makeBuccalRoot(dbCervX, dbApexX, dbMul) });
   }
 
-  // ── Occlusal/Incisal Surface (semi-occlusal view: 3D lip on top of crown) ──
-  // Drawn as a flattened ellipse with cusps/edge details, sitting on top of the crown
-  var occlusalD = '';        // outer ellipse outline of the occlusal table
-  var occlusalDetailD = ''; // grooves, fissures, cusp dividers
-  var occlW = crownTopW;                      // occlusal table width = crown top width
-  var occlBL = occlH * 1.6;                    // bucco-lingual depth in 2D projection
-  var occlCx = cx;
-  var occlCyTop = occlTop;                     // top of occlusal ellipse
-  var occlCyBot = occlTop + occlH;             // bottom (joins crown top)
-  var occlL = occlCx - occlW/2;
-  var occlR = occlCx + occlW/2;
+  // ── Occlusal/Incisal Surface Detail (drawn INSIDE the crown, near the top) ──
+  // No separate path — these are subtle shading + groove lines that integrate into
+  // the existing crown outline to give a 2.5D semi-occlusal feel
+  var occlusalDetailD = '';   // groove lines (mesial-distal central + transverse)
+  var occlusalBandD = '';     // soft shadow band representing the occlusal "table" depth
+  var occlBandH;              // height of the occlusal shaded zone within the crown
+  if (t === 'incisor' || t === 'canine') occlBandH = 6;
+  else if (t === 'premolar')              occlBandH = 9;
+  else                                    occlBandH = 12;
+
+  // Occlusal band: a soft horizontal zone at the top of the crown (from cusp tips down)
+  // This gives the impression of looking slightly down at the occlusal table
+  var bandTop = crownTop + 1;
+  var bandBot = crownTop + occlBandH;
+  // The band follows the crown's top contour — narrower than the crown body
+  var bandL = crownTL + 1;
+  var bandR = crownTR - 1;
 
   if (t === 'incisor' || t === 'canine') {
-    // Incisal edge: thin curved cap on top of crown
-    var iEdgeBow = (t === 'canine') ? 3 : 1.5;  // canine has a pointed cusp
-    var iCuspX = (t === 'canine') ? (occlCx + (mesialOnRight ? -2 : 2)) : occlCx;
-    occlusalD =
-      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
-      ' Q ' + (occlCx - occlW*0.30) + ' ' + (occlCyTop + 1) +
-      ' '   + iCuspX + ' ' + occlCyTop +
-      ' Q ' + (occlCx + occlW*0.30) + ' ' + (occlCyTop + 1) +
-      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
-      ' Q ' + occlCx + ' ' + (occlCyBot + 1.5) +
-      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
+    // Incisal edge: thin highlight band along the cutting edge (translucent enamel)
+    occlusalBandD =
+      'M ' + bandL + ' ' + bandBot +
+      ' Q ' + cx + ' ' + (bandBot - 2) +
+      ' '   + bandR + ' ' + bandBot +
+      ' Q ' + (cx + (t === 'canine' ? (mesialOnRight ? -2 : 2) : 0)) + ' ' + (bandTop - 1) +
+      ' '   + bandL + ' ' + bandBot + ' Z';
   }
   else if (t === 'premolar') {
-    // 2 cusps (buccal larger, lingual smaller in semi-occlusal view) + central groove
-    var pCuspBL = occlL + occlW * 0.30;       // first cusp tip x
-    var pCuspBR = occlR - occlW * 0.30;       // second cusp tip x
-    var pGrooveX = occlCx;                     // central groove
-    occlusalD =
-      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
-      // Up to first cusp
-      ' Q ' + (occlL + 2) + ' ' + (occlCyTop + 2) +
-      ' '   + pCuspBL + ' ' + (occlCyTop + 1.5) +
-      // Dip into central groove
-      ' Q ' + (occlCx - occlW*0.10) + ' ' + (occlCyTop + 4) +
-      ' '   + pGrooveX + ' ' + (occlCyTop + 5) +
-      // Out of groove to second cusp
-      ' Q ' + (occlCx + occlW*0.10) + ' ' + (occlCyTop + 4) +
-      ' '   + pCuspBR + ' ' + (occlCyTop + 1.5) +
+    // Two-cusp occlusal: shading dips between the cusps (central groove visible)
+    var pCuspL = cx - crownTopW * 0.27;
+    var pCuspR = cx + crownTopW * 0.27;
+    occlusalBandD =
+      'M ' + bandL + ' ' + (bandBot - 0.5) +
+      // Left cusp slope down into the band
+      ' Q ' + (pCuspL - 4) + ' ' + (bandTop + 1) +
+      ' '   + pCuspL + ' ' + (bandTop + 0.5) +
+      // Down into central groove
+      ' Q ' + (cx - crownTopW*0.10) + ' ' + (bandTop + 3) +
+      ' '   + cx + ' ' + (bandTop + 4) +
+      // Up to right cusp
+      ' Q ' + (cx + crownTopW*0.10) + ' ' + (bandTop + 3) +
+      ' '   + pCuspR + ' ' + (bandTop + 0.5) +
       // Down to right edge
-      ' Q ' + (occlR - 2) + ' ' + (occlCyTop + 2) +
-      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
-      // Lingual back edge (perspective ellipse bottom)
-      ' Q ' + occlCx + ' ' + (occlCyBot + 2) +
-      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
-    // Central groove line (mesial-distal)
+      ' Q ' + (pCuspR + 4) + ' ' + (bandTop + 1) +
+      ' '   + bandR + ' ' + (bandBot - 0.5) +
+      // Bottom edge of the band (the "shelf" line)
+      ' Q ' + cx + ' ' + (bandBot + 1.5) +
+      ' '   + bandL + ' ' + (bandBot - 0.5) + ' Z';
+    // Central groove line
     occlusalDetailD =
-      'M ' + (occlL + 4) + ' ' + (occlCyBot - 1) +
-      ' Q ' + occlCx + ' ' + (occlCyTop + 6) +
-      ' '   + (occlR - 4) + ' ' + (occlCyBot - 1);
+      'M ' + (bandL + 4) + ' ' + (bandBot - 0.5) +
+      ' Q ' + cx + ' ' + (bandTop + 4) +
+      ' '   + (bandR - 4) + ' ' + (bandBot - 0.5);
   }
   else {
-    // Molar: 4 cusps (MB, ML, DB, DL) with central groove + buccal/lingual grooves
-    var mCusp1X = occlL + occlW * 0.18;       // MB or DB (left)
-    var mCusp2X = occlCx - occlW * 0.10;       // adjacent inner cusp
-    var mCusp3X = occlCx + occlW * 0.10;       // adjacent inner cusp
-    var mCusp4X = occlR - occlW * 0.18;       // far right cusp
-    var cuspY1 = occlCyTop + 1;                 // outer cusps slightly lower
-    var cuspY2 = occlCyTop + 2;
-    occlusalD =
-      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
+    // Molar four-cusp occlusal band (MB/ML/DB/DL visible from semi-occlusal angle)
+    var mC1 = bandL + (bandR - bandL) * 0.18;
+    var mC2 = cx - crownTopW * 0.10;
+    var mC3 = cx + crownTopW * 0.10;
+    var mC4 = bandR - (bandR - bandL) * 0.18;
+    occlusalBandD =
+      'M ' + bandL + ' ' + (bandBot - 0.5) +
       // Up to first outer cusp
-      ' Q ' + (occlL + 1.5) + ' ' + (occlCyTop + 2.5) +
-      ' '   + mCusp1X + ' ' + cuspY1 +
+      ' Q ' + (bandL + 1) + ' ' + (bandTop + 1.5) +
+      ' '   + mC1 + ' ' + (bandTop + 0.8) +
       // Dip then second cusp
-      ' Q ' + (mCusp1X + 4) + ' ' + (occlCyTop + 5) +
-      ' '   + mCusp2X + ' ' + cuspY2 +
+      ' Q ' + (mC1 + 3) + ' ' + (bandTop + 3) +
+      ' '   + mC2 + ' ' + (bandTop + 1.5) +
       // Central groove (deeper)
-      ' Q ' + occlCx + ' ' + (occlCyTop + 7) +
-      ' '   + mCusp3X + ' ' + cuspY2 +
-      // Up to fourth cusp via dip
-      ' Q ' + (mCusp4X - 4) + ' ' + (occlCyTop + 5) +
-      ' '   + mCusp4X + ' ' + cuspY1 +
+      ' Q ' + cx + ' ' + (bandTop + 5) +
+      ' '   + mC3 + ' ' + (bandTop + 1.5) +
+      // Up to fourth cusp
+      ' Q ' + (mC4 - 3) + ' ' + (bandTop + 3) +
+      ' '   + mC4 + ' ' + (bandTop + 0.8) +
       // Down to right edge
-      ' Q ' + (occlR - 1.5) + ' ' + (occlCyTop + 2.5) +
-      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
-      // Lingual back arch (perspective)
-      ' Q ' + occlCx + ' ' + (occlCyBot + 2.5) +
-      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
-    // Detail lines: central groove (mesial-distal) + transverse grooves
+      ' Q ' + (bandR - 1) + ' ' + (bandTop + 1.5) +
+      ' '   + bandR + ' ' + (bandBot - 0.5) +
+      // Bottom edge of the band
+      ' Q ' + cx + ' ' + (bandBot + 2) +
+      ' '   + bandL + ' ' + (bandBot - 0.5) + ' Z';
+    // Detail lines: central + transverse grooves
     occlusalDetailD =
-      // Main central groove
-      'M ' + (occlL + 4) + ' ' + (occlCyBot - 1) +
-      ' Q ' + occlCx + ' ' + (occlCyTop + 7) +
-      ' '   + (occlR - 4) + ' ' + (occlCyBot - 1) +
-      // Buccal groove (between mCusp1 and mCusp2)
-      ' M ' + ((mCusp1X + mCusp2X)/2) + ' ' + (occlCyTop + 4) +
-      ' L ' + ((mCusp1X + mCusp2X)/2 + 0.5) + ' ' + (occlCyBot - 1) +
-      // Distal groove (between mCusp3 and mCusp4)
-      ' M ' + ((mCusp3X + mCusp4X)/2) + ' ' + (occlCyTop + 4) +
-      ' L ' + ((mCusp3X + mCusp4X)/2 - 0.5) + ' ' + (occlCyBot - 1);
+      'M ' + (bandL + 3) + ' ' + (bandBot - 0.5) +
+      ' Q ' + cx + ' ' + (bandTop + 5) +
+      ' '   + (bandR - 3) + ' ' + (bandBot - 0.5) +
+      ' M ' + ((mC1 + mC2)/2) + ' ' + (bandTop + 3) +
+      ' L ' + ((mC1 + mC2)/2 + 0.3) + ' ' + (bandBot - 1) +
+      ' M ' + ((mC3 + mC4)/2) + ' ' + (bandTop + 3) +
+      ' L ' + ((mC3 + mC4)/2 - 0.3) + ' ' + (bandBot - 1);
   }
 
   return {
     type: t,
     cellW: cellWidth(num),
     outlineD: outlineD,
-    occlusalD: occlusalD,
+    occlusalBandD: occlusalBandD,
     occlusalDetailD: occlusalDetailD,
     surfaces: { B: bRect, O: oRect, L: lRect, left: leftRect, right: rightRect },
     centerKey: oRect.key,
@@ -1476,24 +1465,22 @@ function buildTooth(num, surfaceMap, isUpper) {
          + 'stroke="rgba(120,75,35,0.35)" stroke-width="0.8" pointer-events="none"/>';
   }
 
-  // ── Occlusal/Incisal Surface (semi-occlusal 3D lip on top of crown) ──
-  if (anat.occlusalD) {
-    var occlFill = hasWhole ? wholeColor : ('url(#og' + gid + ')');
-    // Determine occlusal-specific treatment fill — if O surface has a treatment, use it
-    var occlTreatKey = sm['O'];
-    if (!hasWhole && occlTreatKey && T_FILL[occlTreatKey]) {
-      occlFill = T_FILL[occlTreatKey];
-    }
-    svg += '<path class="tooth-detail" d="' + anat.occlusalD + '" fill="' + occlFill + '" '
-        +  'stroke="' + crownStroke + '" stroke-width="0.8" stroke-linejoin="round" pointer-events="none"></path>';
-    if (!hasWhole) {
-      // Highlight on the occlusal table (light from above)
-      svg += '<path class="tooth-detail" d="' + anat.occlusalD + '" fill="url(#oh' + gid + ')" pointer-events="none"></path>';
-    }
-    // Detail lines (grooves/fissures)
+  // ── Occlusal/Incisal band (drawn INSIDE the crown — clipped by crown outline) ──
+  if (anat.occlusalBandD && !hasWhole) {
+    // Use a clipPath so the occlusal band only shows within the crown shape
+    var clipId = 'cc' + gid;
+    svg += '<clipPath id="' + clipId + '"><path d="' + anat.outlineD + '"/></clipPath>';
+    // Soft shadow band representing the occlusal table depth
+    svg += '<path d="' + anat.occlusalBandD + '" fill="rgba(160,110,55,0.18)" '
+        +  'clip-path="url(#' + clipId + ')" pointer-events="none"></path>';
+    // Bright highlight on top of cusps (light catches the cusp tips)
+    svg += '<path d="' + anat.occlusalBandD + '" fill="url(#oh' + gid + ')" '
+        +  'clip-path="url(#' + clipId + ')" pointer-events="none"></path>';
+    // Groove/fissure lines
     if (anat.occlusalDetailD) {
       svg += '<path d="' + anat.occlusalDetailD + '" fill="none" '
-          +  'stroke="rgba(110,72,32,0.55)" stroke-width="0.5" stroke-linecap="round" pointer-events="none"></path>';
+          +  'stroke="rgba(95,60,25,0.55)" stroke-width="0.45" stroke-linecap="round" '
+          +  'clip-path="url(#' + clipId + ')" pointer-events="none"></path>';
     }
   }
 
