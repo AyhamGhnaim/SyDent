@@ -1080,23 +1080,23 @@ function toothAnatomy(num) {
   var roots = [];
 
   if (nRoots === 1) {
-    // Root widths +20% wider at cervical to match crown
+    // Cone-shaped root: cervical width matches crown, tapers to a pointed apex
     var rTopW, rApexW;
-    if (pos === 2)      { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // lateral
-    else if (pos === 1) { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // central
-    else if (pos === 3) { rTopW = crownW * 0.92; rApexW = crownW * 0.30; } // canine
-    else                { rTopW = crownW * 0.92; rApexW = crownW * 0.26; } // premolar — root cervical width matches crown
+    if (pos === 2)      { rTopW = crownW * 0.92; rApexW = crownW * 0.10; } // lateral
+    else if (pos === 1) { rTopW = crownW * 0.92; rApexW = crownW * 0.10; } // central
+    else if (pos === 3) { rTopW = crownW * 0.92; rApexW = crownW * 0.11; } // canine
+    else                { rTopW = crownW * 0.92; rApexW = crownW * 0.10; } // premolar (single-rooted)
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
     var apexShift = (t === 'canine') ? (mesialOnRight ? -3 : 3) : 0;
     var apexCx = cx + apexShift;
     var d = 'M ' + rTopR + ' ' + rootTop +
             ' C ' + (rTopR - 1) + ' ' + (rootTop + rootLen*0.40) +
-            ' '   + (apexCx + rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
-            ' '   + (apexCx + rApexW/2) + ' ' + (rootBot - 1) +
-            ' Q ' + apexCx + ' ' + (rootBot + 2) +
-            ' '   + (apexCx - rApexW/2) + ' ' + (rootBot - 1) +
-            ' C ' + (apexCx - rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
+            ' '   + (apexCx + rApexW*1.5) + ' ' + (rootTop + rootLen*0.82) +
+            ' '   + (apexCx + rApexW) + ' ' + (rootBot - 2) +
+            ' Q ' + apexCx + ' ' + (rootBot + 1) +              // pointed apex tip
+            ' '   + (apexCx - rApexW) + ' ' + (rootBot - 2) +
+            ' C ' + (apexCx - rApexW*1.5) + ' ' + (rootTop + rootLen*0.82) +
             ' '   + (rTopL + 1) + ' ' + (rootTop + rootLen*0.40) +
             ' '   + rTopL + ' ' + rootTop +
             ' Z';
