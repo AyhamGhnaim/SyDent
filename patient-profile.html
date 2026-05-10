@@ -911,7 +911,14 @@ function toothAnatomy(num) {
   }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
-  var crownTop = 6;
+  // Occlusal/incisal surface lip height (visible from semi-occlusal viewing angle)
+  var occlH;
+  if (t === 'incisor' || t === 'canine') occlH = 7;   // thin incisal edge
+  else if (t === 'premolar')              occlH = 11; // 2 cusps visible
+  else                                    occlH = 15; // 4 cusps visible (molar)
+
+  var crownTop = 6 + occlH;               // crown body starts below the occlusal surface
+  var occlTop = 6;                         // top of occlusal surface
   var crownBot = crownTop + crownH;       // gum line
   var crownL = cx - crownW/2;
   var crownR = cx + crownW/2;
@@ -1246,10 +1253,107 @@ function toothAnatomy(num) {
     roots.push({ key:'R2', d: makeBuccalRoot(dbCervX, dbApexX, dbMul) });
   }
 
+  // ── Occlusal/Incisal Surface (semi-occlusal view: 3D lip on top of crown) ──
+  // Drawn as a flattened ellipse with cusps/edge details, sitting on top of the crown
+  var occlusalD = '';        // outer ellipse outline of the occlusal table
+  var occlusalDetailD = ''; // grooves, fissures, cusp dividers
+  var occlW = crownTopW;                      // occlusal table width = crown top width
+  var occlBL = occlH * 1.6;                    // bucco-lingual depth in 2D projection
+  var occlCx = cx;
+  var occlCyTop = occlTop;                     // top of occlusal ellipse
+  var occlCyBot = occlTop + occlH;             // bottom (joins crown top)
+  var occlL = occlCx - occlW/2;
+  var occlR = occlCx + occlW/2;
+
+  if (t === 'incisor' || t === 'canine') {
+    // Incisal edge: thin curved cap on top of crown
+    var iEdgeBow = (t === 'canine') ? 3 : 1.5;  // canine has a pointed cusp
+    var iCuspX = (t === 'canine') ? (occlCx + (mesialOnRight ? -2 : 2)) : occlCx;
+    occlusalD =
+      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
+      ' Q ' + (occlCx - occlW*0.30) + ' ' + (occlCyTop + 1) +
+      ' '   + iCuspX + ' ' + occlCyTop +
+      ' Q ' + (occlCx + occlW*0.30) + ' ' + (occlCyTop + 1) +
+      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
+      ' Q ' + occlCx + ' ' + (occlCyBot + 1.5) +
+      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
+  }
+  else if (t === 'premolar') {
+    // 2 cusps (buccal larger, lingual smaller in semi-occlusal view) + central groove
+    var pCuspBL = occlL + occlW * 0.30;       // first cusp tip x
+    var pCuspBR = occlR - occlW * 0.30;       // second cusp tip x
+    var pGrooveX = occlCx;                     // central groove
+    occlusalD =
+      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
+      // Up to first cusp
+      ' Q ' + (occlL + 2) + ' ' + (occlCyTop + 2) +
+      ' '   + pCuspBL + ' ' + (occlCyTop + 1.5) +
+      // Dip into central groove
+      ' Q ' + (occlCx - occlW*0.10) + ' ' + (occlCyTop + 4) +
+      ' '   + pGrooveX + ' ' + (occlCyTop + 5) +
+      // Out of groove to second cusp
+      ' Q ' + (occlCx + occlW*0.10) + ' ' + (occlCyTop + 4) +
+      ' '   + pCuspBR + ' ' + (occlCyTop + 1.5) +
+      // Down to right edge
+      ' Q ' + (occlR - 2) + ' ' + (occlCyTop + 2) +
+      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
+      // Lingual back edge (perspective ellipse bottom)
+      ' Q ' + occlCx + ' ' + (occlCyBot + 2) +
+      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
+    // Central groove line (mesial-distal)
+    occlusalDetailD =
+      'M ' + (occlL + 4) + ' ' + (occlCyBot - 1) +
+      ' Q ' + occlCx + ' ' + (occlCyTop + 6) +
+      ' '   + (occlR - 4) + ' ' + (occlCyBot - 1);
+  }
+  else {
+    // Molar: 4 cusps (MB, ML, DB, DL) with central groove + buccal/lingual grooves
+    var mCusp1X = occlL + occlW * 0.18;       // MB or DB (left)
+    var mCusp2X = occlCx - occlW * 0.10;       // adjacent inner cusp
+    var mCusp3X = occlCx + occlW * 0.10;       // adjacent inner cusp
+    var mCusp4X = occlR - occlW * 0.18;       // far right cusp
+    var cuspY1 = occlCyTop + 1;                 // outer cusps slightly lower
+    var cuspY2 = occlCyTop + 2;
+    occlusalD =
+      'M ' + occlL + ' ' + (occlCyBot - 0.5) +
+      // Up to first outer cusp
+      ' Q ' + (occlL + 1.5) + ' ' + (occlCyTop + 2.5) +
+      ' '   + mCusp1X + ' ' + cuspY1 +
+      // Dip then second cusp
+      ' Q ' + (mCusp1X + 4) + ' ' + (occlCyTop + 5) +
+      ' '   + mCusp2X + ' ' + cuspY2 +
+      // Central groove (deeper)
+      ' Q ' + occlCx + ' ' + (occlCyTop + 7) +
+      ' '   + mCusp3X + ' ' + cuspY2 +
+      // Up to fourth cusp via dip
+      ' Q ' + (mCusp4X - 4) + ' ' + (occlCyTop + 5) +
+      ' '   + mCusp4X + ' ' + cuspY1 +
+      // Down to right edge
+      ' Q ' + (occlR - 1.5) + ' ' + (occlCyTop + 2.5) +
+      ' '   + occlR + ' ' + (occlCyBot - 0.5) +
+      // Lingual back arch (perspective)
+      ' Q ' + occlCx + ' ' + (occlCyBot + 2.5) +
+      ' '   + occlL + ' ' + (occlCyBot - 0.5) + ' Z';
+    // Detail lines: central groove (mesial-distal) + transverse grooves
+    occlusalDetailD =
+      // Main central groove
+      'M ' + (occlL + 4) + ' ' + (occlCyBot - 1) +
+      ' Q ' + occlCx + ' ' + (occlCyTop + 7) +
+      ' '   + (occlR - 4) + ' ' + (occlCyBot - 1) +
+      // Buccal groove (between mCusp1 and mCusp2)
+      ' M ' + ((mCusp1X + mCusp2X)/2) + ' ' + (occlCyTop + 4) +
+      ' L ' + ((mCusp1X + mCusp2X)/2 + 0.5) + ' ' + (occlCyBot - 1) +
+      // Distal groove (between mCusp3 and mCusp4)
+      ' M ' + ((mCusp3X + mCusp4X)/2) + ' ' + (occlCyTop + 4) +
+      ' L ' + ((mCusp3X + mCusp4X)/2 - 0.5) + ' ' + (occlCyBot - 1);
+  }
+
   return {
     type: t,
     cellW: cellWidth(num),
     outlineD: outlineD,
+    occlusalD: occlusalD,
+    occlusalDetailD: occlusalDetailD,
     surfaces: { B: bRect, O: oRect, L: lRect, left: leftRect, right: rightRect },
     centerKey: oRect.key,
     leftKey: leftKey,
@@ -1325,6 +1429,17 @@ function buildTooth(num, surfaceMap, isUpper) {
     + '<pattern id="pk' + gid + '" x="0" y="0" width="100" height="3" patternUnits="userSpaceOnUse">'
       + '<line x1="0" y1="1.5" x2="100" y2="1.5" stroke="#a8825a" stroke-width="0.15" opacity="0.06"/>'
     + '</pattern>'
+    // Occlusal surface gradient: brighter enamel (light reflects off the table)
+    + '<linearGradient id="og' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#fffaee"/>'
+      + '<stop offset="50%" stop-color="#fbeed3"/>'
+      + '<stop offset="100%" stop-color="#ecd9ad"/>'
+    + '</linearGradient>'
+    // Occlusal highlight (top-down light reflection)
+    + '<radialGradient id="oh' + gid + '" cx="50%" cy="20%" r="55%">'
+      + '<stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>'
+      + '<stop offset="100%" stop-color="rgba(255,255,255,0)"/>'
+    + '</radialGradient>'
     + '</defs>'
     + '<g ' + transform + '>';
 
@@ -1359,6 +1474,27 @@ function buildTooth(num, surfaceMap, isUpper) {
     svg += '<line x1="' + (anat.crownL + 1) + '" y1="' + anat.cervicalY + '" '
          + 'x2="' + (anat.crownR - 1) + '" y2="' + anat.cervicalY + '" '
          + 'stroke="rgba(120,75,35,0.35)" stroke-width="0.8" pointer-events="none"/>';
+  }
+
+  // ── Occlusal/Incisal Surface (semi-occlusal 3D lip on top of crown) ──
+  if (anat.occlusalD) {
+    var occlFill = hasWhole ? wholeColor : ('url(#og' + gid + ')');
+    // Determine occlusal-specific treatment fill — if O surface has a treatment, use it
+    var occlTreatKey = sm['O'];
+    if (!hasWhole && occlTreatKey && T_FILL[occlTreatKey]) {
+      occlFill = T_FILL[occlTreatKey];
+    }
+    svg += '<path class="tooth-detail" d="' + anat.occlusalD + '" fill="' + occlFill + '" '
+        +  'stroke="' + crownStroke + '" stroke-width="0.8" stroke-linejoin="round" pointer-events="none"></path>';
+    if (!hasWhole) {
+      // Highlight on the occlusal table (light from above)
+      svg += '<path class="tooth-detail" d="' + anat.occlusalD + '" fill="url(#oh' + gid + ')" pointer-events="none"></path>';
+    }
+    // Detail lines (grooves/fissures)
+    if (anat.occlusalDetailD) {
+      svg += '<path d="' + anat.occlusalDetailD + '" fill="none" '
+          +  'stroke="rgba(110,72,32,0.55)" stroke-width="0.5" stroke-linecap="round" pointer-events="none"></path>';
+    }
   }
 
   // ── Surface overlay rectangles (clickable) ──
