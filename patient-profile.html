@@ -903,7 +903,12 @@ function toothAnatomy(num) {
     if (lowerAnt) { crownW = 50; crownH = 70; crownTopW = 32; }
     else          { crownW = 60; crownH = 74; crownTopW = 40; }
   }
-  else if (t === 'premolar'){ crownW = 68; crownH = 56; crownTopW = 60; }
+  else if (t === 'premolar'){
+    // Anatomical: BL≈8mm, MD≈7mm at crown widest, crown height≈8.5mm
+    // In facial view we see MD (slightly narrower than BL) — ratio ~0.84-0.88
+    if (pos === 4) { crownW = 60; crownH = 60; crownTopW = 54; } // first premolar slightly wider
+    else           { crownW = 56; crownH = 58; crownTopW = 52; } // second premolar
+  }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
   var crownTop = 6;
@@ -961,22 +966,40 @@ function toothAnatomy(num) {
       ' '   + (crownL - bulge*2) + ' ' + (crownTop + crownH*0.32) +
       ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else if (t === 'premolar') {
-    // Single broad rounded dome (smooth, no cusp peaks)
+    // Anatomically: two cusps visible from facial view — buccal cusp larger and
+    // higher, lingual cusp smaller (in facial 2D projection both appear as twin
+    // peaks separated by a central groove). Mesial side has a slight concavity
+    // (mesial developmental depression characteristic of premolars).
+    var pCusp1X = cx - crownTopW * 0.28;  // first cusp peak
+    var pCusp2X = cx + crownTopW * 0.28;  // second cusp peak
+    var pCusp1Y = crownTop + 1;            // taller cusp (buccal)
+    var pCusp2Y = crownTop + 3;            // slightly shorter cusp (lingual)
+    var pGrooveY = crownTop + 9;           // central groove depth
+    // Mesial concavity (mesial dev. depression): slight inward curve on mesial side
+    var mesialDip = mesialOnRight ? 1.5 : -1.5;
     outlineD =
-      'M ' + (crownTL - 1) + ' ' + (crownTop + 12) +
-      ' C ' + (crownTL + 2) + ' ' + (crownTop + 4) +
-      ' '   + (cx - crownTopW*0.30) + ' ' + (crownTop + 1) +
-      ' '   + cx + ' ' + (crownTop + 1) +
-      ' C ' + (cx + crownTopW*0.30) + ' ' + (crownTop + 1) +
-      ' '   + (crownTR - 2) + ' ' + (crownTop + 4) +
-      ' '   + (crownTR + 1) + ' ' + (crownTop + 12) +
-      ' C ' + (crownR + bulge*1.8) + ' ' + (crownTop + crownH*0.32) +
-      ' '   + (crownR + bulge*1.3) + ' ' + (crownTop + crownH*0.62) +
+      'M ' + (crownTL - 1) + ' ' + (crownTop + 11) +
+      // First cusp slope
+      ' Q ' + (pCusp1X - 7) + ' ' + (crownTop + 2) +
+      ' '   + pCusp1X + ' ' + pCusp1Y +
+      // Inner ridge into central groove
+      ' Q ' + (cx - crownTopW * 0.10) + ' ' + (crownTop + 4) +
+      ' '   + cx + ' ' + pGrooveY +
+      // Out of groove to second cusp
+      ' Q ' + (cx + crownTopW * 0.10) + ' ' + (crownTop + 4) +
+      ' '   + pCusp2X + ' ' + pCusp2Y +
+      // Distal slope down
+      ' Q ' + (pCusp2X + 7) + ' ' + (crownTop + 2) +
+      ' '   + (crownTR + 1) + ' ' + (crownTop + 11) +
+      // Right side bulge then narrow toward cervix
+      ' C ' + (crownR + bulge * 1.6) + ' ' + (crownTop + crownH * 0.30) +
+      ' '   + (crownR + bulge * 1.1) + ' ' + (crownTop + crownH * 0.60) +
       ' '   + (crownR - 2) + ' ' + crownBot +
       ' L ' + (crownL + 2) + ' ' + crownBot +
-      ' C ' + (crownL - bulge*1.3) + ' ' + (crownTop + crownH*0.62) +
-      ' '   + (crownL - bulge*1.8) + ' ' + (crownTop + crownH*0.32) +
-      ' '   + (crownTL - 1) + ' ' + (crownTop + 12) + ' Z';
+      // Left side mirror — with mesial concavity if mesial is on left
+      ' C ' + (crownL - bulge * (mesialOnRight ? 1.1 : 0.9)) + ' ' + (crownTop + crownH * 0.60) +
+      ' '   + (crownL - bulge * (mesialOnRight ? 1.6 : 1.3)) + ' ' + (crownTop + crownH * 0.30) +
+      ' '   + (crownTL - 1) + ' ' + (crownTop + 11) + ' Z';
   } else {
     // Molar: 4-5 rounded cusps with deeper occlusal valleys
     // Two prominent cusps visible (mesial + distal) with central groove
@@ -1058,7 +1081,7 @@ function toothAnatomy(num) {
     if (pos === 2)      rootBot = isUpperAnt ? 165 : 147;  // lateral
     else if (pos === 1) rootBot = isUpperAnt ? 178 : 158;  // central
     else if (pos === 3) rootBot = isUpperAnt ? 192 : 169;  // canine
-    else                rootBot = 154;  // premolar
+    else                rootBot = 168;  // premolar (root ~14mm vs crown ~8.5mm — ratio ~1.6:1)
   } else {
     rootBot = 154;
   }
@@ -1071,7 +1094,7 @@ function toothAnatomy(num) {
     if (pos === 2)      { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // lateral
     else if (pos === 1) { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // central
     else if (pos === 3) { rTopW = crownW * 0.92; rApexW = crownW * 0.30; } // canine
-    else                { rTopW = crownW * 0.50; rApexW = crownW * 0.12; } // premolar
+    else                { rTopW = crownW * 0.82; rApexW = crownW * 0.24; } // premolar — root width matches cervical crown
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
     var apexShift = (t === 'canine') ? (mesialOnRight ? -3 : 3) : 0;
@@ -1088,17 +1111,30 @@ function toothAnatomy(num) {
             ' Z';
     roots.push({ key:'R1', d:d });
   } else if (nRoots === 2) {
-    // Two roots (mesial + distal): diverge outward, then mesial curves toward distal
-    // (classic lower molar shape — both roots tapered, mesial usually wider)
-    var trunkW = crownW * 0.85;       // total width at cervical
-    var rW = trunkW * 0.42;           // each root width at top
-    var rApex = rW * 0.30;            // apex width
-    var leftTopCx  = cx - trunkW*0.22;
-    var rightTopCx = cx + trunkW*0.22;
-    // Roots diverge: apex positions are wider apart than tops
-    var leftApexCx  = cx - trunkW*0.32;
-    var rightApexCx = cx + trunkW*0.32;
-    // Mesial root anatomically slightly wider than distal
+    // Two roots — but premolar (upper first) needs different proportions than molar
+    var trunkW, rW, rApex, leftTopCx, rightTopCx, leftApexCx, rightApexCx;
+    if (t === 'premolar') {
+      // Upper first premolar: buccal + palatal roots, narrower & less divergent
+      // (in 2D facial view they appear close together with mild divergence)
+      trunkW = crownW * 0.72;          // narrower trunk than molar
+      rW = trunkW * 0.42;              // each root width
+      rApex = rW * 0.34;
+      leftTopCx  = cx - trunkW * 0.18; // closer at cervical
+      rightTopCx = cx + trunkW * 0.18;
+      leftApexCx  = cx - trunkW * 0.26; // mild divergence
+      rightApexCx = cx + trunkW * 0.26;
+    } else {
+      // Lower molar: classic two-rooted shape (mesial + distal)
+      trunkW = crownW * 0.85;
+      rW = trunkW * 0.42;
+      rApex = rW * 0.30;
+      leftTopCx  = cx - trunkW * 0.22;
+      rightTopCx = cx + trunkW * 0.22;
+      leftApexCx  = cx - trunkW * 0.40;  // increased divergence
+      rightApexCx = cx + trunkW * 0.40;
+    }
+    // Mesial root anatomically slightly wider than distal (lower molar)
+    // For premolar: buccal root usually slightly larger than palatal — treat similarly
     function makeRoot(topCx, apexCx, widthMul) {
       var w = rW * widthMul;
       var aw = rApex * widthMul;
