@@ -1041,62 +1041,105 @@ function toothAnatomy(num) {
   var leftRect  = { x: stripL_x, y: stripY, w: sideStripW, h: stripH, key: leftKey };
   var rightRect = { x: stripR_x, y: stripY, w: sideStripW, h: stripH, key: rightKey };
 
-  // ── Roots ──
+  // ── Roots (anatomically correct shapes) ──
+  // Reference: standard dental anatomy — roots are tapered conical shapes that
+  // diverge from the cervical area, with characteristic curvatures per tooth type.
   var rootTop = crownBot + 2;     // small gum band between crown and root
   var rootBot = 154;
+  var rootLen = rootBot - rootTop;
   var roots = [];
+
   if (nRoots === 1) {
-    var rW = crownW * 0.55;
-    var rL = cx - rW/2;
-    var rR = cx + rW/2;
-    var apexW = rW * 0.22;
-    var d = 'M ' + rL + ' ' + rootTop +
-            ' L ' + rR + ' ' + rootTop +
-            ' Q ' + (rR + 1) + ' ' + (rootTop + (rootBot-rootTop)*0.6) +
-            ' '   + (cx + apexW/2) + ' ' + rootBot +
-            ' Q ' + cx + ' ' + (rootBot + 4) +
-            ' '   + (cx - apexW/2) + ' ' + rootBot +
-            ' Q ' + (rL - 1) + ' ' + (rootTop + (rootBot-rootTop)*0.6) +
-            ' '   + rL + ' ' + rootTop + ' Z';
+    // Single root: tapered cone, slight distal curve at apex
+    // Wider at cervical (60% of crown), tapers to ~25% at apex
+    var rTopW = crownW * 0.50;
+    var rApexW = crownW * 0.12;
+    var rTopL = cx - rTopW/2;
+    var rTopR = cx + rTopW/2;
+    // Anatomical apex displacement: canines and incisors curve slightly distal
+    var apexShift = (t === 'canine') ? (mesialOnRight ? -3 : 3) : 0;
+    var apexCx = cx + apexShift;
+    // Use cubic Bezier for natural taper with slight curve
+    var d = 'M ' + rTopR + ' ' + rootTop +
+            // Right side: smooth taper from cervical to apex
+            ' C ' + (rTopR - 1) + ' ' + (rootTop + rootLen*0.40) +
+            ' '   + (apexCx + rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
+            ' '   + (apexCx + rApexW/2) + ' ' + (rootBot - 1) +
+            // Rounded apex
+            ' Q ' + apexCx + ' ' + (rootBot + 2) +
+            ' '   + (apexCx - rApexW/2) + ' ' + (rootBot - 1) +
+            // Left side: mirror taper
+            ' C ' + (apexCx - rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
+            ' '   + (rTopL + 1) + ' ' + (rootTop + rootLen*0.40) +
+            ' '   + rTopL + ' ' + rootTop +
+            ' Z';
     roots.push({ key:'R1', d:d });
   } else if (nRoots === 2) {
-    var rW2 = crownW * 0.32;
-    var leftCx  = cx - crownW*0.22;
-    var rightCx = cx + crownW*0.22;
-    function makeRoot(centerX) {
-      var rL = centerX - rW2/2;
-      var rR = centerX + rW2/2;
-      var apex = rW2 * 0.30;
-      // Slight inward curve (mesial root curves toward midline at apex)
-      return 'M ' + rL + ' ' + rootTop +
-             ' L ' + rR + ' ' + rootTop +
-             ' Q ' + (rR - 0.5) + ' ' + (rootTop + (rootBot-rootTop)*0.55) +
-             ' '   + (centerX + apex/2) + ' ' + (rootBot - 2) +
-             ' Q ' + centerX + ' ' + (rootBot + 3) +
-             ' '   + (centerX - apex/2) + ' ' + (rootBot - 2) +
-             ' Q ' + (rL + 0.5) + ' ' + (rootTop + (rootBot-rootTop)*0.55) +
-             ' '   + rL + ' ' + rootTop + ' Z';
+    // Two roots (mesial + distal): diverge outward, then mesial curves toward distal
+    // (classic lower molar shape — both roots tapered, mesial usually wider)
+    var trunkW = crownW * 0.85;       // total width at cervical
+    var rW = trunkW * 0.42;           // each root width at top
+    var rApex = rW * 0.30;            // apex width
+    var leftTopCx  = cx - trunkW*0.22;
+    var rightTopCx = cx + trunkW*0.22;
+    // Roots diverge: apex positions are wider apart than tops
+    var leftApexCx  = cx - trunkW*0.32;
+    var rightApexCx = cx + trunkW*0.32;
+    // Mesial root anatomically slightly wider than distal
+    function makeRoot(topCx, apexCx, widthMul) {
+      var w = rW * widthMul;
+      var aw = rApex * widthMul;
+      var topL = topCx - w/2;
+      var topR = topCx + w/2;
+      return 'M ' + topR + ' ' + rootTop +
+             ' C ' + (topR + 0.5) + ' ' + (rootTop + rootLen*0.35) +
+             ' '   + (apexCx + aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
+             ' '   + (apexCx + aw/2) + ' ' + (rootBot - 1) +
+             ' Q ' + apexCx + ' ' + (rootBot + 2) +
+             ' '   + (apexCx - aw/2) + ' ' + (rootBot - 1) +
+             ' C ' + (apexCx - aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
+             ' '   + (topL - 0.5) + ' ' + (rootTop + rootLen*0.35) +
+             ' '   + topL + ' ' + rootTop + ' Z';
     }
-    roots.push({ key:'R1', d: makeRoot(leftCx) });
-    roots.push({ key:'R2', d: makeRoot(rightCx) });
+    // R1 = mesial (slightly wider), R2 = distal
+    var mesialIsLeft = mesialOnRight ? false : true;
+    if (mesialIsLeft) {
+      roots.push({ key:'R1', d: makeRoot(leftTopCx, leftApexCx, 1.1) });   // mesial
+      roots.push({ key:'R2', d: makeRoot(rightTopCx, rightApexCx, 0.95) }); // distal
+    } else {
+      roots.push({ key:'R1', d: makeRoot(rightTopCx, rightApexCx, 1.1) });   // mesial
+      roots.push({ key:'R2', d: makeRoot(leftTopCx, leftApexCx, 0.95) });    // distal
+    }
   } else {
-    // 3 roots: 2 buccal + 1 palatal (upper molars)
-    var rW3 = crownW * 0.22;
-    var positions = [cx - crownW*0.30, cx, cx + crownW*0.30];
+    // Three roots (upper molars): 2 buccal (MB + DB) + 1 palatal
+    // Palatal root is wider and more divergent (in 2D facial view shows behind/centered)
+    // Buccal roots are narrower
+    var trunkW3 = crownW * 0.92;
+    var rW3 = trunkW3 * 0.24;
+    var rApex3 = rW3 * 0.35;
+    // Top positions of the 3 roots (cervical level — closer together)
+    var topPositions = [cx - trunkW3*0.30, cx, cx + trunkW3*0.30];
+    // Apex positions (further apart — divergent roots)
+    var apexPositions = [cx - trunkW3*0.40, cx, cx + trunkW3*0.40];
+    // Width multipliers: middle (palatal) is widest
+    var widthMuls = [0.95, 1.15, 0.90];
+    function makeMolarRoot(topCx, apexCx, widthMul) {
+      var w = rW3 * widthMul;
+      var aw = rApex3 * widthMul;
+      var topL = topCx - w/2;
+      var topR = topCx + w/2;
+      return 'M ' + topR + ' ' + rootTop +
+             ' C ' + (topR + 0.3) + ' ' + (rootTop + rootLen*0.35) +
+             ' '   + (apexCx + aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
+             ' '   + (apexCx + aw/2) + ' ' + (rootBot - 1) +
+             ' Q ' + apexCx + ' ' + (rootBot + 2) +
+             ' '   + (apexCx - aw/2) + ' ' + (rootBot - 1) +
+             ' C ' + (apexCx - aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
+             ' '   + (topL - 0.3) + ' ' + (rootTop + rootLen*0.35) +
+             ' '   + topL + ' ' + rootTop + ' Z';
+    }
     for (var ri = 0; ri < 3; ri++) {
-      var centerX = positions[ri];
-      var rL = centerX - rW3/2;
-      var rR = centerX + rW3/2;
-      var apex = rW3 * 0.40;
-      var dr = 'M ' + rL + ' ' + rootTop +
-               ' L ' + rR + ' ' + rootTop +
-               ' Q ' + (rR - 0.3) + ' ' + (rootTop + (rootBot-rootTop)*0.55) +
-               ' '   + (centerX + apex/2) + ' ' + (rootBot - 2) +
-               ' Q ' + centerX + ' ' + (rootBot + 2) +
-               ' '   + (centerX - apex/2) + ' ' + (rootBot - 2) +
-               ' Q ' + (rL + 0.3) + ' ' + (rootTop + (rootBot-rootTop)*0.55) +
-               ' '   + rL + ' ' + rootTop + ' Z';
-      roots.push({ key:'R'+(ri+1), d: dr });
+      roots.push({ key:'R'+(ri+1), d: makeMolarRoot(topPositions[ri], apexPositions[ri], widthMuls[ri]) });
     }
   }
 
