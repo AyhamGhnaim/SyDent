@@ -1139,9 +1139,34 @@ function buildTooth(num, surfaceMap, isUpper) {
   var transform = isUpper ? 'transform="translate(0,160) scale(1,-1)"' : '';
   var W = anat.cellW;
   var H = Math.round(W * 1.6);
+  // Unique gradient ID per tooth to avoid SVG collisions
+  var gid = 'g' + num;
 
   var svg = '<svg class="tooth-shape" viewBox="0 0 100 160" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
-          + '<g ' + transform + '>';
+    + '<defs>'
+    // Crown gradient: lighter at top (incisal/occlusal) → darker near cervical
+    + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#fdf3dc"/>'
+      + '<stop offset="55%" stop-color="#f4e4c1"/>'
+      + '<stop offset="100%" stop-color="#dcc499"/>'
+    + '</linearGradient>'
+    // Root gradient: darker at top (cervical) → lighter at apex
+    + '<linearGradient id="rg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#d8c39a"/>'
+      + '<stop offset="100%" stop-color="#efddb4"/>'
+    + '</linearGradient>'
+    // Soft inner shadow at the equator (gives 3D bulge feeling)
+    + '<radialGradient id="sh' + gid + '" cx="50%" cy="48%" r="55%">'
+      + '<stop offset="60%" stop-color="rgba(0,0,0,0)"/>'
+      + '<stop offset="100%" stop-color="rgba(140,90,40,0.18)"/>'
+    + '</radialGradient>'
+    // Highlight (the shiny spot near top of crown)
+    + '<radialGradient id="hi' + gid + '" cx="35%" cy="22%" r="28%">'
+      + '<stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>'
+      + '<stop offset="100%" stop-color="rgba(255,255,255,0)"/>'
+    + '</radialGradient>'
+    + '</defs>'
+    + '<g ' + transform + '>';
 
   // ── Roots (drawn first, behind crown) ──
   for (var ri = 0; ri < anat.roots.length; ri++) {
@@ -1150,15 +1175,21 @@ function buildTooth(num, surfaceMap, isUpper) {
     var rFill;
     if (hasWhole) rFill = wholeColor;
     else if (rTreatKey && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
-    else rFill = rootBase;
+    else rFill = 'url(#rg' + gid + ')';
     svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
         +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
   }
 
-  // ── Crown outline (the silhouette, ivory-colored base) ──
-  var crownFillBase = hasWhole ? wholeColor : crownBase;
+  // ── Crown outline (with gradient + inner shadow + highlight) ──
+  var crownFillBase = hasWhole ? wholeColor : ('url(#cg' + gid + ')');
   svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="' + crownFillBase + '" '
       +  'stroke="' + crownStroke + '" stroke-width="1" stroke-linejoin="round"></path>';
+  if (!hasWhole) {
+    // Inner shadow at edges for 3D bulge
+    svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#sh' + gid + ')" pointer-events="none"></path>';
+    // Highlight near top of crown
+    svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#hi' + gid + ')" pointer-events="none"></path>';
+  }
 
   // ── Surface overlay rectangles (clickable) ──
   // Each overlay is filled transparent if no treatment, or with treatment color (60% opacity) if treated.
