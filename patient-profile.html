@@ -1051,9 +1051,9 @@ function toothAnatomy(num) {
   var pos = parseInt(num,10) % 10;
   var rootBot;
   if (nRoots === 1) {
-    if (pos === 2)      rootBot = 138;  // lateral incisor — shortest
-    else if (pos === 1) rootBot = 148;  // central incisor — longer
-    else if (pos === 3) rootBot = 158;  // canine — longest
+    if (pos === 2)      rootBot = 147;  // lateral incisor — shortest (+20%)
+    else if (pos === 1) rootBot = 158;  // central incisor — longer (+20%)
+    else if (pos === 3) rootBot = 169;  // canine — longest (+20%)
     else                rootBot = 154;  // premolar
   } else {
     rootBot = 154;
@@ -1062,12 +1062,11 @@ function toothAnatomy(num) {
   var roots = [];
 
   if (nRoots === 1) {
-    // Single root width matches crown proportions
-    // Anterior teeth: narrower at cervical proportional to crown width
+    // Root widths +20% wider at cervical to match crown
     var rTopW, rApexW;
-    if (pos === 2)      { rTopW = crownW * 0.55; rApexW = crownW * 0.16; } // lateral
-    else if (pos === 1) { rTopW = crownW * 0.58; rApexW = crownW * 0.16; } // central
-    else if (pos === 3) { rTopW = crownW * 0.62; rApexW = crownW * 0.18; } // canine — wider
+    if (pos === 2)      { rTopW = crownW * 0.66; rApexW = crownW * 0.19; } // lateral
+    else if (pos === 1) { rTopW = crownW * 0.70; rApexW = crownW * 0.19; } // central
+    else if (pos === 3) { rTopW = crownW * 0.74; rApexW = crownW * 0.22; } // canine
     else                { rTopW = crownW * 0.50; rApexW = crownW * 0.12; } // premolar
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
