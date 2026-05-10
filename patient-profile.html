@@ -886,6 +886,7 @@ function toothAnatomy(num) {
   var cx = 50;
   // Lower anteriors are anatomically smaller/narrower than upper
   var quad_n = Math.floor(parseInt(num,10) / 10);
+  var pos = parseInt(num,10) % 10;
   var isLowerJaw = (quad_n === 3 || quad_n === 4);
   var isAntTooth = (t === 'incisor' || t === 'canine');
   var lowerAnt = isLowerJaw && isAntTooth;
