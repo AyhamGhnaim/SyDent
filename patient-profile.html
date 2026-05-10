@@ -1085,7 +1085,7 @@ function toothAnatomy(num) {
     if (pos === 2)      { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // lateral
     else if (pos === 1) { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // central
     else if (pos === 3) { rTopW = crownW * 0.92; rApexW = crownW * 0.30; } // canine
-    else                { rTopW = crownW * 0.82; rApexW = crownW * 0.24; } // premolar — root width matches cervical crown
+    else                { rTopW = crownW * 0.92; rApexW = crownW * 0.26; } // premolar — root cervical width matches crown
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
     var apexShift = (t === 'canine') ? (mesialOnRight ? -3 : 3) : 0;
@@ -1106,24 +1106,22 @@ function toothAnatomy(num) {
     var trunkW, rW, rApex, leftTopCx, rightTopCx, leftApexCx, rightApexCx;
     if (t === 'premolar') {
       // Upper first premolar (14/24) — buccal + palatal roots
-      // Anatomically: at cervical level the two roots together span the full crown
-      // width (no gap) — they share a common cervical trunk and bifurcate just below
-      // the CEJ, then diverge mildly toward the apex.
-      trunkW = crownW * 0.86;              // total cervical span ≈ crown cervical width
+      // Cervical trunk matches crown cervical width (no gap, full coverage)
+      trunkW = crownW * 0.92;              // cervical span = crown cervical width
       rW = trunkW * 0.50;                  // each root takes half — no gap at cervix
       rApex = rW * 0.32;
-      leftTopCx  = cx - trunkW * 0.25;     // roots touch at midline (rW/2 = 0.25*trunkW)
+      leftTopCx  = cx - trunkW * 0.25;
       rightTopCx = cx + trunkW * 0.25;
-      leftApexCx  = cx - trunkW * 0.36;    // mild divergence toward apex
+      leftApexCx  = cx - trunkW * 0.36;
       rightApexCx = cx + trunkW * 0.36;
     } else {
       // Lower molar: classic two-rooted shape (mesial + distal)
-      trunkW = crownW * 0.85;
-      rW = trunkW * 0.42;
+      trunkW = crownW * 0.92;              // cervical trunk matches crown cervical width
+      rW = trunkW * 0.46;                  // each root close to half-trunk
       rApex = rW * 0.30;
-      leftTopCx  = cx - trunkW * 0.22;
-      rightTopCx = cx + trunkW * 0.22;
-      leftApexCx  = cx - trunkW * 0.40;  // increased divergence
+      leftTopCx  = cx - trunkW * 0.23;
+      rightTopCx = cx + trunkW * 0.23;
+      leftApexCx  = cx - trunkW * 0.40;    // strong divergence
       rightApexCx = cx + trunkW * 0.40;
     }
     // Mesial root anatomically slightly wider than distal (lower molar)
@@ -1160,8 +1158,8 @@ function toothAnatomy(num) {
     //  - Palatal is the longest and thickest, MB second, DB smallest
     //  - Divergence varies by position: 1st molar widest, 2nd & 3rd progressively closer
     //  - In 2D buccal projection, palatal appears centered between MB and DB
-    var trunkW3 = crownW * 0.95;          // cervical trunk spans almost full crown width
-    var rW3 = trunkW3 * 0.34;             // each buccal root width (substantial, not skinny)
+    var trunkW3 = crownW * 0.92;          // cervical trunk matches crown cervical width
+    var rW3 = trunkW3 * 0.34;             // each buccal root width
     var rApex3 = rW3 * 0.32;
     // Divergence multiplier by position: 1st molar (pos 6) most divergent, 2nd less, 3rd least
     var divMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.72 : 0.55;
