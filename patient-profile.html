@@ -1042,20 +1042,20 @@ function toothAnatomy(num) {
   var leftKey  = mesialOnRight ? 'D' : 'M';
   var rightKey = mesialOnRight ? 'M' : 'D';
 
-  // Center column subdivision
-  // B (buccal/dehlizi) takes the largest top portion
-  // O/I (center) is the middle band
-  // L (lingual/lothawi) is a smaller bottom band closer to the gum line
+  // Center column subdivision (top → bottom):
+  //  O/I (occlusal/incisal) — thin band at the top (where the grooves/edge actually are)
+  //  B (buccal/dehlizi) — large middle portion (the main facial body of the tooth)
+  //  L (lingual/lothawi) — small band at the bottom near the gum
   var midL = crownL + sideStripW;
   var midR = crownR - sideStripW;
   var midW = midR - midL;
-  var bH = stripH * 0.55;  // buccal takes top 55% (enlarged)
-  var oH = stripH * 0.18;  // center (occlusal/incisal) takes 18%
-  // lingual takes the remaining 27% at the bottom (smaller, closer to gum)
+  var oH = stripH * 0.12;  // occlusal/incisal — thin top band on grooves/edge only
+  var bH = stripH * 0.70;  // buccal — dominant middle portion
+  // lingual takes the remaining ~18% at the bottom
 
-  var bRect = { x: midL, y: stripY,            w: midW, h: bH,            key: 'B' };
-  var oRect = { x: midL, y: stripY + bH,       w: midW, h: oH,            key: (t === 'incisor' || t === 'canine') ? 'I' : 'O' };
-  var lRect = { x: midL, y: stripY + bH + oH,  w: midW, h: stripH-bH-oH,  key: 'L' };
+  var oRect = { x: midL, y: stripY,            w: midW, h: oH,            key: (t === 'incisor' || t === 'canine') ? 'I' : 'O' };
+  var bRect = { x: midL, y: stripY + oH,       w: midW, h: bH,            key: 'B' };
+  var lRect = { x: midL, y: stripY + oH + bH,  w: midW, h: stripH-oH-bH,  key: 'L' };
   var leftRect  = { x: stripL_x, y: stripY, w: sideStripW, h: stripH, key: leftKey };
   var rightRect = { x: stripR_x, y: stripY, w: sideStripW, h: stripH, key: rightKey };
 
