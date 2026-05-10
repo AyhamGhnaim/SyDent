@@ -1045,30 +1045,40 @@ function toothAnatomy(num) {
   // Reference: standard dental anatomy — roots are tapered conical shapes that
   // diverge from the cervical area, with characteristic curvatures per tooth type.
   var rootTop = crownBot + 2;     // small gum band between crown and root
-  var rootBot = 154;
+
+  // Anatomical root lengths per tooth type (FDI position)
+  // Lateral incisor (pos 2) shortest, central (pos 1) longer, canine (pos 3) longest
+  var pos = parseInt(num,10) % 10;
+  var rootBot;
+  if (nRoots === 1) {
+    if (pos === 2)      rootBot = 138;  // lateral incisor — shortest
+    else if (pos === 1) rootBot = 148;  // central incisor — longer
+    else if (pos === 3) rootBot = 158;  // canine — longest
+    else                rootBot = 154;  // premolar
+  } else {
+    rootBot = 154;
+  }
   var rootLen = rootBot - rootTop;
   var roots = [];
 
   if (nRoots === 1) {
-    // Single root: tapered cone, slight distal curve at apex
-    // Wider at cervical (60% of crown), tapers to ~25% at apex
-    var rTopW = crownW * 0.50;
-    var rApexW = crownW * 0.12;
+    // Single root width matches crown proportions
+    // Anterior teeth: narrower at cervical proportional to crown width
+    var rTopW, rApexW;
+    if (pos === 2)      { rTopW = crownW * 0.55; rApexW = crownW * 0.16; } // lateral
+    else if (pos === 1) { rTopW = crownW * 0.58; rApexW = crownW * 0.16; } // central
+    else if (pos === 3) { rTopW = crownW * 0.62; rApexW = crownW * 0.18; } // canine — wider
+    else                { rTopW = crownW * 0.50; rApexW = crownW * 0.12; } // premolar
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
-    // Anatomical apex displacement: canines and incisors curve slightly distal
     var apexShift = (t === 'canine') ? (mesialOnRight ? -3 : 3) : 0;
     var apexCx = cx + apexShift;
-    // Use cubic Bezier for natural taper with slight curve
     var d = 'M ' + rTopR + ' ' + rootTop +
-            // Right side: smooth taper from cervical to apex
             ' C ' + (rTopR - 1) + ' ' + (rootTop + rootLen*0.40) +
             ' '   + (apexCx + rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
             ' '   + (apexCx + rApexW/2) + ' ' + (rootBot - 1) +
-            // Rounded apex
             ' Q ' + apexCx + ' ' + (rootBot + 2) +
             ' '   + (apexCx - rApexW/2) + ' ' + (rootBot - 1) +
-            // Left side: mirror taper
             ' C ' + (apexCx - rApexW*0.7) + ' ' + (rootTop + rootLen*0.80) +
             ' '   + (rTopL + 1) + ' ' + (rootTop + rootLen*0.40) +
             ' '   + rTopL + ' ' + rootTop +
