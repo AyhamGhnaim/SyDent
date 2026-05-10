@@ -1102,15 +1102,17 @@ function toothAnatomy(num) {
     // Two roots — but premolar (upper first) needs different proportions than molar
     var trunkW, rW, rApex, leftTopCx, rightTopCx, leftApexCx, rightApexCx;
     if (t === 'premolar') {
-      // Upper first premolar: buccal + palatal roots, narrower & less divergent
-      // (in 2D facial view they appear close together with mild divergence)
-      trunkW = crownW * 0.72;          // narrower trunk than molar
-      rW = trunkW * 0.42;              // each root width
-      rApex = rW * 0.34;
-      leftTopCx  = cx - trunkW * 0.18; // closer at cervical
-      rightTopCx = cx + trunkW * 0.18;
-      leftApexCx  = cx - trunkW * 0.26; // mild divergence
-      rightApexCx = cx + trunkW * 0.26;
+      // Upper first premolar (14/24) — buccal + palatal roots
+      // Anatomically: at cervical level the two roots together span the full crown
+      // width (no gap) — they share a common cervical trunk and bifurcate just below
+      // the CEJ, then diverge mildly toward the apex.
+      trunkW = crownW * 0.86;              // total cervical span ≈ crown cervical width
+      rW = trunkW * 0.50;                  // each root takes half — no gap at cervix
+      rApex = rW * 0.32;
+      leftTopCx  = cx - trunkW * 0.25;     // roots touch at midline (rW/2 = 0.25*trunkW)
+      rightTopCx = cx + trunkW * 0.25;
+      leftApexCx  = cx - trunkW * 0.36;    // mild divergence toward apex
+      rightApexCx = cx + trunkW * 0.36;
     } else {
       // Lower molar: classic two-rooted shape (mesial + distal)
       trunkW = crownW * 0.85;
