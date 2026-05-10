@@ -1290,27 +1290,41 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   var svg = '<svg class="tooth-shape" viewBox="0 0 100 210" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
     + '<defs>'
-    // Crown gradient: lighter at top (incisal/occlusal) → darker near cervical
+    // Crown gradient: enamel translucent-bluish at top → ivory mid → dentin yellow at cervical
     + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="#fdf3dc"/>'
-      + '<stop offset="55%" stop-color="#f4e4c1"/>'
-      + '<stop offset="100%" stop-color="#dcc499"/>'
+      + '<stop offset="0%" stop-color="#fefaf0"/>'        // bright enamel tip
+      + '<stop offset="25%" stop-color="#fcf2dc"/>'        // upper enamel
+      + '<stop offset="60%" stop-color="#f4e4c1"/>'        // mid-crown ivory
+      + '<stop offset="92%" stop-color="#e6cf9f"/>'        // dentin showing through near cervical
+      + '<stop offset="100%" stop-color="#d8bd87"/>'       // cervical (darker dentin)
     + '</linearGradient>'
-    // Root gradient: darker at top (cervical) → lighter at apex
+    // Root gradient: pale ivory at cervical → slightly darker mid → soft tip at apex
     + '<linearGradient id="rg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="#d8c39a"/>'
-      + '<stop offset="100%" stop-color="#efddb4"/>'
+      + '<stop offset="0%" stop-color="#f0dcb0"/>'         // pale at cervical (matches dentin)
+      + '<stop offset="55%" stop-color="#dcc290"/>'        // mid-root slightly darker
+      + '<stop offset="100%" stop-color="#c9a972"/>'       // apex deeper
     + '</linearGradient>'
-    // Soft inner shadow at the equator (gives 3D bulge feeling)
+    // Side shadow on roots (light from upper-left → right side darker)
+    + '<linearGradient id="rs' + gid + '" x1="0" y1="0" x2="1" y2="0">'
+      + '<stop offset="0%" stop-color="rgba(255,255,255,0.10)"/>'
+      + '<stop offset="50%" stop-color="rgba(0,0,0,0)"/>'
+      + '<stop offset="100%" stop-color="rgba(80,50,20,0.18)"/>'
+    + '</linearGradient>'
+    // Soft inner shadow at the equator (3D bulge)
     + '<radialGradient id="sh' + gid + '" cx="50%" cy="48%" r="55%">'
-      + '<stop offset="60%" stop-color="rgba(0,0,0,0)"/>'
-      + '<stop offset="100%" stop-color="rgba(140,90,40,0.18)"/>'
+      + '<stop offset="55%" stop-color="rgba(0,0,0,0)"/>'
+      + '<stop offset="100%" stop-color="rgba(140,90,40,0.22)"/>'
     + '</radialGradient>'
-    // Highlight (the shiny spot near top of crown)
-    + '<radialGradient id="hi' + gid + '" cx="35%" cy="22%" r="28%">'
-      + '<stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>'
+    // Linear highlight band (enamel reflection — diagonal soft glow on upper-left)
+    + '<linearGradient id="hi' + gid + '" x1="0.20" y1="0.10" x2="0.55" y2="0.65">'
+      + '<stop offset="0%" stop-color="rgba(255,255,255,0.65)"/>'
+      + '<stop offset="40%" stop-color="rgba(255,255,255,0.25)"/>'
       + '<stop offset="100%" stop-color="rgba(255,255,255,0)"/>'
-    + '</radialGradient>'
+    + '</linearGradient>'
+    // Subtle vertical perikymata pattern (growth lines on enamel)
+    + '<pattern id="pk' + gid + '" x="0" y="0" width="100" height="3" patternUnits="userSpaceOnUse">'
+      + '<line x1="0" y1="1.5" x2="100" y2="1.5" stroke="#a8825a" stroke-width="0.15" opacity="0.06"/>'
+    + '</pattern>'
     + '</defs>'
     + '<g ' + transform + '>';
 
@@ -1324,17 +1338,27 @@ function buildTooth(num, surfaceMap, isUpper) {
     else rFill = 'url(#rg' + gid + ')';
     svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
         +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
+    // Side shadow overlay on each root (only if no treatment fill)
+    if (!hasWhole && !(rTreatKey && T_FILL[rTreatKey])) {
+      svg += '<path d="' + r.d + '" fill="url(#rs' + gid + ')" pointer-events="none"></path>';
+    }
   }
 
-  // ── Crown outline (with gradient + inner shadow + highlight) ──
+  // ── Crown outline (gradient + perikymata + inner shadow + highlight) ──
   var crownFillBase = hasWhole ? wholeColor : ('url(#cg' + gid + ')');
   svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="' + crownFillBase + '" '
       +  'stroke="' + crownStroke + '" stroke-width="1" stroke-linejoin="round"></path>';
   if (!hasWhole) {
+    // Perikymata (subtle horizontal growth-line texture)
+    svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#pk' + gid + ')" pointer-events="none"></path>';
     // Inner shadow at edges for 3D bulge
     svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#sh' + gid + ')" pointer-events="none"></path>';
-    // Highlight near top of crown
+    // Linear highlight (enamel reflection band)
     svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#hi' + gid + ')" pointer-events="none"></path>';
+    // CEJ shadow line (cementoenamel junction — subtle dark band where crown meets root)
+    svg += '<line x1="' + (anat.crownL + 1) + '" y1="' + anat.cervicalY + '" '
+         + 'x2="' + (anat.crownR - 1) + '" y2="' + anat.cervicalY + '" '
+         + 'stroke="rgba(120,75,35,0.35)" stroke-width="0.8" pointer-events="none"/>';
   }
 
   // ── Surface overlay rectangles (clickable) ──
