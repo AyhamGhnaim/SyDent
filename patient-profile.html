@@ -1158,26 +1158,27 @@ function toothAnatomy(num) {
     //  - Roots emerge from a shared cervical trunk (no gap at cervix)
     //  - MB and DB are buccal, sit at the front; Palatal sits behind them centrally
     //  - Palatal is the longest and thickest, MB second, DB smallest
-    //  - Strong divergence: roots fan out from the trunk toward the apex
+    //  - Divergence varies by position: 1st molar widest, 2nd & 3rd progressively closer
     //  - In 2D buccal projection, palatal appears centered between MB and DB
     var trunkW3 = crownW * 0.95;          // cervical trunk spans almost full crown width
     var rW3 = trunkW3 * 0.34;             // each buccal root width (substantial, not skinny)
     var rApex3 = rW3 * 0.32;
+    // Divergence multiplier by position: 1st molar (pos 6) most divergent, 2nd less, 3rd least
+    var divMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.72 : 0.55;
     // Cervical positions: MB and DB touch the palatal at midline (no gaps at trunk)
-    // Palatal sits at center, slightly elevated visually (drawn first = behind)
-    var mbTopCx = cx - trunkW3 * 0.27;    // MB cervical center
-    var dbTopCx = cx + trunkW3 * 0.27;    // DB cervical center
+    var mbTopCx = cx - trunkW3 * 0.27 * Math.max(divMul, 0.75);
+    var dbTopCx = cx + trunkW3 * 0.27 * Math.max(divMul, 0.75);
     var palTopCx = cx;                     // palatal cervical center (behind MB/DB)
-    // Apex positions: strong divergence
-    var mbApexCx = cx - trunkW3 * 0.42;
-    var dbApexCx = cx + trunkW3 * 0.42;
+    // Apex positions: divergence scaled by position
+    var mbApexCx = cx - trunkW3 * 0.42 * divMul;
+    var dbApexCx = cx + trunkW3 * 0.42 * divMul;
     var palApexCx = cx;                    // palatal apex stays roughly central
     // Width multipliers (anatomical hierarchy: Palatal > MB > DB)
-    var palMul = 1.20;                     // palatal widest
+    var palMul = 1.40;                     // palatal clearly widest
     var mbMul  = 1.00;                     // MB medium
     var dbMul  = 0.85;                     // DB smallest
-    // Palatal root extends slightly beyond the buccal roots (longer)
-    var palBot = rootBot + 6;
+    // Palatal root extends noticeably beyond the buccal roots (longer)
+    var palBot = rootBot + 12;
     function makeMolarRoot(topCx, apexCx, widthMul, customBot) {
       var w = rW3 * widthMul;
       var aw = rApex3 * widthMul;
