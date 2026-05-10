@@ -1074,7 +1074,7 @@ function toothAnatomy(num) {
     // Multi-rooted: premolar (upper 1st) shorter than molars
     if (t === 'premolar') rootBot = 168;
     else if (nRoots === 3) rootBot = 168;  // upper molar buccal roots
-    else rootBot = 172;                     // lower molar (longer roots ~14mm)
+    else rootBot = 156;                     // lower molar (15% shorter than upper)
   }
   var rootLen = rootBot - rootTop;
   var roots = [];
@@ -1132,30 +1132,48 @@ function toothAnatomy(num) {
       leftApexCx  = leftTopCx - lowerDivOffset;
       rightApexCx = rightTopCx + lowerDivOffset;
     }
-    // Cone-shaped roots with pointed apex tip
-    function makeRoot(topCx, apexCx, widthMul) {
+    // Cone-shaped roots with anatomical curvature
+    // Mesial root: S-curve (curves mesially in middle, then distally toward apex)
+    // Distal root: gentler curve, apical third inclines distally
+    function makeRoot(topCx, apexCx, widthMul, isMesial, isOnLeft) {
       var w = rW * widthMul;
       var aw = rApex * widthMul;
       var topL = topCx - w/2;
       var topR = topCx + w/2;
+      // Mesial direction in screen coords:
+      // - if mesial root is on left of midline: mesial = further left (negative x)
+      // - if mesial root is on right of midline: mesial = further right (positive x)
+      var mesialDir = isOnLeft ? -1 : 1;
+      // Mesial root: S-curve. Middle bows mesially (outward from midline), apex curves back distally
+      // Distal root: gentler. Apex inclines distally (away from midline)
+      var midBowAmt = isMesial ? 2.5 : 1.0;     // mesial root bows more
+      var apexShift = isMesial ? -2.0 : 1.5;    // mesial: apex shifts back distally; distal: shifts further distally
+      // Apply shifts (mesialDir flips sign based on quadrant)
+      var midX = (topCx + apexCx)/2 + mesialDir * midBowAmt;
+      var actualApexCx = apexCx + (isMesial ? -mesialDir * 2 : mesialDir * 1.5);
+      // Side curves take into account the curved center axis
       return 'M ' + topR + ' ' + rootTop +
-             ' C ' + (topR + 0.4) + ' ' + (rootTop + rootLen*0.40) +
-             ' '   + (apexCx + aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
-             ' '   + (apexCx + aw) + ' ' + (rootBot - 2) +
-             ' Q ' + apexCx + ' ' + (rootBot + 1) +              // pointed apex tip
-             ' '   + (apexCx - aw) + ' ' + (rootBot - 2) +
-             ' C ' + (apexCx - aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
-             ' '   + (topL - 0.4) + ' ' + (rootTop + rootLen*0.40) +
+             ' C ' + (topR + mesialDir * midBowAmt * 0.8) + ' ' + (rootTop + rootLen*0.40) +
+             ' '   + (midX + w*0.45 + mesialDir * midBowAmt * 0.4) + ' ' + (rootTop + rootLen*0.55) +
+             ' '   + (actualApexCx + aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
+             ' '   + (actualApexCx + aw) + ' ' + (rootBot - 2) +
+             ' Q ' + actualApexCx + ' ' + (rootBot + 1) +              // pointed apex tip
+             ' '   + (actualApexCx - aw) + ' ' + (rootBot - 2) +
+             ' C ' + (actualApexCx - aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
+             ' '   + (midX - w*0.45 + mesialDir * midBowAmt * 0.4) + ' ' + (rootTop + rootLen*0.55) +
+             ' '   + (topL + mesialDir * midBowAmt * 0.8) + ' ' + (rootTop + rootLen*0.40) +
              ' '   + topL + ' ' + rootTop + ' Z';
     }
-    // R1 = mesial (slightly wider), R2 = distal
+    // R1 = mesial (slightly wider), R2 = distal — only applies to lower molars
+    // For premolar (14/24): R1 = buccal, R2 = palatal — no S-curve (use isMesial=false)
+    var isLowerMolar = (t === 'molar');
     var mesialIsLeft = mesialOnRight ? false : true;
     if (mesialIsLeft) {
-      roots.push({ key:'R1', d: makeRoot(leftTopCx, leftApexCx, 1.1) });   // mesial
-      roots.push({ key:'R2', d: makeRoot(rightTopCx, rightApexCx, 0.95) }); // distal
+      roots.push({ key:'R1', d: makeRoot(leftTopCx, leftApexCx, 1.1, isLowerMolar, true) });
+      roots.push({ key:'R2', d: makeRoot(rightTopCx, rightApexCx, 0.95, false, false) });
     } else {
-      roots.push({ key:'R1', d: makeRoot(rightTopCx, rightApexCx, 1.1) });   // mesial
-      roots.push({ key:'R2', d: makeRoot(leftTopCx, leftApexCx, 0.95) });    // distal
+      roots.push({ key:'R1', d: makeRoot(rightTopCx, rightApexCx, 1.1, isLowerMolar, false) });
+      roots.push({ key:'R2', d: makeRoot(leftTopCx, leftApexCx, 0.95, false, true) });
     }
   } else {
     // Three roots (upper molars 16-18, 26-28): MB + DB + Palatal
@@ -1202,19 +1220,30 @@ function toothAnatomy(num) {
     var mbMul  = 1.00;
     var dbMul  = 0.85;
 
-    function makeBuccalRoot(topCx, apexCx, widthMul) {
+    // Buccal roots curve DISTALLY at apical third (Wheeler's anatomy)
+    // isDistalRoot: true if this is the DB root (already on the distal side)
+    function makeBuccalRoot(topCx, apexCx, widthMul, isDistalSide) {
       var w = rW3 * widthMul;
       var aw = rApex3 * widthMul;
       var topL = topCx - w/2;
       var topR = topCx + w/2;
+      // Distal direction in screen coords for this tooth:
+      // - quadrant 1/4 (mesialOnRight=true): distal = LEFT (-x)
+      // - quadrant 2/3 (mesialOnRight=false): distal = RIGHT (+x)
+      var distalDir = mesialOnRight ? -1 : 1;
+      // Apical bend toward distal (the apex shifts further distally from its base position)
+      var apicalBend = 2.2;
+      var bentApexCx = apexCx + distalDir * apicalBend;
+      // Mid-third also bends slightly distally (creating gentle curve, not sharp kink)
+      var midBend = distalDir * apicalBend * 0.4;
       return 'M ' + topR + ' ' + rootTop +
-             ' C ' + (topR + 0.3) + ' ' + (rootTop + rootLen*0.40) +
-             ' '   + (apexCx + aw*1.6) + ' ' + (rootTop + rootLen*0.82) +
-             ' '   + (apexCx + aw) + ' ' + (rootBot - 2) +
-             ' Q ' + apexCx + ' ' + (rootBot + 1) +
-             ' '   + (apexCx - aw) + ' ' + (rootBot - 2) +
-             ' C ' + (apexCx - aw*1.6) + ' ' + (rootTop + rootLen*0.82) +
-             ' '   + (topL - 0.3) + ' ' + (rootTop + rootLen*0.40) +
+             ' C ' + (topR + midBend) + ' ' + (rootTop + rootLen*0.40) +
+             ' '   + (bentApexCx + aw*1.6 + midBend) + ' ' + (rootTop + rootLen*0.78) +
+             ' '   + (bentApexCx + aw) + ' ' + (rootBot - 2) +
+             ' Q ' + bentApexCx + ' ' + (rootBot + 1) +
+             ' '   + (bentApexCx - aw) + ' ' + (rootBot - 2) +
+             ' C ' + (bentApexCx - aw*1.6 + midBend) + ' ' + (rootTop + rootLen*0.78) +
+             ' '   + (topL + midBend) + ' ' + (rootTop + rootLen*0.40) +
              ' '   + topL + ' ' + rootTop + ' Z';
     }
     function makePalatalRoot() {
@@ -1223,6 +1252,8 @@ function toothAnatomy(num) {
       var topL = palTopCx - w/2;
       var topR = palTopCx + w/2;
       var thisLen = palBot - palStartY;
+      // Palatal root: relatively straight, with subtle buccal curve at apex (Wheeler's)
+      // In 2D buccal view this is barely visible — keep it mostly straight
       return 'M ' + topR + ' ' + palStartY +
              ' C ' + (topR + 0.3) + ' ' + (palStartY + thisLen*0.40) +
              ' '   + (palApexCx + aw*1.6) + ' ' + (palStartY + thisLen*0.82) +
