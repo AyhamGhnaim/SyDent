@@ -894,9 +894,10 @@ function toothAnatomy(num) {
   // Crown dimensions per tooth type
   var crownW, crownH, crownTopW;
   if (t === 'incisor') {
-    if (lowerAnt)   { crownW = 44; crownH = 64; crownTopW = 38; }
-    else if (pos === 2) { crownW = 37; crownH = 70; crownTopW = 33; } // upper lateral
-    else            { crownW = 60; crownH = 70; crownTopW = 54; }
+    if (lowerAnt && pos === 2) { crownW = 40; crownH = 64; crownTopW = 34; } // lower lateral -10%
+    else if (lowerAnt)         { crownW = 44; crownH = 64; crownTopW = 38; }
+    else if (pos === 2)        { crownW = 41; crownH = 70; crownTopW = 36; } // upper lateral +10%
+    else                       { crownW = 60; crownH = 70; crownTopW = 54; }
   }
   else if (t === 'canine') {
     if (lowerAnt) { crownW = 50; crownH = 70; crownTopW = 32; }
@@ -1073,6 +1074,8 @@ function toothAnatomy(num) {
       var origCrownW = 60;
       rTopW = origCrownW * 0.66;
       rApexW = origCrownW * 0.19;
+      // Lower lateral: -10% root width
+      if (isLowerJaw) { rTopW *= 0.9; rApexW *= 0.9; }
     }
     else if (pos === 1) { rTopW = crownW * 0.70; rApexW = crownW * 0.19; } // central
     else if (pos === 3) { rTopW = crownW * 0.74; rApexW = crownW * 0.22; } // canine
