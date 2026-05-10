@@ -893,8 +893,9 @@ function toothAnatomy(num) {
   // Crown dimensions per tooth type
   var crownW, crownH, crownTopW;
   if (t === 'incisor') {
-    if (lowerAnt) { crownW = 44; crownH = 64; crownTopW = 38; }
-    else          { crownW = 60; crownH = 70; crownTopW = 54; }
+    if (lowerAnt)   { crownW = 44; crownH = 64; crownTopW = 38; }
+    else if (pos === 2) { crownW = 48; crownH = 70; crownTopW = 43; } // upper lateral -20%
+    else            { crownW = 60; crownH = 70; crownTopW = 54; }
   }
   else if (t === 'canine') {
     if (lowerAnt) { crownW = 50; crownH = 70; crownTopW = 32; }
@@ -1051,9 +1052,10 @@ function toothAnatomy(num) {
   var pos = parseInt(num,10) % 10;
   var rootBot;
   if (nRoots === 1) {
-    if (pos === 2)      rootBot = 147;  // lateral incisor — shortest (+20%)
-    else if (pos === 1) rootBot = 158;  // central incisor — longer (+20%)
-    else if (pos === 3) rootBot = 169;  // canine — longest (+20%)
+    var isUpperAnt = (!isLowerJaw) && isAntTooth;
+    if (pos === 2)      rootBot = isUpperAnt ? 165 : 147;  // lateral
+    else if (pos === 1) rootBot = isUpperAnt ? 178 : 158;  // central
+    else if (pos === 3) rootBot = isUpperAnt ? 192 : 169;  // canine
     else                rootBot = 154;  // premolar
   } else {
     rootBot = 154;
@@ -1188,13 +1190,13 @@ function buildTooth(num, surfaceMap, isUpper) {
   var crownStroke = '#a8825a';
   var rootStroke  = '#967048';
 
-  var transform = isUpper ? 'transform="translate(0,175) scale(1,-1)"' : '';
+  var transform = isUpper ? 'transform="translate(0,195) scale(1,-1)"' : '';
   var W = anat.cellW;
-  var H = Math.round(W * 1.75);
+  var H = Math.round(W * 1.95);
   // Unique gradient ID per tooth to avoid SVG collisions
   var gid = 'g' + num;
 
-  var svg = '<svg class="tooth-shape" viewBox="0 0 100 175" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
+  var svg = '<svg class="tooth-shape" viewBox="0 0 100 195" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
     + '<defs>'
     // Crown gradient: lighter at top (incisal/occlusal) → darker near cervical
     + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
