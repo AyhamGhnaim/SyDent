@@ -919,46 +919,105 @@ function toothAnatomy(num) {
   // curves down each side with a slight equatorial bulge, ending at the gum line.
   var outlineD;
   if (t === 'incisor') {
-    // Natural incisor: rounded incisal edge, bulging body, narrowing toward cervix
-    // (egg-shape inverted) — incisal edge is gently curved, sides are convex
-    var incEdgeY = crownTop + 1;
+    // Continuous path: incisal edge → mesial side → mesial cervical curve → mesial root side
+    //                  → apex → distal root side → distal cervical curve → distal side → back to start
+    // mesialOnRight: true → mesial is on the right side of screen
+    // Mesial side has more pronounced curve at cervical (anatomical)
+    var rTopW_anat, rApexW_anat;
+    if (pos === 2)      { rTopW_anat = crownW * 0.85; rApexW_anat = crownW * 0.22; }
+    else                { rTopW_anat = crownW * 0.85; rApexW_anat = crownW * 0.22; }
+    var rTopL_anat = cx - rTopW_anat/2;
+    var rTopR_anat = cx + rTopW_anat/2;
+    var rApexL_anat = cx - rApexW_anat/2;
+    var rApexR_anat = cx + rApexW_anat/2;
+    // Mesial root deviation: incisor root tilts slightly to distal at apex
+    var rApexShift = mesialOnRight ? -2 : 2;
+    var apexCx = cx + rApexShift;
+
+    // Asymmetric mesial/distal curves: the mesial side is more rounded
+    var mesialBulge = bulge * 1.7;
+    var distalBulge = bulge * 1.3;
+    var leftBulge  = mesialOnRight ? distalBulge : mesialBulge;
+    var rightBulge = mesialOnRight ? mesialBulge : distalBulge;
+
     outlineD =
+      // Start at left top of incisal edge
       'M ' + crownTL + ' ' + (crownTop + 4) +
-      // Smooth curved incisal edge
-      ' Q ' + (cx - crownTopW*0.25) + ' ' + incEdgeY +
+      // Curved incisal edge (slight smile shape)
+      ' Q ' + (cx - crownTopW*0.28) + ' ' + (crownTop + 0.5) +
       ' '   + cx + ' ' + crownTop +
-      ' Q ' + (cx + crownTopW*0.25) + ' ' + incEdgeY +
+      ' Q ' + (cx + crownTopW*0.28) + ' ' + (crownTop + 0.5) +
       ' '   + crownTR + ' ' + (crownTop + 4) +
-      // Right side: bulges out then curves back to cervical (narrower at gum line)
-      ' C ' + (crownR + bulge*1.6) + ' ' + (crownTop + crownH*0.30) +
-      ' '   + (crownR + bulge*1.2) + ' ' + (crownTop + crownH*0.55) +
-      ' '   + (crownR - 2) + ' ' + crownBot +
-      // Left side: mirror the curve back to start
-      ' L ' + (crownL + 2) + ' ' + crownBot +
-      ' C ' + (crownL - bulge*1.2) + ' ' + (crownTop + crownH*0.55) +
-      ' '   + (crownL - bulge*1.6) + ' ' + (crownTop + crownH*0.30) +
+      // Right side: convex bulge then narrowing to cervical (smooth curve into root)
+      ' C ' + (crownR + rightBulge) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownR + rightBulge*0.5) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + rTopR_anat + ' ' + crownBot +
+      // Right root side: continues from cervical down to apex (no break!)
+      ' C ' + (rTopR_anat + 1) + ' ' + (crownBot + (rootBot-crownBot)*0.35) +
+      ' '   + (apexCx + rApexW_anat*0.7) + ' ' + (rootBot - 6) +
+      ' '   + (apexCx + rApexW_anat/2) + ' ' + (rootBot - 1) +
+      // Rounded apex
+      ' Q ' + apexCx + ' ' + (rootBot + 2) +
+      ' '   + (apexCx - rApexW_anat/2) + ' ' + (rootBot - 1) +
+      // Left root side: apex back up to cervical
+      ' C ' + (apexCx - rApexW_anat*0.7) + ' ' + (rootBot - 6) +
+      ' '   + (rTopL_anat - 1) + ' ' + (crownBot + (rootBot-crownBot)*0.35) +
+      ' '   + rTopL_anat + ' ' + crownBot +
+      // Left side: cervical back up the body to start (mirror of right)
+      ' C ' + (crownL - leftBulge*0.5) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + (crownL - leftBulge) + ' ' + (crownTop + crownH*0.32) +
       ' '   + crownTL + ' ' + (crownTop + 4) + ' Z';
   } else if (t === 'canine') {
-    // Natural canine: prominent rounded cusp tip slightly off-center,
-    // wider/more bulging body than incisor, tapers more toward cervix
-    // The cusp tip is slightly toward the mesial side (anatomically standard)
-    var canineCuspX = cx + (mesialOnRight ? 2 : -2);  // cusp tip slightly mesial
+    // Continuous tooth: pointed cusp tip → mesial slope (shorter) → mesial side bulge
+    // → cervical → mesial root → curved apex → distal root → cervical → distal side → distal slope → back to cusp
+    // Anatomically: mesial slope of canine is SHORTER than distal slope
+    var canineCuspX = cx + (mesialOnRight ? 2 : -2);
     var canineCuspY = crownTop - 1;
+
+    var rTopW_can = crownW * 0.85;
+    var rApexW_can = crownW * 0.24;
+    var rTopL_can = cx - rTopW_can/2;
+    var rTopR_can = cx + rTopW_can/2;
+    var rApexShift_can = mesialOnRight ? -3 : 3;  // canine root curves distally at apex
+    var apexCx_can = cx + rApexShift_can;
+
+    // Asymmetric: canine mesial side has more pronounced curvature
+    var mesialBulgeC = bulge * 2.1;
+    var distalBulgeC = bulge * 1.5;
+    var leftBulgeC  = mesialOnRight ? distalBulgeC : mesialBulgeC;
+    var rightBulgeC = mesialOnRight ? mesialBulgeC : distalBulgeC;
+
+    // Mesial slope shorter (shoulder closer to cusp), distal slope longer
+    var mesialShoulderDx = 6;   // shorter
+    var distalShoulderDx = 10;  // longer
+    var leftShoulderDx  = mesialOnRight ? distalShoulderDx : mesialShoulderDx;
+    var rightShoulderDx = mesialOnRight ? mesialShoulderDx : distalShoulderDx;
+
     outlineD =
       'M ' + (crownTL - 1) + ' ' + (crownTop + 8) +
-      // Slope up to the cusp tip (mesial slope is shorter, distal slope is longer)
-      ' Q ' + (canineCuspX - 6) + ' ' + (crownTop + 1) +
+      // Up to cusp tip with asymmetric slopes
+      ' Q ' + (canineCuspX - leftShoulderDx) + ' ' + (crownTop + 1) +
       ' '   + canineCuspX + ' ' + canineCuspY +
-      ' Q ' + (canineCuspX + 7) + ' ' + (crownTop + 2) +
+      ' Q ' + (canineCuspX + rightShoulderDx) + ' ' + (crownTop + 2) +
       ' '   + (crownTR + 1) + ' ' + (crownTop + 8) +
-      // Right side: more pronounced bulge than incisor
-      ' C ' + (crownR + bulge*2) + ' ' + (crownTop + crownH*0.32) +
-      ' '   + (crownR + bulge*1.4) + ' ' + (crownTop + crownH*0.58) +
-      ' '   + (crownR - 3) + ' ' + crownBot +
-      // Left side: mirror
-      ' L ' + (crownL + 3) + ' ' + crownBot +
-      ' C ' + (crownL - bulge*1.4) + ' ' + (crownTop + crownH*0.58) +
-      ' '   + (crownL - bulge*2) + ' ' + (crownTop + crownH*0.32) +
+      // Right body: convex bulge to cervical
+      ' C ' + (crownR + rightBulgeC) + ' ' + (crownTop + crownH*0.32) +
+      ' '   + (crownR + rightBulgeC*0.6) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + rTopR_can + ' ' + crownBot +
+      // Right root side: smooth taper to apex
+      ' C ' + (rTopR_can + 1) + ' ' + (crownBot + (rootBot-crownBot)*0.40) +
+      ' '   + (apexCx_can + rApexW_can*0.7) + ' ' + (rootBot - 8) +
+      ' '   + (apexCx_can + rApexW_can/2) + ' ' + (rootBot - 1) +
+      // Rounded apex
+      ' Q ' + apexCx_can + ' ' + (rootBot + 2) +
+      ' '   + (apexCx_can - rApexW_can/2) + ' ' + (rootBot - 1) +
+      // Left root side: apex back to cervical
+      ' C ' + (apexCx_can - rApexW_can*0.7) + ' ' + (rootBot - 8) +
+      ' '   + (rTopL_can - 1) + ' ' + (crownBot + (rootBot-crownBot)*0.40) +
+      ' '   + rTopL_can + ' ' + crownBot +
+      // Left body: cervical back to crown shoulder
+      ' C ' + (crownL - leftBulgeC*0.6) + ' ' + (crownTop + crownH*0.62) +
+      ' '   + (crownL - leftBulgeC) + ' ' + (crownTop + crownH*0.32) +
       ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else if (t === 'premolar') {
     // Single broad rounded dome (smooth, no cusp peaks)
@@ -1224,19 +1283,26 @@ function buildTooth(num, surfaceMap, isUpper) {
     + '</defs>'
     + '<g ' + transform + '>';
 
+  var isAnteriorTooth = (anat.type === 'incisor' || anat.type === 'canine');
+
   // ── Roots (drawn first, behind crown) ──
-  for (var ri = 0; ri < anat.roots.length; ri++) {
-    var r = anat.roots[ri];
-    var rTreatKey = sm[r.key];
-    var rFill;
-    if (hasWhole) rFill = wholeColor;
-    else if (rTreatKey && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
-    else rFill = 'url(#rg' + gid + ')';
-    svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
-        +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
+  // For anteriors, the root is part of the unified outline (drawn below as the base shape)
+  // We still need root paths for click overlays, but as transparent zones over the unified shape
+  if (!isAnteriorTooth) {
+    for (var ri = 0; ri < anat.roots.length; ri++) {
+      var r = anat.roots[ri];
+      var rTreatKey = sm[r.key];
+      var rFill;
+      if (hasWhole) rFill = wholeColor;
+      else if (rTreatKey && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
+      else rFill = 'url(#rg' + gid + ')';
+      svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
+          +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
+    }
   }
 
   // ── Crown outline (with gradient + inner shadow + highlight) ──
+  // For anteriors: outline includes root, drawn as one continuous shape
   var crownFillBase = hasWhole ? wholeColor : ('url(#cg' + gid + ')');
   svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="' + crownFillBase + '" '
       +  'stroke="' + crownStroke + '" stroke-width="1" stroke-linejoin="round"></path>';
@@ -1245,6 +1311,22 @@ function buildTooth(num, surfaceMap, isUpper) {
     svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#sh' + gid + ')" pointer-events="none"></path>';
     // Highlight near top of crown
     svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#hi' + gid + ')" pointer-events="none"></path>';
+  }
+
+  // For anteriors, draw transparent root overlay zones for clicks
+  if (isAnteriorTooth) {
+    for (var ri2 = 0; ri2 < anat.roots.length; ri2++) {
+      var r2 = anat.roots[ri2];
+      var rTreat2 = sm[r2.key];
+      // If a root has a treatment, paint it visibly; otherwise transparent click zone
+      if (rTreat2 && T_FILL[rTreat2] && !hasWhole) {
+        svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r2.key + '" '
+            +  'd="' + r2.d + '" fill="' + T_FILL[rTreat2] + '" fill-opacity="0.7" stroke="none"></path>';
+      } else {
+        svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r2.key + '" '
+            +  'd="' + r2.d + '" fill="#000" fill-opacity="0" stroke="none"></path>';
+      }
+    }
   }
 
   // ── Surface overlay rectangles (clickable) ──
