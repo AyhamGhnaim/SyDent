@@ -113,7 +113,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .jaw-wrap{overflow-x:auto;overflow-y:visible;padding:80px 0 6px;}
 .chart-hint{font-size:12px;color:var(--text2);}
-.jaw-row{display:flex;justify-content:flex-start;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;}
+.jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;padding:0 12px;}
 .midline{width:2px;background:linear-gradient(to bottom,transparent,var(--border) 15%,var(--border) 85%,transparent);margin:0 6px;align-self:stretch;border-radius:2px;}
 .tooth-cell{display:flex;flex-direction:column;align-items:center;gap:1px;transition:transform .15s;position:relative;}
 .tooth-cell:hover{transform:scale(1.12);z-index:5;}
@@ -1188,13 +1188,13 @@ function buildTooth(num, surfaceMap, isUpper) {
   var crownStroke = '#a8825a';
   var rootStroke  = '#967048';
 
-  var transform = isUpper ? 'transform="translate(0,160) scale(1,-1)"' : '';
+  var transform = isUpper ? 'transform="translate(0,175) scale(1,-1)"' : '';
   var W = anat.cellW;
-  var H = Math.round(W * 1.6);
+  var H = Math.round(W * 1.75);
   // Unique gradient ID per tooth to avoid SVG collisions
   var gid = 'g' + num;
 
-  var svg = '<svg class="tooth-shape" viewBox="0 0 100 160" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
+  var svg = '<svg class="tooth-shape" viewBox="0 0 100 175" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
     + '<defs>'
     // Crown gradient: lighter at top (incisal/occlusal) → darker near cervical
     + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
