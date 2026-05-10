@@ -966,40 +966,28 @@ function toothAnatomy(num) {
       ' '   + (crownL - bulge*2) + ' ' + (crownTop + crownH*0.32) +
       ' '   + (crownTL - 1) + ' ' + (crownTop + 8) + ' Z';
   } else if (t === 'premolar') {
-    // Anatomically: two cusps visible from facial view — buccal cusp larger and
-    // higher, lingual cusp smaller (in facial 2D projection both appear as twin
-    // peaks separated by a central groove). Mesial side has a slight concavity
-    // (mesial developmental depression characteristic of premolars).
-    var pCusp1X = cx - crownTopW * 0.28;  // first cusp peak
-    var pCusp2X = cx + crownTopW * 0.28;  // second cusp peak
-    var pCusp1Y = crownTop + 1;            // taller cusp (buccal)
-    var pCusp2Y = crownTop + 3;            // slightly shorter cusp (lingual)
-    var pGrooveY = crownTop + 9;           // central groove depth
-    // Mesial concavity (mesial dev. depression): slight inward curve on mesial side
-    var mesialDip = mesialOnRight ? 1.5 : -1.5;
+    // BUCCAL VIEW: only the buccal cusp is visible (lingual cusp hidden behind it).
+    // Shape: single rounded cusp peak slightly less prominent than canine, with
+    // a convex buccal surface. Mesial side has a subtle developmental depression.
+    var pCuspX = cx;                    // buccal cusp tip centered in facial view
+    var pCuspY = crownTop;              // peak height
     outlineD =
-      'M ' + (crownTL - 1) + ' ' + (crownTop + 11) +
-      // First cusp slope
-      ' Q ' + (pCusp1X - 7) + ' ' + (crownTop + 2) +
-      ' '   + pCusp1X + ' ' + pCusp1Y +
-      // Inner ridge into central groove
-      ' Q ' + (cx - crownTopW * 0.10) + ' ' + (crownTop + 4) +
-      ' '   + cx + ' ' + pGrooveY +
-      // Out of groove to second cusp
-      ' Q ' + (cx + crownTopW * 0.10) + ' ' + (crownTop + 4) +
-      ' '   + pCusp2X + ' ' + pCusp2Y +
-      // Distal slope down
-      ' Q ' + (pCusp2X + 7) + ' ' + (crownTop + 2) +
-      ' '   + (crownTR + 1) + ' ' + (crownTop + 11) +
-      // Right side bulge then narrow toward cervix
-      ' C ' + (crownR + bulge * 1.6) + ' ' + (crownTop + crownH * 0.30) +
-      ' '   + (crownR + bulge * 1.1) + ' ' + (crownTop + crownH * 0.60) +
+      'M ' + (crownTL - 1) + ' ' + (crownTop + 9) +
+      // Mesial slope up to cusp tip (slightly steeper than distal)
+      ' Q ' + (cx - crownTopW * 0.30) + ' ' + (crownTop + 2) +
+      ' '   + pCuspX + ' ' + pCuspY +
+      // Distal slope down — slightly longer than mesial slope (anatomical)
+      ' Q ' + (cx + crownTopW * 0.32) + ' ' + (crownTop + 3) +
+      ' '   + (crownTR + 1) + ' ' + (crownTop + 9) +
+      // Right side bulge then taper to cervix
+      ' C ' + (crownR + bulge * 1.7) + ' ' + (crownTop + crownH * 0.32) +
+      ' '   + (crownR + bulge * 1.2) + ' ' + (crownTop + crownH * 0.62) +
       ' '   + (crownR - 2) + ' ' + crownBot +
       ' L ' + (crownL + 2) + ' ' + crownBot +
-      // Left side mirror — with mesial concavity if mesial is on left
-      ' C ' + (crownL - bulge * (mesialOnRight ? 1.1 : 0.9)) + ' ' + (crownTop + crownH * 0.60) +
-      ' '   + (crownL - bulge * (mesialOnRight ? 1.6 : 1.3)) + ' ' + (crownTop + crownH * 0.30) +
-      ' '   + (crownTL - 1) + ' ' + (crownTop + 11) + ' Z';
+      // Left side mirror — mesial side has slightly less bulge (mesial dev. depression)
+      ' C ' + (crownL - bulge * (mesialOnRight ? 1.2 : 1.0)) + ' ' + (crownTop + crownH * 0.62) +
+      ' '   + (crownL - bulge * (mesialOnRight ? 1.7 : 1.4)) + ' ' + (crownTop + crownH * 0.32) +
+      ' '   + (crownTL - 1) + ' ' + (crownTop + 9) + ' Z';
   } else {
     // Molar: 4-5 rounded cusps with deeper occlusal valleys
     // Two prominent cusps visible (mesial + distal) with central groove
