@@ -1043,12 +1043,15 @@ function toothAnatomy(num) {
   var rightKey = mesialOnRight ? 'M' : 'D';
 
   // Center column subdivision
+  // B (buccal/dehlizi) takes the largest top portion
+  // O/I (center) is the middle band
+  // L (lingual/lothawi) is a smaller bottom band closer to the gum line
   var midL = crownL + sideStripW;
   var midR = crownR - sideStripW;
   var midW = midR - midL;
-  var bH = stripH * 0.40;  // buccal takes top 40%
-  var oH = stripH * 0.20;  // center (occlusal/incisal) takes middle 20%
-  // lingual takes the rest
+  var bH = stripH * 0.55;  // buccal takes top 55% (enlarged)
+  var oH = stripH * 0.18;  // center (occlusal/incisal) takes 18%
+  // lingual takes the remaining 27% at the bottom (smaller, closer to gum)
 
   var bRect = { x: midL, y: stripY,            w: midW, h: bH,            key: 'B' };
   var oRect = { x: midL, y: stripY + bH,       w: midW, h: oH,            key: (t === 'incisor' || t === 'canine') ? 'I' : 'O' };
@@ -1059,7 +1062,7 @@ function toothAnatomy(num) {
   // ── Roots (anatomically correct shapes) ──
   // Reference: standard dental anatomy — roots are tapered conical shapes that
   // diverge from the cervical area, with characteristic curvatures per tooth type.
-  var rootTop = crownBot + 2;     // small gum band between crown and root
+  var rootTop = crownBot - 1;     // slight overlap to merge roots seamlessly with the crown
 
   // Anatomical root lengths per tooth type (FDI position)
   // Lateral incisor (pos 2) shortest, central (pos 1) longer, canine (pos 3) longest
