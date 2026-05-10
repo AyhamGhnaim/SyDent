@@ -1102,43 +1102,47 @@ function toothAnatomy(num) {
             ' Z';
     roots.push({ key:'R1', d:d });
   } else if (nRoots === 2) {
-    // Two roots — but premolar (upper first) needs different proportions than molar
+    // Two roots — premolar (upper first) and lower molars
     var trunkW, rW, rApex, leftTopCx, rightTopCx, leftApexCx, rightApexCx;
     if (t === 'premolar') {
       // Upper first premolar (14/24) — buccal + palatal roots
-      // Cervical trunk matches crown cervical width (no gap, full coverage)
-      trunkW = crownW * 0.92;              // cervical span = crown cervical width
-      rW = trunkW * 0.50;                  // each root takes half — no gap at cervix
-      rApex = rW * 0.32;
+      trunkW = crownW * 0.92;
+      rW = trunkW * 0.50;
+      rApex = rW * 0.10;                   // narrow pointed apex
       leftTopCx  = cx - trunkW * 0.25;
       rightTopCx = cx + trunkW * 0.25;
       leftApexCx  = cx - trunkW * 0.36;
       rightApexCx = cx + trunkW * 0.36;
     } else {
-      // Lower molar: classic two-rooted shape (mesial + distal)
-      trunkW = crownW * 0.92;              // cervical trunk matches crown cervical width
-      rW = trunkW * 0.46;                  // each root close to half-trunk
-      rApex = rW * 0.30;
-      leftTopCx  = cx - trunkW * 0.23;
-      rightTopCx = cx + trunkW * 0.23;
-      leftApexCx  = cx - trunkW * 0.40;    // strong divergence
-      rightApexCx = cx + trunkW * 0.40;
+      // Lower molar (Wheeler's; Hou & Tsai): mesial + distal roots
+      // - Cervical trunk spans full crown width (no side gaps)
+      // - Mesial root broader than distal; both have pointed apices
+      // - Strong divergence (1st molar more than 2nd/3rd)
+      trunkW = crownW;                     // full crown cervical width
+      rW = trunkW * 0.46;                  // each root cervical width
+      rApex = rW * 0.10;                   // narrow pointed apex
+      // Divergence by position: 1st molar (pos 6) widest, 2nd/3rd progressively closer
+      var lowerDivMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.78 : 0.62;
+      var lowerCervSpread = (trunkW - rW) * 0.5;  // cervical edge alignment
+      leftTopCx  = cx - lowerCervSpread * Math.max(lowerDivMul, 0.70);
+      rightTopCx = cx + lowerCervSpread * Math.max(lowerDivMul, 0.70);
+      leftApexCx  = cx - trunkW * 0.40 * lowerDivMul;
+      rightApexCx = cx + trunkW * 0.40 * lowerDivMul;
     }
-    // Mesial root anatomically slightly wider than distal (lower molar)
-    // For premolar: buccal root usually slightly larger than palatal — treat similarly
+    // Cone-shaped roots with pointed apex tip
     function makeRoot(topCx, apexCx, widthMul) {
       var w = rW * widthMul;
       var aw = rApex * widthMul;
       var topL = topCx - w/2;
       var topR = topCx + w/2;
       return 'M ' + topR + ' ' + rootTop +
-             ' C ' + (topR + 0.5) + ' ' + (rootTop + rootLen*0.35) +
-             ' '   + (apexCx + aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
-             ' '   + (apexCx + aw/2) + ' ' + (rootBot - 1) +
-             ' Q ' + apexCx + ' ' + (rootBot + 2) +
-             ' '   + (apexCx - aw/2) + ' ' + (rootBot - 1) +
-             ' C ' + (apexCx - aw*0.6) + ' ' + (rootTop + rootLen*0.75) +
-             ' '   + (topL - 0.5) + ' ' + (rootTop + rootLen*0.35) +
+             ' C ' + (topR + 0.4) + ' ' + (rootTop + rootLen*0.40) +
+             ' '   + (apexCx + aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
+             ' '   + (apexCx + aw) + ' ' + (rootBot - 2) +
+             ' Q ' + apexCx + ' ' + (rootBot + 1) +              // pointed apex tip
+             ' '   + (apexCx - aw) + ' ' + (rootBot - 2) +
+             ' C ' + (apexCx - aw*1.5) + ' ' + (rootTop + rootLen*0.82) +
+             ' '   + (topL - 0.4) + ' ' + (rootTop + rootLen*0.40) +
              ' '   + topL + ' ' + rootTop + ' Z';
     }
     // R1 = mesial (slightly wider), R2 = distal
@@ -1152,46 +1156,51 @@ function toothAnatomy(num) {
     }
   } else {
     // Three roots (upper molars 16-18, 26-28): MB (mesiobuccal) + DB (distobuccal) + Palatal
-    // Anatomy:
-    //  - Roots emerge from a shared cervical trunk (no gap at cervix)
-    //  - MB and DB are buccal, sit at the front; Palatal sits behind them centrally
-    //  - Palatal is the longest and thickest, MB second, DB smallest
-    //  - Divergence varies by position: 1st molar widest, 2nd & 3rd progressively closer
-    //  - In 2D buccal projection, palatal appears centered between MB and DB
-    var trunkW3 = crownW * 0.92;          // cervical trunk matches crown cervical width
-    var rW3 = trunkW3 * 0.34;             // each buccal root width
-    var rApex3 = rW3 * 0.32;
-    // Divergence multiplier by position: 1st molar (pos 6) most divergent, 2nd less, 3rd least
+    // Anatomy (refs: Wheeler's Dental Anatomy; Hou & Tsai 1997):
+    //  - Roots emerge from a shared cervical trunk that spans the full crown width
+    //  - Root trunk length ~3-4mm (1st molar), longer for 2nd/3rd
+    //  - MB and DB are buccal; Palatal sits behind them centrally
+    //  - Palatal is longest (~13mm) and thickest, MB second (~12mm BL-broad), DB smallest
+    //  - Divergence: 1st molar widest, 2nd less, 3rd least (often fused)
+    //  - Each root is cone-shaped, widest at CEJ, tapering to a pointed apex
+    var trunkW3 = crownW;                  // cervical trunk = full crown width (no side gaps)
+    var rW3 = trunkW3 * 0.40;              // each buccal root cervical width
+    var rApex3 = rW3 * 0.10;               // tapered apex — narrow point
+    // Divergence multiplier by position
     var divMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.72 : 0.55;
-    // Cervical positions: MB and DB touch the palatal at midline (no gaps at trunk)
-    var mbTopCx = cx - trunkW3 * 0.27 * Math.max(divMul, 0.75);
-    var dbTopCx = cx + trunkW3 * 0.27 * Math.max(divMul, 0.75);
+    // Cervical positions: roots emerge from a shared trunk under the crown
+    // MB cervical center placed so the buccal cervical edge aligns near crown edge
+    var buccalCervSpread = (trunkW3 - rW3) * 0.5;  // half of available cervical span
+    var mbTopCx = cx - buccalCervSpread * Math.max(divMul, 0.65);
+    var dbTopCx = cx + buccalCervSpread * Math.max(divMul, 0.65);
     var palTopCx = cx;                     // palatal cervical center (behind MB/DB)
     // Apex positions: divergence scaled by position
     var mbApexCx = cx - trunkW3 * 0.42 * divMul;
     var dbApexCx = cx + trunkW3 * 0.42 * divMul;
     var palApexCx = cx;                    // palatal apex stays roughly central
     // Width multipliers (anatomical hierarchy: Palatal > MB > DB)
-    var palMul = 1.40;                     // palatal clearly widest
+    var palMul = 1.30;                     // palatal clearly widest
     var mbMul  = 1.00;                     // MB medium
-    var dbMul  = 0.85;                     // DB smallest
+    var dbMul  = 0.80;                     // DB smallest
     // Palatal root extends noticeably beyond the buccal roots (longer)
     var palBot = rootBot + 12;
     function makeMolarRoot(topCx, apexCx, widthMul, customBot) {
       var w = rW3 * widthMul;
-      var aw = rApex3 * widthMul;
+      var aw = rApex3 * widthMul;          // narrow apex (cone tip)
       var topL = topCx - w/2;
       var topR = topCx + w/2;
       var thisBot = customBot || rootBot;
       var thisLen = thisBot - rootTop;
+      // Cone-shaped root with pointed apex:
+      // Side curves taper smoothly from cervical width down to a near-point at apex
       return 'M ' + topR + ' ' + rootTop +
-             ' C ' + (topR + 0.3) + ' ' + (rootTop + thisLen*0.35) +
-             ' '   + (apexCx + aw*0.6) + ' ' + (rootTop + thisLen*0.78) +
-             ' '   + (apexCx + aw/2) + ' ' + (thisBot - 1) +
-             ' Q ' + apexCx + ' ' + (thisBot + 2) +
-             ' '   + (apexCx - aw/2) + ' ' + (thisBot - 1) +
-             ' C ' + (apexCx - aw*0.6) + ' ' + (rootTop + thisLen*0.78) +
-             ' '   + (topL - 0.3) + ' ' + (rootTop + thisLen*0.35) +
+             ' C ' + (topR + 0.3) + ' ' + (rootTop + thisLen*0.40) +
+             ' '   + (apexCx + aw*1.5) + ' ' + (rootTop + thisLen*0.82) +
+             ' '   + (apexCx + aw) + ' ' + (thisBot - 2) +
+             ' Q ' + apexCx + ' ' + (thisBot + 1) +              // pointed apex tip
+             ' '   + (apexCx - aw) + ' ' + (thisBot - 2) +
+             ' C ' + (apexCx - aw*1.5) + ' ' + (rootTop + thisLen*0.82) +
+             ' '   + (topL - 0.3) + ' ' + (rootTop + thisLen*0.40) +
              ' '   + topL + ' ' + rootTop + ' Z';
     }
     // Order matters for z-stacking: palatal drawn FIRST (behind), then MB & DB on top
