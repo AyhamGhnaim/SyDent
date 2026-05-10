@@ -1068,17 +1068,9 @@ function toothAnatomy(num) {
   if (nRoots === 1) {
     // Root widths +20% wider at cervical to match crown
     var rTopW, rApexW;
-    if (pos === 2) {
-      // Upper lateral: keep root width as original (pre-narrowing crown), but normalize crown denominator
-      // Original crownW was 60. Use that as basis for root width so root stays at original size.
-      var origCrownW = 60;
-      rTopW = origCrownW * 0.66;
-      rApexW = origCrownW * 0.19;
-      // Lower lateral: -10% root width
-      if (isLowerJaw) { rTopW *= 0.9; rApexW *= 0.9; }
-    }
-    else if (pos === 1) { rTopW = crownW * 0.70; rApexW = crownW * 0.19; } // central
-    else if (pos === 3) { rTopW = crownW * 0.74; rApexW = crownW * 0.22; } // canine
+    if (pos === 2)      { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // lateral
+    else if (pos === 1) { rTopW = crownW * 0.92; rApexW = crownW * 0.28; } // central
+    else if (pos === 3) { rTopW = crownW * 0.92; rApexW = crownW * 0.30; } // canine
     else                { rTopW = crownW * 0.50; rApexW = crownW * 0.12; } // premolar
     var rTopL = cx - rTopW/2;
     var rTopR = cx + rTopW/2;
