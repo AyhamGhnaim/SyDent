@@ -861,8 +861,13 @@ function rootsCount(num) {
   return isUpper ? 3 : 2;
 }
 
-/* Cell width in px — uniform 50px for all teeth */
+/* Cell width in px — narrower for upper lateral incisor */
 function cellWidth(num) {
+  var n = parseInt(num, 10);
+  var pos = n % 10;
+  var quad = Math.floor(n / 10);
+  var isUpper = (quad === 1 || quad === 2);
+  if (isUpper && pos === 2) return 36;
   return 50;
 }
 
