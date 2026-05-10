@@ -1413,19 +1413,20 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   var svg = '<svg class="tooth-shape" viewBox="0 0 100 210" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
     + '<defs>'
-    // Crown gradient: enamel translucent-bluish at top → ivory mid → dentin yellow at cervical
+    // Crown gradient: A1 enamel shade (bright cream-white, slightly warm)
+    // Vita A1: light cream with subtle ivory tones — preserve gradient depth
     + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="#fefaf0"/>'        // bright enamel tip
-      + '<stop offset="25%" stop-color="#fcf2dc"/>'        // upper enamel
-      + '<stop offset="60%" stop-color="#f4e4c1"/>'        // mid-crown ivory
-      + '<stop offset="92%" stop-color="#e6cf9f"/>'        // dentin showing through near cervical
-      + '<stop offset="100%" stop-color="#d8bd87"/>'       // cervical (darker dentin)
+      + '<stop offset="0%" stop-color="#fdfaf2"/>'         // bright enamel tip (A1 light)
+      + '<stop offset="25%" stop-color="#faf4e2"/>'         // upper enamel (A1 mid)
+      + '<stop offset="60%" stop-color="#f5edd8"/>'         // mid-crown (A1 base)
+      + '<stop offset="92%" stop-color="#ede1c4"/>'         // dentin warmth showing through near cervical
+      + '<stop offset="100%" stop-color="#e3d3aa"/>'        // cervical (warm transition to root)
     + '</linearGradient>'
-    // Root gradient: pale ivory at cervical → slightly darker mid → soft tip at apex
+    // Root gradient: natural dentin color (warm yellowish-ivory) with depth
     + '<linearGradient id="rg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="#f0dcb0"/>'         // pale at cervical (matches dentin)
-      + '<stop offset="55%" stop-color="#dcc290"/>'        // mid-root slightly darker
-      + '<stop offset="100%" stop-color="#c9a972"/>'       // apex deeper
+      + '<stop offset="0%" stop-color="#e8d2a0"/>'          // pale dentin at cervical
+      + '<stop offset="55%" stop-color="#dcc28a"/>'         // mid-root dentin
+      + '<stop offset="100%" stop-color="#c8aa6e"/>'        // apex — deeper dentin
     + '</linearGradient>'
     // Side shadow on roots (light from upper-left → right side darker)
     + '<linearGradient id="rs' + gid + '" x1="0" y1="0" x2="1" y2="0">'
@@ -1448,11 +1449,11 @@ function buildTooth(num, surfaceMap, isUpper) {
     + '<pattern id="pk' + gid + '" x="0" y="0" width="100" height="3" patternUnits="userSpaceOnUse">'
       + '<line x1="0" y1="1.5" x2="100" y2="1.5" stroke="#a8825a" stroke-width="0.15" opacity="0.06"/>'
     + '</pattern>'
-    // Occlusal surface gradient: brighter enamel (light reflects off the table)
+    // Occlusal surface gradient: A1 enamel (brighter at table, light reflects off cusps)
     + '<linearGradient id="og' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="#fffaee"/>'
-      + '<stop offset="50%" stop-color="#fbeed3"/>'
-      + '<stop offset="100%" stop-color="#ecd9ad"/>'
+      + '<stop offset="0%" stop-color="#fefcf6"/>'
+      + '<stop offset="50%" stop-color="#faf4e2"/>'
+      + '<stop offset="100%" stop-color="#f0e6cc"/>'
     + '</linearGradient>'
     // Occlusal highlight (top-down light reflection)
     + '<radialGradient id="oh' + gid + '" cx="50%" cy="20%" r="55%">'
