@@ -1049,9 +1049,9 @@ function toothAnatomy(num) {
   var midL = crownL + sideStripW;
   var midR = crownR - sideStripW;
   var midW = midR - midL;
-  var oH = stripH * 0.12;  // occlusal/incisal — thin top band on grooves/edge only
-  var bH = stripH * 0.70;  // buccal — dominant middle portion
-  // lingual takes the remaining ~18% at the bottom
+  var oH = stripH * 0.25;  // occlusal/incisal — top 25%
+  var bH = stripH * 0.50;  // buccal — middle 50%
+  // lingual takes the remaining 25% at the bottom
 
   var oRect = { x: midL, y: stripY,            w: midW, h: oH,            key: (t === 'incisor' || t === 'canine') ? 'I' : 'O' };
   var bRect = { x: midL, y: stripY + oH,       w: midW, h: bH,            key: 'B' };
