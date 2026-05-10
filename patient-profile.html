@@ -111,7 +111,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .chart-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .chart-card-title{font-size:14px;font-weight:700;color:var(--green);}
 
-.jaw-wrap{overflow-x:auto;overflow-y:visible;padding:80px 0 6px;}
+.jaw-wrap{overflow-x:auto;overflow-y:visible;padding:80px 0 6px;scrollbar-width:none;-ms-overflow-style:none;}
+.jaw-wrap::-webkit-scrollbar{display:none;width:0;height:0;}
 .chart-hint{font-size:12px;color:var(--text2);}
 .jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;padding:0 12px;}
 .midline{width:2px;background:linear-gradient(to bottom,transparent,var(--border) 15%,var(--border) 85%,transparent);margin:0 6px;align-self:stretch;border-radius:2px;}
@@ -1455,6 +1456,8 @@ function buildTooth(num, surfaceMap, isUpper) {
       + '<stop offset="0%" stop-color="rgba(255,255,255,0.55)"/>'
       + '<stop offset="100%" stop-color="rgba(255,255,255,0)"/>'
     + '</radialGradient>'
+    // Crown clip-path: surface overlays and internal shading clip to the crown silhouette
+    + '<clipPath id="cc' + gid + '"><path d="' + anat.outlineD + '"/></clipPath>'
     + '</defs>'
     + '<g ' + transform + '>';
 
@@ -1493,9 +1496,7 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   // ── Occlusal/Incisal band (drawn INSIDE the crown — clipped by crown outline) ──
   if (anat.occlusalBandD && !hasWhole) {
-    // Use a clipPath so the occlusal band only shows within the crown shape
     var clipId = 'cc' + gid;
-    svg += '<clipPath id="' + clipId + '"><path d="' + anat.outlineD + '"/></clipPath>';
     // Soft shadow band representing the occlusal table depth
     svg += '<path d="' + anat.occlusalBandD + '" fill="rgba(160,110,55,0.18)" '
         +  'clip-path="url(#' + clipId + ')" pointer-events="none"></path>';
@@ -1520,10 +1521,12 @@ function buildTooth(num, surfaceMap, isUpper) {
     if (hasWhole) { fill = wholeColor; opacity = 0; } // whole already painted via outline
     else if (tk) { fill = T_FILL[tk] || crownBase; opacity = 0.75; }
     else { fill = '#000'; opacity = 0; } // transparent click zone
-    var rx = isCenter ? 1 : 0.5;
+    // Clip to crown outline so colored regions hug the tooth silhouette,
+    // not appear as floating rectangles
     return '<rect class="crown-surface" data-tooth="' + num + '" data-surface="' + fillKey + '" '
         + 'x="' + rect.x + '" y="' + rect.y + '" width="' + rect.w + '" height="' + rect.h + '" '
-        + 'rx="' + rx + '" fill="' + fill + '" fill-opacity="' + opacity + '"></rect>';
+        + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
+        + 'clip-path="url(#cc' + gid + ')"></rect>';
   }
 
   var s = anat.surfaces;
