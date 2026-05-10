@@ -1192,13 +1192,13 @@ function buildTooth(num, surfaceMap, isUpper) {
   var crownStroke = '#a8825a';
   var rootStroke  = '#967048';
 
-  var transform = isUpper ? 'transform="translate(0,195) scale(1,-1)"' : '';
+  var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
   var W = anat.cellW;
-  var H = Math.round(W * 1.95);
+  var H = Math.round(W * 2.1);
   // Unique gradient ID per tooth to avoid SVG collisions
   var gid = 'g' + num;
 
-  var svg = '<svg class="tooth-shape" viewBox="0 0 100 195" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
+  var svg = '<svg class="tooth-shape" viewBox="0 0 100 210" width="' + W + '" height="' + H + '" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
     + '<defs>'
     // Crown gradient: lighter at top (incisal/occlusal) → darker near cervical
     + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
