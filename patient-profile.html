@@ -2002,7 +2002,8 @@ async function openToothModal(n, surface) {
     if (isAlreadyBridgeAbut) return false;  // no new treatments; only undo
     if (isRootClick)  return tp === 'root';
     if (isWholeClick) return tp === 'whole';
-    return tp === 'crown' || tp === 'crown_full';
+    // Crown surface click: show crown-area treatments + whole-tooth treatments (قلع، تلبيس، زراعة)
+    return tp === 'crown' || tp === 'crown_full' || tp === 'whole';
   }
 
   var container = document.getElementById('toothOptsContainer');
