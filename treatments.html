@@ -414,10 +414,12 @@ function render() {
     var builtinTag = t.builtin ? '<div class="treat-builtin-tag">افتراضي</div>' : '';
     var labTag = t.needs_lab ? '<span class="treat-lab-tag">🧪 مخبر</span>' : '';
     var targetMap = {
-      'crown': { text:'سطح تاج',     color:'#f5c842' },
-      'root':  { text:'جذر السن',    color:'#a78bfa' },
-      'whole': { text:'سن كامل',     color:'#06b6d4' },
-      'both':  { text:'تاج وجذر',    color:'#fb923c' }
+      'crown':      { text:'سطح تاج',     color:'#f5c842' },
+      'root':       { text:'جذر السن',    color:'#a78bfa' },
+      'whole':      { text:'سن كامل',     color:'#06b6d4' },
+      'crown_full': { text:'التاج كامل',  color:'#fb923c' },
+      'bridge':     { text:'جسر',         color:'#dc2626' },
+      'both':       { text:'تاج وجذر',    color:'#fb923c' }
     };
     var tp = targetMap[t.target_part] || targetMap.crown;
     var targetTag = '<span class="treat-target-tag" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:' + tp.color + '22;color:' + tp.color + ';border:1px solid ' + tp.color + '55;margin-right:4px;">🦷 ' + tp.text + '</span>';
@@ -520,6 +522,7 @@ async function resetToDefaults() {
     { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', sort_order:3 },
     { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  sort_order:4 },
     { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'whole', sort_order:5 },
+    { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', sort_order:6 },
     { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:6 },
     { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:7 },
     { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', sort_order:8 },

@@ -146,6 +146,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   border:5px solid transparent;border-top-color:var(--green);
 }
 .tooth-cell:hover .tooth-tip{display:block;}
+.extract-slot:hover{background:rgba(239,83,80,0.10)!important;border-color:rgba(239,83,80,0.65)!important;}
+.extract-slot:hover .extract-plus{transform:scale(1.4);color:#ef5350;}
+.bridge-bar{transition:opacity .15s;}
 .tip-row{display:flex;align-items:center;gap:6px;padding:2px 0;}
 .tip-row b{color:var(--green);font-weight:700;}
 .tip-dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
@@ -814,7 +817,8 @@ var SURFACE_LABELS = {
   'R2': 'جذر 2',
   'R3': 'جذر 3',
   'WHOLE': 'السن كاملاً',
-  'CROWN_FULL': 'التاج كامل'
+  'CROWN_FULL': 'التاج كامل',
+  'BRIDGE': 'جسر'
 };
 
 /* Get the center surface key for a given tooth (O for posterior, I for anterior) */
@@ -1391,6 +1395,74 @@ function toothAnatomy(num) {
   };
 }
 
+/* ── Extraction / Bridge helpers ── */
+function isExtracted(num) {
+  var sm = teethMap[String(num)] || {};
+  // any surface marked extracted counts (we save under WHOLE)
+  for (var k in sm) {
+    if (sm[k] === 'extracted') return true;
+  }
+  return false;
+}
+
+function isBridgeTooth(num) {
+  var sm = teethMap[String(num)] || {};
+  for (var k in sm) {
+    if (sm[k] === 'bridge') return true;
+  }
+  return false;
+}
+
+/* Find bridge abutments: search outward from this missing tooth in BOTH directions
+   along the same arch (upper or lower). Returns { mesial: num|null, distal: num|null, gap: [nums] }.
+   "gap" = the contiguous missing teeth that share this bridge. */
+function findBridgeAbutments(num) {
+  var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
+  var idx = arch.indexOf(num);
+  if (idx < 0) return { mesial:null, distal:null, gap:[num] };
+  // Walk left until a non-missing tooth
+  var leftAbut = null, gap = [num];
+  for (var i = idx - 1; i >= 0; i--) {
+    if (isExtracted(arch[i]) || isBridgeTooth(arch[i])) {
+      // also part of the gap if extracted; abutment if bridge-tooth
+      if (isExtracted(arch[i])) gap.unshift(arch[i]);
+      else { leftAbut = arch[i]; break; }
+    } else {
+      leftAbut = arch[i];
+      break;
+    }
+  }
+  // Walk right
+  var rightAbut = null;
+  for (var j = idx + 1; j < arch.length; j++) {
+    if (isExtracted(arch[j]) || isBridgeTooth(arch[j])) {
+      if (isExtracted(arch[j])) gap.push(arch[j]);
+      else { rightAbut = arch[j]; break; }
+    } else {
+      rightAbut = arch[j];
+      break;
+    }
+  }
+  return { mesial: leftAbut, distal: rightAbut, gap: gap };
+}
+
+/* Build an empty placeholder for an extracted tooth.
+   Clickable area exposes a "+ ضع علاج" affordance on hover. */
+function buildExtractedPlaceholder(num, isUpper) {
+  var anatRef = toothAnatomy(num);
+  var W = anatRef.cellW;
+  var H = Math.round(W * 2.1);
+  return '<div class="extract-slot" data-tooth="' + num + '" '
+    + 'style="display:inline-flex;align-items:center;justify-content:center;'
+    + 'width:' + W + 'px;height:' + H + 'px;vertical-align:bottom;cursor:pointer;'
+    + 'border:1.5px dashed rgba(239,83,80,0.35);border-radius:8px;'
+    + 'background:rgba(239,83,80,0.04);position:relative;margin:0 1px;" '
+    + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)" '
+    + 'title="السن ' + num + ' — مقلوع (اضغط لإضافة جسر/زراعة)">'
+    + '<span class="extract-plus" style="font-size:22px;color:rgba(239,83,80,0.55);font-weight:300;transition:transform .15s,color .15s;">+</span>'
+    + '</div>';
+}
+
 function buildTooth(num, surfaceMap, isUpper) {
   var sm = surfaceMap || {};
   var anat = toothAnatomy(num);
@@ -1403,12 +1475,15 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // Whole-tooth treatment paints the entire tooth one color
+  // Note: bridge is stored under WHOLE but should NOT paint whole — handled as crown_full below
   var wholeT = sm.WHOLE;
-  var hasWhole = !!wholeT;
+  var isBridgeAbutment = (wholeT === 'bridge');
+  var hasWhole = !!wholeT && !isBridgeAbutment;
   var wholeColor = hasWhole ? (T_FILL[wholeT] || '#f5e6c8') : null;
 
   // crown_full: treat entire crown with semi-transparent overlay (preserves tooth anatomy)
-  var crownFullT = sm.CROWN_FULL;
+  // bridge abutments also use this rendering style
+  var crownFullT = sm.CROWN_FULL || (isBridgeAbutment ? 'bridge' : null);
   var hasCrownFull = !!crownFullT;
   var crownFullColor = hasCrownFull ? (T_FILL[crownFullT] || '#fb923c') : null;
 
@@ -1622,7 +1697,8 @@ function buildTooth(num, surfaceMap, isUpper) {
   var tipRows = '';
   if (hasCrownFull) {
     var cft = getTreatment(crownFullT);
-    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>التاج كامل:</b> ' + (cft ? cft.name : crownFullT) + '</div>';
+    var cfLabel = isBridgeAbutment ? 'دعامة جسر' : 'التاج كامل';
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>' + cfLabel + ':</b> ' + (cft ? cft.name : crownFullT) + '</div>';
   }
   if (hasWhole) {
     var wt = getTreatment(wholeT);
@@ -1686,15 +1762,90 @@ function renderTeeth() {
   var uHtml = '', lHtml = '';
   for (var i=0; i<UPPER_T.length; i++) {
     if (i === 8) uHtml += '<div class="midline"></div>';
-    uHtml += buildTooth(UPPER_T[i], teethMap[String(UPPER_T[i])], true);
+    var un = UPPER_T[i];
+    if (isExtracted(un)) uHtml += buildExtractedPlaceholder(un, true);
+    else uHtml += buildTooth(un, teethMap[String(un)], true);
   }
   for (var j=0; j<LOWER_T.length; j++) {
     if (j === 8) lHtml += '<div class="midline"></div>';
-    lHtml += buildTooth(LOWER_T[j], teethMap[String(LOWER_T[j])], false);
+    var ln = LOWER_T[j];
+    if (isExtracted(ln)) lHtml += buildExtractedPlaceholder(ln, false);
+    else lHtml += buildTooth(ln, teethMap[String(ln)], false);
   }
   upperEl.innerHTML = uHtml;
   lowerEl.innerHTML = lHtml;
+  // Draw bridge connectors after teeth are in DOM
+  setTimeout(renderBridges, 0);
   attachSurfaceClicks();
+}
+
+/* Render bridge connector bars over abutments + pontics.
+   We use absolute-positioned <div> bars layered on top of each jaw row. */
+function renderBridges() {
+  ['upperJaw','lowerJaw'].forEach(function(jawId){
+    var jaw = document.getElementById(jawId);
+    if (!jaw) return;
+    // Remove old bridge bars
+    var olds = jaw.querySelectorAll('.bridge-bar');
+    for (var i=0; i<olds.length; i++) olds[i].remove();
+    // Ensure jaw is positioned for absolute children
+    var jawStyle = window.getComputedStyle(jaw);
+    if (jawStyle.position === 'static') jaw.style.position = 'relative';
+    var arch = (jawId === 'upperJaw') ? UPPER_T : LOWER_T;
+    // Find groups of consecutive bridge-marked teeth
+    var processed = {};
+    for (var k=0; k<arch.length; k++) {
+      var n = arch[k];
+      if (!isBridgeTooth(n) || processed[n]) continue;
+      // Find all consecutive bridge/extracted teeth around this one
+      var startIdx = k, endIdx = k;
+      while (startIdx > 0 && (isBridgeTooth(arch[startIdx-1]) || isExtracted(arch[startIdx-1]))) startIdx--;
+      while (endIdx < arch.length-1 && (isBridgeTooth(arch[endIdx+1]) || isExtracted(arch[endIdx+1]))) endIdx++;
+      // Collect tooth nums in this bridge unit
+      var unit = [];
+      for (var ii=startIdx; ii<=endIdx; ii++) {
+        unit.push(arch[ii]);
+        processed[arch[ii]] = true;
+      }
+      if (unit.length < 2) continue;
+      // Find first + last element DOMs to compute bar position
+      var firstEl = jaw.querySelector('[data-tooth="' + unit[0] + '"]');
+      var lastEl  = jaw.querySelector('[data-tooth="' + unit[unit.length-1] + '"]');
+      if (!firstEl || !lastEl) continue;
+      var jawRect = jaw.getBoundingClientRect();
+      var fRect = firstEl.getBoundingClientRect();
+      var lRect = lastEl.getBoundingClientRect();
+      var left = Math.min(fRect.left, lRect.left) - jawRect.left;
+      var right = Math.max(fRect.right, lRect.right) - jawRect.left;
+      var width = right - left;
+      var top = (fRect.top - jawRect.top) + fRect.height * (jawId === 'upperJaw' ? 0.55 : 0.10);
+      // Get bridge color from any bridge-marked tooth
+      var bridgeColor = (T_FILL && T_FILL['bridge']) || '#dc2626';
+      var bar = document.createElement('div');
+      bar.className = 'bridge-bar';
+      bar.style.cssText = 'position:absolute;pointer-events:none;'
+        + 'left:' + left + 'px;top:' + top + 'px;width:' + width + 'px;height:10px;'
+        + 'background:linear-gradient(to bottom,' + bridgeColor + 'dd 0%,' + bridgeColor + ' 50%,' + bridgeColor + 'aa 100%);'
+        + 'border-radius:5px;box-shadow:0 1px 3px rgba(0,0,0,0.4);'
+        + 'border:1px solid rgba(0,0,0,0.25);z-index:5;';
+      jaw.appendChild(bar);
+      // Also fill pontic placeholders with a fake crown of bridge color
+      for (var pi=0; pi<unit.length; pi++) {
+        if (isExtracted(unit[pi])) {
+          var slot = jaw.querySelector('.extract-slot[data-tooth="' + unit[pi] + '"]');
+          if (slot) {
+            slot.style.borderStyle = 'solid';
+            slot.style.borderColor = bridgeColor;
+            slot.style.background = bridgeColor + '33';
+            // Replace the + icon with a tooth shape
+            slot.innerHTML = '<svg width="80%" height="80%" viewBox="0 0 64 64" fill="' + bridgeColor + 'cc" stroke="' + bridgeColor + '" stroke-width="2">'
+              + '<path d="M14 8 C14 8 8 10 8 20 C8 26 10 30 12 34 L52 34 C54 30 56 26 56 20 C56 10 50 8 50 8 C44 4 38 2 32 2 C26 2 20 4 14 8Z"/>'
+              + '</svg>';
+          }
+        }
+      }
+    }
+  });
 }
 
 /* Attach click handlers to all crown surfaces and root parts */
@@ -1738,12 +1889,22 @@ async function openToothModal(n, surface) {
   document.getElementById('toothModalTitle').textContent =
     'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
 
-  // Filter treatments: crown surface clicks show crown/crown_full; root clicks show root; whole clicks show whole
+  // Detect if this tooth is already extracted — opens a special "missing tooth" picker
+  var isAlreadyExtracted = isExtracted(n);
+  var isAlreadyBridgeAbut = isBridgeTooth(n) && !isAlreadyExtracted;
+
+  // Filter treatments by what's clicked.
+  // - Extracted tooth: only show bridge + implant; plus an "undo extraction" pseudo-option below
+  // - Bridge abutment: clicking gives the "undo extraction" / "remove bridge" option only
+  // - Root click: only root-target treatments
+  // - Whole click: only whole-target (e.g. extraction, crown, implant)
+  // - Crown surface click: crown or crown_full
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
+    if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
+    if (isAlreadyBridgeAbut) return false;  // no new treatments; only undo
     if (isRootClick)  return tp === 'root';
     if (isWholeClick) return tp === 'whole';
-    // crown surface click
     return tp === 'crown' || tp === 'crown_full';
   }
 
@@ -1765,7 +1926,13 @@ async function openToothModal(n, surface) {
     html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
   }
 
-  html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+  if (isAlreadyExtracted) {
+    html += '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
+  } else if (isAlreadyBridgeAbut) {
+    html += '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
+  } else {
+    html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+  }
   container.innerHTML = html;
   document.getElementById('toothStep1').style.display = 'block';
   document.getElementById('toothStep2').style.display = 'none';
@@ -1779,6 +1946,40 @@ function switchToWholeTooth() {
   openToothModal(currentTooth, 'WHOLE');
 }
 
+/* Undo extraction: delete all teeth_status rows for this tooth, redraw */
+async function undoExtraction(num) {
+  if (!confirm('إعادة السن ' + num + '؟ سيتم إلغاء القلع وأي جسر مرتبط به.')) return;
+  // Find the bridge unit (if any) so we clear bridge teeth too
+  var unitToClear = [num];
+  if (isBridgeTooth(num) || isExtracted(num)) {
+    var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
+    var idx = arch.indexOf(num);
+    if (idx >= 0) {
+      var s = idx, e = idx;
+      while (s > 0 && (isBridgeTooth(arch[s-1]) || isExtracted(arch[s-1]))) s--;
+      while (e < arch.length-1 && (isBridgeTooth(arch[e+1]) || isExtracted(arch[e+1]))) e++;
+      unitToClear = arch.slice(s, e+1);
+    }
+  }
+  // Delete from DB only the entries we control (extraction + bridge keys)
+  for (var i=0; i<unitToClear.length; i++) {
+    var tn = String(unitToClear[i]);
+    var sm = teethMap[tn] || {};
+    for (var sk in sm) {
+      if (sm[sk] === 'extracted' || sm[sk] === 'bridge') {
+        await window.sb.from('teeth_status').delete()
+          .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+          .eq('tooth_num', tn).eq('surface', sk);
+        delete teethMap[tn][sk];
+      }
+    }
+    if (Object.keys(teethMap[tn] || {}).length === 0) delete teethMap[tn];
+  }
+  closeModal('toothModal');
+  renderTeeth(); renderStats();
+  showToast('✅ تمت إعادة السن ' + num);
+}
+
 function isLightColor(hex) {
   var c = hex.replace('#','');
   var r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
@@ -1788,15 +1989,18 @@ function isLightColor(hex) {
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
-  // إذا العلاج يغطي التاج كامل، غيّر currentSurface لـ CROWN_FULL
+  // غيّر currentSurface حسب نوع العلاج
   var tr = getTreatment(status);
   if (tr && tr.target_part === 'crown_full') currentSurface = 'CROWN_FULL';
+  else if (tr && tr.target_part === 'whole') currentSurface = 'WHOLE';
+  else if (tr && tr.target_part === 'bridge') currentSurface = 'WHOLE';
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
   // Build a label that reflects the area type (surface / root / whole)
   var areaLabel;
-  if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  if (tr && tr.target_part === 'bridge') areaLabel = 'جسر (يشمل السن قبل وبعد)';
+  else if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
   else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
@@ -1823,13 +2027,38 @@ async function saveToothTreatment() {
   if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
-  // 1. Save tooth status (per surface)
-  await window.sb.from('teeth_status').upsert({
-    doctor_id: currentUser.id, patient_id: patientId,
-    tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
-  }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-  if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
-  teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
+  // Special handling: bridge marks abutments + pontics as a single unit
+  if (pendingToothStatus === 'bridge') {
+    var abuts = findBridgeAbutments(currentTooth);
+    if (!abuts.mesial || !abuts.distal) {
+      showToast('⚠️ يحتاج الجسر سن سليم على كلا الجانبين');
+      return;
+    }
+    // Build the full unit (mesial abut + gap teeth + distal abut)
+    var arch = (UPPER_T.indexOf(currentTooth) >= 0) ? UPPER_T : LOWER_T;
+    var mIdx = arch.indexOf(abuts.mesial);
+    var dIdx = arch.indexOf(abuts.distal);
+    var lo = Math.min(mIdx, dIdx), hi = Math.max(mIdx, dIdx);
+    var unit = arch.slice(lo, hi+1);
+    // Save each tooth in unit as bridge (WHOLE surface)
+    for (var u=0; u<unit.length; u++) {
+      var un = String(unit[u]);
+      await window.sb.from('teeth_status').upsert({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: un, surface: 'WHOLE', treatment_key: 'bridge'
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (!teethMap[un]) teethMap[un] = {};
+      teethMap[un]['WHOLE'] = 'bridge';
+    }
+  } else {
+    // Normal save
+    await window.sb.from('teeth_status').upsert({
+      doctor_id: currentUser.id, patient_id: patientId,
+      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
+    }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+    if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+    teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
+  }
 
   // Build description that reflects the area type
   var areaForDesc;
