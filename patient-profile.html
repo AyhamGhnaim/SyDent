@@ -1105,7 +1105,7 @@ function toothAnatomy(num) {
             ' '   + (rTopL + 1) + ' ' + (rootTop + rootLen*0.40) +
             ' '   + rTopL + ' ' + rootTop +
             ' Z';
-    roots.push({ key:'R1', d:d });
+    roots.push({ key:'R1', d:d, canalTopCx:cx, canalApexCx:apexCx, canalTop:rootTop, canalBot:rootBot, canalTopW:rTopW });
   } else if (nRoots === 2) {
     // Two roots — premolar (upper first) and lower molars
     var trunkW, rW, rApex, leftTopCx, rightTopCx, leftApexCx, rightApexCx;
@@ -1169,11 +1169,15 @@ function toothAnatomy(num) {
     var isLowerMolar = (t === 'molar');
     var mesialIsLeft = mesialOnRight ? false : true;
     if (mesialIsLeft) {
-      roots.push({ key:'R1', d: makeRoot(leftTopCx, leftApexCx, 1.1, isLowerMolar, true) });
-      roots.push({ key:'R2', d: makeRoot(rightTopCx, rightApexCx, 0.95, false, false) });
+      roots.push({ key:'R1', d: makeRoot(leftTopCx, leftApexCx, 1.1, isLowerMolar, true),
+                   canalTopCx:leftTopCx, canalApexCx:leftApexCx, canalTop:rootTop, canalBot:rootBot, canalTopW:rW*1.1 });
+      roots.push({ key:'R2', d: makeRoot(rightTopCx, rightApexCx, 0.95, false, false),
+                   canalTopCx:rightTopCx, canalApexCx:rightApexCx, canalTop:rootTop, canalBot:rootBot, canalTopW:rW*0.95 });
     } else {
-      roots.push({ key:'R1', d: makeRoot(rightTopCx, rightApexCx, 1.1, isLowerMolar, false) });
-      roots.push({ key:'R2', d: makeRoot(leftTopCx, leftApexCx, 0.95, false, true) });
+      roots.push({ key:'R1', d: makeRoot(rightTopCx, rightApexCx, 1.1, isLowerMolar, false),
+                   canalTopCx:rightTopCx, canalApexCx:rightApexCx, canalTop:rootTop, canalBot:rootBot, canalTopW:rW*1.1 });
+      roots.push({ key:'R2', d: makeRoot(leftTopCx, leftApexCx, 0.95, false, true),
+                   canalTopCx:leftTopCx, canalApexCx:leftApexCx, canalTop:rootTop, canalBot:rootBot, canalTopW:rW*0.95 });
     }
   } else {
     // Three roots (upper molars 16-18, 26-28): MB + DB + Palatal
@@ -1272,9 +1276,12 @@ function toothAnatomy(num) {
     var dbApexX = mesialOnRight ? mbApexCx : dbApexCx;
 
     // Z-stacking: palatal drawn FIRST (behind), then MB & DB on top
-    roots.push({ key:'R3', d: makePalatalRoot() });
-    roots.push({ key:'R1', d: makeBuccalRoot(mbCervX, mbApexX, mbMul) });
-    roots.push({ key:'R2', d: makeBuccalRoot(dbCervX, dbApexX, dbMul) });
+    roots.push({ key:'R3', d: makePalatalRoot(),
+                 canalTopCx:palTopCx, canalApexCx:palApexCx, canalTop:palStartY, canalBot:palBot, canalTopW:rW3*palMul });
+    roots.push({ key:'R1', d: makeBuccalRoot(mbCervX, mbApexX, mbMul),
+                 canalTopCx:mbCervX, canalApexCx:mbApexX, canalTop:rootTop, canalBot:rootBot, canalTopW:rW3*mbMul });
+    roots.push({ key:'R2', d: makeBuccalRoot(dbCervX, dbApexX, dbMul),
+                 canalTopCx:dbCervX, canalApexCx:dbApexX, canalTop:rootTop, canalBot:rootBot, canalTopW:rW3*dbMul });
   }
 
   // ── Occlusal/Incisal Surface Detail (drawn INSIDE the crown, near the top) ──
@@ -1472,18 +1479,53 @@ function buildTooth(num, surfaceMap, isUpper) {
     + '<g ' + transform + '>';
 
   // ── Roots (drawn first, behind crown) ──
+  // Helper: detect if a treatment targets root (so we render a canal inside, not a full fill)
+  function isRootCanalTreat(tkey) {
+    if (!tkey) return false;
+    var tr = getTreatment(tkey);
+    return tr && tr.target_part === 'root';
+  }
   for (var ri = 0; ri < anat.roots.length; ri++) {
     var r = anat.roots[ri];
     var rTreatKey = sm[r.key];
+    var isCanal = isRootCanalTreat(rTreatKey);
     var rFill;
     if (hasWhole) rFill = wholeColor;
-    else if (rTreatKey && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
+    else if (rTreatKey && !isCanal && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
     else rFill = 'url(#rg' + gid + ')';
     svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
         +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
-    // Side shadow overlay on each root (only if no treatment fill)
-    if (!hasWhole && !(rTreatKey && T_FILL[rTreatKey])) {
+    // Side shadow overlay on each root (only if no full-fill treatment)
+    if (!hasWhole && !(rTreatKey && !isCanal && T_FILL[rTreatKey])) {
       svg += '<path d="' + r.d + '" fill="url(#rs' + gid + ')" pointer-events="none"></path>';
+    }
+    // Root canal: draw a thin vertical channel INSIDE the root, from CEJ down toward apex
+    if (isCanal && r.canalTopCx !== undefined && !hasWhole) {
+      var canalColor = T_FILL[rTreatKey] || '#a78bfa';
+      var canalTopW = (r.canalTopW || 8) * 0.22;  // canal opening ≈ 22% of root cervical width
+      var canalApexW = canalTopW * 0.18;          // narrows toward apex
+      var cTop = r.canalTop + 1;                   // start just inside the cervical
+      var cBot = r.canalBot - 4;                   // stop short of the apex
+      var cTopCx = r.canalTopCx;
+      var cApexCx = r.canalApexCx;
+      var cTopL = cTopCx - canalTopW/2;
+      var cTopR = cTopCx + canalTopW/2;
+      var cApexL = cApexCx - canalApexW/2;
+      var cApexR = cApexCx + canalApexW/2;
+      var cLen = cBot - cTop;
+      // Build a tapered canal that follows the root curvature (S-curve via cubic beziers)
+      var canalD = 'M ' + cTopR + ' ' + cTop +
+                   ' C ' + cTopR + ' ' + (cTop + cLen*0.40) +
+                   ' '   + cApexR + ' ' + (cTop + cLen*0.78) +
+                   ' '   + cApexR + ' ' + cBot +
+                   ' L ' + cApexL + ' ' + cBot +
+                   ' C ' + cApexL + ' ' + (cTop + cLen*0.78) +
+                   ' '   + cTopL + ' ' + (cTop + cLen*0.40) +
+                   ' '   + cTopL + ' ' + cTop +
+                   ' Z';
+      svg += '<path d="' + canalD + '" fill="' + canalColor + '" fill-opacity="0.85" '
+          +  'stroke="' + canalColor + '" stroke-width="0.3" stroke-opacity="0.6" '
+          +  'pointer-events="none"></path>';
     }
   }
 
