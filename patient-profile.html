@@ -1465,7 +1465,8 @@ function buildExtractedPlaceholder(num, isUpper) {
 
 /* Pontic: a crown-only tooth (no root) colored in bridge color.
    Drawn in place of an extracted tooth that's part of a bridge unit.
-   Uses the same crown outline as the natural tooth — only the root section is omitted. */
+   The crown is rendered in the SAME viewBox position as a natural crown
+   (so it lines up vertically with adjacent abutments). */
 function buildPonticTooth(num, isUpper) {
   var anat = toothAnatomy(num);
   var W = anat.cellW;
@@ -1474,25 +1475,22 @@ function buildPonticTooth(num, isUpper) {
   var bridgeStroke = (T_STROKE && T_STROKE['bridge']) || '#991b1b';
   var gid = 'p' + num;
   var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
-  // Build SVG with just the crown outline, filled with bridge color
-  var svg = '<svg class="tooth-shape pontic-shape" data-tooth="' + num + '" '
+  // Solid bridge color (no semi-transparency, no blend modes)
+  var svg = '<svg class="tooth-shape pontic-shape" data-tooth="' + num + '" data-bridge="1" '
     + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
     + 'xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" '
-    + 'style="cursor:pointer;" '
+    + 'style="cursor:pointer;vertical-align:bottom;" '
     + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)">'
     + '<defs>'
     + '<linearGradient id="pg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
-      + '<stop offset="0%" stop-color="' + bridgeColor + '" stop-opacity="0.95"/>'
-      + '<stop offset="55%" stop-color="' + bridgeColor + '" stop-opacity="1"/>'
-      + '<stop offset="100%" stop-color="' + bridgeStroke + '" stop-opacity="1"/>'
+      + '<stop offset="0%" stop-color="' + bridgeColor + '"/>'
+      + '<stop offset="60%" stop-color="' + bridgeColor + '"/>'
+      + '<stop offset="100%" stop-color="' + bridgeStroke + '"/>'
     + '</linearGradient>'
     + '</defs>'
     + '<g ' + transform + '>'
     + '<path d="' + anat.outlineD + '" fill="url(#pg' + gid + ')" '
       + 'stroke="' + bridgeStroke + '" stroke-width="1.2" stroke-linejoin="round"/>'
-    // Subtle highlight to give it some depth
-    + '<path d="' + anat.outlineD + '" fill="rgba(255,255,255,0.18)" pointer-events="none" '
-      + 'style="mix-blend-mode:overlay;"/>'
     + '</g>'
     + '<title>السن ' + num + ' — جسر (دعامة وهمية)</title>'
     + '</svg>';
@@ -1659,8 +1657,10 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   // ── Occlusal/Incisal band (drawn INSIDE the crown — clipped by crown outline) ──
   // crown_full: semi-transparent color overlay over entire crown (preserves gradient + details)
+  // Bridge abutments use higher opacity so they read as solid crown of bridge color
   if (hasCrownFull) {
-    svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="0.38" '
+    var cfOpacity = isBridgeAbutment ? 0.92 : 0.38;
+    svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="' + cfOpacity + '" '
         +  'stroke="none" pointer-events="none"></path>';
   }
 
@@ -1840,9 +1840,22 @@ function renderTeeth() {
   attachSurfaceClicks();
 }
 
-/* Render bridge connectors: small color blocks between adjacent crowns of a bridge unit.
-   Each connector sits at the mesial-distal contact area between two consecutive teeth in the unit,
-   centered vertically on the crown. */
+/* Compute the on-screen vertical center of a tooth's CROWN inside its cell.
+   The SVG viewBox is 0..210. Crown spans y=6 to y=cervicalY (~76-92).
+   For upper teeth, the SVG is flipped, so crown sits at the bottom of the cell. */
+function getCrownCenterFrac(num, isUpper) {
+  var anat = toothAnatomy(num);
+  var crownTop = 6;
+  var crownBot = anat.cervicalY || 80;
+  var midY = (crownTop + crownBot) / 2;  // in viewBox units (0..210)
+  // For upper teeth, flipped vertically: actualY = 210 - viewBoxY
+  var actualY = isUpper ? (210 - midY) : midY;
+  return actualY / 210;
+}
+
+/* Render bridge connectors between adjacent crowns of a bridge unit.
+   Each connector is a solid block in the bridge color at the crown's vertical center,
+   sitting in the contact zone between two consecutive teeth. */
 function renderBridges() {
   var bridgeColor = (T_FILL && T_FILL['bridge']) || '#dc2626';
   var bridgeStroke = (T_STROKE && T_STROKE['bridge']) || '#991b1b';
@@ -1854,19 +1867,17 @@ function renderBridges() {
     var jawStyle = window.getComputedStyle(jaw);
     if (jawStyle.position === 'static') jaw.style.position = 'relative';
     var arch = (jawId === 'upperJaw') ? UPPER_T : LOWER_T;
+    var isUpperJaw = (jawId === 'upperJaw');
     var processed = {};
     for (var k=0; k<arch.length; k++) {
       var n = arch[k];
       if ((!isBridgeTooth(n) && !isExtracted(n)) || processed[n]) continue;
-      // Skip extracted teeth that are not part of a bridge (no abutment on both sides)
       if (isExtracted(n) && !isBridgeTooth(n)) {
-        // Verify it's between two abutments via ponticSet logic
         var leftA = false, rightA = false;
         for (var L=k-1; L>=0; L--) { if (isBridgeTooth(arch[L])) { leftA=true; break; } if (!isExtracted(arch[L])) break; }
         for (var R=k+1; R<arch.length; R++) { if (isBridgeTooth(arch[R])) { rightA=true; break; } if (!isExtracted(arch[R])) break; }
         if (!leftA || !rightA) continue;
       }
-      // Walk to gather the unit
       var startIdx = k, endIdx = k;
       while (startIdx > 0 && (isBridgeTooth(arch[startIdx-1]) || isExtracted(arch[startIdx-1]))) startIdx--;
       while (endIdx < arch.length-1 && (isBridgeTooth(arch[endIdx+1]) || isExtracted(arch[endIdx+1]))) endIdx++;
@@ -1876,7 +1887,6 @@ function renderBridges() {
         processed[arch[ii]] = true;
       }
       if (unit.length < 2) continue;
-      // For each adjacent pair, draw a small connector block between them
       var jawRect = jaw.getBoundingClientRect();
       for (var u=0; u<unit.length-1; u++) {
         var elA = jaw.querySelector('[data-tooth="' + unit[u] + '"]');
@@ -1884,27 +1894,30 @@ function renderBridges() {
         if (!elA || !elB) continue;
         var aRect = elA.getBoundingClientRect();
         var bRect = elB.getBoundingClientRect();
-        // Determine which is on the left (smaller x) for screen-space positioning
         var leftRect = (aRect.left < bRect.left) ? aRect : bRect;
         var rightRect = (aRect.left < bRect.left) ? bRect : aRect;
-        // Connector spans from inside the left tooth's right edge to inside the right tooth's left edge
-        var overlap = 6;  // pixels into each tooth so it visually merges
+        // The connector overlaps INTO each tooth by ~20% of its width, so it visually fuses
+        var leftToothW = leftRect.width;
+        var rightToothW = rightRect.width;
+        var overlap = Math.min(leftToothW, rightToothW) * 0.25;
         var left = (leftRect.right - jawRect.left) - overlap;
         var right = (rightRect.left - jawRect.left) + overlap;
         var width = Math.max(2, right - left);
-        // Vertical center on the crown: crown spans ~0-40% of tooth height
-        // For upper teeth the crown is at the bottom of the cell (because of flip), for lower it's at top
-        var crownMidFrac = (jawId === 'upperJaw') ? 0.78 : 0.22;
-        var crownHFrac = 0.30;  // connector height ≈ 30% of tooth display height
+        // Compute crown-center for each adjacent tooth, average them
+        var fracA = getCrownCenterFrac(unit[u], isUpperJaw);
+        var fracB = getCrownCenterFrac(unit[u+1], isUpperJaw);
+        var fracMid = (fracA + fracB) / 2;
         var refH = Math.min(aRect.height, bRect.height);
-        var top = (leftRect.top - jawRect.top) + refH * (crownMidFrac - crownHFrac/2);
-        var height = refH * crownHFrac;
+        // Connector height: ~40% of crown height. Crown ≈ 40% of total tooth height (cellH=2.1*W, crownH≈70 of 210)
+        var height = refH * 0.16;
+        var midScreenY = (leftRect.top - jawRect.top) + refH * fracMid;
+        var top = midScreenY - height/2;
         var block = document.createElement('div');
         block.className = 'bridge-link';
         block.style.cssText = 'position:absolute;pointer-events:none;z-index:3;'
           + 'left:' + left + 'px;top:' + top + 'px;'
           + 'width:' + width + 'px;height:' + height + 'px;'
-          + 'background:linear-gradient(to bottom,' + bridgeColor + 'ee 0%,' + bridgeColor + ' 50%,' + bridgeStroke + ' 100%);'
+          + 'background:' + bridgeColor + ';'
           + 'border-top:1px solid ' + bridgeStroke + ';'
           + 'border-bottom:1px solid ' + bridgeStroke + ';';
         jaw.appendChild(block);
