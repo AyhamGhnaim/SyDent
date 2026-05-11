@@ -813,7 +813,8 @@ var SURFACE_LABELS = {
   'R1': 'جذر 1',
   'R2': 'جذر 2',
   'R3': 'جذر 3',
-  'WHOLE': 'السن كاملاً'
+  'WHOLE': 'السن كاملاً',
+  'CROWN_FULL': 'التاج كامل'
 };
 
 /* Get the center surface key for a given tooth (O for posterior, I for anterior) */
@@ -1399,6 +1400,11 @@ function buildTooth(num, surfaceMap, isUpper) {
   var hasWhole = !!wholeT;
   var wholeColor = hasWhole ? (T_FILL[wholeT] || '#f5e6c8') : null;
 
+  // crown_full: treat entire crown with semi-transparent overlay (preserves tooth anatomy)
+  var crownFullT = sm.CROWN_FULL;
+  var hasCrownFull = !!crownFullT;
+  var crownFullColor = hasCrownFull ? (T_FILL[crownFullT] || '#fb923c') : null;
+
   // Base colors: ivory crown, slightly darker ivory roots
   var crownBase = '#f4e4c1';
   var rootBase  = '#e8d5b0';
@@ -1499,6 +1505,12 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // ── Occlusal/Incisal band (drawn INSIDE the crown — clipped by crown outline) ──
+  // crown_full: semi-transparent color overlay over entire crown (preserves gradient + details)
+  if (hasCrownFull) {
+    svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="0.38" '
+        +  'stroke="none" pointer-events="none"></path>';
+  }
+
   if (anat.occlusalBandD && !hasWhole) {
     var clipId = 'cc' + gid;
     // Soft shadow band representing the occlusal table depth
@@ -1523,6 +1535,7 @@ function buildTooth(num, surfaceMap, isUpper) {
     var tk = sm[fillKey];
     var fill, opacity;
     if (hasWhole) { fill = wholeColor; opacity = 0; } // whole already painted via outline
+    else if (hasCrownFull) { fill = crownFullColor; opacity = 0; } // crown_full painted as overlay below
     else if (tk) { fill = T_FILL[tk] || crownBase; opacity = 0.75; }
     else { fill = '#000'; opacity = 0; } // transparent click zone
     // Clip to crown outline so colored regions hug the tooth silhouette,
@@ -1565,6 +1578,10 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   // ── Tooltip rows ──
   var tipRows = '';
+  if (hasCrownFull) {
+    var cft = getTreatment(crownFullT);
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>التاج كامل:</b> ' + (cft ? cft.name : crownFullT) + '</div>';
+  }
   if (hasWhole) {
     var wt = getTreatment(wholeT);
     tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + wholeColor + '"></span><b>السن كاملاً:</b> ' + (wt ? wt.name : wholeT) + '</div>';
@@ -1679,13 +1696,13 @@ async function openToothModal(n, surface) {
   document.getElementById('toothModalTitle').textContent =
     'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
 
-  // Filter treatments: crown surface clicks show crown+both; root clicks show root+both; whole clicks show whole+both
+  // Filter treatments: crown surface clicks show crown/crown_full; root clicks show root; whole clicks show whole
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
-    if (isRootClick)  return tp === 'root'  || tp === 'both';
-    if (isWholeClick) return tp === 'whole' || tp === 'both';
+    if (isRootClick)  return tp === 'root';
+    if (isWholeClick) return tp === 'whole';
     // crown surface click
-    return tp === 'crown' || tp === 'both';
+    return tp === 'crown' || tp === 'crown_full';
   }
 
   var container = document.getElementById('toothOptsContainer');
@@ -1736,12 +1753,16 @@ function isLightColor(hex) {
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
+  // إذا العلاج يغطي التاج كامل، غيّر currentSurface لـ CROWN_FULL
+  var tr = getTreatment(status);
+  if (tr && tr.target_part === 'crown_full') currentSurface = 'CROWN_FULL';
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
   // Build a label that reflects the area type (surface / root / whole)
   var areaLabel;
   if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
   else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
   document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + areaLabel + ')';
@@ -1778,6 +1799,7 @@ async function saveToothTreatment() {
   // Build description that reflects the area type
   var areaForDesc;
   if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaForDesc = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
   else areaForDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
 
@@ -1803,6 +1825,7 @@ async function saveToothTreatment() {
   // Build area label that reflects the type
   var areaLabelToast;
   if (currentSurface === 'WHOLE') areaLabelToast = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaLabelToast = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabelToast = 'الجذر ' + currentSurface.replace('R','');
   else areaLabelToast = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
   showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + areaLabelToast + ')');
@@ -1812,6 +1835,7 @@ async function clearToothStatus() {
   // Build area label that reflects the type
   var areaLabel;
   if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
   else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
   if (!confirm('هل تريد إزالة العلاج من ' + areaLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
