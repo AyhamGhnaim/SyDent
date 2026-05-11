@@ -1761,13 +1761,6 @@ async function openToothModal(n, surface) {
          + t.name + '</button>';
   }
 
-  // If clicking a crown surface, add a "treat whole tooth" shortcut at the bottom
-  if (!isRootClick && !isWholeClick) {
-    html += '<button class="topt" style="border-color:#06b6d4;background:#06b6d422;color:var(--text);font-weight:700;" onclick="switchToWholeTooth()">'
-         + '<span style="font-size:14px;margin-left:6px;">🦷</span>'
-         + 'علاج على السن كاملاً (تلبيسة، قلع، زرعة...)</button>';
-  }
-
   if (matched === 0) {
     html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
   }
