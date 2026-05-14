@@ -1433,11 +1433,11 @@ function findBridgeAbutments(num) {
   var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
   var idx = arch.indexOf(num);
   if (idx < 0) return { mesial:null, distal:null, gap:[num] };
-  // Walk LEFT: collect extracted teeth into the gap; stop at first non-extracted tooth (abutment candidate)
+  // Walk LEFT: skip extracted/implants (they can't be abutments); stop at first natural tooth
   var leftAbut = null, gap = [num];
   for (var i = idx - 1; i >= 0; i--) {
     if (isExtracted(arch[i])) { gap.unshift(arch[i]); continue; }
-    // First non-extracted tooth becomes the mesial abutment
+    if (isImplant(arch[i])) continue;  // implants aren't bridge abutments
     leftAbut = arch[i];
     break;
   }
@@ -1445,6 +1445,7 @@ function findBridgeAbutments(num) {
   var rightAbut = null;
   for (var j = idx + 1; j < arch.length; j++) {
     if (isExtracted(arch[j])) { gap.push(arch[j]); continue; }
+    if (isImplant(arch[j])) continue;
     rightAbut = arch[j];
     break;
   }
@@ -2164,22 +2165,21 @@ async function undoExtraction(num) {
 
 /* Remove an implant: delete only the implant entry; tooth becomes extracted again (since implants are typically placed in missing tooth slots) */
 async function removeImplant(num) {
-  if (!confirm('إزالة الزراعة من السن ' + num + '؟')) return;
+  var choice = confirm('إزالة الزراعة من السن ' + num + '؟\n\nاضغط موافق لإزالة الزراعة (السن سيعود مقلوعاً)\nاضغط إلغاء للخروج بدون تغيير');
+  if (!choice) return;
   var tn = String(num);
   var sm = teethMap[tn] || {};
-  for (var sk in sm) {
-    if (sm[sk] === 'implant') {
-      var dr = await window.sb.from('teeth_status').delete()
-        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
-        .eq('tooth_num', tn).eq('surface', sk);
-      if (dr.error) console.error('delete implant error:', dr.error);
-      delete teethMap[tn][sk];
-    }
-  }
-  if (teethMap[tn] && Object.keys(teethMap[tn]).length === 0) delete teethMap[tn];
+  // Replace implant with extracted at the same surface (WHOLE) — typically an implant replaces a missing tooth
+  var rU = await window.sb.from('teeth_status').upsert({
+    doctor_id: currentUser.id, patient_id: patientId,
+    tooth_num: tn, surface: 'WHOLE', treatment_key: 'extracted'
+  }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+  if (rU.error) console.error('restore extracted after implant removal error:', rU.error);
+  if (!teethMap[tn]) teethMap[tn] = {};
+  teethMap[tn]['WHOLE'] = 'extracted';
   closeModal('toothModal');
   renderTeeth(); renderStats();
-  showToast('✅ تمت إزالة الزراعة من السن ' + num);
+  showToast('✅ تمت إزالة الزراعة — السن ' + num + ' مقلوع');
 }
 
 function isLightColor(hex) {
