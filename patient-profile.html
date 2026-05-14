@@ -1776,7 +1776,8 @@ function buildTooth(num, surfaceMap, isUpper) {
 
   // Whole-tooth treatment paints the entire tooth one color
   // Detect treatment classification by inspecting target_part of the treatment, not just surface key.
-  // This fixes the case where DB constraints forced surface='WHOLE' for a crown_full treatment.
+  // Backward-compat: legacy records (saved before DB constraint was widened) may have
+  // surface='WHOLE' for crown_full / bridge treatments — render them correctly here.
   var wholeT = sm.WHOLE;
   var wholeTreatObj = wholeT ? getTreatment(wholeT) : null;
   var wholeTargetPart = wholeTreatObj ? (wholeTreatObj.target_part || 'whole') : null;
@@ -2638,25 +2639,14 @@ async function saveToothTreatment() {
         if (!teethMap[un].__status) teethMap[un].__status = {};
         teethMap[un].__status.WHOLE = pendingTreatStatus;
       } else {
-        // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE
+        // Pontic: save at PONTIC surface (DB constraint accepts it)
         var rP = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
           tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rP.error) {
-          console.warn('PONTIC surface rejected, falling back to WHOLE:', rP.error);
-          var rF = await window.sb.from('teeth_status').upsert({
-            doctor_id: currentUser.id, patient_id: patientId,
-            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
-          }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-          if (rF.error) {
-            console.error('bridge pontic fallback save error:', rF.error);
-            showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rF.error.message);
-          }
-          if (!teethMap[un]) teethMap[un] = {};
-          teethMap[un]['WHOLE'] = bridgeKey;
-          if (!teethMap[un].__status) teethMap[un].__status = {};
-          teethMap[un].__status.WHOLE = pendingTreatStatus;
+          console.error('bridge pontic save error:', rP.error);
+          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rP.error.message);
         } else {
           if (!teethMap[un]) teethMap[un] = {};
           teethMap[un]['PONTIC'] = bridgeKey;
@@ -2677,26 +2667,14 @@ async function saveToothTreatment() {
       if (dAll.error) console.error('clear surfaces before implant error:', dAll.error);
       teethMap[String(currentTooth)] = {};
     }
-    // Normal save
+    // Normal save — DB constraint now accepts all valid surface values
     var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
       tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
     if (rN.error) {
-      console.warn('teeth_status save failed with surface=' + currentSurface + ', trying WHOLE fallback:', rN.error);
-      // Fallback to WHOLE surface
-      var rFb = await window.sb.from('teeth_status').upsert({
-        doctor_id: currentUser.id, patient_id: patientId,
-        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
-      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-      if (rFb.error) {
-        console.error('teeth_status fallback save error:', rFb.error);
-        showToast('⚠️ خطأ حفظ الحالة: ' + rFb.error.message);
-      }
-      if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
-      teethMap[String(currentTooth)]['WHOLE'] = pendingToothStatus;
-      if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
-      teethMap[String(currentTooth)].__status.WHOLE = pendingTreatStatus;
+      console.error('teeth_status save error:', rN.error);
+      showToast('⚠️ خطأ حفظ الحالة: ' + rN.error.message);
     } else {
       if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
       teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
@@ -2720,12 +2698,9 @@ async function saveToothTreatment() {
   }
 
   // 2. Save session in the ledger.
-  // Normalize non-standard surface keys ('CROWN_FULL', 'PONTIC') down to 'WHOLE'
-  // so DB check constraints accept them. The full label is in the description anyway.
+  // DB constraint now accepts the full set of surface keys (O/I/B/L/M/D/V/WHOLE/PONTIC/CROWN_FULL/BRIDGE/R1/R2/R3)
+  // so we save the true surface key for accurate per-surface reporting.
   var dbSurface = currentSurface;
-  if (dbSurface === 'CROWN_FULL' || dbSurface === 'PONTIC' || dbSurface === 'BRIDGE') {
-    dbSurface = 'WHOLE';
-  }
   // Only create a ledger entry for completed and planned treatments (financial records).
   // 'existing' (pre-existing) and 'referred' (sent away) are clinical notes, not billable.
   var newSess = null;
