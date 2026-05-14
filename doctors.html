@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="manifest" href="manifest.json">
+<title>أطباء العيادة — SyDent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
+<script src="sidebar.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
+  --border:rgba(46,232,158,0.15);
+  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --blue:#63b3ed;--purple:#a78bfa;
+  --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
+}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;gap:12px;
+}
+.tb-title{font-size:18px;font-weight:800;color:var(--green);}
+.tb-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:9px;
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{background:var(--green);color:var(--bg);}
+.btn-primary:hover{background:#26d48e;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-outline:hover{border-color:var(--green);color:var(--green);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+
+.page{padding:24px 28px;max-width:1200px;margin:0 auto;}
+
+.info-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;
+  margin-bottom:20px;
+  display:flex;align-items:center;gap:12px;
+  font-size:13px;color:var(--text2);
+}
+.info-box .info-icon{font-size:24px;}
+
+/* Doctors grid */
+.doc-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+  gap:16px;
+}
+.doc-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  transition:all .2s;
+}
+.doc-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--green);}
+.doc-color-bar{height:5px;width:100%;}
+.doc-body{padding:16px 18px;}
+.doc-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.doc-avatar{
+  width:50px;height:50px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.doc-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.3;}
+.doc-role{font-size:11px;color:var(--text2);margin-top:2px;display:flex;gap:6px;align-items:center;}
+.role-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(163,139,250,.15);color:var(--purple);border:1px solid rgba(163,139,250,.4);}
+.doc-meta{font-size:12px;color:var(--text2);margin-top:8px;line-height:1.5;}
+.doc-meta b{color:var(--text);font-weight:600;}
+.doc-actions{
+  display:flex;gap:6px;margin-top:14px;padding-top:12px;
+  border-top:1px solid rgba(46,232,158,0.06);
+  flex-wrap:wrap;
+}
+.doc-actions button{flex:1;min-width:calc(50% - 3px);padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.doc-actions .btn-edit:hover{color:var(--blue);border-color:var(--blue);}
+.doc-actions .btn-del:hover{color:var(--red);border-color:var(--red);}
+.doc-actions .btn-toggle:hover{color:var(--yellow);border-color:var(--yellow);}
+
+.inactive-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.4);margin-right:4px;}
+.you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(46,232,158,.15);color:var(--green);border:1px solid rgba(46,232,158,.4);margin-right:4px;}
+
+.empty-state{
+  background:var(--bg2);border:2px dashed var(--border);
+  border-radius:var(--radius);padding:60px 20px;
+  text-align:center;color:var(--text2);
+}
+.empty-state .ic{font-size:48px;margin-bottom:12px;opacity:.6;}
+.empty-state .ttl{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
+
+/* Modal */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:100;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);width:100%;max-width:560px;
+  max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+}
+.modal-head{
+  padding:16px 20px;background:var(--bg3);
+  border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.modal-head h3{font-size:16px;font-weight:800;color:var(--green);}
+.modal-close{
+  background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;
+  width:32px;height:32px;border-radius:50%;
+}
+.modal-close:hover{background:var(--bg3);color:var(--red);}
+.modal-body{padding:20px;overflow-y:auto;}
+.modal-foot{
+  padding:14px 20px;background:var(--bg3);
+  border-top:1px solid var(--border);
+  display:flex;gap:10px;justify-content:flex-end;
+}
+
+.form-group{margin-bottom:16px;}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:10px 12px;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+  font-family:'Cairo',sans-serif;font-size:14px;
+  transition:border-color .15s;
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{
+  outline:none;border-color:var(--green);
+}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+/* Color picker */
+.color-grid{display:grid;grid-template-columns:repeat(8, 1fr);gap:6px;}
+.color-swatch{
+  width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;
+  border:2px solid transparent;transition:all .15s;
+}
+.color-swatch:hover{transform:scale(1.1);}
+.color-swatch.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--green);}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--bg2);border:1px solid var(--green);
+  border-radius:8px;padding:12px 20px;font-size:13px;font-weight:600;
+  color:var(--text);z-index:200;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+  opacity:0;transition:opacity .25s;
+  pointer-events:none;
+}
+.toast.show{opacity:1;}
+
+@media (max-width:768px){
+  .form-row{grid-template-columns:1fr;}
+  .topbar{padding:12px 16px;}
+  .page{padding:16px;}
+}
+</style>
+</head>
+<body>
+<div class="main" id="sbMainContent">
+
+<div class="topbar">
+  <div>
+    <div class="tb-title">👨‍⚕️ أطباء العيادة</div>
+    <div class="tb-sub">إدارة الأطباء وأسعارهم الخاصة</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="openAddModal()">＋ إضافة طبيب</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="info-box">
+    <span class="info-icon">💡</span>
+    <div>
+      الأطباء الذين تضيفهم هنا سيظهرون في قائمة "الطبيب المعالج" عند تسجيل الجلسات.
+      كل طبيب يمكن أن يكون له <b>سعر خاص لكل علاج</b> (يُضبط من صفحة العلاجات).
+    </div>
+  </div>
+
+  <div id="docList"></div>
+
+</div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="docModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">＋ إضافة طبيب</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-group">
+        <label>الاسم الكامل *</label>
+        <input type="text" id="dName" placeholder="د. أحمد محمد">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>التخصص / الدور</label>
+          <input type="text" id="dRole" placeholder="مثلاً: تقويم / لب وجذور / طبيب عام">
+        </div>
+        <div class="form-group">
+          <label>الهاتف</label>
+          <input type="tel" id="dPhone" placeholder="09xxxxxxxx" dir="ltr">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>اللون المميّز (يظهر في كشف الحساب)</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>نسبة الطبيب من الجلسة (%)</label>
+          <input type="number" id="dShare" min="0" max="100" placeholder="مثلاً: 40">
+        </div>
+        <div class="form-group">
+          <label>ساعات العمل (أسبوعياً)</label>
+          <input type="number" id="dHours" min="0" placeholder="مثلاً: 24">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="dNotes" rows="2" placeholder="أي تفاصيل إضافية..."></textarea>
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveDoctor()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var currentUser = null;
+var doctorOwner = null;  // The clinic-owner doctor record
+var doctors = [];
+var editingId = null;
+var pickedColor = '#2ee89e';
+
+var COLORS = [
+  '#2ee89e','#63b3ed','#a78bfa','#f5c842','#fb923c','#ef5350','#06b6d4','#84cc16',
+  '#ec4899','#14b8a6','#f97316','#8b5cf6','#22d3ee','#eab308','#f87171','#a3e635'
+];
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function initials(name) {
+  if (!name) return '?';
+  var parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length-1].charAt(0)).toUpperCase();
+}
+
+function renderColorGrid() {
+  var grid = document.getElementById('colorGrid');
+  grid.innerHTML = COLORS.map(function(c){
+    return '<div class="color-swatch ' + (c === pickedColor ? 'selected' : '') + '" style="background:' + c + '" onclick="pickColor(\'' + c + '\')"></div>';
+  }).join('');
+}
+
+function pickColor(c) {
+  pickedColor = c;
+  renderColorGrid();
+}
+
+async function loadDoctors() {
+  // Load all clinic_doctors for this owner
+  var { data, error } = await window.sb.from('clinic_doctors')
+    .select('*')
+    .eq('owner_id', currentUser.id)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('load doctors:', error);
+    if (error.code === 'PGRST204' || (error.message && error.message.indexOf('clinic_doctors') >= 0)) {
+      document.getElementById('docList').innerHTML =
+        '<div class="empty-state"><div class="ic">⚙️</div>' +
+        '<div class="ttl">يجب تشغيل تحديث قاعدة البيانات أولاً</div>' +
+        '<div style="margin-top:12px;font-size:13px;">انسخ SQL من Claude وشغّله في Supabase SQL Editor.</div></div>';
+      return;
+    }
+    showToast('⚠️ فشل تحميل الأطباء');
+    return;
+  }
+
+  doctors = data || [];
+
+  // Auto-create the owner-doctor record if missing (legacy upgrade)
+  if (doctors.length === 0 && doctorOwner) {
+    var insertOwner = await window.sb.from('clinic_doctors').insert({
+      owner_id: currentUser.id,
+      user_id: currentUser.id,
+      name: doctorOwner.name || 'الطبيب الرئيسي',
+      role: doctorOwner.specialty || 'طبيب أسنان',
+      phone: doctorOwner.phone || null,
+      color: '#2ee89e',
+      is_owner: true,
+      is_active: true
+    }).select().single();
+    if (!insertOwner.error && insertOwner.data) {
+      doctors = [insertOwner.data];
+    }
+  }
+
+  renderList();
+}
+
+function renderList() {
+  var el = document.getElementById('docList');
+  if (!doctors.length) {
+    el.innerHTML =
+      '<div class="empty-state"><div class="ic">👨‍⚕️</div>' +
+      '<div class="ttl">لا يوجد أطباء بعد</div>' +
+      '<div style="margin-top:6px;">أضف أول طبيب لبدء تسجيل الجلسات لكل طبيب على حدة.</div>' +
+      '<button class="btn btn-primary" style="margin-top:16px;" onclick="openAddModal()">＋ إضافة طبيب</button></div>';
+    return;
+  }
+
+  var html = '<div class="doc-grid">';
+  doctors.forEach(function(d){
+    var inactiveBadge = d.is_active === false ? '<span class="inactive-badge">⏸️ معطل</span>' : '';
+    var youBadge = d.is_owner ? '<span class="you-badge">⭐ صاحب العيادة</span>' : '';
+    var roleBadge = d.role ? '<span class="role-badge">' + escapeHtml(d.role) + '</span>' : '';
+
+    var sharePart = (d.share_percent !== null && d.share_percent !== undefined) ? ('<b>النسبة:</b> ' + d.share_percent + '%') : '';
+    var hoursPart = d.weekly_hours ? ('<b>الساعات/الأسبوع:</b> ' + d.weekly_hours) : '';
+    var phonePart = d.phone ? ('<b>الهاتف:</b> ' + escapeHtml(d.phone)) : '';
+    var metaItems = [sharePart, hoursPart, phonePart].filter(function(x){ return x; }).join(' &nbsp;•&nbsp; ');
+
+    var toggleLabel = d.is_active === false ? '▶️ تفعيل' : '⏸️ تعطيل';
+    var delBtn = d.is_owner
+      ? '<button title="لا يمكن حذف صاحب العيادة" disabled style="opacity:.4;cursor:not-allowed;">🔒 محمي</button>'
+      : '<button class="btn-del" onclick="deleteDoctor(\'' + d.id + '\')">🗑️ حذف</button>';
+
+    html += '<div class="doc-card">'
+      + '<div class="doc-color-bar" style="background:' + (d.color || '#2ee89e') + '"></div>'
+      + '<div class="doc-body">'
+      + '<div class="doc-head">'
+      + '<div class="doc-avatar" style="background:' + (d.color || '#2ee89e') + '">' + initials(d.name) + '</div>'
+      + '<div style="flex:1;">'
+      + '<div class="doc-name">' + escapeHtml(d.name) + ' ' + youBadge + ' ' + inactiveBadge + '</div>'
+      + '<div class="doc-role">' + roleBadge + '</div>'
+      + '</div></div>'
+      + (metaItems ? '<div class="doc-meta">' + metaItems + '</div>' : '')
+      + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')
+      + '<div class="doc-actions">'
+      + '<button class="btn-edit" onclick="editDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
+      + '<button class="btn-toggle" onclick="toggleActive(\'' + d.id + '\')">' + toggleLabel + '</button>'
+      + delBtn
+      + '</div></div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '＋ إضافة طبيب';
+  document.getElementById('dName').value = '';
+  document.getElementById('dRole').value = '';
+  document.getElementById('dPhone').value = '';
+  document.getElementById('dShare').value = '';
+  document.getElementById('dHours').value = '';
+  document.getElementById('dNotes').value = '';
+  pickColor('#63b3ed');
+  document.getElementById('docModal').classList.add('show');
+  setTimeout(function(){ document.getElementById('dName').focus(); }, 100);
+}
+
+function editDoctor(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = '✏️ تعديل الطبيب';
+  document.getElementById('dName').value = d.name || '';
+  document.getElementById('dRole').value = d.role || '';
+  document.getElementById('dPhone').value = d.phone || '';
+  document.getElementById('dShare').value = (d.share_percent !== null && d.share_percent !== undefined) ? d.share_percent : '';
+  document.getElementById('dHours').value = d.weekly_hours || '';
+  document.getElementById('dNotes').value = d.notes || '';
+  pickColor(d.color || '#2ee89e');
+  document.getElementById('docModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('docModal').classList.remove('show');
+}
+
+async function saveDoctor() {
+  var name = document.getElementById('dName').value.trim();
+  if (!name) { showToast('⚠️ أدخل اسم الطبيب'); return; }
+
+  var role = document.getElementById('dRole').value.trim() || null;
+  var phone = document.getElementById('dPhone').value.trim() || null;
+  var shareRaw = document.getElementById('dShare').value;
+  var share = shareRaw === '' ? null : parseFloat(shareRaw);
+  var hoursRaw = document.getElementById('dHours').value;
+  var hours = hoursRaw === '' ? null : parseFloat(hoursRaw);
+  var notes = document.getElementById('dNotes').value.trim() || null;
+
+  if (editingId) {
+    var { error } = await window.sb.from('clinic_doctors')
+      .update({
+        name: name, role: role, phone: phone,
+        share_percent: share, weekly_hours: hours,
+        notes: notes, color: pickedColor,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', editingId);
+    if (error) { showToast('⚠️ فشل التعديل: ' + error.message); return; }
+    showToast('✅ تم التعديل');
+  } else {
+    var { error: insertErr } = await window.sb.from('clinic_doctors').insert({
+      owner_id: currentUser.id,
+      name: name, role: role, phone: phone,
+      share_percent: share, weekly_hours: hours,
+      notes: notes, color: pickedColor,
+      is_owner: false, is_active: true
+    });
+    if (insertErr) { showToast('⚠️ فشل الإضافة: ' + insertErr.message); return; }
+    showToast('✅ تمت إضافة الطبيب');
+  }
+  closeModal();
+  await loadDoctors();
+}
+
+async function toggleActive(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  var newState = !(d.is_active !== false);
+  var { error } = await window.sb.from('clinic_doctors')
+    .update({ is_active: newState, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) {
+    if (error.code === '42703') {
+      showToast('ℹ️ يحتاج تحديث قاعدة البيانات');
+    } else {
+      showToast('⚠️ فشل: ' + error.message);
+    }
+    return;
+  }
+  showToast(newState ? '▶️ تم التفعيل' : '⏸️ تم التعطيل');
+  await loadDoctors();
+}
+
+async function deleteDoctor(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  if (d.is_owner) { showToast('🔒 لا يمكن حذف صاحب العيادة'); return; }
+  if (!confirm('حذف الطبيب "' + d.name + '"؟\n\nملاحظة: الجلسات المرتبطة به ستبقى محفوظة لكنها ستفقد ارتباطها بالطبيب.')) return;
+
+  var { error } = await window.sb.from('clinic_doctors').delete().eq('id', id);
+  if (error) { showToast('⚠️ فشل الحذف: ' + error.message); return; }
+  showToast('🗑️ تم الحذف');
+  await loadDoctors();
+}
+
+// Close modal on overlay click
+document.addEventListener('click', function(e){
+  if (e.target.id === 'docModal') closeModal();
+});
+
+(async function init() {
+  initSidebar('doctors');
+  renderColorGrid();
+
+  // Wait for session
+  var { data: sessionData } = await window.sb.auth.getSession();
+  if (!sessionData.session) {
+    window.location.href = 'auth.html';
+    return;
+  }
+  currentUser = sessionData.session.user;
+
+  // Load owner-doctor record from doctors table (the legacy main doctor entry)
+  var { data: ownerData } = await window.sb.from('doctors')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .single();
+  doctorOwner = ownerData;
+
+  await loadDoctors();
+})();
+
+async function doLogout() {
+  await window.sb.auth.signOut();
+  window.location.href = 'auth.html?logged_out=1';
+}
+window.doLogout = doLogout;
+</script>
+</body>
+</html>

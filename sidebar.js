@@ -148,6 +148,7 @@ const navItems = [
   { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
   { section: 'الإدارة' },
   { icon: '💊', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
+  { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
   { icon: '🧪', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },

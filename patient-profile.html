@@ -483,6 +483,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             </button>
           </div>
         </div>
+        <div class="form-group" id="providerPickerGroup" style="display:none;">
+          <label>الطبيب المعالج</label>
+          <select id="toothProvider" onchange="onProviderChange()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
+        </div>
         <div class="form-group">
           <label>التكلفة (ل.س)</label>
           <input type="number" id="toothCost" placeholder="مثال: 50000" min="0" inputmode="numeric" autofocus>
@@ -674,10 +678,53 @@ async function loadTreatmentsFromSupabase() {
                is_active: t.is_active !== false,
                category: t.category || 'other',
                default_note: t.default_note || '',
-               completion_note: t.completion_note || '' };
+               completion_note: t.completion_note || '',
+               price_overrides: t.price_overrides || {},
+               is_bundle: !!t.is_bundle };
     });
     localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
   } catch(e){ console.error(e); }
+  // Load clinic doctors
+  try {
+    var dRes = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_owner, is_active')
+      .eq('owner_id', currentUser.id)
+      .order('is_owner', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (!dRes.error && dRes.data) {
+      CLINIC_DOCTORS = dRes.data.filter(function(d){ return d.is_active !== false; });
+    }
+  } catch(e) { CLINIC_DOCTORS = []; }
+  // Load bundle items
+  try {
+    var bRes = await window.sb.from('treatment_bundles')
+      .select('*')
+      .eq('owner_id', currentUser.id);
+    if (!bRes.error && bRes.data) {
+      BUNDLE_ITEMS = bRes.data;
+    }
+  } catch(e) { BUNDLE_ITEMS = []; }
+}
+
+/* Get the right price for a treatment, considering the selected provider's override */
+function getPriceForDoctor(treatment, doctorId) {
+  if (!treatment) return 0;
+  if (doctorId && treatment.price_overrides && treatment.price_overrides[doctorId] !== undefined && treatment.price_overrides[doctorId] !== null) {
+    return treatment.price_overrides[doctorId];
+  }
+  return treatment.price || 0;
+}
+
+/* Get bundle child items for a parent treatment (by treatment_key, returns child treatment objects) */
+function getBundleChildren(parentTreatmentKey) {
+  var parent = getTreatment(parentTreatmentKey);
+  if (!parent || !parent.dbId) return [];
+  var items = BUNDLE_ITEMS.filter(function(bi){ return bi.parent_id === parent.dbId; })
+    .sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0); });
+  return items.map(function(bi){
+    var child = TREATMENTS.find(function(t){ return t.dbId === bi.child_id; });
+    return child ? { treatment: child, quantity: bi.quantity || 1 } : null;
+  }).filter(function(x){ return x; });
 }
 function getTreatment(id) {
   for (var i=0; i<TREATMENTS.length; i++) if (TREATMENTS[i].id === id) return TREATMENTS[i];
@@ -2162,6 +2209,9 @@ var currentSurface = null;
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
 var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing' / 'referred'
+var pendingProviderId = null;  // Selected clinic doctor for this treatment
+var CLINIC_DOCTORS = [];
+var BUNDLE_ITEMS = [];
 
 var STATUS_LABELS = {
   planned:   'مخطط',
@@ -2404,6 +2454,54 @@ function isLightColor(hex) {
   return (r*299 + g*587 + b*114)/1000 > 155;
 }
 
+function populateProviderPicker() {
+  var group = document.getElementById('providerPickerGroup');
+  var select = document.getElementById('toothProvider');
+  if (!group || !select) return;
+  // Hide if no multi-doctor setup
+  if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
+    group.style.display = 'none';
+    pendingProviderId = null;
+    return;
+  }
+  // If only 1 doctor, also hide but auto-set pendingProviderId
+  if (CLINIC_DOCTORS.length === 1) {
+    pendingProviderId = CLINIC_DOCTORS[0].id;
+    group.style.display = 'none';
+    return;
+  }
+  // Show picker with all clinic doctors
+  group.style.display = 'block';
+  var html = '';
+  CLINIC_DOCTORS.forEach(function(d, idx){
+    var ownerStr = d.is_owner ? ' ⭐' : '';
+    html += '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + '</option>';
+  });
+  select.innerHTML = html;
+  // Default to first (usually owner)
+  if (!pendingProviderId || !CLINIC_DOCTORS.find(function(d){ return d.id === pendingProviderId; })) {
+    pendingProviderId = CLINIC_DOCTORS[0].id;
+  }
+  select.value = pendingProviderId;
+}
+
+function onProviderChange() {
+  var select = document.getElementById('toothProvider');
+  if (!select) return;
+  pendingProviderId = select.value;
+  // Update cost based on the new provider's override
+  var t = getTreatment(pendingToothStatus);
+  if (t) {
+    document.getElementById('toothCost').value = getPriceForDoctor(t, pendingProviderId);
+  }
+}
+
+// Local escapeHtml helper (in case not already defined)
+function escapeHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
@@ -2441,7 +2539,6 @@ function pickToothTreatment(status, label) {
   else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
   document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + areaLabel + ')';
   var t = getTreatment(status);
-  document.getElementById('toothCost').value  = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
   document.getElementById('toothDate').value  = toDay();
   // Default status = completed; reset visual selection then call pickStatus to pre-fill note
@@ -2450,6 +2547,10 @@ function pickToothTreatment(status, label) {
     if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
     else b.classList.remove('selected');
   });
+  // Populate provider picker if there are multiple clinic doctors
+  populateProviderPicker();
+  // Set price based on selected provider (uses override if available)
+  document.getElementById('toothCost').value = t ? getPriceForDoctor(t, pendingProviderId) : '';
   // Pre-fill notes for completed (uses completion_note if available, else default_note)
   if (t) {
     var defaultNote = (t.completion_note || t.default_note || '').trim();
@@ -2505,7 +2606,7 @@ async function saveToothTreatment() {
       if (isAbut) {
         var rA = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus
+          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rA.error) {
           console.error('bridge abutment save error:', rA.error);
@@ -2519,13 +2620,13 @@ async function saveToothTreatment() {
         // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE
         var rP = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus
+          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rP.error) {
           console.warn('PONTIC surface rejected, falling back to WHOLE:', rP.error);
           var rF = await window.sb.from('teeth_status').upsert({
             doctor_id: currentUser.id, patient_id: patientId,
-            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus
+            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
           }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
           if (rF.error) {
             console.error('bridge pontic fallback save error:', rF.error);
@@ -2558,14 +2659,14 @@ async function saveToothTreatment() {
     // Normal save
     var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
-      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus
+      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
     if (rN.error) {
       console.warn('teeth_status save failed with surface=' + currentSurface + ', trying WHOLE fallback:', rN.error);
       // Fallback to WHOLE surface
       var rFb = await window.sb.from('teeth_status').upsert({
         doctor_id: currentUser.id, patient_id: patientId,
-        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus, status: pendingTreatStatus
+        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
       }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
       if (rFb.error) {
         console.error('teeth_status fallback save error:', rFb.error);
@@ -2612,7 +2713,8 @@ async function saveToothTreatment() {
       doctor_id: currentUser.id, patient_id: patientId,
       type: pendingToothLabel, description: ledgerDescription,
       cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface,
-      status: pendingTreatStatus
+      status: pendingTreatStatus,
+      provider_id: pendingProviderId
     }).select().single();
     if (rL.error) {
       console.error('ledger insert error:', rL.error);
