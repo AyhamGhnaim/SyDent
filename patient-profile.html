@@ -1420,6 +1420,12 @@ function isBridgeAbut(num) {
   return sm.WHOLE === 'bridge';
 }
 
+/* Is this tooth an implant? */
+function isImplant(num) {
+  var sm = teethMap[String(num)] || {};
+  return sm.WHOLE === 'implant';
+}
+
 /* Find bridge abutments: search outward from this missing tooth in BOTH directions
    along the same arch (upper or lower). Returns { mesial: num|null, distal: num|null, gap: [nums] }.
    "gap" = the contiguous missing teeth that share this bridge. */
@@ -1507,6 +1513,89 @@ function buildPonticTooth(num, isUpper) {
   var num_html = '<div class="tooth-num">' + num + '</div>';
   var inner = isUpper ? (svg + num_html) : (num_html + svg);
   return '<div class="tooth-cell pontic-cell" data-tooth-cell="' + num + '" title="السن ' + num + ' — جسر">' + inner + '</div>';
+}
+
+/* Implant: renders a metallic screw fixture instead of a natural root, with a crown on top.
+   The crown takes the implant treatment's color. */
+function buildImplantTooth(num, isUpper) {
+  var anat = toothAnatomy(num);
+  var W = anat.cellW;
+  var H = Math.round(W * 2.1);
+  var implantColor = (T_FILL && T_FILL['implant']) || '#a78bfa';
+  var implantStroke = (T_STROKE && T_STROKE['implant']) || '#7c5cbf';
+  var screwBody = '#7a7d82';
+  var screwHi = '#c6c9cd';
+  var screwLo = '#3e4146';
+  var gid = 'im' + num;
+  var crownTop = 6;
+  var crownBot = anat.cervicalY || 80;
+  var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
+  // Screw geometry: vertical fixture below the cervical line
+  var screwTop = crownBot + 2;  // small gap between crown and screw collar
+  var screwBot = 195;            // leave a bit at the apex for the rounded tip
+  var screwW = (anat.crownR - anat.crownL) * 0.55;  // narrower than crown
+  var screwCx = (anat.crownL + anat.crownR) / 2;
+  var screwL = screwCx - screwW/2;
+  var screwR = screwCx + screwW/2;
+  // Threads: horizontal stripes inside the fixture
+  var threadStart = screwTop + 8;
+  var threadEnd = screwBot - 6;
+  var threadStep = 5;
+  var threadsD = '';
+  for (var ty = threadStart; ty < threadEnd; ty += threadStep) {
+    // Each thread is a thin V-shape (looks like a screw thread from the side)
+    threadsD += 'M ' + screwL + ' ' + ty
+              + ' L ' + (screwL + screwW * 0.18) + ' ' + (ty + threadStep * 0.5)
+              + ' L ' + screwR + ' ' + ty + ' ';
+  }
+  var svg = '<svg class="tooth-shape implant-shape" data-tooth="' + num + '" data-implant="1" '
+    + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
+    + 'xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" '
+    + 'style="cursor:pointer;" '
+    + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)">'
+    + '<defs>'
+    + '<linearGradient id="cg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="' + implantColor + '"/>'
+      + '<stop offset="70%" stop-color="' + implantColor + '"/>'
+      + '<stop offset="100%" stop-color="' + implantStroke + '"/>'
+    + '</linearGradient>'
+    + '<linearGradient id="sg' + gid + '" x1="0" y1="0" x2="1" y2="0">'
+      + '<stop offset="0%" stop-color="' + screwLo + '"/>'
+      + '<stop offset="30%" stop-color="' + screwBody + '"/>'
+      + '<stop offset="55%" stop-color="' + screwHi + '"/>'
+      + '<stop offset="80%" stop-color="' + screwBody + '"/>'
+      + '<stop offset="100%" stop-color="' + screwLo + '"/>'
+    + '</linearGradient>'
+    + '<clipPath id="cclip' + gid + '">'
+      + '<rect x="0" y="' + crownTop + '" width="100" height="' + (crownBot - crownTop) + '"/>'
+    + '</clipPath>'
+    + '</defs>'
+    + '<g ' + transform + '>'
+    // Crown (clipped to crown area)
+    + '<path d="' + anat.outlineD + '" fill="url(#cg' + gid + ')" '
+      + 'stroke="' + implantStroke + '" stroke-width="1.2" stroke-linejoin="round" '
+      + 'clip-path="url(#cclip' + gid + ')"/>'
+    // Screw body (rounded rectangle with pointed apex)
+    + '<path d="M ' + screwL + ' ' + screwTop
+      + ' L ' + screwR + ' ' + screwTop
+      + ' L ' + screwR + ' ' + (screwBot - 6)
+      + ' Q ' + screwCx + ' ' + (screwBot + 4) + ' '
+            + screwL + ' ' + (screwBot - 6)
+      + ' Z" '
+      + 'fill="url(#sg' + gid + ')" stroke="' + screwLo + '" stroke-width="0.8"/>'
+    // Screw collar (slight wider band at the top, just below crown)
+    + '<rect x="' + (screwL - 1.5) + '" y="' + screwTop + '" '
+      + 'width="' + (screwW + 3) + '" height="5" '
+      + 'fill="' + screwBody + '" stroke="' + screwLo + '" stroke-width="0.7"/>'
+    // Threads (zig-zag pattern across the fixture)
+    + '<path d="' + threadsD + '" fill="none" '
+      + 'stroke="' + screwLo + '" stroke-width="0.6" opacity="0.85"/>'
+    + '</g>'
+    + '<title>السن ' + num + ' — زراعة</title>'
+    + '</svg>';
+  var num_html = '<div class="tooth-num">' + num + '</div>';
+  var inner = isUpper ? (svg + num_html) : (num_html + svg);
+  return '<div class="tooth-cell implant-cell" data-tooth-cell="' + num + '" title="السن ' + num + ' — زراعة">' + inner + '</div>';
 }
 
 function buildTooth(num, surfaceMap, isUpper) {
@@ -1851,14 +1940,16 @@ function renderTeeth() {
   for (var i=0; i<UPPER_T.length; i++) {
     if (i === 8) uHtml += '<div class="midline"></div>';
     var un = UPPER_T[i];
-    if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
+    if (isImplant(un)) uHtml += buildImplantTooth(un, true);
+    else if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
     else if (isExtracted(un)) uHtml += buildExtractedPlaceholder(un, true);
     else uHtml += buildTooth(un, teethMap[String(un)], true);
   }
   for (var j=0; j<LOWER_T.length; j++) {
     if (j === 8) lHtml += '<div class="midline"></div>';
     var ln = LOWER_T[j];
-    if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
+    if (isImplant(ln)) lHtml += buildImplantTooth(ln, false);
+    else if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
     else if (isExtracted(ln)) lHtml += buildExtractedPlaceholder(ln, false);
     else lHtml += buildTooth(ln, teethMap[String(ln)], false);
   }
@@ -1944,23 +2035,19 @@ async function openToothModal(n, surface) {
   var smN = teethMap[String(n)] || {};
   var isAlreadyPontic = isAlreadyExtracted && (smN.PONTIC === 'bridge');
   var isPartOfBridge = isAlreadyBridgeAbut || isAlreadyPontic;
+  var isAlreadyImplant = isImplant(n);
 
   // Filter treatments by what's clicked.
-  // - Part of a bridge (abutment or pontic): NO new treatments; only "remove bridge"
-  // - Plain extracted (not in a bridge): show bridge + implant; plus "undo extraction"
-  // - Root click: only root-target treatments
-  // - Whole click: only whole-target (e.g. extraction, crown, implant)
-  // - Crown surface click: crown or crown_full + whole (extraction, crown, implant)
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
-    // Bridge abutment: the crown is covered, but the root is still treatable
+    // Implant: no further treatments allowed; only the remove-implant button below
+    if (isAlreadyImplant) return false;
+    // Bridge abutment: crown is covered; root still treatable
     if (isAlreadyBridgeAbut) {
       if (isRootClick) return tp === 'root';
-      return false;  // no crown/whole treatments on a covered crown
+      return false;
     }
-    // Pontic (extracted + part of bridge): nothing allowed; only remove-bridge
     if (isAlreadyPontic) return false;
-    // Plain extracted tooth: only bridge or implant
     if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
     if (isRootClick)  return tp === 'root';
     if (isWholeClick) return tp === 'whole';
@@ -1985,7 +2072,9 @@ async function openToothModal(n, surface) {
     html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
   }
 
-  if (isPartOfBridge) {
+  if (isAlreadyImplant) {
+    html += '<button class="topt" style="border-color:#a78bfa;color:#a78bfa;font-weight:700;" onclick="removeImplant(' + n + ')">🔩 إزالة الزراعة</button>';
+  } else if (isPartOfBridge) {
     html += '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
   } else if (isAlreadyExtracted) {
     html += '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
@@ -2071,6 +2160,26 @@ async function undoExtraction(num) {
   closeModal('toothModal');
   renderTeeth(); renderStats();
   showToast(isPartOfBridge ? '✅ تمت إزالة الجسر' : '✅ تمت إعادة السن ' + num);
+}
+
+/* Remove an implant: delete only the implant entry; tooth becomes extracted again (since implants are typically placed in missing tooth slots) */
+async function removeImplant(num) {
+  if (!confirm('إزالة الزراعة من السن ' + num + '؟')) return;
+  var tn = String(num);
+  var sm = teethMap[tn] || {};
+  for (var sk in sm) {
+    if (sm[sk] === 'implant') {
+      var dr = await window.sb.from('teeth_status').delete()
+        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+        .eq('tooth_num', tn).eq('surface', sk);
+      if (dr.error) console.error('delete implant error:', dr.error);
+      delete teethMap[tn][sk];
+    }
+  }
+  if (teethMap[tn] && Object.keys(teethMap[tn]).length === 0) delete teethMap[tn];
+  closeModal('toothModal');
+  renderTeeth(); renderStats();
+  showToast('✅ تمت إزالة الزراعة من السن ' + num);
 }
 
 function isLightColor(hex) {
