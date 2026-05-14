@@ -1521,15 +1521,22 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // Whole-tooth treatment paints the entire tooth one color
-  // Note: bridge is stored under WHOLE but should NOT paint whole — handled as crown_full below
+  // Detect treatment classification by inspecting target_part of the treatment, not just surface key.
+  // This fixes the case where DB constraints forced surface='WHOLE' for a crown_full treatment.
   var wholeT = sm.WHOLE;
+  var wholeTreatObj = wholeT ? getTreatment(wholeT) : null;
+  var wholeTargetPart = wholeTreatObj ? (wholeTreatObj.target_part || 'whole') : null;
   var isBridgeAbutment = (wholeT === 'bridge');
-  var hasWhole = !!wholeT && !isBridgeAbutment;
+  // A WHOLE entry is genuinely 'whole' only if the treatment's target_part is 'whole' (e.g. extraction, implant)
+  // If target_part is 'crown_full', render as crown_full instead.
+  var isStoredCrownFull = (wholeTargetPart === 'crown_full');
+  var hasWhole = !!wholeT && !isBridgeAbutment && !isStoredCrownFull;
   var wholeColor = hasWhole ? (T_FILL[wholeT] || '#f5e6c8') : null;
 
-  // crown_full: treat entire crown with semi-transparent overlay (preserves tooth anatomy)
-  // bridge abutments also use this rendering style
-  var crownFullT = sm.CROWN_FULL || (isBridgeAbutment ? 'bridge' : null);
+  // crown_full: from CROWN_FULL surface OR from WHOLE with crown_full target_part OR bridge abutment
+  var crownFullT = sm.CROWN_FULL
+    || (isStoredCrownFull ? wholeT : null)
+    || (isBridgeAbutment ? 'bridge' : null);
   var hasCrownFull = !!crownFullT;
   var crownFullColor = hasCrownFull ? (T_FILL[crownFullT] || '#fb923c') : null;
 
@@ -2135,17 +2142,30 @@ async function saveToothTreatment() {
       }
     }
   } else {
-    // Normal save
+    // Normal save. teeth_status.surface CAN accept CROWN_FULL since it's not constrained,
+    // but if a check constraint is added later, this still works because we try first
+    // and fall back to WHOLE if it fails.
     var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
       tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
     if (rN.error) {
-      console.error('teeth_status save error:', rN.error);
-      showToast('⚠️ خطأ حفظ الحالة: ' + rN.error.message);
+      console.warn('teeth_status save failed with surface=' + currentSurface + ', trying WHOLE fallback:', rN.error);
+      // Fallback to WHOLE surface
+      var rFb = await window.sb.from('teeth_status').upsert({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (rFb.error) {
+        console.error('teeth_status fallback save error:', rFb.error);
+        showToast('⚠️ خطأ حفظ الحالة: ' + rFb.error.message);
+      }
+      if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+      teethMap[String(currentTooth)]['WHOLE'] = pendingToothStatus;
+    } else {
+      if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+      teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
     }
-    if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
-    teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
   }
 
   // Build description for the ledger entry
@@ -2162,11 +2182,17 @@ async function saveToothTreatment() {
     ledgerDescription = 'السن رقم ' + currentTooth + ' — ' + areaForDesc;
   }
 
-  // 2. Save session in the ledger
+  // 2. Save session in the ledger.
+  // Normalize non-standard surface keys ('CROWN_FULL', 'PONTIC') down to 'WHOLE'
+  // so DB check constraints accept them. The full label is in the description anyway.
+  var dbSurface = currentSurface;
+  if (dbSurface === 'CROWN_FULL' || dbSurface === 'PONTIC' || dbSurface === 'BRIDGE') {
+    dbSurface = 'WHOLE';
+  }
   var rL = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: pendingToothLabel, description: ledgerDescription,
-    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: currentSurface
+    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface
   }).select().single();
   if (rL.error) {
     console.error('ledger insert error:', rL.error);
