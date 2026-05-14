@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="manifest" href="manifest.json">
+<title>تقارير الأطباء — SyDent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
+<script src="sidebar.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
+  --border:rgba(46,232,158,0.15);
+  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --blue:#63b3ed;--purple:#a78bfa;--orange:#fb923c;
+  --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
+}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;gap:12px;
+}
+.tb-title{font-size:18px;font-weight:800;color:var(--green);}
+.tb-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:9px;
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{background:var(--green);color:var(--bg);}
+.btn-primary:hover{background:#26d48e;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-outline:hover{border-color:var(--green);color:var(--green);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+
+.page{padding:24px 28px;max-width:1300px;margin:0 auto;}
+
+/* Filters bar */
+.filters-bar{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 18px;
+  margin-bottom:20px;
+  display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+  gap:12px;align-items:end;
+}
+.filter-group label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:5px;letter-spacing:.3px;}
+.filter-group input,.filter-group select{
+  width:100%;padding:9px 11px;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+  font-family:'Cairo',sans-serif;font-size:13px;
+}
+.filter-group input:focus,.filter-group select:focus{outline:none;border-color:var(--green);}
+
+/* Quick presets */
+.preset-row{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;
+}
+.preset-btn{
+  background:var(--bg2);border:1px solid var(--border);color:var(--text2);
+  padding:6px 12px;border-radius:18px;font-size:11px;font-weight:700;
+  cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;
+}
+.preset-btn:hover{border-color:var(--green);color:var(--green);}
+.preset-btn.active{background:var(--green-dim,rgba(46,232,158,0.12));border-color:var(--green);color:var(--green);}
+
+/* Calc-basis toggle */
+.basis-toggle{
+  display:flex;background:var(--bg2);border:1px solid var(--border);
+  border-radius:10px;padding:3px;gap:3px;
+  margin-bottom:20px;
+}
+.basis-btn{
+  flex:1;padding:10px 12px;background:transparent;border:none;
+  color:var(--text2);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;
+  border-radius:7px;cursor:pointer;transition:all .15s;
+}
+.basis-btn:hover{color:var(--text);}
+.basis-btn.active{background:var(--green);color:var(--bg);}
+.basis-help{font-size:11px;color:var(--text2);margin-top:8px;font-style:italic;}
+
+/* Summary stats */
+.summary-row{
+  display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+  gap:12px;margin-bottom:24px;
+}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px 16px;
+}
+.stat-card .lbl{font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px;letter-spacing:.3px;}
+.stat-card .val{font-size:22px;font-weight:800;color:var(--text);font-family:'Cairo',sans-serif;}
+.stat-card .sub{font-size:11px;color:var(--text2);margin-top:3px;}
+.stat-card.green{border-color:rgba(46,232,158,0.35);}
+.stat-card.green .val{color:var(--green);}
+.stat-card.blue{border-color:rgba(99,179,237,0.35);}
+.stat-card.blue .val{color:var(--blue);}
+.stat-card.orange{border-color:rgba(251,146,60,0.35);}
+.stat-card.orange .val{color:var(--orange);}
+
+/* Provider cards */
+.providers-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(380px, 1fr));
+  gap:16px;
+}
+.prov-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+}
+.prov-card .color-bar{height:5px;width:100%;}
+.prov-body{padding:18px 20px;}
+.prov-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.prov-avatar{
+  width:48px;height:48px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.prov-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.2;}
+.prov-role{font-size:11px;color:var(--text2);margin-top:3px;}
+
+.prov-rows{
+  background:var(--bg);border-radius:8px;padding:12px 14px;
+  border:1px solid rgba(46,232,158,0.06);
+  margin-bottom:12px;
+}
+.prov-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;padding:5px 0;
+}
+.prov-row .k{color:var(--text2);font-weight:600;}
+.prov-row .v{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;}
+.prov-row.divider{border-top:1px dashed rgba(46,232,158,0.15);margin-top:4px;padding-top:8px;}
+
+.payout-box{
+  background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.3);
+  border-radius:8px;padding:11px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:12px;
+}
+.payout-box .lbl{font-size:11px;color:var(--text2);font-weight:600;}
+.payout-box .amt{font-size:18px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;}
+
+.prov-actions{
+  display:flex;gap:6px;flex-wrap:wrap;
+}
+.prov-actions button{
+  flex:1;min-width:calc(50% - 3px);padding:7px;font-size:11px;font-weight:700;
+  border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;
+  border:1px solid var(--border);background:transparent;color:var(--text2);
+  transition:all .15s;
+}
+.prov-actions .btn-details:hover{color:var(--blue);border-color:var(--blue);}
+.prov-actions .btn-print:hover{color:var(--green);border-color:var(--green);}
+.prov-actions .btn-pay:hover{color:var(--yellow);border-color:var(--yellow);}
+
+/* Details modal & sessions table */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+  z-index:100;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);width:100%;max-width:1000px;
+  max-height:90vh;overflow:hidden;display:flex;flex-direction:column;
+}
+.modal-box.small{max-width:480px;}
+.modal-head{
+  padding:16px 20px;background:var(--bg3);
+  border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.modal-head h3{font-size:16px;font-weight:800;color:var(--green);}
+.modal-close{
+  background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;
+  width:32px;height:32px;border-radius:50%;
+}
+.modal-close:hover{background:var(--bg3);color:var(--red);}
+.modal-body{padding:20px;overflow-y:auto;}
+.modal-foot{
+  padding:14px 20px;background:var(--bg3);
+  border-top:1px solid var(--border);
+  display:flex;gap:10px;justify-content:flex-end;
+}
+
+.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+.data-table thead th{
+  background:var(--bg3);color:var(--text2);font-weight:700;
+  padding:9px 10px;text-align:right;border-bottom:1px solid var(--border);
+  font-size:11px;letter-spacing:.3px;
+}
+.data-table tbody td{
+  padding:9px 10px;border-bottom:1px solid rgba(46,232,158,0.05);
+  color:var(--text);
+}
+.data-table tbody tr:hover{background:rgba(46,232,158,0.03);}
+.data-table .num{font-variant-numeric:tabular-nums;text-align:left;}
+
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px;}
+.form-group input,.form-group textarea,.form-group select{
+  width:100%;padding:10px 12px;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+  font-family:'Cairo',sans-serif;font-size:14px;
+}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--green);}
+
+/* Payout history */
+.payout-history-item{
+  background:var(--bg);border:1px solid rgba(46,232,158,0.08);
+  border-radius:8px;padding:10px 14px;
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:6px;
+  font-size:12px;
+}
+.payout-history-item .meta{color:var(--text2);}
+.payout-history-item .amt{color:var(--green);font-weight:800;font-variant-numeric:tabular-nums;}
+.payout-history-item .del-btn{
+  background:none;border:none;color:var(--text2);cursor:pointer;
+  font-size:14px;margin-right:8px;opacity:.6;
+}
+.payout-history-item .del-btn:hover{color:var(--red);opacity:1;}
+
+/* Empty state */
+.empty-state{
+  background:var(--bg2);border:2px dashed var(--border);
+  border-radius:var(--radius);padding:60px 20px;
+  text-align:center;color:var(--text2);
+}
+.empty-state .ic{font-size:48px;margin-bottom:12px;opacity:.6;}
+.empty-state .ttl{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--bg2);border:1px solid var(--green);
+  border-radius:8px;padding:12px 20px;font-size:13px;font-weight:600;
+  color:var(--text);z-index:200;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+  opacity:0;transition:opacity .25s;pointer-events:none;
+}
+.toast.show{opacity:1;}
+
+/* Print-only styling for payout slip */
+@media print {
+  body * { visibility: hidden; }
+  #printArea, #printArea * { visibility: visible; }
+  #printArea { position: absolute; inset: 0; padding: 30px; }
+}
+
+@media (max-width:768px){
+  .topbar{padding:12px 16px;}
+  .page{padding:16px;}
+  .providers-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="main" id="sbMainContent">
+
+<div class="topbar">
+  <div>
+    <div class="tb-title">📊 تقارير إنتاج الأطباء</div>
+    <div class="tb-sub">إنتاج وتحصيلات ومستحقات كل طبيب في العيادة</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-outline btn-sm" onclick="refresh()">🔄 تحديث</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- Date presets -->
+  <div class="preset-row">
+    <button class="preset-btn" onclick="setPreset('this_month', event)">هذا الشهر</button>
+    <button class="preset-btn" onclick="setPreset('last_month', event)">الشهر الماضي</button>
+    <button class="preset-btn" onclick="setPreset('this_week', event)">هذا الأسبوع</button>
+    <button class="preset-btn" onclick="setPreset('last_30', event)">آخر 30 يوم</button>
+    <button class="preset-btn" onclick="setPreset('this_year', event)">هذه السنة</button>
+    <button class="preset-btn" onclick="setPreset('all', event)">كل الفترات</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="filter-group">
+      <label>من تاريخ</label>
+      <input type="date" id="fromDate" onchange="onFilterChange()">
+    </div>
+    <div class="filter-group">
+      <label>إلى تاريخ</label>
+      <input type="date" id="toDate" onchange="onFilterChange()">
+    </div>
+    <div class="filter-group">
+      <label>الطبيب</label>
+      <select id="providerFilter" onchange="onFilterChange()">
+        <option value="all">كل الأطباء</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>حالة الجلسات</label>
+      <select id="statusFilter" onchange="onFilterChange()">
+        <option value="completed">المنجزة فقط</option>
+        <option value="completed_planned">المنجزة + المخططة</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Calculation basis toggle -->
+  <div class="basis-toggle">
+    <button class="basis-btn active" data-basis="production" onclick="setBasis('production')">💰 الإنتاج</button>
+    <button class="basis-btn" data-basis="net" onclick="setBasis('net')">📉 الصافي (بعد المخبر)</button>
+    <button class="basis-btn" data-basis="collection" onclick="setBasis('collection')">💵 التحصيل</button>
+  </div>
+  <div class="basis-help" id="basisHelp">الإنتاج: نسبة الطبيب تُحسب من إجمالي ما سُجّل، بغض النظر عن المخبر أو التحصيل.</div>
+
+  <!-- Overall summary -->
+  <div class="summary-row" id="summaryRow"></div>
+
+  <!-- Provider cards -->
+  <div id="provList"></div>
+
+</div>
+</div>
+
+<!-- Provider Details Modal -->
+<div class="modal-overlay" id="detailsModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="detailsTitle">تفاصيل الجلسات</h3>
+      <button class="modal-close" onclick="closeModal('detailsModal')">×</button>
+    </div>
+    <div class="modal-body" id="detailsBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('detailsModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payout Modal -->
+<div class="modal-overlay" id="payoutModal">
+  <div class="modal-box small">
+    <div class="modal-head">
+      <h3 id="payoutTitle">💵 تسجيل دفعة للطبيب</h3>
+      <button class="modal-close" onclick="closeModal('payoutModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="payoutProviderId">
+      <div class="form-group">
+        <label>الطبيب</label>
+        <input type="text" id="payoutProviderName" readonly>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="form-group">
+          <label>من فترة</label>
+          <input type="date" id="payoutFrom">
+        </div>
+        <div class="form-group">
+          <label>إلى فترة</label>
+          <input type="date" id="payoutTo">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>المبلغ (ل.س) *</label>
+        <input type="number" id="payoutAmount" placeholder="مثال: 250000" min="0" inputmode="numeric">
+      </div>
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="payoutNotes" rows="2" placeholder="مثل: دفعة شهر مايو..."></textarea>
+      </div>
+
+      <div style="margin-top:18px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">📜 سجل الدفعات السابقة</div>
+        <div id="payoutHistoryList"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeModal('payoutModal')">إلغاء</button>
+      <button class="btn btn-primary" onclick="savePayout()">💾 حفظ الدفعة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Print Area (hidden, used for print only) -->
+<div id="printArea" style="display:none;"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+// ─── State ───
+var currentUser = null;
+var doctors = [];           // clinic_doctors
+var sessions = [];          // ledger_sessions in date range
+var payments = [];          // ledger_payments in date range
+var labOrders = [];         // lab_orders for cost matching
+var payouts = [];           // provider_payouts for history
+var basis = 'production';   // 'production' | 'net' | 'collection'
+
+// ─── Helpers ───
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmt(n) {
+  n = Number(n) || 0;
+  return n.toLocaleString('en-US');
+}
+
+function fmtSY(n) {
+  return fmt(Math.round(Number(n) || 0)) + ' ل.س';
+}
+
+function initials(name) {
+  if (!name) return '?';
+  var parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length-1].charAt(0)).toUpperCase();
+}
+
+function toDay(d) {
+  d = d || new Date();
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+function openModal(id) { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ─── Date presets ───
+function setPreset(p, evt) {
+  var now = new Date();
+  var from, to;
+  if (p === 'this_month') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to   = now;
+  } else if (p === 'last_month') {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    to   = new Date(now.getFullYear(), now.getMonth(), 0);
+  } else if (p === 'this_week') {
+    var dow = now.getDay(); // 0 = Sunday
+    from = new Date(now); from.setDate(now.getDate() - dow);
+    to = now;
+  } else if (p === 'last_30') {
+    from = new Date(now); from.setDate(now.getDate() - 30);
+    to = now;
+  } else if (p === 'this_year') {
+    from = new Date(now.getFullYear(), 0, 1);
+    to = now;
+  } else { // all
+    from = new Date(2020, 0, 1);
+    to = now;
+  }
+  document.getElementById('fromDate').value = toDay(from);
+  document.getElementById('toDate').value   = toDay(to);
+
+  // visually mark active
+  document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  var e = evt || (typeof event !== 'undefined' ? event : null);
+  if (e && e.target) e.target.classList.add('active');
+
+  onFilterChange();
+}
+
+// ─── Calc basis ───
+function setBasis(b) {
+  basis = b;
+  document.querySelectorAll('.basis-btn').forEach(function(btn){
+    btn.classList.toggle('active', btn.getAttribute('data-basis') === b);
+  });
+  var help = document.getElementById('basisHelp');
+  if (b === 'production') {
+    help.textContent = 'الإنتاج: نسبة الطبيب تُحسب من إجمالي ما سُجّل، بغض النظر عن المخبر أو التحصيل.';
+  } else if (b === 'net') {
+    help.textContent = 'الصافي: تكلفة المخبر تُطرح أولاً من إنتاج الطبيب، ثم تُحسب نسبته. الأعدل للعيادة.';
+  } else {
+    help.textContent = 'التحصيل: نسبة الطبيب تُحسب من المبلغ المُحصَّل فعلاً (بناءً على نصيبه النسبي من إنتاج كل مريض).';
+  }
+  render();
+}
+
+// ─── Load data ───
+async function loadAll() {
+  // 1. Load clinic doctors
+  var dRes = await window.sb.from('clinic_doctors')
+    .select('*')
+    .eq('owner_id', currentUser.id)
+    .order('is_owner', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (dRes.error) {
+    if (dRes.error.code === 'PGRST204' || (dRes.error.message && dRes.error.message.indexOf('clinic_doctors') >= 0)) {
+      document.getElementById('provList').innerHTML =
+        '<div class="empty-state"><div class="ic">⚙️</div>' +
+        '<div class="ttl">يجب تشغيل تحديث قاعدة البيانات أولاً</div>' +
+        '<div style="margin-top:12px;font-size:13px;">شغّل SQL الخاص بالأطباء المتعددين في Supabase أولاً.</div></div>';
+      return;
+    }
+    showToast('⚠️ فشل تحميل الأطباء');
+    return;
+  }
+  doctors = dRes.data || [];
+
+  // Populate provider filter dropdown
+  var sel = document.getElementById('providerFilter');
+  var current = sel.value || 'all';
+  sel.innerHTML = '<option value="all">كل الأطباء</option>' + doctors.map(function(d){
+    var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
+    return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
+  }).join('');
+  sel.value = current;
+
+  await loadFilteredData();
+}
+
+async function loadFilteredData() {
+  var from = document.getElementById('fromDate').value;
+  var to   = document.getElementById('toDate').value;
+  if (!from || !to) return;
+
+  var statusFilter = document.getElementById('statusFilter').value;
+  var statusList = statusFilter === 'completed_planned' ? ['completed','planned'] : ['completed'];
+
+  // Load sessions in range
+  var sRes = await window.sb.from('ledger_sessions')
+    .select('*')
+    .eq('doctor_id', currentUser.id)
+    .gte('date', from)
+    .lte('date', to)
+    .in('status', statusList);
+  if (sRes.error) {
+    console.error('sessions load:', sRes.error);
+    // Fallback if status column missing
+    var sRes2 = await window.sb.from('ledger_sessions')
+      .select('*')
+      .eq('doctor_id', currentUser.id)
+      .gte('date', from)
+      .lte('date', to);
+    sessions = sRes2.data || [];
+  } else {
+    sessions = sRes.data || [];
+  }
+
+  // Load payments in range
+  var pRes = await window.sb.from('ledger_payments')
+    .select('*')
+    .eq('doctor_id', currentUser.id)
+    .gte('date', from)
+    .lte('date', to);
+  payments = (pRes.data) || [];
+
+  // Load all lab_orders (we filter per session by patient+tooth)
+  // Use status filter: include only sent/received/checked/delivered (not rejected)
+  try {
+    var loRes = await window.sb.from('lab_orders')
+      .select('id,patient_id,tooth_num,cost,status,date_sent')
+      .eq('doctor_id', currentUser.id);
+    labOrders = (loRes.data) || [];
+  } catch(e) {
+    labOrders = [];
+  }
+
+  // Load payouts (all-time for history; we filter per provider later)
+  try {
+    var poRes = await window.sb.from('provider_payouts')
+      .select('*')
+      .eq('owner_id', currentUser.id)
+      .order('paid_at', { ascending: false });
+    payouts = (poRes.data) || [];
+  } catch(e) {
+    payouts = [];
+  }
+
+  render();
+}
+
+// ─── Compute provider stats ───
+// For a given provider, compute production/lab/net from sessions and
+// allocated collection from payments based on provider's share of patient production.
+function computeProviderStats(provId) {
+  // 1. Sessions belonging to this provider
+  var provSessions = sessions.filter(function(s){
+    if (provId === '_unassigned') return !s.provider_id;
+    return s.provider_id === provId;
+  });
+  var sessionCount = provSessions.length;
+  var production = provSessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
+
+  // 2. Lab cost: sum lab_orders matching patient+tooth of this provider's sessions
+  var labCost = 0;
+  var matchedLabIds = {};
+  provSessions.forEach(function(s){
+    if (!s.tooth_num) return;
+    var matches = labOrders.filter(function(lo){
+      return lo.patient_id === s.patient_id
+        && lo.tooth_num !== null && lo.tooth_num !== undefined
+        && String(lo.tooth_num) === String(s.tooth_num)
+        && lo.status !== 'rejected'
+        && !matchedLabIds[lo.id];
+    });
+    matches.forEach(function(lo){
+      labCost += Number(lo.cost) || 0;
+      matchedLabIds[lo.id] = true;
+    });
+  });
+
+  var net = production - labCost;
+
+  // 3. Collection allocation:
+  // For each patient, sum total production (across all providers) in date range,
+  // compute this provider's share, then allocate that share of patient's payments.
+  var collection = 0;
+  // Group sessions by patient (all sessions in range, not just this provider's)
+  var byPatient = {};
+  sessions.forEach(function(s){
+    if (!byPatient[s.patient_id]) byPatient[s.patient_id] = { total: 0, provTotal: 0 };
+    byPatient[s.patient_id].total += Number(s.cost) || 0;
+    if ((provId === '_unassigned' && !s.provider_id) || s.provider_id === provId) {
+      byPatient[s.patient_id].provTotal += Number(s.cost) || 0;
+    }
+  });
+  // Sum payments per patient
+  var paymentsByPatient = {};
+  payments.forEach(function(p){
+    paymentsByPatient[p.patient_id] = (paymentsByPatient[p.patient_id] || 0) + (Number(p.amount) || 0);
+  });
+  Object.keys(byPatient).forEach(function(pid){
+    var rec = byPatient[pid];
+    if (rec.total <= 0 || rec.provTotal <= 0) return;
+    var ratio = rec.provTotal / rec.total;
+    collection += (paymentsByPatient[pid] || 0) * ratio;
+  });
+
+  return {
+    sessionCount: sessionCount,
+    production: production,
+    labCost: labCost,
+    net: net,
+    collection: collection,
+    sessions: provSessions
+  };
+}
+
+function getShareBase(stats) {
+  if (basis === 'net') return stats.net;
+  if (basis === 'collection') return stats.collection;
+  return stats.production;
+}
+
+function computePayout(provider, stats) {
+  var sharePct = Number(provider.share_percent);
+  if (!isFinite(sharePct) || sharePct === null || sharePct === undefined || sharePct === '') {
+    // Fallback: owner gets 100% of base, others 0 if not set
+    sharePct = provider.is_owner ? 100 : 0;
+  }
+  var base = getShareBase(stats);
+  return Math.max(0, base * sharePct / 100);
+}
+
+// ─── Render ───
+function render() {
+  var providerFilter = document.getElementById('providerFilter').value;
+  var visibleDoctors = doctors.filter(function(d){
+    return providerFilter === 'all' || d.id === providerFilter;
+  });
+
+  // Detect unassigned sessions (no provider_id)
+  var hasUnassigned = sessions.some(function(s){ return !s.provider_id; });
+
+  if (!visibleDoctors.length && !hasUnassigned) {
+    document.getElementById('summaryRow').innerHTML = '';
+    document.getElementById('provList').innerHTML =
+      '<div class="empty-state"><div class="ic">👨‍⚕️</div>' +
+      '<div class="ttl">لا يوجد أطباء بعد</div>' +
+      '<div style="margin-top:6px;">أضف أطباء العيادة من صفحة "أطباء العيادة" أولاً.</div></div>';
+    return;
+  }
+
+  // ─── Summary stats ───
+  var totalSessions = sessions.length;
+  var totalProduction = sessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
+  var totalCollection = payments.reduce(function(sum, p){ return sum + (Number(p.amount) || 0); }, 0);
+
+  // Total lab cost across all matched
+  var totalLab = 0;
+  var matchedSet = {};
+  sessions.forEach(function(s){
+    if (!s.tooth_num) return;
+    var matches = labOrders.filter(function(lo){
+      return lo.patient_id === s.patient_id
+        && lo.tooth_num !== null && lo.tooth_num !== undefined
+        && String(lo.tooth_num) === String(s.tooth_num)
+        && lo.status !== 'rejected'
+        && !matchedSet[lo.id];
+    });
+    matches.forEach(function(lo){
+      totalLab += Number(lo.cost) || 0;
+      matchedSet[lo.id] = true;
+    });
+  });
+
+  // Total payouts across all visible doctors
+  var totalPayouts = 0;
+  visibleDoctors.forEach(function(d){
+    var stats = computeProviderStats(d.id);
+    totalPayouts += computePayout(d, stats);
+  });
+
+  document.getElementById('summaryRow').innerHTML =
+    '<div class="stat-card blue">'
+      + '<div class="lbl">عدد الجلسات</div>'
+      + '<div class="val">' + fmt(totalSessions) + '</div>'
+      + '<div class="sub">في الفترة المحددة</div>'
+    + '</div>'
+    + '<div class="stat-card green">'
+      + '<div class="lbl">إجمالي الإنتاج</div>'
+      + '<div class="val">' + fmtSY(totalProduction) + '</div>'
+      + '<div class="sub">قيمة كل ما سُجّل</div>'
+    + '</div>'
+    + '<div class="stat-card orange">'
+      + '<div class="lbl">إجمالي المخبر</div>'
+      + '<div class="val">' + fmtSY(totalLab) + '</div>'
+      + '<div class="sub">من طلبات lab_orders</div>'
+    + '</div>'
+    + '<div class="stat-card blue">'
+      + '<div class="lbl">إجمالي التحصيل</div>'
+      + '<div class="val">' + fmtSY(totalCollection) + '</div>'
+      + '<div class="sub">المدفوعات في الفترة</div>'
+    + '</div>'
+    + '<div class="stat-card green">'
+      + '<div class="lbl">مستحق الأطباء</div>'
+      + '<div class="val">' + fmtSY(totalPayouts) + '</div>'
+      + '<div class="sub">حسب الأساس المُختار</div>'
+    + '</div>';
+
+  // ─── Provider cards ───
+  var html = '<div class="providers-grid">';
+
+  visibleDoctors.forEach(function(d){
+    var stats = computeProviderStats(d.id);
+    var payout = computePayout(d, stats);
+    var sharePct = Number(d.share_percent);
+    var sharePctDisplay = (isFinite(sharePct) && sharePct !== null && sharePct !== undefined && sharePct !== '')
+      ? sharePct + '%'
+      : (d.is_owner ? '100% (افتراضي)' : '— لم تُحدد —');
+
+    var color = d.color || '#2ee89e';
+    var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي' : 'التحصيل');
+    var baseValue = getShareBase(stats);
+
+    // Payouts paid so far in date range to this provider
+    var from = document.getElementById('fromDate').value;
+    var to   = document.getElementById('toDate').value;
+    var paidInRange = payouts
+      .filter(function(po){
+        return po.provider_id === d.id
+          && po.period_start <= to && po.period_end >= from;
+      })
+      .reduce(function(sum, po){ return sum + (Number(po.amount) || 0); }, 0);
+
+    var remainingHtml = '';
+    if (paidInRange > 0) {
+      var remaining = payout - paidInRange;
+      remainingHtml = '<div class="prov-row" style="color:' + (remaining > 0 ? 'var(--yellow)' : 'var(--green)') + ';">'
+        + '<span class="k">المتبقي بعد المدفوع</span>'
+        + '<span class="v">' + fmtSY(remaining) + '</span>'
+      + '</div>';
+    }
+
+    html += '<div class="prov-card">'
+      + '<div class="color-bar" style="background:' + color + ';"></div>'
+      + '<div class="prov-body">'
+        + '<div class="prov-head">'
+          + '<div class="prov-avatar" style="background:' + color + ';">' + initials(d.name) + '</div>'
+          + '<div style="flex:1;">'
+            + '<div class="prov-name">' + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + '</div>'
+            + '<div class="prov-role">' + (d.role ? escapeHtml(d.role) + ' • ' : '') + 'نسبة: ' + sharePctDisplay + '</div>'
+          + '</div>'
+        + '</div>'
+
+        + '<div class="prov-rows">'
+          + '<div class="prov-row"><span class="k">عدد الجلسات</span><span class="v">' + fmt(stats.sessionCount) + '</span></div>'
+          + '<div class="prov-row"><span class="k">الإنتاج</span><span class="v">' + fmtSY(stats.production) + '</span></div>'
+          + '<div class="prov-row"><span class="k">تكلفة المخبر</span><span class="v">' + fmtSY(stats.labCost) + '</span></div>'
+          + '<div class="prov-row"><span class="k">الصافي بعد المخبر</span><span class="v">' + fmtSY(stats.net) + '</span></div>'
+          + '<div class="prov-row"><span class="k">التحصيل المُسند</span><span class="v">' + fmtSY(stats.collection) + '</span></div>'
+          + '<div class="prov-row divider"><span class="k">أساس الحساب (' + basisLabel + ')</span><span class="v">' + fmtSY(baseValue) + '</span></div>'
+          + (paidInRange > 0 ? '<div class="prov-row"><span class="k">المدفوع للطبيب</span><span class="v">' + fmtSY(paidInRange) + '</span></div>' : '')
+          + remainingHtml
+        + '</div>'
+
+        + '<div class="payout-box">'
+          + '<div><div class="lbl">💵 مستحق الطبيب</div><div style="font-size:10px;color:var(--text2);">' + sharePctDisplay + ' × ' + basisLabel + '</div></div>'
+          + '<div class="amt">' + fmtSY(payout) + '</div>'
+        + '</div>'
+
+        + '<div class="prov-actions">'
+          + '<button class="btn-details" onclick="showDetails(\'' + d.id + '\')">📋 التفاصيل</button>'
+          + '<button class="btn-print" onclick="printSlip(\'' + d.id + '\')">🖨️ طباعة كشف</button>'
+          + '<button class="btn-pay" onclick="openPayoutModal(\'' + d.id + '\')">💵 تسجيل دفعة</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  });
+
+  // Add unassigned card if relevant and "all" is selected
+  if (hasUnassigned && providerFilter === 'all') {
+    var stats = computeProviderStats('_unassigned');
+    if (stats.sessionCount > 0) {
+      html += '<div class="prov-card">'
+        + '<div class="color-bar" style="background:#8a9ab5;"></div>'
+        + '<div class="prov-body">'
+          + '<div class="prov-head">'
+            + '<div class="prov-avatar" style="background:#8a9ab5;">?</div>'
+            + '<div style="flex:1;">'
+              + '<div class="prov-name">جلسات بدون طبيب محدد</div>'
+              + '<div class="prov-role">قديمة أو أُدخلت قبل ميزة الأطباء المتعددين</div>'
+            + '</div>'
+          + '</div>'
+          + '<div class="prov-rows">'
+            + '<div class="prov-row"><span class="k">عدد الجلسات</span><span class="v">' + fmt(stats.sessionCount) + '</span></div>'
+            + '<div class="prov-row"><span class="k">الإنتاج</span><span class="v">' + fmtSY(stats.production) + '</span></div>'
+            + '<div class="prov-row"><span class="k">تكلفة المخبر</span><span class="v">' + fmtSY(stats.labCost) + '</span></div>'
+          + '</div>'
+          + '<div style="font-size:11px;color:var(--text2);font-style:italic;text-align:center;padding:8px;">💡 افتح كل جلسة منها وحدد لها طبيب من بطاقة المريض</div>'
+        + '</div>'
+      + '</div>';
+    }
+  }
+
+  html += '</div>';
+  document.getElementById('provList').innerHTML = html;
+}
+
+// ─── Details modal ───
+function showDetails(provId) {
+  var d = doctors.find(function(x){ return x.id === provId; });
+  if (!d) return;
+  var stats = computeProviderStats(provId);
+
+  document.getElementById('detailsTitle').textContent = '📋 جلسات د. ' + d.name;
+
+  if (!stats.sessions.length) {
+    document.getElementById('detailsBody').innerHTML =
+      '<div class="empty-state" style="padding:30px 20px;"><div class="ic">📋</div>' +
+      '<div class="ttl">لا توجد جلسات في هذه الفترة</div></div>';
+    openModal('detailsModal');
+    return;
+  }
+
+  // Build a quick map of patient_id → list of lab_orders matched
+  var sharePct = Number(d.share_percent);
+  if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
+
+  var rows = stats.sessions.slice().sort(function(a,b){
+    return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  }).map(function(s){
+    // Find matching lab_orders
+    var sLabCost = 0;
+    if (s.tooth_num) {
+      var matches = labOrders.filter(function(lo){
+        return lo.patient_id === s.patient_id
+          && lo.tooth_num !== null && lo.tooth_num !== undefined
+          && String(lo.tooth_num) === String(s.tooth_num)
+          && lo.status !== 'rejected';
+      });
+      matches.forEach(function(lo){ sLabCost += Number(lo.cost) || 0; });
+    }
+    var net = (Number(s.cost) || 0) - sLabCost;
+    var sessionShare;
+    if (basis === 'production') sessionShare = (Number(s.cost) || 0) * sharePct / 100;
+    else if (basis === 'net')   sessionShare = net * sharePct / 100;
+    else                        sessionShare = '—'; // collection per-session is not meaningful (it's pooled)
+
+    var statusBadge = s.status === 'planned'
+      ? '<span style="display:inline-block;padding:1px 6px;background:rgba(245,200,66,0.15);color:var(--yellow);border-radius:8px;font-size:10px;">مخططة</span>'
+      : '';
+
+    return '<tr>'
+      + '<td>' + escapeHtml(s.date || '—') + '</td>'
+      + '<td>' + escapeHtml(s.type || '—') + ' ' + statusBadge + '</td>'
+      + '<td>' + (s.tooth_num ? escapeHtml(String(s.tooth_num)) : '—') + '</td>'
+      + '<td class="num">' + fmtSY(s.cost) + '</td>'
+      + '<td class="num" style="color:var(--orange);">' + (sLabCost > 0 ? fmtSY(sLabCost) : '—') + '</td>'
+      + '<td class="num">' + (basis === 'collection' ? '—' : fmtSY(sessionShare)) + '</td>'
+    + '</tr>';
+  }).join('');
+
+  var collectionNote = basis === 'collection'
+    ? '<div style="background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.3);padding:10px;border-radius:8px;margin-bottom:14px;font-size:12px;color:var(--blue);">💡 على أساس "التحصيل": لا يمكن تقسيم المدفوعات على جلسات فردية لأنها تُسجّل على مستوى المريض. النصيب من التحصيل يُحسب فقط على مستوى الإجمالي.</div>'
+    : '';
+
+  document.getElementById('detailsBody').innerHTML = collectionNote
+    + '<table class="data-table">'
+      + '<thead><tr>'
+        + '<th>التاريخ</th><th>العلاج</th><th>السن</th>'
+        + '<th class="num">السعر</th><th class="num">المخبر</th><th class="num">نصيب الطبيب</th>'
+      + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+    + '</table>';
+  openModal('detailsModal');
+}
+
+// ─── Print slip ───
+function printSlip(provId) {
+  var d = doctors.find(function(x){ return x.id === provId; });
+  if (!d) return;
+  var stats = computeProviderStats(provId);
+  var payout = computePayout(d, stats);
+  var from = document.getElementById('fromDate').value;
+  var to   = document.getElementById('toDate').value;
+  var sharePct = Number(d.share_percent);
+  if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
+  var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي بعد المخبر' : 'التحصيل');
+
+  // Build sessions table
+  var sessionsRows = stats.sessions.slice().sort(function(a,b){
+    return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+  }).map(function(s){
+    var sLabCost = 0;
+    if (s.tooth_num) {
+      labOrders.filter(function(lo){
+        return lo.patient_id === s.patient_id
+          && lo.tooth_num !== null && lo.tooth_num !== undefined
+          && String(lo.tooth_num) === String(s.tooth_num)
+          && lo.status !== 'rejected';
+      }).forEach(function(lo){ sLabCost += Number(lo.cost) || 0; });
+    }
+    return '<tr>'
+      + '<td>' + escapeHtml(s.date || '—') + '</td>'
+      + '<td>' + escapeHtml(s.type || '—') + '</td>'
+      + '<td style="text-align:center;">' + (s.tooth_num || '—') + '</td>'
+      + '<td style="text-align:left;">' + fmtSY(s.cost) + '</td>'
+      + '<td style="text-align:left;color:#fb923c;">' + (sLabCost > 0 ? fmtSY(sLabCost) : '—') + '</td>'
+    + '</tr>';
+  }).join('');
+
+  // Paid in range
+  var paidInRange = payouts
+    .filter(function(po){ return po.provider_id === d.id && po.period_start <= to && po.period_end >= from; })
+    .reduce(function(sum, po){ return sum + (Number(po.amount) || 0); }, 0);
+
+  var html = ''
+    + '<div style="font-family:Cairo,sans-serif;color:#000;direction:rtl;padding:20px;">'
+    + '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #2ee89e;padding-bottom:14px;">'
+      + '<div style="font-size:22px;font-weight:800;color:#0a1628;">SyDent — كشف إنتاج طبيب</div>'
+      + '<div style="font-size:13px;color:#666;margin-top:4px;">' + escapeHtml(d.name) + (d.role ? ' — ' + escapeHtml(d.role) : '') + '</div>'
+      + '<div style="font-size:11px;color:#888;margin-top:6px;">الفترة: ' + from + ' ← ' + to + '</div>'
+    + '</div>'
+
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">'
+      + '<div style="border:1px solid #ccc;padding:10px;border-radius:6px;">'
+        + '<div style="font-size:11px;color:#666;">الإنتاج</div>'
+        + '<div style="font-size:18px;font-weight:800;">' + fmtSY(stats.production) + '</div>'
+      + '</div>'
+      + '<div style="border:1px solid #ccc;padding:10px;border-radius:6px;">'
+        + '<div style="font-size:11px;color:#666;">المخبر</div>'
+        + '<div style="font-size:18px;font-weight:800;color:#fb923c;">' + fmtSY(stats.labCost) + '</div>'
+      + '</div>'
+      + '<div style="border:1px solid #ccc;padding:10px;border-radius:6px;">'
+        + '<div style="font-size:11px;color:#666;">الصافي بعد المخبر</div>'
+        + '<div style="font-size:18px;font-weight:800;">' + fmtSY(stats.net) + '</div>'
+      + '</div>'
+      + '<div style="border:1px solid #ccc;padding:10px;border-radius:6px;">'
+        + '<div style="font-size:11px;color:#666;">التحصيل المُسند</div>'
+        + '<div style="font-size:18px;font-weight:800;color:#63b3ed;">' + fmtSY(stats.collection) + '</div>'
+      + '</div>'
+    + '</div>'
+
+    + '<div style="background:#f0fdf4;border:2px solid #2ee89e;padding:14px;border-radius:8px;margin-bottom:22px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+        + '<div>'
+          + '<div style="font-size:12px;color:#666;">المستحق (' + sharePct + '% من ' + basisLabel + ')</div>'
+          + '<div style="font-size:11px;color:#888;margin-top:2px;">عدد الجلسات: ' + fmt(stats.sessionCount) + '</div>'
+        + '</div>'
+        + '<div style="font-size:26px;font-weight:800;color:#0a1628;">' + fmtSY(payout) + '</div>'
+      + '</div>'
+      + (paidInRange > 0
+        ? '<div style="border-top:1px dashed #2ee89e;margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;font-size:13px;">'
+          + '<span>المدفوع سابقاً: <b>' + fmtSY(paidInRange) + '</b></span>'
+          + '<span style="font-weight:800;">المتبقي: ' + fmtSY(payout - paidInRange) + '</span>'
+          + '</div>'
+        : '')
+    + '</div>'
+
+    + (sessionsRows ? '<h4 style="margin-bottom:8px;font-size:13px;">📋 تفاصيل الجلسات</h4>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:11px;">'
+        + '<thead><tr style="background:#f3f4f6;">'
+          + '<th style="padding:6px;border:1px solid #ccc;text-align:right;">التاريخ</th>'
+          + '<th style="padding:6px;border:1px solid #ccc;text-align:right;">العلاج</th>'
+          + '<th style="padding:6px;border:1px solid #ccc;text-align:center;">السن</th>'
+          + '<th style="padding:6px;border:1px solid #ccc;text-align:left;">السعر</th>'
+          + '<th style="padding:6px;border:1px solid #ccc;text-align:left;">المخبر</th>'
+        + '</tr></thead>'
+        + '<tbody>' + sessionsRows.replace(/<td/g, '<td style="padding:6px;border:1px solid #ccc;"') + '</tbody>'
+        + '</table>' : '')
+
+    + '<div style="margin-top:30px;font-size:11px;color:#888;text-align:center;border-top:1px solid #ccc;padding-top:10px;">'
+      + 'SyDent — تم الإنشاء في ' + new Date().toLocaleString('ar-SY')
+    + '</div>'
+    + '</div>';
+
+  // Open in new window for printing
+  var w = window.open('', '_blank', 'width=900,height=700');
+  if (!w) { showToast('⚠️ افتح صلاحيات النوافذ المنبثقة'); return; }
+  w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8">'
+    + '<title>كشف ' + escapeHtml(d.name) + '</title>'
+    + '<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">'
+    + '<style>body{margin:0;font-family:Cairo,sans-serif;}</style>'
+    + '</head><body>' + html + '</body></html>');
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 600);
+}
+
+// ─── Payout modal ───
+function openPayoutModal(provId) {
+  var d = doctors.find(function(x){ return x.id === provId; });
+  if (!d) return;
+
+  document.getElementById('payoutProviderId').value = d.id;
+  document.getElementById('payoutProviderName').value = d.name;
+  document.getElementById('payoutFrom').value = document.getElementById('fromDate').value;
+  document.getElementById('payoutTo').value = document.getElementById('toDate').value;
+  document.getElementById('payoutAmount').value = '';
+  document.getElementById('payoutNotes').value = '';
+
+  renderPayoutHistory(provId);
+  openModal('payoutModal');
+}
+
+function renderPayoutHistory(provId) {
+  var list = payouts.filter(function(po){ return po.provider_id === provId; });
+  var el = document.getElementById('payoutHistoryList');
+  if (!list.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text2);font-style:italic;text-align:center;padding:12px;">لا توجد دفعات سابقة</div>';
+    return;
+  }
+  el.innerHTML = list.map(function(po){
+    return '<div class="payout-history-item">'
+      + '<div>'
+        + '<div class="amt">' + fmtSY(po.amount) + '</div>'
+        + '<div class="meta">' + escapeHtml(po.period_start) + ' ← ' + escapeHtml(po.period_end) + (po.notes ? ' • ' + escapeHtml(po.notes) : '') + '</div>'
+      + '</div>'
+      + '<button class="del-btn" onclick="deletePayout(\'' + po.id + '\')" title="حذف">🗑️</button>'
+    + '</div>';
+  }).join('');
+}
+
+async function savePayout() {
+  var provId = document.getElementById('payoutProviderId').value;
+  var from   = document.getElementById('payoutFrom').value;
+  var to     = document.getElementById('payoutTo').value;
+  var amount = parseFloat(document.getElementById('payoutAmount').value);
+  var notes  = document.getElementById('payoutNotes').value.trim();
+
+  if (!from || !to) { showToast('⚠️ اختر الفترة'); return; }
+  if (!amount || amount <= 0) { showToast('⚠️ أدخل مبلغاً صحيحاً'); return; }
+
+  var payload = {
+    owner_id: currentUser.id,
+    provider_id: provId,
+    period_start: from,
+    period_end: to,
+    amount: Math.round(amount),
+    notes: notes || null
+  };
+
+  var res = await window.sb.from('provider_payouts').insert(payload).select().single();
+  if (res.error) {
+    if (res.error.code === '42P01' || (res.error.message && res.error.message.indexOf('provider_payouts') >= 0)) {
+      showToast('⚙️ يجب تشغيل SQL أولاً (جدول provider_payouts)');
+    } else {
+      showToast('⚠️ فشل الحفظ: ' + res.error.message);
+    }
+    return;
+  }
+  if (res.data) payouts.unshift(res.data);
+  renderPayoutHistory(provId);
+  document.getElementById('payoutAmount').value = '';
+  document.getElementById('payoutNotes').value = '';
+  showToast('✅ تم تسجيل الدفعة');
+  render();  // Refresh provider cards to show paid amount
+}
+
+async function deletePayout(id) {
+  if (!confirm('حذف هذه الدفعة؟')) return;
+  var res = await window.sb.from('provider_payouts').delete().eq('id', id);
+  if (res.error) { showToast('⚠️ فشل الحذف: ' + res.error.message); return; }
+  payouts = payouts.filter(function(po){ return po.id !== id; });
+  // Find which provider we're showing
+  var provId = document.getElementById('payoutProviderId').value;
+  renderPayoutHistory(provId);
+  showToast('🗑️ تم الحذف');
+  render();
+}
+
+// ─── Filter changes ───
+async function onFilterChange() {
+  await loadFilteredData();
+}
+
+async function refresh() {
+  await loadAll();
+  showToast('🔄 تم التحديث');
+}
+
+// Close modal on overlay click
+document.addEventListener('click', function(e){
+  if (e.target.id === 'detailsModal') closeModal('detailsModal');
+  if (e.target.id === 'payoutModal') closeModal('payoutModal');
+});
+
+// ─── Init ───
+// Define PTR refresh hook BEFORE initSidebar (so sidebar can wire it up)
+window.onPTRRefresh = function() { loadAll(); };
+
+(async function init() {
+  initSidebar('provider-reports');
+
+  var user = await window.sbRequireAuth();
+  if (!user) return;
+  currentUser = user;
+
+  // Default: this month
+  var now = new Date();
+  var from = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('fromDate').value = toDay(from);
+  document.getElementById('toDate').value   = toDay(now);
+  // Mark "this month" preset as active
+  document.querySelectorAll('.preset-btn')[0].classList.add('active');
+
+  await loadAll();
+})();
+
+async function doLogout() {
+  await window.sb.auth.signOut();
+  window.location.href = 'auth.html?logged_out=1';
+}
+window.doLogout = doLogout;
+</script>
+</body>
+</html>

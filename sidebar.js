@@ -152,6 +152,7 @@ const navItems = [
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
   { icon: '🧪', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },
+  { icon: '📊', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
   { icon: '📈', label: 'التقارير',    href: '#',             id: 'reports'   },
   { icon: '📋', label: 'السجلات',     href: '#',             id: 'logs'      },
   { section: 'النظام' },
