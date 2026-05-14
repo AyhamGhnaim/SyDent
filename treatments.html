@@ -1478,9 +1478,14 @@ function openBundleModal(treatmentId) {
   existing.forEach(function(e){ existingMap[e.child_id] = e.quantity || 1; });
 
   var listEl = document.getElementById('bundleItemsList');
-  // Show all other active treatments
+  // Prevent cycles: exclude treatments where this one already appears as their child
+  // (i.e. if B is a child of A's bundle, A cannot become a child of B's bundle)
+  var parentsOfMe = bundleItems.filter(function(bi){ return bi.child_id === t.id; }).map(function(bi){ return bi.parent_id; });
   var others = treatments.filter(function(x){
-    return x.id !== t.id && x.is_active !== false;
+    if (x.id === t.id) return false;          // not self
+    if (x.is_active === false) return false;  // active only
+    if (parentsOfMe.indexOf(x.id) >= 0) return false;  // prevents A↔B cycle
+    return true;
   });
   if (others.length === 0) {
     listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">لا توجد علاجات أخرى متاحة</div>';

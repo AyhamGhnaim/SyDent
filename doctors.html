@@ -322,20 +322,26 @@ async function loadDoctors() {
 
   doctors = data || [];
 
-  // Auto-create the owner-doctor record if missing (legacy upgrade)
-  if (doctors.length === 0 && doctorOwner) {
+  // Auto-create the owner-doctor record on first visit (legacy upgrade path).
+  // Uses data from the legacy 'doctors' table if available, otherwise sensible defaults.
+  if (doctors.length === 0) {
+    var ownerName = (doctorOwner && doctorOwner.name) || (currentUser.email ? currentUser.email.split('@')[0] : 'الطبيب الرئيسي');
+    var ownerRole = (doctorOwner && doctorOwner.specialty) || 'طبيب أسنان';
+    var ownerPhone = (doctorOwner && doctorOwner.phone) || null;
     var insertOwner = await window.sb.from('clinic_doctors').insert({
       owner_id: currentUser.id,
       user_id: currentUser.id,
-      name: doctorOwner.name || 'الطبيب الرئيسي',
-      role: doctorOwner.specialty || 'طبيب أسنان',
-      phone: doctorOwner.phone || null,
+      name: ownerName,
+      role: ownerRole,
+      phone: ownerPhone,
       color: '#2ee89e',
       is_owner: true,
       is_active: true
     }).select().single();
     if (!insertOwner.error && insertOwner.data) {
       doctors = [insertOwner.data];
+    } else if (insertOwner.error) {
+      console.warn('owner-doctor auto-create failed:', insertOwner.error);
     }
   }
 
@@ -501,20 +507,23 @@ document.addEventListener('click', function(e){
   initSidebar('doctors');
   renderColorGrid();
 
-  // Wait for session
-  var { data: sessionData } = await window.sb.auth.getSession();
-  if (!sessionData.session) {
-    window.location.href = 'auth.html';
-    return;
-  }
-  currentUser = sessionData.session.user;
+  // Auth check (consistent with other pages)
+  var user = await window.sbRequireAuth();
+  if (!user) return;
+  currentUser = user;
 
-  // Load owner-doctor record from doctors table (the legacy main doctor entry)
-  var { data: ownerData } = await window.sb.from('doctors')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .single();
-  doctorOwner = ownerData;
+  // Load owner-doctor record from legacy 'doctors' table (one row per account)
+  // Use maybeSingle so missing row doesn't throw — new users may not have one yet
+  try {
+    var { data: ownerData } = await window.sb.from('doctors')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+    doctorOwner = ownerData;
+  } catch(e) {
+    console.warn('owner doctor lookup failed:', e);
+    doctorOwner = null;
+  }
 
   await loadDoctors();
 })();

@@ -2233,17 +2233,9 @@ function pickStatus(s) {
     if (b.getAttribute('data-status') === s) b.classList.add('selected');
     else b.classList.remove('selected');
   });
-  // Cost field is always visible. Default value adjusts by status:
-  //   - completed: keep treatment's default price
-  //   - planned/existing/referred: default to 0 (doctor edits manually if needed)
-  var costEl = document.getElementById('toothCost');
-  var tDef = getTreatment(pendingToothStatus);
-  if (s === 'completed') {
-    if (tDef && (!costEl.value || costEl.value === '0')) costEl.value = tDef.price;
-  } else {
-    // For planned/existing/referred: zero out cost (doctor can override)
-    costEl.value = 0;
-  }
+  // Cost field is always visible — doctor can leave it 0 if not billable.
+  // Don't change the cost value here; user can edit it manually if they wish.
+  // (The validation in saveToothTreatment makes cost OPTIONAL regardless of status.)
   // Auto-fill the notes textarea from the treatment's default/completion note
   var tr = getTreatment(pendingToothStatus);
   if (tr) {
@@ -2835,15 +2827,24 @@ function renderSessions() {
     return;
   }
   var rows = '';
+  // Show provider column only if clinic has multiple doctors
+  var showProviderCol = CLINIC_DOCTORS && CLINIC_DOCTORS.length > 1;
   sessions.forEach(function(s) {
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth_num + '</span>' : '';
     var st = s.status || 'completed';
     var stLbl = STATUS_LABELS[st] || st;
     var stColor = STATUS_COLORS[st] || '#3b82f6';
     var stBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + stColor + '22;color:' + stColor + ';border:1px solid ' + stColor + '55;margin-right:4px;">' + stLbl + '</span>';
+    var provBadge = '';
+    if (showProviderCol && s.provider_id) {
+      var prov = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
+      if (prov) {
+        provBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + (prov.color || '#2ee89e') + '22;color:' + (prov.color || '#2ee89e') + ';border:1px solid ' + (prov.color || '#2ee89e') + '55;margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
+      }
+    }
     rows += '<tr>'
       + '<td>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + '</td>'
+      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + provBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
@@ -3023,9 +3024,12 @@ async function saveSession() {
   var type = typeVal === '_other' ? (desc || 'أخرى') : (getTreatment(typeVal) ? getTreatment(typeVal).name : typeVal);
   if (!cost||cost<=0){ showToast('⚠️ أدخل التكلفة'); return; }
   if (!date)         { showToast('⚠️ اختر التاريخ'); return; }
+  // Auto-assign to first active clinic doctor if available
+  var defaultProvider = (CLINIC_DOCTORS && CLINIC_DOCTORS.length > 0) ? CLINIC_DOCTORS[0].id : null;
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: type, description: desc, cost: cost, date: date, notes: notes
+    type: type, description: desc, cost: cost, date: date, notes: notes,
+    status: 'completed', provider_id: defaultProvider
   }).select().single();
   if (newSess) sessions.unshift(newSess);
   var updates = {};
