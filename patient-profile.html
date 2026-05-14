@@ -1953,7 +1953,14 @@ async function openToothModal(n, surface) {
   // - Crown surface click: crown or crown_full + whole (extraction, crown, implant)
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
-    if (isPartOfBridge) return false;
+    // Bridge abutment: the crown is covered, but the root is still treatable
+    if (isAlreadyBridgeAbut) {
+      if (isRootClick) return tp === 'root';
+      return false;  // no crown/whole treatments on a covered crown
+    }
+    // Pontic (extracted + part of bridge): nothing allowed; only remove-bridge
+    if (isAlreadyPontic) return false;
+    // Plain extracted tooth: only bridge or implant
     if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
     if (isRootClick)  return tp === 'root';
     if (isWholeClick) return tp === 'whole';
