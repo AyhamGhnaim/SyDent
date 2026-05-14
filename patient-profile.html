@@ -642,7 +642,8 @@ async function loadTreatmentsFromSupabase() {
       return { id:t.treatment_key, dbId:t.id, name:t.name, label:t.label,
                fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin,
                needs_lab: !!t.needs_lab,
-               target_part: t.target_part || 'crown' };
+               target_part: t.target_part || 'crown',
+               is_active: t.is_active !== false };
     });
     localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
   } catch(e){ console.error(e); }
@@ -2064,6 +2065,8 @@ async function openToothModal(n, surface) {
   //   - Bridge abutment: all treatments allowed except those that would overwrite the bridge (implant, bridge) and "extracted"
   //   - Plain extracted: only bridge + implant (those that can replace a missing tooth)
   function isAllowed(t) {
+    // Inactive treatments don't appear in the picker (but their rendering still works for legacy data)
+    if (t.is_active === false) return false;
     if (isAlreadyImplant) return false;
     if (isAlreadyPontic) return false;
     if (isAlreadyBridgeAbut) {
