@@ -539,7 +539,8 @@ async function loadAll() {
   var doctorsForDropdown = doctors.filter(function(d){
     return inactiveModeForDropdown === 'show' || d.is_active !== false;
   });
-  sel.innerHTML = '<option value="all">كل الأطباء النشطين</option>' + doctorsForDropdown.map(function(d){
+  var allLabel = inactiveModeForDropdown === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
+  sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
     var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
@@ -630,6 +631,8 @@ function findMatchingLabOrders(session, matchedSet) {
     if (matchedSet && matchedSet[lo.id]) return false;
     if (sessionDate && lo.date_sent) {
       var loDate = new Date(lo.date_sent);
+      // Guard against invalid dates (NaN > 90 is false, which would incorrectly pass)
+      if (isNaN(sessionDate.getTime()) || isNaN(loDate.getTime())) return true;
       var diffDays = Math.abs((sessionDate - loDate) / 86400000);
       if (diffDays > windowDays) return false;
     }
@@ -716,13 +719,31 @@ function getShareBase(stats) {
 }
 
 function computePayout(provider, stats) {
-  var sharePct = Number(provider.share_percent);
-  if (!isFinite(sharePct) || sharePct === null || sharePct === undefined || sharePct === '') {
-    // Fallback: owner gets 100% of base, others 0 if not set
-    sharePct = provider.is_owner ? 100 : 0;
-  }
+  var sharePct = resolveSharePercent(provider);
   var base = getShareBase(stats);
   return Math.max(0, base * sharePct / 100);
+}
+
+// Resolve effective share% for a provider, handling null/empty/invalid values.
+// Owner with no share set → 100% (so owner-as-only-doctor still works).
+// Non-owner with no share set → 0%.
+function resolveSharePercent(provider) {
+  var raw = provider.share_percent;
+  if (raw === null || raw === undefined || raw === '') {
+    return provider.is_owner ? 100 : 0;
+  }
+  var n = Number(raw);
+  if (!isFinite(n)) return provider.is_owner ? 100 : 0;
+  return n;
+}
+
+// Format share% for display (handles "not set" case)
+function formatSharePctDisplay(provider) {
+  var raw = provider.share_percent;
+  if (raw === null || raw === undefined || raw === '' || !isFinite(Number(raw))) {
+    return provider.is_owner ? '100% (افتراضي)' : '— لم تُحدد —';
+  }
+  return Number(raw) + '%';
 }
 
 // ─── Render ───
@@ -804,10 +825,7 @@ function render() {
   visibleDoctors.forEach(function(d){
     var stats = providerStatsCache[d.id];  // Use cached version with deduped labs
     var payout = computePayout(d, stats);
-    var sharePct = Number(d.share_percent);
-    var sharePctDisplay = (isFinite(sharePct) && sharePct !== null && sharePct !== undefined && sharePct !== '')
-      ? sharePct + '%'
-      : (d.is_owner ? '100% (افتراضي)' : '— لم تُحدد —');
+    var sharePctDisplay = formatSharePctDisplay(d);
 
     var color = d.color || '#2ee89e';
     var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي' : 'التحصيل');
@@ -921,9 +939,8 @@ function showDetails(provId) {
     return;
   }
 
-  // Build a quick map of patient_id → list of lab_orders matched
-  var sharePct = Number(d.share_percent);
-  if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
+  // Resolve effective share% via helper (handles null/empty/owner fallback correctly)
+  var sharePct = resolveSharePercent(d);
 
   // Use a shared matchedSet so that across all rows of this provider,
   // each lab_order is only counted once (matches stats display).
@@ -976,8 +993,7 @@ function printSlip(provId) {
   var payout = computePayout(d, stats);
   var from = document.getElementById('fromDate').value;
   var to   = document.getElementById('toDate').value;
-  var sharePct = Number(d.share_percent);
-  if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
+  var sharePct = resolveSharePercent(d);
   var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي بعد المخبر' : 'التحصيل');
 
   // Build sessions table (using shared helper for consistency)
@@ -1193,7 +1209,8 @@ function rebuildProviderDropdown() {
   var doctorsForDropdown = doctors.filter(function(d){
     return inactiveMode === 'show' || d.is_active !== false;
   });
-  sel.innerHTML = '<option value="all">كل الأطباء النشطين</option>' + doctorsForDropdown.map(function(d){
+  var allLabel = inactiveMode === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
+  sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
     var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
