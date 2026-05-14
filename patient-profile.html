@@ -905,12 +905,13 @@ function isAnterior(num){ return ANTERIOR_TEETH.indexOf(parseInt(num,10)) !== -1
 
 /* Surface labels in Arabic */
 var SURFACE_LABELS = {
-  'O': 'دهليزي',
+  'O': 'إطباقي',
   'I': 'قاطع',
   'M': 'وحشي',
   'D': 'إنسي',
-  'B': 'إطباقي',
+  'B': 'دهليزي',
   'L': 'لثوي',
+  'V': 'عنقي',
   'R1': 'جذر 1',
   'R2': 'جذر 2',
   'R3': 'جذر 3',
@@ -1147,9 +1148,9 @@ function toothAnatomy(num) {
   var rightKey = mesialOnRight ? 'M' : 'D';
 
   // Center column subdivision (top → bottom):
-  //  O/I (occlusal/incisal) — thin band at the top (where the grooves/edge actually are)
-  //  B (buccal/dehlizi) — large middle portion (the main facial body of the tooth)
-  //  L (lingual/lothawi) — small band at the bottom near the gum
+  //  O/I (occlusal/إطباقي for posteriors, incisal/قاطع for anteriors) — top 25%
+  //  B (buccal/دهليزي) — large middle 50% (the main facial body of the tooth)
+  //  L (lingual/لثوي) — bottom 25% (near the gum line)
   var midL = crownL + sideStripW;
   var midR = crownR - sideStripW;
   var midW = midR - midL;
