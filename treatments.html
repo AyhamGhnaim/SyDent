@@ -211,10 +211,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="page">
 
-  <div class="info-box">
-    <span class="info-icon">💡</span>
-    <span>عند إضافة جلسة لمريض أو الضغط على سن في المخطط، التكلفة تُعبأ تلقائياً من السعر المحدد هنا (مع إمكانية التعديل اليدوي). الألوان تظهر على المخطط وفي السجلات.</span>
-  </div>
 
   <div class="treat-grid" id="treatGrid"></div>
 
@@ -241,10 +237,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
 
-      <div class="form-group">
-        <label>الحرف داخل السن</label>
-        <input type="text" id="tLabel" placeholder="ح" maxlength="2" style="text-align:center;font-size:18px;font-weight:800;">
-      </div>
+      <!-- Hidden label input (auto-generated from name) -->
+      <input type="hidden" id="tLabel" value="">
 
       <div class="form-group">
         <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;margin-bottom:0;">
@@ -411,7 +405,7 @@ function render() {
     var iconBg = 'background:' + bg + ';';
     var bar = 'background:' + bg + ';';
     var textColor = isLightColor(bg) ? '#0a1628' : '#fff';
-    var builtinTag = t.builtin ? '<div class="treat-builtin-tag">افتراضي</div>' : '';
+    var builtinTag = '';
     var labTag = t.needs_lab ? '<span class="treat-lab-tag">🧪 مخبر</span>' : '';
     var targetMap = {
       'crown':      { text:'سطح تاج',     color:'#f5c842' },
@@ -469,6 +463,12 @@ var pickedTarget = 'crown';
 
 function openAddModal() {
   editingId = null;
+  // Reset implant name lock
+  var nameInputAdd = document.getElementById('tName');
+  nameInputAdd.readOnly = false;
+  nameInputAdd.style.opacity = '';
+  nameInputAdd.style.cursor = '';
+  nameInputAdd.title = '';
   document.getElementById('modalTitle').textContent = '＋ إضافة علاج جديد';
   document.getElementById('tName').value  = '';
   document.getElementById('tPrice').value = '';
@@ -490,6 +490,19 @@ function editTreatment(id) {
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
+  // Implant name is fixed and cannot be edited
+  var nameInput = document.getElementById('tName');
+  if (t.treatment_key === 'implant') {
+    nameInput.readOnly = true;
+    nameInput.style.opacity = '0.6';
+    nameInput.style.cursor = 'not-allowed';
+    nameInput.title = 'اسم علاج الزراعة لا يمكن تغييره';
+  } else {
+    nameInput.readOnly = false;
+    nameInput.style.opacity = '';
+    nameInput.style.cursor = '';
+    nameInput.title = '';
+  }
   pickColor(t.fill, t.stroke);
   pickTarget(t.target_part || 'crown');
   updatePreview();
@@ -541,11 +554,11 @@ async function resetToDefaults() {
 async function saveTreatment() {
   var name  = document.getElementById('tName').value.trim();
   var price = parseFloat(document.getElementById('tPrice').value);
-  var label = document.getElementById('tLabel').value.trim();
+  // Auto-generate label from name (first non-space character)
+  var label = name.replace(/\s+/g, '').charAt(0) || '·';
   var needsLab = document.getElementById('tNeedsLab').checked;
   if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
-  if (!label)                { showToast('⚠️ ضع حرفاً واحداً للسن'); return; }
 
   if (editingId) {
     // UPDATE existing
@@ -589,7 +602,8 @@ function pickColor(fill, stroke) {
 }
 
 function updatePreview() {
-  var label = document.getElementById('tLabel').value.trim() || 'ح';
+  var name = (document.getElementById('tName').value || '').trim();
+  var label = name.replace(/\s+/g, '').charAt(0) || 'ح';
   var p = document.getElementById('previewTooth');
   p.style.background    = pickedFill;
   p.style.borderColor   = pickedStroke;
@@ -612,7 +626,7 @@ document.querySelectorAll('.target-opt').forEach(function(o){
   });
 });
 
-document.getElementById('tLabel').addEventListener('input', updatePreview);
+document.getElementById('tName').addEventListener('input', updatePreview);
 
 // Replace direct render() at bottom with auth-aware loader
 window.addEventListener('load', function(){
