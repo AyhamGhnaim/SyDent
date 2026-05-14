@@ -1811,22 +1811,31 @@ function renderTeeth() {
   // Determine which extracted teeth are part of a bridge unit (between 2 bridge abutments)
   var ponticSet = {};
   function findPontics(arch) {
+    // A tooth is a pontic when:
+    //  (a) extracted AND flagged with PONTIC='bridge', OR
+    //  (b) extracted AND between two bridge-marked teeth, OR
+    //  (c) marked WHOLE='bridge' AND between two other bridge-marked teeth (legacy data)
     for (var i=0; i<arch.length; i++) {
-      if (!isExtracted(arch[i])) continue;
-      // A pontic = extracted tooth flagged with bridge at PONTIC, OR extracted between two abutments
       var sm = teethMap[String(arch[i])] || {};
-      if (sm.PONTIC === 'bridge') { ponticSet[arch[i]] = true; continue; }
-      // Fallback: extracted with abutments on both sides
-      var hasLeftAbut = false, hasRightAbut = false;
+      var isExt = (sm.WHOLE === 'extracted');
+      var isBr = (sm.WHOLE === 'bridge');
+      // Case (a)
+      if (isExt && sm.PONTIC === 'bridge') { ponticSet[arch[i]] = true; continue; }
+      // Cases (b) and (c) — must be flanked by other bridge-marked teeth in the unit
+      if (!isExt && !isBr) continue;
+      var hasLeftBr = false, hasRightBr = false;
       for (var L=i-1; L>=0; L--) {
-        if (isBridgeAbut(arch[L])) { hasLeftAbut = true; break; }
-        if (!isExtracted(arch[L])) break;
+        var smL = teethMap[String(arch[L])] || {};
+        if (smL.WHOLE === 'bridge') { hasLeftBr = true; break; }
+        if (smL.WHOLE !== 'extracted') break;
       }
       for (var R=i+1; R<arch.length; R++) {
-        if (isBridgeAbut(arch[R])) { hasRightAbut = true; break; }
-        if (!isExtracted(arch[R])) break;
+        var smR = teethMap[String(arch[R])] || {};
+        if (smR.WHOLE === 'bridge') { hasRightBr = true; break; }
+        if (smR.WHOLE !== 'extracted') break;
       }
-      if (hasLeftAbut && hasRightAbut) ponticSet[arch[i]] = true;
+      // Only mark as pontic if it's in the MIDDLE of a bridge unit (flanked on both sides)
+      if (hasLeftBr && hasRightBr) ponticSet[arch[i]] = true;
     }
   }
   findPontics(UPPER_T);
@@ -1835,18 +1844,16 @@ function renderTeeth() {
   for (var i=0; i<UPPER_T.length; i++) {
     if (i === 8) uHtml += '<div class="midline"></div>';
     var un = UPPER_T[i];
-    if (isExtracted(un)) {
-      if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
-      else uHtml += buildExtractedPlaceholder(un, true);
-    } else uHtml += buildTooth(un, teethMap[String(un)], true);
+    if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
+    else if (isExtracted(un)) uHtml += buildExtractedPlaceholder(un, true);
+    else uHtml += buildTooth(un, teethMap[String(un)], true);
   }
   for (var j=0; j<LOWER_T.length; j++) {
     if (j === 8) lHtml += '<div class="midline"></div>';
     var ln = LOWER_T[j];
-    if (isExtracted(ln)) {
-      if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
-      else lHtml += buildExtractedPlaceholder(ln, false);
-    } else lHtml += buildTooth(ln, teethMap[String(ln)], false);
+    if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
+    else if (isExtracted(ln)) lHtml += buildExtractedPlaceholder(ln, false);
+    else lHtml += buildTooth(ln, teethMap[String(ln)], false);
   }
   upperEl.innerHTML = uHtml;
   lowerEl.innerHTML = lHtml;
@@ -1873,81 +1880,13 @@ function getConnectorFrac(num, isUpper) {
    Each connector is a solid block in the bridge color at the crown's vertical center,
    sitting in the contact zone between two consecutive teeth. */
 function renderBridges() {
-  var bridgeColor = (T_FILL && T_FILL['bridge']) || '#dc2626';
-  var bridgeStroke = (T_STROKE && T_STROKE['bridge']) || '#991b1b';
+  // Bridge connectors removed by user request. Bridges are now visually represented
+  // by the bridge color on abutments + pontics only, without horizontal connectors.
   ['upperJaw','lowerJaw'].forEach(function(jawId){
     var jaw = document.getElementById(jawId);
     if (!jaw) return;
     var olds = jaw.querySelectorAll('.bridge-link');
     for (var i=0; i<olds.length; i++) olds[i].remove();
-    var jawStyle = window.getComputedStyle(jaw);
-    if (jawStyle.position === 'static') jaw.style.position = 'relative';
-    var arch = (jawId === 'upperJaw') ? UPPER_T : LOWER_T;
-    var isUpperJaw = (jawId === 'upperJaw');
-    function isBridgeMember(t) {
-      if (isBridgeAbut(t)) return true;
-      var sm = teethMap[String(t)] || {};
-      return sm.PONTIC === 'bridge';
-    }
-    // Get the actual SVG element (or extract-slot) inside a cell for measurement.
-    // We measure the SVG/slot itself (not the cell) because the cell includes the number label.
-    function getToothEl(n) {
-      var cell = jaw.querySelector('.tooth-cell[data-tooth-cell="' + n + '"]');
-      if (!cell) return null;
-      // The SVG (natural or pontic) or the extract-slot is the real measurable element
-      return cell.querySelector('svg.tooth-shape') || cell.querySelector('.extract-slot') || cell;
-    }
-    var processed = {};
-    for (var k=0; k<arch.length; k++) {
-      var n = arch[k];
-      if (!isBridgeMember(n) || processed[n]) continue;
-      var startIdx = k, endIdx = k;
-      while (startIdx > 0 && isBridgeMember(arch[startIdx-1])) startIdx--;
-      while (endIdx < arch.length-1 && isBridgeMember(arch[endIdx+1])) endIdx++;
-      var unit = [];
-      for (var ii=startIdx; ii<=endIdx; ii++) {
-        unit.push(arch[ii]);
-        processed[arch[ii]] = true;
-      }
-      if (unit.length < 2) continue;
-      var jawRect = jaw.getBoundingClientRect();
-      for (var u=0; u<unit.length-1; u++) {
-        var elA = getToothEl(unit[u]);
-        var elB = getToothEl(unit[u+1]);
-        if (!elA || !elB) continue;
-        var aRect = elA.getBoundingClientRect();
-        var bRect = elB.getBoundingClientRect();
-        var leftRect = (aRect.left < bRect.left) ? aRect : bRect;
-        var rightRect = (aRect.left < bRect.left) ? bRect : aRect;
-        // Compute crown vertical center for each tooth using its own SVG bounds
-        var fracA = getConnectorFrac(unit[u], isUpperJaw);
-        var fracB = getConnectorFrac(unit[u+1], isUpperJaw);
-        // The SVG height in viewBox units is 210. The crown center in viewBox y is computed
-        // from cervicalY for each tooth. We turn this into a SCREEN y per tooth (top + frac*height).
-        var midA = aRect.top - jawRect.top + aRect.height * fracA;
-        var midB = bRect.top - jawRect.top + bRect.height * fracB;
-        var midScreenY = (midA + midB) / 2;
-        // Connector horizontal: overlap into each crown by 30% of its width for visual fusion
-        var overlap = Math.min(leftRect.width, rightRect.width) * 0.30;
-        var left = (leftRect.right - jawRect.left) - overlap;
-        var right = (rightRect.left - jawRect.left) + overlap;
-        var width = Math.max(2, right - left);
-        // Connector height: scale with smaller of the two teeth
-        var refH = Math.min(aRect.height, bRect.height);
-        var height = refH * 0.14;
-        var top = midScreenY - height/2;
-        var block = document.createElement('div');
-        block.className = 'bridge-link';
-        block.style.cssText = 'position:absolute;pointer-events:none;z-index:6;'
-          + 'left:' + left + 'px;top:' + top + 'px;'
-          + 'width:' + width + 'px;height:' + height + 'px;'
-          + 'background:' + bridgeColor + ';'
-          + 'border:1px solid ' + bridgeStroke + ';'
-          + 'border-radius:3px;'
-          + 'box-shadow:inset 0 1px 0 rgba(255,255,255,0.18),inset 0 -1px 0 rgba(0,0,0,0.18);';
-        jaw.appendChild(block);
-      }
-    }
   });
 }
 
