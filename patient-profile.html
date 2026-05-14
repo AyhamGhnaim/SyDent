@@ -2183,6 +2183,11 @@ function pickStatus(s) {
     if (b.getAttribute('data-status') === s) b.classList.add('selected');
     else b.classList.remove('selected');
   });
+  // Cost is only relevant for completed/planned treatments (billable work).
+  // For existing/referred (clinical notes), hide the cost field.
+  var costGroup = document.getElementById('toothCost').closest('.form-group');
+  var needsCost = (s === 'completed' || s === 'planned');
+  if (costGroup) costGroup.style.display = needsCost ? 'block' : 'none';
   // Auto-fill the notes textarea from the treatment's default/completion note
   var tr = getTreatment(pendingToothStatus);
   if (tr) {
@@ -2439,6 +2444,9 @@ function pickToothTreatment(status, label) {
     if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
     else b.classList.remove('selected');
   });
+  // Cost field is visible by default (completed needs cost)
+  var costGroupInit = document.getElementById('toothCost').closest('.form-group');
+  if (costGroupInit) costGroupInit.style.display = 'block';
   // Pre-fill notes for completed (uses completion_note if available, else default_note)
   if (t) {
     var defaultNote = (t.completion_note || t.default_note || '').trim();
@@ -2456,10 +2464,14 @@ function backToStep1() {
 }
 
 async function saveToothTreatment() {
-  var cost  = parseFloat(document.getElementById('toothCost').value);
+  var costRaw = parseFloat(document.getElementById('toothCost').value);
   var date  = document.getElementById('toothDate').value;
   var notes = document.getElementById('toothNotes').value.trim();
-  if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
+  // Cost is required only for 'planned' and 'completed' (which represent real work by this clinic).
+  // 'existing' (pre-existing condition) and 'referred' (sent to another doctor) don't need a cost.
+  var costRequired = (pendingTreatStatus === 'planned' || pendingTreatStatus === 'completed');
+  var cost = (costRaw && costRaw > 0) ? costRaw : 0;
+  if (costRequired && cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
   // Special handling: bridge marks abutments + pontics as a single unit.
@@ -2591,18 +2603,23 @@ async function saveToothTreatment() {
   if (dbSurface === 'CROWN_FULL' || dbSurface === 'PONTIC' || dbSurface === 'BRIDGE') {
     dbSurface = 'WHOLE';
   }
-  var rL = await window.sb.from('ledger_sessions').insert({
-    doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: ledgerDescription,
-    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface,
-    status: pendingTreatStatus
-  }).select().single();
-  if (rL.error) {
-    console.error('ledger insert error:', rL.error);
-    showToast('⚠️ تسجيل الجلسة فشل: ' + rL.error.message);
+  // Only create a ledger entry for completed and planned treatments (financial records).
+  // 'existing' (pre-existing) and 'referred' (sent away) are clinical notes, not billable.
+  var newSess = null;
+  if (pendingTreatStatus === 'completed' || pendingTreatStatus === 'planned') {
+    var rL = await window.sb.from('ledger_sessions').insert({
+      doctor_id: currentUser.id, patient_id: patientId,
+      type: pendingToothLabel, description: ledgerDescription,
+      cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface,
+      status: pendingTreatStatus
+    }).select().single();
+    if (rL.error) {
+      console.error('ledger insert error:', rL.error);
+      showToast('⚠️ تسجيل الجلسة فشل: ' + rL.error.message);
+    }
+    newSess = rL.data;
+    if (newSess) sessions.unshift(newSess);
   }
-  var newSess = rL.data;
-  if (newSess) sessions.unshift(newSess);
 
   // 3. Update last_visit + status
   var updates = {};
@@ -2626,29 +2643,58 @@ async function saveToothTreatment() {
 
 async function clearToothStatus() {
   // Determine what surfaces to clear.
-  // If the user clicked a crown surface (O, I, B, L, M, D) BUT the tooth actually has
-  // a crown_full / whole treatment stored at WHOLE or CROWN_FULL, we need to clear THAT.
+  // Logic:
+  //   1. If the clicked surface has its own treatment_key → clear just that surface (+ crown_full overlay)
+  //   2. If the clicked surface is empty but WHOLE/CROWN_FULL covers the tooth → clear that
+  //   3. If the clicked surface is empty and nothing covers the whole tooth → clear ALL surfaces
+  //      (this is the user trying to make the tooth healthy by clicking anywhere on it)
   var sm = teethMap[String(currentTooth)] || {};
-  var surfacesToClear = [currentSurface];
-  // Check if WHOLE has a treatment that visually covers the area we clicked
-  if (currentSurface !== 'WHOLE' && currentSurface !== 'CROWN_FULL' && !(/^R[123]$/.test(currentSurface))) {
-    // Crown surface click — also clear WHOLE / CROWN_FULL if they represent a full-crown treatment
-    if (sm.WHOLE) {
-      var wt = getTreatment(sm.WHOLE);
-      var wtp = wt ? (wt.target_part || 'whole') : null;
-      if (wtp === 'crown_full' || wtp === 'whole') surfacesToClear.push('WHOLE');
-    }
-    if (sm.CROWN_FULL) surfacesToClear.push('CROWN_FULL');
+  var surfacesToClear = [];
+
+  // Collect all surfaces that have a treatment_key (skip __status meta)
+  var allTreatedSurfaces = [];
+  for (var k in sm) {
+    if (k === '__status') continue;
+    if (sm[k]) allTreatedSurfaces.push(k);
   }
+
+  if (allTreatedSurfaces.length === 0) {
+    // Nothing to clear
+    showToast('السن ' + currentTooth + ' سليم بالفعل');
+    closeModal('toothModal');
+    return;
+  }
+
+  // If the clicked surface itself has a treatment, prefer clearing that (+ WHOLE/CROWN_FULL if they cover the area)
+  if (sm[currentSurface]) {
+    surfacesToClear.push(currentSurface);
+    // Also clear WHOLE/CROWN_FULL if they represent a full-tooth/full-crown overlay
+    if (currentSurface !== 'WHOLE' && currentSurface !== 'CROWN_FULL' && !(/^R[123]$/.test(currentSurface))) {
+      if (sm.WHOLE && surfacesToClear.indexOf('WHOLE') < 0) {
+        var wt = getTreatment(sm.WHOLE);
+        var wtp = wt ? (wt.target_part || 'whole') : null;
+        if (wtp === 'crown_full' || wtp === 'whole') surfacesToClear.push('WHOLE');
+      }
+      if (sm.CROWN_FULL && surfacesToClear.indexOf('CROWN_FULL') < 0) surfacesToClear.push('CROWN_FULL');
+    }
+  } else {
+    // Clicked surface is empty — clear EVERYTHING on this tooth
+    surfacesToClear = allTreatedSurfaces;
+  }
+
   // Build a friendly label for the confirmation
   var areaLabel;
-  if (surfacesToClear.indexOf('WHOLE') >= 0 || surfacesToClear.indexOf('CROWN_FULL') >= 0) {
+  if (surfacesToClear.length === allTreatedSurfaces.length && allTreatedSurfaces.length > 1) {
+    areaLabel = 'جميع علاجات السن';
+  } else if (surfacesToClear.indexOf('WHOLE') >= 0 || surfacesToClear.indexOf('CROWN_FULL') >= 0) {
     areaLabel = 'تغطية التاج';
-  } else if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
-  else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
-  else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
-  else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  } else if (surfacesToClear[0] === 'WHOLE') areaLabel = 'السن كاملاً';
+  else if (surfacesToClear[0] === 'CROWN_FULL') areaLabel = 'التاج كامل';
+  else if (/^R[123]$/.test(surfacesToClear[0])) areaLabel = 'الجذر ' + surfacesToClear[0].replace('R','');
+  else areaLabel = 'السطح ' + (SURFACE_LABELS[surfacesToClear[0]] || surfacesToClear[0]);
+
   if (!confirm('هل تريد إزالة العلاج من ' + areaLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
+
   // Delete each surface from DB + memory
   for (var s=0; s<surfacesToClear.length; s++) {
     var sk = surfacesToClear[s];
@@ -2657,10 +2703,21 @@ async function clearToothStatus() {
       .eq('tooth_num', String(currentTooth))
       .eq('surface', sk);
     if (dr.error) console.error('clear surface ' + sk + ' error:', dr.error);
-    if (teethMap[String(currentTooth)]) delete teethMap[String(currentTooth)][sk];
+    if (teethMap[String(currentTooth)]) {
+      delete teethMap[String(currentTooth)][sk];
+      // Also clear the status meta for this surface
+      if (teethMap[String(currentTooth)].__status) {
+        delete teethMap[String(currentTooth)].__status[sk];
+      }
+    }
   }
-  if (teethMap[String(currentTooth)] && Object.keys(teethMap[String(currentTooth)]).length === 0) {
-    delete teethMap[String(currentTooth)];
+  // Clean up if tooth is now fully empty (only __status meta left, or nothing)
+  if (teethMap[String(currentTooth)]) {
+    var remaining = [];
+    for (var rk in teethMap[String(currentTooth)]) {
+      if (rk !== '__status' && teethMap[String(currentTooth)][rk]) remaining.push(rk);
+    }
+    if (remaining.length === 0) delete teethMap[String(currentTooth)];
   }
   renderTeeth();
   closeModal('toothModal');
