@@ -818,7 +818,8 @@ var SURFACE_LABELS = {
   'R3': 'جذر 3',
   'WHOLE': 'السن كاملاً',
   'CROWN_FULL': 'التاج كامل',
-  'BRIDGE': 'جسر'
+  'BRIDGE': 'جسر',
+  'PONTIC': 'سن وهمي (جسر)'
 };
 
 /* Get the center surface key for a given tooth (O for posterior, I for anterior) */
@@ -1426,28 +1427,20 @@ function findBridgeAbutments(num) {
   var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
   var idx = arch.indexOf(num);
   if (idx < 0) return { mesial:null, distal:null, gap:[num] };
-  // Walk left until a non-missing tooth
+  // Walk LEFT: collect extracted teeth into the gap; stop at first non-extracted tooth (abutment candidate)
   var leftAbut = null, gap = [num];
   for (var i = idx - 1; i >= 0; i--) {
-    if (isExtracted(arch[i]) || isBridgeTooth(arch[i])) {
-      // also part of the gap if extracted; abutment if bridge-tooth
-      if (isExtracted(arch[i])) gap.unshift(arch[i]);
-      else { leftAbut = arch[i]; break; }
-    } else {
-      leftAbut = arch[i];
-      break;
-    }
+    if (isExtracted(arch[i])) { gap.unshift(arch[i]); continue; }
+    // First non-extracted tooth becomes the mesial abutment
+    leftAbut = arch[i];
+    break;
   }
-  // Walk right
+  // Walk RIGHT
   var rightAbut = null;
   for (var j = idx + 1; j < arch.length; j++) {
-    if (isExtracted(arch[j]) || isBridgeTooth(arch[j])) {
-      if (isExtracted(arch[j])) gap.push(arch[j]);
-      else { rightAbut = arch[j]; break; }
-    } else {
-      rightAbut = arch[j];
-      break;
-    }
+    if (isExtracted(arch[j])) { gap.push(arch[j]); continue; }
+    rightAbut = arch[j];
+    break;
   }
   return { mesial: leftAbut, distal: rightAbut, gap: gap };
 }
@@ -2046,10 +2039,14 @@ function switchToWholeTooth() {
 
 /* Undo extraction: delete all teeth_status rows for this tooth, redraw */
 async function undoExtraction(num) {
-  if (!confirm('إعادة السن ' + num + '؟ سيتم إلغاء القلع وأي جسر مرتبط به.')) return;
-  // Find the bridge unit (if any) so we clear bridge teeth too
+  // Determine the scope: just this tooth, or the whole bridge unit?
+  var isPartOfBridge = isBridgeTooth(num);
+  var confirmMsg = isPartOfBridge
+    ? 'إزالة الجسر بالكامل وإعادة الأسنان المقلوعة؟'
+    : 'إلغاء القلع وإعادة السن ' + num + '؟';
+  if (!confirm(confirmMsg)) return;
   var unitToClear = [num];
-  if (isBridgeTooth(num) || isExtracted(num)) {
+  if (isPartOfBridge) {
     var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
     var idx = arch.indexOf(num);
     if (idx >= 0) {
@@ -2059,15 +2056,16 @@ async function undoExtraction(num) {
       unitToClear = arch.slice(s, e+1);
     }
   }
-  // Delete from DB only the entries we control (extraction + bridge keys)
+  // Delete only the entries we control (extraction + bridge keys)
   for (var i=0; i<unitToClear.length; i++) {
     var tn = String(unitToClear[i]);
     var sm = teethMap[tn] || {};
     for (var sk in sm) {
       if (sm[sk] === 'extracted' || sm[sk] === 'bridge') {
-        await window.sb.from('teeth_status').delete()
+        var dr = await window.sb.from('teeth_status').delete()
           .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
           .eq('tooth_num', tn).eq('surface', sk);
+        if (dr.error) console.error('delete teeth_status error:', dr.error);
         delete teethMap[tn][sk];
       }
     }
@@ -2075,7 +2073,7 @@ async function undoExtraction(num) {
   }
   closeModal('toothModal');
   renderTeeth(); renderStats();
-  showToast('✅ تمت إعادة السن ' + num);
+  showToast(isPartOfBridge ? '✅ تمت إزالة الجسر' : '✅ تمت إعادة السن ' + num);
 }
 
 function isLightColor(hex) {
@@ -2129,6 +2127,8 @@ async function saveToothTreatment() {
   // - Abutments (the existing teeth on each side): treatment_key='bridge' at surface='WHOLE'
   // - Pontics (the extracted teeth in between): keep 'extracted' at WHOLE,
   //   AND add 'bridge' at a separate surface='PONTIC' so they're flagged as part of the bridge
+  // Track the bridge unit for ledger description (null if not a bridge save)
+  var bridgeUnitForLedger = null;
   if (pendingToothStatus === 'bridge') {
     var abuts = findBridgeAbutments(currentTooth);
     if (!abuts.mesial || !abuts.distal) {
@@ -2140,52 +2140,85 @@ async function saveToothTreatment() {
     var dIdx = arch.indexOf(abuts.distal);
     var lo = Math.min(mIdx, dIdx), hi = Math.max(mIdx, dIdx);
     var unit = arch.slice(lo, hi+1);
+    bridgeUnitForLedger = unit;
     for (var u=0; u<unit.length; u++) {
       var un = String(unit[u]);
       var isAbut = (unit[u] === abuts.mesial || unit[u] === abuts.distal);
       if (isAbut) {
-        // Abutment: mark as bridge at WHOLE (covers natural crown)
-        await window.sb.from('teeth_status').upsert({
+        var rA = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
           tooth_num: un, surface: 'WHOLE', treatment_key: 'bridge'
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+        if (rA.error) {
+          console.error('bridge abutment save error:', rA.error);
+          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rA.error.message);
+        }
         if (!teethMap[un]) teethMap[un] = {};
         teethMap[un]['WHOLE'] = 'bridge';
       } else {
-        // Pontic: keep extracted, also flag as bridge pontic (separate surface key)
-        await window.sb.from('teeth_status').upsert({
+        // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE='bridge'
+        var rP = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
           tooth_num: un, surface: 'PONTIC', treatment_key: 'bridge'
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-        if (!teethMap[un]) teethMap[un] = {};
-        teethMap[un]['PONTIC'] = 'bridge';
-        // ensure extracted stays
-        if (teethMap[un]['WHOLE'] !== 'extracted') teethMap[un]['WHOLE'] = 'extracted';
+        if (rP.error) {
+          console.warn('PONTIC surface rejected, falling back to WHOLE:', rP.error);
+          var rF = await window.sb.from('teeth_status').upsert({
+            doctor_id: currentUser.id, patient_id: patientId,
+            tooth_num: un, surface: 'WHOLE', treatment_key: 'bridge'
+          }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+          if (rF.error) {
+            console.error('bridge pontic fallback save error:', rF.error);
+            showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rF.error.message);
+          }
+          if (!teethMap[un]) teethMap[un] = {};
+          teethMap[un]['WHOLE'] = 'bridge';
+        } else {
+          if (!teethMap[un]) teethMap[un] = {};
+          teethMap[un]['PONTIC'] = 'bridge';
+          if (teethMap[un]['WHOLE'] !== 'extracted') teethMap[un]['WHOLE'] = 'extracted';
+        }
       }
     }
   } else {
     // Normal save
-    await window.sb.from('teeth_status').upsert({
+    var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
       tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+    if (rN.error) {
+      console.error('teeth_status save error:', rN.error);
+      showToast('⚠️ خطأ حفظ الحالة: ' + rN.error.message);
+    }
     if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
     teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
   }
 
-  // Build description that reflects the area type
-  var areaForDesc;
-  if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
-  else if (currentSurface === 'CROWN_FULL') areaForDesc = 'التاج كامل';
-  else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
-  else areaForDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  // Build description for the ledger entry
+  var areaForDesc, ledgerToothNum = String(currentTooth), ledgerDescription;
+  if (bridgeUnitForLedger) {
+    areaForDesc = 'جسر يشمل الأسنان ' + bridgeUnitForLedger.join('، ');
+    ledgerToothNum = bridgeUnitForLedger.join(',');
+    ledgerDescription = areaForDesc;
+  } else {
+    if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
+    else if (currentSurface === 'CROWN_FULL') areaForDesc = 'التاج كامل';
+    else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
+    else areaForDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+    ledgerDescription = 'السن رقم ' + currentTooth + ' — ' + areaForDesc;
+  }
 
-  // 2. Save session
-  const { data: newSess } = await window.sb.from('ledger_sessions').insert({
+  // 2. Save session in the ledger
+  var rL = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForDesc,
-    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
+    type: pendingToothLabel, description: ledgerDescription,
+    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: currentSurface
   }).select().single();
+  if (rL.error) {
+    console.error('ledger insert error:', rL.error);
+    showToast('⚠️ تسجيل الجلسة فشل: ' + rL.error.message);
+  }
+  var newSess = rL.data;
   if (newSess) sessions.unshift(newSess);
 
   // 3. Update last_visit + status
