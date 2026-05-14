@@ -1451,15 +1451,18 @@ function buildExtractedPlaceholder(num, isUpper) {
   var anatRef = toothAnatomy(num);
   var W = anatRef.cellW;
   var H = Math.round(W * 2.1);
-  return '<div class="extract-slot" data-tooth="' + num + '" '
-    + 'style="display:inline-flex;align-items:center;justify-content:center;'
-    + 'width:' + W + 'px;height:' + H + 'px;vertical-align:bottom;cursor:pointer;'
+  var slot = '<div class="extract-slot" data-tooth="' + num + '" '
+    + 'style="display:flex;align-items:center;justify-content:center;'
+    + 'width:' + W + 'px;height:' + H + 'px;cursor:pointer;'
     + 'border:1.5px dashed rgba(239,83,80,0.35);border-radius:8px;'
-    + 'background:rgba(239,83,80,0.04);position:relative;margin:0 1px;" '
+    + 'background:rgba(239,83,80,0.04);position:relative;" '
     + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)" '
     + 'title="السن ' + num + ' — مقلوع (اضغط لإضافة جسر/زراعة)">'
     + '<span class="extract-plus" style="font-size:22px;color:rgba(239,83,80,0.55);font-weight:300;transition:transform .15s,color .15s;">+</span>'
     + '</div>';
+  var num_html = '<div class="tooth-num">' + num + '</div>';
+  var inner = isUpper ? (slot + num_html) : (num_html + slot);
+  return '<div class="tooth-cell extract-cell" data-tooth-cell="' + num + '">' + inner + '</div>';
 }
 
 /* Pontic: a crown-only tooth (no root) colored in bridge color.
@@ -1473,17 +1476,15 @@ function buildPonticTooth(num, isUpper) {
   var bridgeColor = (T_FILL && T_FILL['bridge']) || '#dc2626';
   var bridgeStroke = (T_STROKE && T_STROKE['bridge']) || '#991b1b';
   var gid = 'p' + num;
-  // The pontic uses ONLY the crown shape (no root). To keep the crown at the same
-  // vertical position as natural abutments, we keep the full 100x210 viewBox but
-  // only draw the crown outline (clipped to crown area).
   var crownTop = 6;
   var crownBot = anat.cervicalY || 80;
   var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
-  // Use a clip path bounded by the crown rect so even if the outline extends further it stays in the crown area
+  // SVG occupies the FULL tooth cell (same as a natural tooth) so it stays in
+  // the row flow at the same height. The clipPath restricts drawing to the crown area only.
   var svg = '<svg class="tooth-shape pontic-shape" data-tooth="' + num + '" data-bridge="1" '
     + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
     + 'xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" '
-    + 'style="cursor:pointer;vertical-align:bottom;overflow:visible;" '
+    + 'style="cursor:pointer;" '
     + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)">'
     + '<defs>'
     + '<linearGradient id="pg' + gid + '" x1="0" y1="0" x2="0" y2="1">'
@@ -1502,7 +1503,10 @@ function buildPonticTooth(num, isUpper) {
     + '</g>'
     + '<title>السن ' + num + ' — جسر (دعامة وهمية)</title>'
     + '</svg>';
-  return svg;
+  // Wrap in tooth-cell (same as buildTooth) so it occupies the proper row slot with its number
+  var num_html = '<div class="tooth-num">' + num + '</div>';
+  var inner = isUpper ? (svg + num_html) : (num_html + svg);
+  return '<div class="tooth-cell pontic-cell" data-tooth-cell="' + num + '" title="السن ' + num + ' — جسر">' + inner + '</div>';
 }
 
 function buildTooth(num, surfaceMap, isUpper) {
@@ -1775,7 +1779,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   var num_html = '<div class="tooth-num">' + num + '</div>';
   var tip_html = '<div class="tooth-tip">' + tipRows + '</div>';
 
-  var html = '<div class="tooth-cell" title="السن ' + num + '">';
+  var html = '<div class="tooth-cell" data-tooth-cell="' + num + '" title="السن ' + num + '">';
   if (isUpper) {
     html += tip_html + svg + num_html;
   } else {
@@ -1880,11 +1884,18 @@ function renderBridges() {
     if (jawStyle.position === 'static') jaw.style.position = 'relative';
     var arch = (jawId === 'upperJaw') ? UPPER_T : LOWER_T;
     var isUpperJaw = (jawId === 'upperJaw');
-    // A tooth is part of a bridge if it's an abutment, OR an extracted+pontic-marked tooth
     function isBridgeMember(t) {
       if (isBridgeAbut(t)) return true;
       var sm = teethMap[String(t)] || {};
       return sm.PONTIC === 'bridge';
+    }
+    // Get the actual SVG element (or extract-slot) inside a cell for measurement.
+    // We measure the SVG/slot itself (not the cell) because the cell includes the number label.
+    function getToothEl(n) {
+      var cell = jaw.querySelector('.tooth-cell[data-tooth-cell="' + n + '"]');
+      if (!cell) return null;
+      // The SVG (natural or pontic) or the extract-slot is the real measurable element
+      return cell.querySelector('svg.tooth-shape') || cell.querySelector('.extract-slot') || cell;
     }
     var processed = {};
     for (var k=0; k<arch.length; k++) {
@@ -1901,27 +1912,29 @@ function renderBridges() {
       if (unit.length < 2) continue;
       var jawRect = jaw.getBoundingClientRect();
       for (var u=0; u<unit.length-1; u++) {
-        var elA = jaw.querySelector('[data-tooth="' + unit[u] + '"]');
-        var elB = jaw.querySelector('[data-tooth="' + unit[u+1] + '"]');
+        var elA = getToothEl(unit[u]);
+        var elB = getToothEl(unit[u+1]);
         if (!elA || !elB) continue;
         var aRect = elA.getBoundingClientRect();
         var bRect = elB.getBoundingClientRect();
         var leftRect = (aRect.left < bRect.left) ? aRect : bRect;
         var rightRect = (aRect.left < bRect.left) ? bRect : aRect;
-        // Connector sits in the embrasure (the gap between crowns), spanning fully
-        // and overlapping deeply into each crown so it visually fuses
-        var overlap = Math.min(leftRect.width, rightRect.width) * 0.32;
+        // Compute crown vertical center for each tooth using its own SVG bounds
+        var fracA = getConnectorFrac(unit[u], isUpperJaw);
+        var fracB = getConnectorFrac(unit[u+1], isUpperJaw);
+        // The SVG height in viewBox units is 210. The crown center in viewBox y is computed
+        // from cervicalY for each tooth. We turn this into a SCREEN y per tooth (top + frac*height).
+        var midA = aRect.top - jawRect.top + aRect.height * fracA;
+        var midB = bRect.top - jawRect.top + bRect.height * fracB;
+        var midScreenY = (midA + midB) / 2;
+        // Connector horizontal: overlap into each crown by 30% of its width for visual fusion
+        var overlap = Math.min(leftRect.width, rightRect.width) * 0.30;
         var left = (leftRect.right - jawRect.left) - overlap;
         var right = (rightRect.left - jawRect.left) + overlap;
         var width = Math.max(2, right - left);
-        // Position at the gingival third of the crown (embrasure level)
-        var fracA = getConnectorFrac(unit[u], isUpperJaw);
-        var fracB = getConnectorFrac(unit[u+1], isUpperJaw);
-        var fracMid = (fracA + fracB) / 2;
+        // Connector height: scale with smaller of the two teeth
         var refH = Math.min(aRect.height, bRect.height);
-        // Connector height: ~14% of cell height (thick enough to read as part of the crown)
         var height = refH * 0.14;
-        var midScreenY = (leftRect.top - jawRect.top) + refH * fracMid;
         var top = midScreenY - height/2;
         var block = document.createElement('div');
         block.className = 'bridge-link';
@@ -1979,23 +1992,25 @@ async function openToothModal(n, surface) {
   document.getElementById('toothModalTitle').textContent =
     'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
 
-  // Detect if this tooth is already extracted — opens a special "missing tooth" picker
+  // Detect tooth states for the picker
   var isAlreadyExtracted = isExtracted(n);
-  var isAlreadyBridgeAbut = isBridgeTooth(n) && !isAlreadyExtracted;
+  var isAlreadyBridgeAbut = isBridgeAbut(n);   // bridge abutment (not pontic)
+  var smN = teethMap[String(n)] || {};
+  var isAlreadyPontic = isAlreadyExtracted && (smN.PONTIC === 'bridge');
+  var isPartOfBridge = isAlreadyBridgeAbut || isAlreadyPontic;
 
   // Filter treatments by what's clicked.
-  // - Extracted tooth: only show bridge + implant; plus an "undo extraction" pseudo-option below
-  // - Bridge abutment: clicking gives the "undo extraction" / "remove bridge" option only
+  // - Part of a bridge (abutment or pontic): NO new treatments; only "remove bridge"
+  // - Plain extracted (not in a bridge): show bridge + implant; plus "undo extraction"
   // - Root click: only root-target treatments
   // - Whole click: only whole-target (e.g. extraction, crown, implant)
-  // - Crown surface click: crown or crown_full
+  // - Crown surface click: crown or crown_full + whole (extraction, crown, implant)
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
+    if (isPartOfBridge) return false;
     if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
-    if (isAlreadyBridgeAbut) return false;  // no new treatments; only undo
     if (isRootClick)  return tp === 'root';
     if (isWholeClick) return tp === 'whole';
-    // Crown surface click: show crown-area treatments + whole-tooth treatments (قلع، تلبيس، زراعة)
     return tp === 'crown' || tp === 'crown_full' || tp === 'whole';
   }
 
@@ -2017,10 +2032,10 @@ async function openToothModal(n, surface) {
     html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
   }
 
-  if (isAlreadyExtracted) {
-    html += '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
-  } else if (isAlreadyBridgeAbut) {
+  if (isPartOfBridge) {
     html += '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
+  } else if (isAlreadyExtracted) {
+    html += '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
   } else {
     html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
   }
