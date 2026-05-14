@@ -1406,18 +1406,26 @@ function isExtracted(num) {
   return false;
 }
 
+/* Is this stored treatment_key a bridge treatment (built-in 'bridge' or any custom variant)? */
+function isBridgeKey(key) {
+  if (!key) return false;
+  if (key === 'bridge') return true;
+  var tr = getTreatment(key);
+  return !!(tr && tr.target_part === 'bridge');
+}
+
 function isBridgeTooth(num) {
   var sm = teethMap[String(num)] || {};
-  // A tooth is a bridge member if it has 'bridge' in any surface (WHOLE for abutment, PONTIC for pontic)
+  // A tooth is a bridge member if it has any bridge treatment in any surface
   for (var k in sm) {
-    if (sm[k] === 'bridge') return true;
+    if (isBridgeKey(sm[k])) return true;
   }
   return false;
 }
 /* Is this tooth an abutment (not a pontic)? Abutments have bridge at WHOLE; pontics have it at PONTIC */
 function isBridgeAbut(num) {
   var sm = teethMap[String(num)] || {};
-  return sm.WHOLE === 'bridge';
+  return isBridgeKey(sm.WHOLE);
 }
 
 /* Is this tooth an implant? */
@@ -1485,8 +1493,11 @@ function buildPonticTooth(num, isUpper) {
   var anat = toothAnatomy(num);
   var W = anat.cellW;
   var H = Math.round(W * 2.1);
-  var bridgeColor = (T_FILL && T_FILL['bridge']) || '#dc2626';
-  var bridgeStroke = (T_STROKE && T_STROKE['bridge']) || '#991b1b';
+  // Use the actual stored bridge key (could be 'bridge' or a custom variant like 'custom_xyz')
+  var sm = teethMap[String(num)] || {};
+  var bridgeKey = isBridgeKey(sm.PONTIC) ? sm.PONTIC : (isBridgeKey(sm.WHOLE) ? sm.WHOLE : 'bridge');
+  var bridgeColor = (T_FILL && T_FILL[bridgeKey]) || '#dc2626';
+  var bridgeStroke = (T_STROKE && T_STROKE[bridgeKey]) || '#991b1b';
   var gid = 'p' + num;
   var crownTop = 6;
   var crownBot = anat.cervicalY || 80;
@@ -1622,17 +1633,18 @@ function buildTooth(num, surfaceMap, isUpper) {
   var wholeT = sm.WHOLE;
   var wholeTreatObj = wholeT ? getTreatment(wholeT) : null;
   var wholeTargetPart = wholeTreatObj ? (wholeTreatObj.target_part || 'whole') : null;
-  var isBridgeAbutment = (wholeT === 'bridge');
+  var isBridgeAbutment = isBridgeKey(wholeT);
   // A WHOLE entry is genuinely 'whole' only if the treatment's target_part is 'whole' (e.g. extraction, implant)
   // If target_part is 'crown_full', render as crown_full instead.
   var isStoredCrownFull = (wholeTargetPart === 'crown_full');
   var hasWhole = !!wholeT && !isBridgeAbutment && !isStoredCrownFull;
   var wholeColor = hasWhole ? (T_FILL[wholeT] || '#f5e6c8') : null;
 
-  // crown_full: from CROWN_FULL surface OR from WHOLE with crown_full target_part OR bridge abutment
+  // crown_full: from CROWN_FULL surface OR from WHOLE with crown_full target_part OR bridge abutment.
+  // For bridge abutments use the actual stored key (so custom bridge variants render with their own color).
   var crownFullT = sm.CROWN_FULL
     || (isStoredCrownFull ? wholeT : null)
-    || (isBridgeAbutment ? 'bridge' : null);
+    || (isBridgeAbutment ? (wholeT || 'bridge') : null);
   var hasCrownFull = !!crownFullT;
   var crownFullColor = hasCrownFull ? (T_FILL[crownFullT] || '#fb923c') : null;
 
@@ -1921,20 +1933,20 @@ function renderTeeth() {
     for (var i=0; i<arch.length; i++) {
       var sm = teethMap[String(arch[i])] || {};
       var isExt = (sm.WHOLE === 'extracted');
-      var isBr = (sm.WHOLE === 'bridge');
+      var isBr = isBridgeKey(sm.WHOLE);
       // Case (a)
-      if (isExt && sm.PONTIC === 'bridge') { ponticSet[arch[i]] = true; continue; }
+      if (isExt && isBridgeKey(sm.PONTIC)) { ponticSet[arch[i]] = true; continue; }
       // Cases (b) and (c) — must be flanked by other bridge-marked teeth in the unit
       if (!isExt && !isBr) continue;
       var hasLeftBr = false, hasRightBr = false;
       for (var L=i-1; L>=0; L--) {
         var smL = teethMap[String(arch[L])] || {};
-        if (smL.WHOLE === 'bridge') { hasLeftBr = true; break; }
+        if (isBridgeKey(smL.WHOLE)) { hasLeftBr = true; break; }
         if (smL.WHOLE !== 'extracted') break;
       }
       for (var R=i+1; R<arch.length; R++) {
         var smR = teethMap[String(arch[R])] || {};
-        if (smR.WHOLE === 'bridge') { hasRightBr = true; break; }
+        if (isBridgeKey(smR.WHOLE)) { hasRightBr = true; break; }
         if (smR.WHOLE !== 'extracted') break;
       }
       // Only mark as pontic if it's in the MIDDLE of a bridge unit (flanked on both sides)
@@ -2040,31 +2052,33 @@ async function openToothModal(n, surface) {
   var isAlreadyExtracted = isExtracted(n);
   var isAlreadyBridgeAbut = isBridgeAbut(n);   // bridge abutment (not pontic)
   var smN = teethMap[String(n)] || {};
-  var isAlreadyPontic = isAlreadyExtracted && (smN.PONTIC === 'bridge');
+  var isAlreadyPontic = isAlreadyExtracted && isBridgeKey(smN.PONTIC);
   var isPartOfBridge = isAlreadyBridgeAbut || isAlreadyPontic;
   var isAlreadyImplant = isImplant(n);
 
-  // Filter treatments by what's clicked.
+  // UNIFIED LIST: Show ALL treatments regardless of where the user clicked.
+  // The smart routing happens at save time based on each treatment's target_part.
+  // State-based exceptions:
+  //   - Implant: no treatments allowed (only remove button)
+  //   - Pontic: no treatments allowed (only remove bridge)
+  //   - Bridge abutment: all treatments allowed except those that would overwrite the bridge (implant, bridge) and "extracted"
+  //   - Plain extracted: only bridge + implant (those that can replace a missing tooth)
   function isAllowed(t) {
-    var tp = t.target_part || 'crown';
-    // Hardcoded: implant and bridge are whole-tooth treatments regardless of target_part value
-    if (t.id === 'implant' || t.id === 'bridge') {
-      // These are only available from a whole-tooth context, NOT from a root click
-      if (isRootClick) return false;
-      // Allowed on extracted tooth picker OR whole click OR crown click
-      // (further conditions handled in branches below)
-    }
     if (isAlreadyImplant) return false;
-    if (isAlreadyBridgeAbut) {
-      // Root still treatable on abutments; but implant/bridge not selectable here
-      if (isRootClick) return tp === 'root' && t.id !== 'implant' && t.id !== 'bridge';
-      return false;
-    }
     if (isAlreadyPontic) return false;
-    if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
-    if (isRootClick)  return tp === 'root' && t.id !== 'implant' && t.id !== 'bridge';
-    if (isWholeClick) return tp === 'whole' || t.id === 'implant' || t.id === 'bridge';
-    return tp === 'crown' || tp === 'crown_full' || tp === 'whole' || t.id === 'implant' || t.id === 'bridge';
+    if (isAlreadyBridgeAbut) {
+      // Can still add any treatment (e.g. root canal) except those that would overwrite the bridge itself
+      var tpA = t.target_part || 'crown';
+      return t.id !== 'implant' && t.id !== 'extracted' && tpA !== 'bridge';
+    }
+    if (isAlreadyExtracted) {
+      // A missing tooth can only have bridge or implant treatments
+      // Match by target_part (so custom bridge variants like "جسر زركون" also work)
+      var tp = t.target_part || 'crown';
+      return tp === 'bridge' || t.id === 'implant' || t.id === 'bridge';
+    }
+    // Normal tooth — every treatment is allowed; smart routing handles the surface
+    return true;
   }
 
   var container = document.getElementById('toothOptsContainer');
@@ -2134,7 +2148,7 @@ async function undoExtraction(num) {
     if (isPartOfBridge) {
       // Removing a bridge: delete ONLY bridge entries; keep 'extracted' so previously-extracted teeth stay extracted.
       for (var sk in sm) {
-        if (sm[sk] === 'bridge') {
+        if (isBridgeKey(sm[sk])) {
           // If the bridge was stored at WHOLE for a tooth that was originally extracted (legacy data),
           // we need to restore the 'extracted' marker so the tooth shows as missing again.
           // Heuristic: if this WHOLE='bridge' tooth is in the middle of the unit (not first/last), it was a pontic.
@@ -2207,13 +2221,28 @@ function isLightColor(hex) {
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
-  // غيّر currentSurface حسب نوع العلاج
+  // Smart routing: pick the right surface based on the treatment's target_part,
+  // not where the user clicked. This way the list can stay unified.
   var tr = getTreatment(status);
-  // Implant + bridge ALWAYS save at WHOLE regardless of what the user clicked or what target_part says
-  if (status === 'implant' || status === 'bridge') currentSurface = 'WHOLE';
-  else if (tr && tr.target_part === 'crown_full') currentSurface = 'CROWN_FULL';
-  else if (tr && tr.target_part === 'whole') currentSurface = 'WHOLE';
-  else if (tr && tr.target_part === 'bridge') currentSurface = 'WHOLE';
+  var tp = tr ? (tr.target_part || 'crown') : 'crown';
+  // Special treatments override:
+  if (status === 'implant' || status === 'bridge') {
+    currentSurface = 'WHOLE';
+  } else if (status === 'extracted') {
+    currentSurface = 'WHOLE';
+  } else if (tp === 'root') {
+    // Root treatment: default to R1, or keep the root the user already clicked
+    if (!/^R[123]$/.test(currentSurface)) currentSurface = 'R1';
+  } else if (tp === 'crown_full') {
+    currentSurface = 'CROWN_FULL';
+  } else if (tp === 'whole' || tp === 'bridge') {
+    currentSurface = 'WHOLE';
+  } else if (tp === 'crown') {
+    // Crown surface treatment: keep the clicked surface, or default to O (occlusal)
+    if (/^R[123]$/.test(currentSurface) || currentSurface === 'WHOLE' || currentSurface === 'CROWN_FULL') {
+      currentSurface = 'O';
+    }
+  }
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
@@ -2251,9 +2280,14 @@ async function saveToothTreatment() {
   // - Abutments (the existing teeth on each side): treatment_key='bridge' at surface='WHOLE'
   // - Pontics (the extracted teeth in between): keep 'extracted' at WHOLE,
   //   AND add 'bridge' at a separate surface='PONTIC' so they're flagged as part of the bridge
+  // Bridge save: detect by target_part (so custom variants like "جسر زركون" work too).
+  // We store the ACTUAL treatment_key (not always 'bridge') so the right color renders.
+  var pendingTr = getTreatment(pendingToothStatus);
+  var pendingTp = pendingTr ? (pendingTr.target_part || 'crown') : 'crown';
+  var isBridgeTreatment = (pendingTp === 'bridge') || (pendingToothStatus === 'bridge');
   // Track the bridge unit for ledger description (null if not a bridge save)
   var bridgeUnitForLedger = null;
-  if (pendingToothStatus === 'bridge') {
+  if (isBridgeTreatment) {
     var abuts = findBridgeAbutments(currentTooth);
     if (!abuts.mesial || !abuts.distal) {
       showToast('⚠️ يحتاج الجسر سن سليم على كلا الجانبين');
@@ -2265,41 +2299,42 @@ async function saveToothTreatment() {
     var lo = Math.min(mIdx, dIdx), hi = Math.max(mIdx, dIdx);
     var unit = arch.slice(lo, hi+1);
     bridgeUnitForLedger = unit;
+    var bridgeKey = pendingToothStatus;  // Could be 'bridge' or a custom key like 'custom_xxx'
     for (var u=0; u<unit.length; u++) {
       var un = String(unit[u]);
       var isAbut = (unit[u] === abuts.mesial || unit[u] === abuts.distal);
       if (isAbut) {
         var rA = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'WHOLE', treatment_key: 'bridge'
+          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rA.error) {
           console.error('bridge abutment save error:', rA.error);
           showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rA.error.message);
         }
         if (!teethMap[un]) teethMap[un] = {};
-        teethMap[un]['WHOLE'] = 'bridge';
+        teethMap[un]['WHOLE'] = bridgeKey;
       } else {
-        // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE='bridge'
+        // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE
         var rP = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'PONTIC', treatment_key: 'bridge'
+          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rP.error) {
           console.warn('PONTIC surface rejected, falling back to WHOLE:', rP.error);
           var rF = await window.sb.from('teeth_status').upsert({
             doctor_id: currentUser.id, patient_id: patientId,
-            tooth_num: un, surface: 'WHOLE', treatment_key: 'bridge'
+            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey
           }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
           if (rF.error) {
             console.error('bridge pontic fallback save error:', rF.error);
             showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rF.error.message);
           }
           if (!teethMap[un]) teethMap[un] = {};
-          teethMap[un]['WHOLE'] = 'bridge';
+          teethMap[un]['WHOLE'] = bridgeKey;
         } else {
           if (!teethMap[un]) teethMap[un] = {};
-          teethMap[un]['PONTIC'] = 'bridge';
+          teethMap[un]['PONTIC'] = bridgeKey;
           if (teethMap[un]['WHOLE'] !== 'extracted') teethMap[un]['WHOLE'] = 'extracted';
         }
       }
