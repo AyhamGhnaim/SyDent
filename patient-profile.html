@@ -427,6 +427,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="form-group"><label>التاريخ</label><input type="date" id="aDate"></div>
         <div class="form-group"><label>الوقت</label><input type="time" id="aTime" value="09:00"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label>الحالة</label>
+          <select id="aStatus">
+            <option value="confirmed">مؤكد</option>
+            <option value="pending" selected>معلّق</option>
+            <option value="cancelled">ملغى</option>
+          </select>
+        </div>
+        <div class="form-group" id="apptProviderGroup" style="display:none;">
+          <label>الطبيب</label>
+          <select id="aProvider" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
+        </div>
+      </div>
       <div class="form-group"><label>ملاحظات</label><textarea id="aNotes" placeholder="أي ملاحظات…"></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('apptModal')">إلغاء</button><button class="btn-save-m" onclick="saveAppt()">حفظ الموعد</button></div>
@@ -3094,8 +3107,12 @@ async function saveAppt() {
   var time  = document.getElementById('aTime').value;
   var dur   = document.getElementById('aDur').value;
   var notes = document.getElementById('aNotes').value.trim();
+  var statusEl = document.getElementById('aStatus');
+  var apptStatus = (statusEl && statusEl.value) ? statusEl.value : 'pending';
+  var provEl = document.getElementById('aProvider');
+  var provId = (provEl && provEl.value) ? provEl.value : getDefaultProviderId(CLINIC_DOCTORS);
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
-  await window.sb.from('appointments').insert({
+  const { data: newAppt, error: aErr } = await window.sb.from('appointments').insert({
     doctor_id:   currentUser.id,
     patient_id:  patientId,
     patient_name: patient.name,
@@ -3103,10 +3120,23 @@ async function saveAppt() {
     duration: parseInt(dur) || 30,
     type: type,
     treatment_id: (_t && _t.dbId) ? _t.dbId : null,
-    status: 'pending',
+    status: apptStatus,
     color: apptColor, stroke: apptStroke,
-    notes: notes
-  });
+    notes: notes,
+    provider_id: provId
+  }).select().single();
+  if (aErr) { showToast('❌ خطأ في حفظ الموعد: ' + aErr.message); return; }
+  // Refresh the in-memory list of upcoming appts so the new one shows in the
+  // session-link dropdown immediately (only if it's today or later).
+  if (newAppt && date >= toDay()) {
+    upcomingAppts.push({
+      id: newAppt.id, date: newAppt.date, time: newAppt.time,
+      type: newAppt.type, status: newAppt.status
+    });
+    upcomingAppts.sort(function(a,b){
+      return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
+    });
+  }
   closeModal('apptModal');
   document.getElementById('aNotes').value='';
   showToast('✅ تم حفظ الموعد في التقويم');
@@ -3576,7 +3606,33 @@ function openSessionModal() {
   }
   openModal('sessionModal');
 }
-function openApptModal()    { populateApptTypes(); document.getElementById('aDate').value=toDay(); openModal('apptModal'); }
+function openApptModal() {
+  populateApptTypes();
+  document.getElementById('aDate').value = toDay();
+  document.getElementById('aStatus').value = 'pending';
+  // Populate provider picker (OpenDental-style default: user-link → owner → first active)
+  var pGroup = document.getElementById('apptProviderGroup');
+  var pSel = document.getElementById('aProvider');
+  if (pGroup && pSel) {
+    if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
+      pGroup.style.display = 'none';
+      pSel.innerHTML = '';
+    } else {
+      var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+      var listToShow = active.length > 0 ? active : CLINIC_DOCTORS;
+      pGroup.style.display = 'block';
+      pSel.innerHTML = listToShow.map(function(d){
+        var prefix = '';
+        if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
+        else if (d.is_owner) prefix = '⭐ ';
+        var inactiveStr = d.is_active === false ? ' (معطل)' : '';
+        return '<option value="' + d.id + '">' + prefix + escapeHtml(d.name) + inactiveStr + '</option>';
+      }).join('');
+      pSel.value = getDefaultProviderId(listToShow);
+    }
+  }
+  openModal('apptModal');
+}
 
 var overlays = document.querySelectorAll('.modal-overlay');
 for (var _o=0; _o<overlays.length; _o++) {
