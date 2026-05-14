@@ -1423,7 +1423,12 @@ function isBridgeAbut(num) {
 /* Is this tooth an implant? */
 function isImplant(num) {
   var sm = teethMap[String(num)] || {};
-  return sm.WHOLE === 'implant';
+  // Primary: WHOLE='implant'. Legacy fallback: any surface marked as implant.
+  if (sm.WHOLE === 'implant') return true;
+  for (var k in sm) {
+    if (sm[k] === 'implant') return true;
+  }
+  return false;
 }
 
 /* Find bridge abutments: search outward from this missing tooth in BOTH directions
@@ -2041,18 +2046,24 @@ async function openToothModal(n, surface) {
   // Filter treatments by what's clicked.
   function isAllowed(t) {
     var tp = t.target_part || 'crown';
-    // Implant: no further treatments allowed; only the remove-implant button below
+    // Hardcoded: implant and bridge are whole-tooth treatments regardless of target_part value
+    if (t.id === 'implant' || t.id === 'bridge') {
+      // These are only available from a whole-tooth context, NOT from a root click
+      if (isRootClick) return false;
+      // Allowed on extracted tooth picker OR whole click OR crown click
+      // (further conditions handled in branches below)
+    }
     if (isAlreadyImplant) return false;
-    // Bridge abutment: crown is covered; root still treatable
     if (isAlreadyBridgeAbut) {
-      if (isRootClick) return tp === 'root';
+      // Root still treatable on abutments; but implant/bridge not selectable here
+      if (isRootClick) return tp === 'root' && t.id !== 'implant' && t.id !== 'bridge';
       return false;
     }
     if (isAlreadyPontic) return false;
     if (isAlreadyExtracted) return (t.id === 'bridge' || t.id === 'implant');
-    if (isRootClick)  return tp === 'root';
-    if (isWholeClick) return tp === 'whole';
-    return tp === 'crown' || tp === 'crown_full' || tp === 'whole';
+    if (isRootClick)  return tp === 'root' && t.id !== 'implant' && t.id !== 'bridge';
+    if (isWholeClick) return tp === 'whole' || t.id === 'implant' || t.id === 'bridge';
+    return tp === 'crown' || tp === 'crown_full' || tp === 'whole' || t.id === 'implant' || t.id === 'bridge';
   }
 
   var container = document.getElementById('toothOptsContainer');
@@ -2168,15 +2179,19 @@ async function removeImplant(num) {
   var choice = confirm('إزالة الزراعة من السن ' + num + '؟\n\nاضغط موافق لإزالة الزراعة (السن سيعود مقلوعاً)\nاضغط إلغاء للخروج بدون تغيير');
   if (!choice) return;
   var tn = String(num);
-  var sm = teethMap[tn] || {};
-  // Replace implant with extracted at the same surface (WHOLE) — typically an implant replaces a missing tooth
+  // First: wipe ALL surfaces (clears any legacy implant entries on R1/R2/etc.)
+  var dAll = await window.sb.from('teeth_status').delete()
+    .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+    .eq('tooth_num', tn);
+  if (dAll.error) console.error('clear surfaces error:', dAll.error);
+  delete teethMap[tn];
+  // Then: replace with extracted at WHOLE — typically an implant replaces a missing tooth
   var rU = await window.sb.from('teeth_status').upsert({
     doctor_id: currentUser.id, patient_id: patientId,
     tooth_num: tn, surface: 'WHOLE', treatment_key: 'extracted'
   }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
   if (rU.error) console.error('restore extracted after implant removal error:', rU.error);
-  if (!teethMap[tn]) teethMap[tn] = {};
-  teethMap[tn]['WHOLE'] = 'extracted';
+  teethMap[tn] = { WHOLE: 'extracted' };
   closeModal('toothModal');
   renderTeeth(); renderStats();
   showToast('✅ تمت إزالة الزراعة — السن ' + num + ' مقلوع');
@@ -2193,7 +2208,9 @@ function pickToothTreatment(status, label) {
   pendingToothLabel  = label;
   // غيّر currentSurface حسب نوع العلاج
   var tr = getTreatment(status);
-  if (tr && tr.target_part === 'crown_full') currentSurface = 'CROWN_FULL';
+  // Implant + bridge ALWAYS save at WHOLE regardless of what the user clicked or what target_part says
+  if (status === 'implant' || status === 'bridge') currentSurface = 'WHOLE';
+  else if (tr && tr.target_part === 'crown_full') currentSurface = 'CROWN_FULL';
   else if (tr && tr.target_part === 'whole') currentSurface = 'WHOLE';
   else if (tr && tr.target_part === 'bridge') currentSurface = 'WHOLE';
   document.getElementById('toothStep1').style.display = 'none';
@@ -2287,9 +2304,16 @@ async function saveToothTreatment() {
       }
     }
   } else {
-    // Normal save. teeth_status.surface CAN accept CROWN_FULL since it's not constrained,
-    // but if a check constraint is added later, this still works because we try first
-    // and fall back to WHOLE if it fails.
+    // For IMPLANT: wipe ALL existing surfaces for this tooth first
+    // (so old root canals, fillings, etc. don't survive — an implant replaces the natural tooth completely)
+    if (pendingToothStatus === 'implant') {
+      var dAll = await window.sb.from('teeth_status').delete()
+        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+        .eq('tooth_num', String(currentTooth));
+      if (dAll.error) console.error('clear surfaces before implant error:', dAll.error);
+      teethMap[String(currentTooth)] = {};
+    }
+    // Normal save
     var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
       tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
