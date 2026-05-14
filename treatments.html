@@ -293,6 +293,18 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <div class="target-title">التاج كامل</div>
             <div class="target-sub">تلبيسة، تاج كامل</div>
           </div>
+          <div class="target-opt" data-target="bridge">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Three connected crowns representing a bridge -->
+              <path d="M6 10 C6 10 3 12 3 18 C3 22 5 26 7 30 L17 30 C19 26 21 22 21 18 C21 12 18 10 18 10 C15 7 12 6 12 6 C9 6 6 10 6 10Z" fill="rgba(220,38,38,0.45)"/>
+              <path d="M26 12 C26 12 23 14 23 20 C23 24 25 28 27 32 L37 32 C39 28 41 24 41 20 C41 14 38 12 38 12 C35 9 32 8 32 8 C29 8 26 12 26 12Z" fill="rgba(220,38,38,0.45)"/>
+              <path d="M46 10 C46 10 43 12 43 18 C43 22 45 26 47 30 L57 30 C59 26 61 22 61 18 C61 12 58 10 58 10 C55 7 52 6 52 6 C49 6 46 10 46 10Z" fill="rgba(220,38,38,0.45)"/>
+              <line x1="17" y1="22" x2="27" y2="22" stroke-width="2.5"/>
+              <line x1="37" y1="22" x2="47" y2="22" stroke-width="2.5"/>
+            </svg>
+            <div class="target-title">جسر</div>
+            <div class="target-sub">يربط سن مفقود بأسنان مجاورة</div>
+          </div>
         </div>
       </div>
 
@@ -370,11 +382,16 @@ async function loadTreatments() {
     return;
   }
   treatments = (data || []).map(function(t){
+    // Derive label from name if it's empty (legacy data may have empty labels)
+    var lbl = t.label;
+    if (!lbl || !lbl.trim()) {
+      lbl = (t.name || '').replace(/\s+/g, '').charAt(0) || '·';
+    }
     return {
       id: t.id,                        // DB UUID — used for edit/delete
       treatment_key: t.treatment_key,  // human-readable key
       name: t.name,
-      label: t.label,
+      label: lbl,
       fill: t.fill,
       stroke: t.stroke,
       price: t.price,
@@ -490,13 +507,15 @@ function editTreatment(id) {
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
-  // Implant name is fixed and cannot be edited
+  // Implant/extracted names are fixed and cannot be edited (built-in special treatments)
   var nameInput = document.getElementById('tName');
-  if (t.treatment_key === 'implant') {
+  var lockedKeys = ['implant', 'extracted', 'bridge'];
+  if (lockedKeys.indexOf(t.treatment_key) >= 0) {
     nameInput.readOnly = true;
     nameInput.style.opacity = '0.6';
     nameInput.style.cursor = 'not-allowed';
-    nameInput.title = 'اسم علاج الزراعة لا يمكن تغييره';
+    var lockedNames = { implant: 'الزراعة', extracted: 'القلع', bridge: 'الجسر' };
+    nameInput.title = 'اسم علاج ' + (lockedNames[t.treatment_key] || '') + ' لا يمكن تغييره';
   } else {
     nameInput.readOnly = false;
     nameInput.style.opacity = '';
@@ -554,8 +573,9 @@ async function resetToDefaults() {
 async function saveTreatment() {
   var name  = document.getElementById('tName').value.trim();
   var price = parseFloat(document.getElementById('tPrice').value);
-  // Auto-generate label from name (first non-space character)
-  var label = name.replace(/\s+/g, '').charAt(0) || '·';
+  // Preserve existing label if editing; otherwise generate from name
+  var existingLabel = document.getElementById('tLabel').value;
+  var label = existingLabel || name.replace(/\s+/g, '').charAt(0) || '·';
   var needsLab = document.getElementById('tNeedsLab').checked;
   if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
