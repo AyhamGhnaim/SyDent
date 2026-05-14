@@ -90,6 +90,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .doc-actions .btn-edit:hover{color:var(--blue);border-color:var(--blue);}
 .doc-actions .btn-del:hover{color:var(--red);border-color:var(--red);}
 .doc-actions .btn-toggle:hover{color:var(--yellow);border-color:var(--yellow);}
+.doc-actions .btn-make-owner:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
 
 .inactive-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.4);margin-right:4px;}
 .you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(46,232,158,.15);color:var(--green);border:1px solid rgba(46,232,158,.4);margin-right:4px;}
@@ -343,6 +344,23 @@ async function loadDoctors() {
     } else if (insertOwner.error) {
       console.warn('owner-doctor auto-create failed:', insertOwner.error);
     }
+  } else {
+    // Auto-heal: if no doctor has is_owner=true, promote the first one with
+    // user_id=currentUser.id (or the very first as final fallback).
+    // This handles legacy data where doctors were added before is_owner was tracked.
+    var hasOwner = doctors.some(function(d){ return d.is_owner; });
+    if (!hasOwner) {
+      var candidate = doctors.find(function(d){ return d.user_id === currentUser.id; })
+                   || doctors[0];
+      var healRes = await window.sb.from('clinic_doctors')
+        .update({ is_owner: true, updated_at: new Date().toISOString() })
+        .eq('id', candidate.id)
+        .eq('owner_id', currentUser.id);
+      if (!healRes.error) {
+        candidate.is_owner = true;
+        console.log('[SyDent] Auto-healed: promoted "' + candidate.name + '" to clinic owner');
+      }
+    }
   }
 
   renderList();
@@ -374,6 +392,10 @@ function renderList() {
     var delBtn = d.is_owner
       ? '<button title="لا يمكن حذف صاحب العيادة" disabled style="opacity:.4;cursor:not-allowed;">🔒 محمي</button>'
       : '<button class="btn-del" onclick="deleteDoctor(\'' + d.id + '\')">🗑️ حذف</button>';
+    // "Make owner" button — only show on non-owner cards (to transfer ownership)
+    var ownerBtn = d.is_owner
+      ? ''
+      : '<button class="btn-make-owner" onclick="makeOwner(\'' + d.id + '\')">⭐ تعيين كصاحب العيادة</button>';
 
     html += '<div class="doc-card">'
       + '<div class="doc-color-bar" style="background:' + (d.color || '#2ee89e') + '"></div>'
@@ -389,6 +411,7 @@ function renderList() {
       + '<div class="doc-actions">'
       + '<button class="btn-edit" onclick="editDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
       + '<button class="btn-toggle" onclick="toggleActive(\'' + d.id + '\')">' + toggleLabel + '</button>'
+      + ownerBtn
       + delBtn
       + '</div></div></div>';
   });
@@ -495,6 +518,37 @@ async function deleteDoctor(id) {
   var { error } = await window.sb.from('clinic_doctors').delete().eq('id', id);
   if (error) { showToast('⚠️ فشل الحذف: ' + error.message); return; }
   showToast('🗑️ تم الحذف');
+  await loadDoctors();
+}
+
+// Transfer "صاحب العيادة" ownership to another doctor
+// Only one doctor can be owner at a time → unset previous, set new
+async function makeOwner(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  var currentOwner = doctors.find(function(x){ return x.is_owner; });
+  var msg = currentOwner
+    ? 'تعيين "' + d.name + '" كصاحب العيادة بدلاً من "' + currentOwner.name + '"؟\n\nصاحب العيادة هو الافتراضي في كل الجلسات الجديدة وفي تقارير المستحقات.'
+    : 'تعيين "' + d.name + '" كصاحب العيادة؟\n\nصاحب العيادة هو الافتراضي في كل الجلسات الجديدة وفي تقارير المستحقات.';
+  if (!confirm(msg)) return;
+
+  // Step 1: unset current owner (if any) — only if it's a different doctor
+  if (currentOwner && currentOwner.id !== id) {
+    var r1 = await window.sb.from('clinic_doctors')
+      .update({ is_owner: false, updated_at: new Date().toISOString() })
+      .eq('id', currentOwner.id)
+      .eq('owner_id', currentUser.id);
+    if (r1.error) { showToast('⚠️ فشل تحديث المالك السابق: ' + r1.error.message); return; }
+  }
+
+  // Step 2: set new owner
+  var r2 = await window.sb.from('clinic_doctors')
+    .update({ is_owner: true, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (r2.error) { showToast('⚠️ فشل تعيين المالك الجديد: ' + r2.error.message); return; }
+
+  showToast('⭐ تم تعيين "' + d.name + '" كصاحب العيادة');
   await loadDoctors();
 }
 

@@ -2474,9 +2474,12 @@ function populateProviderPicker() {
     html += '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
   });
   select.innerHTML = html;
-  // Default to first active (usually owner). Keep existing pendingProviderId if still valid.
+  // Default to owner first, then first active doctor.
+  // Industry-standard (OpenDental/Dentrix): logged-in user/owner is the default treating provider.
+  // Keep existing pendingProviderId if it's still valid in the list.
   if (!pendingProviderId || !listToShow.find(function(d){ return d.id === pendingProviderId; })) {
-    pendingProviderId = listToShow[0].id;
+    var owner = listToShow.find(function(d){ return d.is_owner; });
+    pendingProviderId = owner ? owner.id : listToShow[0].id;
   }
   select.value = pendingProviderId;
 }
@@ -3028,13 +3031,16 @@ async function saveSession() {
   var type = typeVal === '_other' ? (desc || 'أخرى') : (getTreatment(typeVal) ? getTreatment(typeVal).name : typeVal);
   if (!cost||cost<=0){ showToast('⚠️ أدخل التكلفة'); return; }
   if (!date)         { showToast('⚠️ اختر التاريخ'); return; }
-  // Use picker value if visible; otherwise default to first active clinic doctor
+  // Use picker value if visible; otherwise default to owner, then first active doctor
   var pickerEl = document.getElementById('sProvider');
   var pickedProvider = (pickerEl && pickerEl.value) ? pickerEl.value : null;
   var fallbackDoctor = null;
   if (CLINIC_DOCTORS && CLINIC_DOCTORS.length > 0) {
+    var ownerFallback = CLINIC_DOCTORS.find(function(d){ return d.is_owner && d.is_active !== false; });
     var activeFallback = CLINIC_DOCTORS.find(function(d){ return d.is_active !== false; });
-    fallbackDoctor = activeFallback ? activeFallback.id : CLINIC_DOCTORS[0].id;
+    fallbackDoctor = (ownerFallback && ownerFallback.id)
+      || (activeFallback && activeFallback.id)
+      || CLINIC_DOCTORS[0].id;
   }
   var defaultProvider = pickedProvider || fallbackDoctor;
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
@@ -3513,7 +3519,7 @@ function openPayModal()     { document.getElementById('payDate').value=toDay(); 
 function openSessionModal() {
   populateSessionTypes();
   document.getElementById('sDate').value = toDay();
-  // Populate provider picker (prefer active doctors, fall back to all if none active)
+  // Populate provider picker (prefer owner first, then active doctors)
   var group = document.getElementById('sessionProviderGroup');
   var select = document.getElementById('sProvider');
   if (group && select) {
@@ -3528,7 +3534,9 @@ function openSessionModal() {
         var inactiveStr = d.is_active === false ? ' (معطل)' : '';
         return '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
       }).join('');
-      select.value = listToShow[0].id;
+      // Default to owner first (OpenDental/Dentrix standard)
+      var owner = listToShow.find(function(d){ return d.is_owner; });
+      select.value = owner ? owner.id : listToShow[0].id;
     }
   }
   openModal('sessionModal');
