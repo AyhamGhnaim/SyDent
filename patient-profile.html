@@ -1678,7 +1678,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   // crown_full: semi-transparent color overlay over entire crown (preserves gradient + details)
   // Bridge abutments use higher opacity so they read as solid crown of bridge color
   if (hasCrownFull) {
-    var cfOpacity = isBridgeAbutment ? 0.92 : 0.38;
+    var cfOpacity = isBridgeAbutment ? 0.92 : 0.70;
     svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="' + cfOpacity + '" '
         +  'stroke="none" pointer-events="none"></path>';
   }
