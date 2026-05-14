@@ -2183,11 +2183,17 @@ function pickStatus(s) {
     if (b.getAttribute('data-status') === s) b.classList.add('selected');
     else b.classList.remove('selected');
   });
-  // Cost is only relevant for completed/planned treatments (billable work).
-  // For existing/referred (clinical notes), hide the cost field.
-  var costGroup = document.getElementById('toothCost').closest('.form-group');
-  var needsCost = (s === 'completed' || s === 'planned');
-  if (costGroup) costGroup.style.display = needsCost ? 'block' : 'none';
+  // Cost field is always visible. Default value adjusts by status:
+  //   - completed: keep treatment's default price
+  //   - planned/existing/referred: default to 0 (doctor edits manually if needed)
+  var costEl = document.getElementById('toothCost');
+  var tDef = getTreatment(pendingToothStatus);
+  if (s === 'completed') {
+    if (tDef && (!costEl.value || costEl.value === '0')) costEl.value = tDef.price;
+  } else {
+    // For planned/existing/referred: zero out cost (doctor can override)
+    costEl.value = 0;
+  }
   // Auto-fill the notes textarea from the treatment's default/completion note
   var tr = getTreatment(pendingToothStatus);
   if (tr) {
@@ -2444,9 +2450,6 @@ function pickToothTreatment(status, label) {
     if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
     else b.classList.remove('selected');
   });
-  // Cost field is visible by default (completed needs cost)
-  var costGroupInit = document.getElementById('toothCost').closest('.form-group');
-  if (costGroupInit) costGroupInit.style.display = 'block';
   // Pre-fill notes for completed (uses completion_note if available, else default_note)
   if (t) {
     var defaultNote = (t.completion_note || t.default_note || '').trim();
@@ -2467,11 +2470,9 @@ async function saveToothTreatment() {
   var costRaw = parseFloat(document.getElementById('toothCost').value);
   var date  = document.getElementById('toothDate').value;
   var notes = document.getElementById('toothNotes').value.trim();
-  // Cost is required only for 'planned' and 'completed' (which represent real work by this clinic).
-  // 'existing' (pre-existing condition) and 'referred' (sent to another doctor) don't need a cost.
-  var costRequired = (pendingTreatStatus === 'planned' || pendingTreatStatus === 'completed');
+  // Cost is OPTIONAL for all statuses. Default to 0 if empty/invalid.
+  // The doctor can edit it later if needed (e.g. set a price on a planned treatment).
   var cost = (costRaw && costRaw > 0) ? costRaw : 0;
-  if (costRequired && cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
   // Special handling: bridge marks abutments + pontics as a single unit.
