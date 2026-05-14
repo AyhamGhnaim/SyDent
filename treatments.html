@@ -93,6 +93,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   border-top:1px solid rgba(46,232,158,0.06);
 }
 .treat-actions button{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.treat-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
+.search-wrap{position:relative;width:100%;}
+.search-icon{position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:15px;opacity:.6;pointer-events:none;}
+#treatSearch{width:100%;padding:12px 42px 12px 14px;font-family:'Cairo',sans-serif;font-size:14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;color:var(--text);outline:none;transition:border-color .15s;}
+#treatSearch:focus{border-color:var(--green);}
+.filter-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:6px 12px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;border-radius:18px;background:var(--bg2);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.chip:hover{border-color:var(--green);color:var(--green);}
+.chip-active{background:var(--green);color:#0a1628;border-color:var(--green);}
+.dup-btn{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.dup-btn:hover{border-color:var(--purple,#a78bfa);color:var(--purple,#a78bfa);}
 .treat-actions .ed-btn:hover{border-color:var(--blue);color:var(--blue);}
 .treat-actions .del-btn:hover{border-color:var(--red);color:var(--red);}
 .treat-builtin-tag{
@@ -211,8 +222,29 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="page">
 
+  <!-- Search + filter toolbar -->
+  <div class="treat-toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="search" id="treatSearch" placeholder="ابحث باسم العلاج..." autocomplete="off">
+    </div>
+    <div class="filter-chips" id="filterChips">
+      <button class="chip chip-active" data-filter="all">الكل</button>
+      <button class="chip" data-filter="crown">تاج (سطح)</button>
+      <button class="chip" data-filter="crown_full">تاج كامل</button>
+      <button class="chip" data-filter="root">جذر</button>
+      <button class="chip" data-filter="whole">سن كامل</button>
+      <button class="chip" data-filter="bridge">جسر</button>
+      <button class="chip" data-filter="lab">🧪 مخبر</button>
+      <button class="chip" data-filter="custom">مخصصة</button>
+    </div>
+  </div>
 
   <div class="treat-grid" id="treatGrid"></div>
+  <div id="treatEmpty" style="display:none;text-align:center;padding:40px 20px;color:var(--text2);">
+    <div style="font-size:40px;margin-bottom:8px;">🔍</div>
+    <div>لا توجد علاجات تطابق البحث</div>
+  </div>
 
 </div>
 </div>
@@ -408,16 +440,53 @@ function saveAll() { /* no-op (Supabase writes happen per operation) */ }
 
 function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
 
+// ── Filter + search state ──
+var activeFilter = 'all';
+var searchTerm = '';
+
+function filteredTreatments() {
+  var q = searchTerm.trim().toLowerCase();
+  return treatments.filter(function(t){
+    // Filter chip
+    if (activeFilter !== 'all') {
+      if (activeFilter === 'lab') {
+        if (!t.needs_lab) return false;
+      } else if (activeFilter === 'custom') {
+        if (t.builtin) return false;
+      } else {
+        // target_part filter
+        if ((t.target_part || 'crown') !== activeFilter) return false;
+      }
+    }
+    // Search
+    if (q) {
+      var hay = (t.name || '') + ' ' + (t.treatment_key || '') + ' ' + (t.label || '');
+      if (hay.toLowerCase().indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+}
+
 // ── Render grid ──
 function render() {
   var grid = document.getElementById('treatGrid');
+  var emptyEl = document.getElementById('treatEmpty');
   if (!treatments.length) {
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2);"><div style="font-size:48px;margin-bottom:12px;">🦷</div><div>لا توجد علاجات. أضف أول علاج للبدء.</div></div>';
+    grid.style.display = 'none';
+    if (emptyEl) { emptyEl.style.display = 'block'; emptyEl.innerHTML = '<div style="font-size:48px;margin-bottom:12px;">🦷</div><div>لا توجد علاجات. أضف أول علاج للبدء.</div>'; }
     return;
   }
+  var list = filteredTreatments();
+  if (!list.length) {
+    grid.style.display = 'none';
+    if (emptyEl) { emptyEl.style.display = 'block'; emptyEl.innerHTML = '<div style="font-size:40px;margin-bottom:8px;">🔍</div><div>لا توجد علاجات تطابق البحث</div>'; }
+    return;
+  }
+  grid.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
   var html = '';
-  for (var i=0; i<treatments.length; i++) {
-    var t = treatments[i];
+  for (var i=0; i<list.length; i++) {
+    var t = list[i];
     var bg = t.fill, fg = t.stroke;
     var iconBg = 'background:' + bg + ';';
     var bar = 'background:' + bg + ';';
@@ -448,6 +517,7 @@ function render() {
         + '<div class="treat-price">' + fmt(t.price) + ' <span class="currency">ل.س</span></div>'
         + '<div class="treat-actions">'
           + '<button class="ed-btn" onclick="editTreatment(\'' + t.id + '\')">✏️ تعديل</button>'
+          + '<button class="dup-btn" onclick="duplicateTreatment(\'' + t.id + '\')" title="إنشاء نسخة جديدة من هذا العلاج">📋 نسخ</button>'
           + (t.builtin
               ? '<button class="del-btn" onclick="alert(\'لا يمكن حذف العلاج الافتراضي\')" style="opacity:.5;cursor:not-allowed;">🗑 محمي</button>'
               : '<button class="del-btn" onclick="deleteTreatment(\'' + t.id + '\')">🗑 حذف</button>')
@@ -536,6 +606,34 @@ function pickTarget(target) {
     if (o.getAttribute('data-target') === target) o.classList.add('selected');
     else o.classList.remove('selected');
   }
+}
+
+function duplicateTreatment(id) {
+  var t = null;
+  for (var i=0; i<treatments.length; i++) if (treatments[i].id === id) { t = treatments[i]; break; }
+  if (!t) return;
+  // Open the add modal pre-filled with this treatment's values; user can rename and save as a new entry
+  editingId = null;  // creating a new treatment
+  document.getElementById('modalTitle').textContent = '📋 نسخ من: ' + t.name;
+  document.getElementById('tName').value  = t.name + ' (نسخة)';
+  document.getElementById('tPrice').value = t.price;
+  document.getElementById('tLabel').value = t.label || '';
+  document.getElementById('tNeedsLab').checked = !!t.needs_lab;
+  // Reset readonly state (duplicate is a new treatment, name editable)
+  var nameInputDup = document.getElementById('tName');
+  nameInputDup.readOnly = false;
+  nameInputDup.style.opacity = '';
+  nameInputDup.style.cursor = '';
+  nameInputDup.title = '';
+  pickColor(t.fill, t.stroke);
+  pickTarget(t.target_part || 'crown');
+  updatePreview();
+  openModal();
+  // Focus and select name for quick edit
+  setTimeout(function(){
+    nameInputDup.focus();
+    nameInputDup.select();
+  }, 100);
 }
 
 async function deleteTreatment(id) {
@@ -644,6 +742,26 @@ document.querySelectorAll('.target-opt').forEach(function(o){
 });
 
 document.getElementById('tName').addEventListener('input', updatePreview);
+
+// Search input
+var searchInputEl = document.getElementById('treatSearch');
+if (searchInputEl) {
+  searchInputEl.addEventListener('input', function(e){
+    searchTerm = e.target.value;
+    render();
+  });
+}
+
+// Filter chips
+var chipEls = document.querySelectorAll('#filterChips .chip');
+chipEls.forEach(function(chip){
+  chip.addEventListener('click', function(){
+    chipEls.forEach(function(c){ c.classList.remove('chip-active'); });
+    chip.classList.add('chip-active');
+    activeFilter = chip.getAttribute('data-filter');
+    render();
+  });
+});
 
 // Replace direct render() at bottom with auth-aware loader
 window.addEventListener('load', function(){
