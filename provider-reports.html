@@ -299,16 +299,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="filters-bar">
     <div class="filter-group">
       <label>من تاريخ</label>
-      <input type="date" id="fromDate" onchange="onFilterChange()">
+      <input type="date" id="fromDate" onchange="clearPresetHighlight(); onFilterChange();">
     </div>
     <div class="filter-group">
       <label>إلى تاريخ</label>
-      <input type="date" id="toDate" onchange="onFilterChange()">
+      <input type="date" id="toDate" onchange="clearPresetHighlight(); onFilterChange();">
     </div>
     <div class="filter-group">
       <label>الطبيب</label>
       <select id="providerFilter" onchange="onFilterChange()">
-        <option value="all">كل الأطباء</option>
+        <option value="all">كل الأطباء النشطين</option>
       </select>
     </div>
     <div class="filter-group">
@@ -316,6 +316,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <select id="statusFilter" onchange="onFilterChange()">
         <option value="completed">المنجزة فقط</option>
         <option value="completed_planned">المنجزة + المخططة</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>الأطباء المعطلون</label>
+      <select id="inactiveFilter" onchange="onFilterChange()">
+        <option value="hide">إخفاء</option>
+        <option value="show">إظهار (مع تاريخهم)</option>
       </select>
     </div>
   </div>
@@ -525,14 +532,23 @@ async function loadAll() {
   }
   doctors = dRes.data || [];
 
-  // Populate provider filter dropdown
+  // Populate provider filter dropdown - respects inactive toggle
   var sel = document.getElementById('providerFilter');
   var current = sel.value || 'all';
-  sel.innerHTML = '<option value="all">كل الأطباء</option>' + doctors.map(function(d){
+  var inactiveModeForDropdown = document.getElementById('inactiveFilter').value;
+  var doctorsForDropdown = doctors.filter(function(d){
+    return inactiveModeForDropdown === 'show' || d.is_active !== false;
+  });
+  sel.innerHTML = '<option value="all">كل الأطباء النشطين</option>' + doctorsForDropdown.map(function(d){
     var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
-  sel.value = current;
+  // Restore selection if still valid; otherwise reset to all
+  if (current === 'all' || doctorsForDropdown.find(function(d){ return d.id === current; })) {
+    sel.value = current;
+  } else {
+    sel.value = 'all';
+  }
 
   await loadFilteredData();
 }
@@ -598,10 +614,46 @@ async function loadFilteredData() {
   render();
 }
 
+// ─── Lab matching helper (single source of truth) ───
+// Match lab_orders to a session by patient + tooth + date proximity (±90 days).
+// matchedSet is shared across calls to avoid double-counting one lab_order across
+// multiple sessions on the same tooth.
+function findMatchingLabOrders(session, matchedSet) {
+  if (!session.tooth_num) return [];
+  var sessionDate = session.date ? new Date(session.date) : null;
+  var windowDays = 90;
+  return labOrders.filter(function(lo){
+    if (lo.patient_id !== session.patient_id) return false;
+    if (lo.tooth_num === null || lo.tooth_num === undefined) return false;
+    if (String(lo.tooth_num) !== String(session.tooth_num)) return false;
+    if (lo.status === 'rejected') return false;
+    if (matchedSet && matchedSet[lo.id]) return false;
+    if (sessionDate && lo.date_sent) {
+      var loDate = new Date(lo.date_sent);
+      var diffDays = Math.abs((sessionDate - loDate) / 86400000);
+      if (diffDays > windowDays) return false;
+    }
+    return true;
+  });
+}
+
+function sumSessionLabCost(session, matchedSet) {
+  var matches = findMatchingLabOrders(session, matchedSet);
+  var cost = 0;
+  matches.forEach(function(lo){
+    cost += Number(lo.cost) || 0;
+    if (matchedSet) matchedSet[lo.id] = true;
+  });
+  return cost;
+}
+
 // ─── Compute provider stats ───
 // For a given provider, compute production/lab/net from sessions and
 // allocated collection from payments based on provider's share of patient production.
-function computeProviderStats(provId) {
+// Optional sharedMatchedSet ensures one lab_order can only be attributed to one
+// provider (the first one that matches). When called from render(), pass a shared
+// set; when called standalone, pass nothing (uses per-call set).
+function computeProviderStats(provId, sharedMatchedSet) {
   // 1. Sessions belonging to this provider
   var provSessions = sessions.filter(function(s){
     if (provId === '_unassigned') return !s.provider_id;
@@ -610,22 +662,14 @@ function computeProviderStats(provId) {
   var sessionCount = provSessions.length;
   var production = provSessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
 
-  // 2. Lab cost: sum lab_orders matching patient+tooth of this provider's sessions
+  // 2. Lab cost: per-procedure matching via helper.
+  // If sharedMatchedSet is provided, labs are deduped across providers (each lab
+  // can only be attributed once). If not, this provider gets its own set (used
+  // by details/print modals where we're focused on a single provider).
   var labCost = 0;
-  var matchedLabIds = {};
+  var matchedLabIds = sharedMatchedSet || {};
   provSessions.forEach(function(s){
-    if (!s.tooth_num) return;
-    var matches = labOrders.filter(function(lo){
-      return lo.patient_id === s.patient_id
-        && lo.tooth_num !== null && lo.tooth_num !== undefined
-        && String(lo.tooth_num) === String(s.tooth_num)
-        && lo.status !== 'rejected'
-        && !matchedLabIds[lo.id];
-    });
-    matches.forEach(function(lo){
-      labCost += Number(lo.cost) || 0;
-      matchedLabIds[lo.id] = true;
-    });
+    labCost += sumSessionLabCost(s, matchedLabIds);
   });
 
   var net = production - labCost;
@@ -684,7 +728,10 @@ function computePayout(provider, stats) {
 // ─── Render ───
 function render() {
   var providerFilter = document.getElementById('providerFilter').value;
+  var inactiveMode = document.getElementById('inactiveFilter').value; // 'hide' | 'show'
   var visibleDoctors = doctors.filter(function(d){
+    // Hide inactive unless explicitly showing them OR they're specifically picked
+    if (inactiveMode === 'hide' && d.is_active === false && providerFilter !== d.id) return false;
     return providerFilter === 'all' || d.id === providerFilter;
   });
 
@@ -705,28 +752,22 @@ function render() {
   var totalProduction = sessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
   var totalCollection = payments.reduce(function(sum, p){ return sum + (Number(p.amount) || 0); }, 0);
 
-  // Total lab cost across all matched
+  // Total lab cost across all matched (single global matchedSet)
   var totalLab = 0;
-  var matchedSet = {};
+  var globalMatchedSet = {};
   sessions.forEach(function(s){
-    if (!s.tooth_num) return;
-    var matches = labOrders.filter(function(lo){
-      return lo.patient_id === s.patient_id
-        && lo.tooth_num !== null && lo.tooth_num !== undefined
-        && String(lo.tooth_num) === String(s.tooth_num)
-        && lo.status !== 'rejected'
-        && !matchedSet[lo.id];
-    });
-    matches.forEach(function(lo){
-      totalLab += Number(lo.cost) || 0;
-      matchedSet[lo.id] = true;
-    });
+    totalLab += sumSessionLabCost(s, globalMatchedSet);
   });
 
   // Total payouts across all visible doctors
+  // Use a shared matchedSet so labs are attributed to only one provider total
+  var payoutsMatchedSet = {};
   var totalPayouts = 0;
+  // Cache provider stats to avoid duplicate work in cards loop below
+  var providerStatsCache = {};
   visibleDoctors.forEach(function(d){
-    var stats = computeProviderStats(d.id);
+    var stats = computeProviderStats(d.id, payoutsMatchedSet);
+    providerStatsCache[d.id] = stats;
     totalPayouts += computePayout(d, stats);
   });
 
@@ -761,7 +802,7 @@ function render() {
   var html = '<div class="providers-grid">';
 
   visibleDoctors.forEach(function(d){
-    var stats = computeProviderStats(d.id);
+    var stats = providerStatsCache[d.id];  // Use cached version with deduped labs
     var payout = computePayout(d, stats);
     var sharePct = Number(d.share_percent);
     var sharePctDisplay = (isFinite(sharePct) && sharePct !== null && sharePct !== undefined && sharePct !== '')
@@ -791,23 +832,30 @@ function render() {
       + '</div>';
     }
 
+    var avgSessionValue = stats.sessionCount > 0 ? stats.production / stats.sessionCount : 0;
+    var collectionRate = stats.production > 0 ? (stats.collection / stats.production * 100) : 0;
+    var inactiveBadge = d.is_active === false
+      ? ' <span style="display:inline-block;padding:1px 6px;background:rgba(239,83,80,.15);color:var(--red);border-radius:8px;font-size:9px;font-weight:700;">معطل</span>'
+      : '';
+
     html += '<div class="prov-card">'
       + '<div class="color-bar" style="background:' + color + ';"></div>'
       + '<div class="prov-body">'
         + '<div class="prov-head">'
           + '<div class="prov-avatar" style="background:' + color + ';">' + initials(d.name) + '</div>'
           + '<div style="flex:1;">'
-            + '<div class="prov-name">' + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + '</div>'
+            + '<div class="prov-name">' + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + inactiveBadge + '</div>'
             + '<div class="prov-role">' + (d.role ? escapeHtml(d.role) + ' • ' : '') + 'نسبة: ' + sharePctDisplay + '</div>'
           + '</div>'
         + '</div>'
 
         + '<div class="prov-rows">'
           + '<div class="prov-row"><span class="k">عدد الجلسات</span><span class="v">' + fmt(stats.sessionCount) + '</span></div>'
+          + '<div class="prov-row"><span class="k">متوسط قيمة الجلسة</span><span class="v">' + fmtSY(avgSessionValue) + '</span></div>'
           + '<div class="prov-row"><span class="k">الإنتاج</span><span class="v">' + fmtSY(stats.production) + '</span></div>'
           + '<div class="prov-row"><span class="k">تكلفة المخبر</span><span class="v">' + fmtSY(stats.labCost) + '</span></div>'
           + '<div class="prov-row"><span class="k">الصافي بعد المخبر</span><span class="v">' + fmtSY(stats.net) + '</span></div>'
-          + '<div class="prov-row"><span class="k">التحصيل المُسند</span><span class="v">' + fmtSY(stats.collection) + '</span></div>'
+          + '<div class="prov-row"><span class="k">التحصيل المُسند</span><span class="v">' + fmtSY(stats.collection) + ' <span style="color:var(--text2);font-size:10px;">(' + collectionRate.toFixed(0) + '%)</span></span></div>'
           + '<div class="prov-row divider"><span class="k">أساس الحساب (' + basisLabel + ')</span><span class="v">' + fmtSY(baseValue) + '</span></div>'
           + (paidInRange > 0 ? '<div class="prov-row"><span class="k">المدفوع للطبيب</span><span class="v">' + fmtSY(paidInRange) + '</span></div>' : '')
           + remainingHtml
@@ -828,8 +876,9 @@ function render() {
   });
 
   // Add unassigned card if relevant and "all" is selected
+  // Use the same shared matchedSet to dedupe lab matches against named providers
   if (hasUnassigned && providerFilter === 'all') {
-    var stats = computeProviderStats('_unassigned');
+    var stats = computeProviderStats('_unassigned', payoutsMatchedSet);
     if (stats.sessionCount > 0) {
       html += '<div class="prov-card">'
         + '<div class="color-bar" style="background:#8a9ab5;"></div>'
@@ -876,20 +925,14 @@ function showDetails(provId) {
   var sharePct = Number(d.share_percent);
   if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
 
+  // Use a shared matchedSet so that across all rows of this provider,
+  // each lab_order is only counted once (matches stats display).
+  var detailsMatchedSet = {};
   var rows = stats.sessions.slice().sort(function(a,b){
     return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   }).map(function(s){
-    // Find matching lab_orders
-    var sLabCost = 0;
-    if (s.tooth_num) {
-      var matches = labOrders.filter(function(lo){
-        return lo.patient_id === s.patient_id
-          && lo.tooth_num !== null && lo.tooth_num !== undefined
-          && String(lo.tooth_num) === String(s.tooth_num)
-          && lo.status !== 'rejected';
-      });
-      matches.forEach(function(lo){ sLabCost += Number(lo.cost) || 0; });
-    }
+    // Find matching lab_orders (per-procedure, with date window via helper)
+    var sLabCost = sumSessionLabCost(s, detailsMatchedSet);
     var net = (Number(s.cost) || 0) - sLabCost;
     var sessionShare;
     if (basis === 'production') sessionShare = (Number(s.cost) || 0) * sharePct / 100;
@@ -937,19 +980,12 @@ function printSlip(provId) {
   if (!isFinite(sharePct) || sharePct === null || sharePct === '') sharePct = d.is_owner ? 100 : 0;
   var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي بعد المخبر' : 'التحصيل');
 
-  // Build sessions table
+  // Build sessions table (using shared helper for consistency)
+  var printMatchedSet = {};
   var sessionsRows = stats.sessions.slice().sort(function(a,b){
     return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   }).map(function(s){
-    var sLabCost = 0;
-    if (s.tooth_num) {
-      labOrders.filter(function(lo){
-        return lo.patient_id === s.patient_id
-          && lo.tooth_num !== null && lo.tooth_num !== undefined
-          && String(lo.tooth_num) === String(s.tooth_num)
-          && lo.status !== 'rejected';
-      }).forEach(function(lo){ sLabCost += Number(lo.cost) || 0; });
-    }
+    var sLabCost = sumSessionLabCost(s, printMatchedSet);
     return '<tr>'
       + '<td>' + escapeHtml(s.date || '—') + '</td>'
       + '<td>' + escapeHtml(s.type || '—') + '</td>'
@@ -1041,11 +1077,26 @@ function openPayoutModal(provId) {
   var d = doctors.find(function(x){ return x.id === provId; });
   if (!d) return;
 
+  // Calculate current stats and suggested amount (remaining unpaid)
+  var stats = computeProviderStats(provId);
+  var payout = computePayout(d, stats);
+  var from = document.getElementById('fromDate').value;
+  var to   = document.getElementById('toDate').value;
+  var alreadyPaid = payouts
+    .filter(function(po){
+      return po.provider_id === d.id
+        && po.period_start <= to && po.period_end >= from;
+    })
+    .reduce(function(sum, po){ return sum + (Number(po.amount) || 0); }, 0);
+  var suggested = Math.max(0, payout - alreadyPaid);
+
   document.getElementById('payoutProviderId').value = d.id;
-  document.getElementById('payoutProviderName').value = d.name;
-  document.getElementById('payoutFrom').value = document.getElementById('fromDate').value;
-  document.getElementById('payoutTo').value = document.getElementById('toDate').value;
-  document.getElementById('payoutAmount').value = '';
+  document.getElementById('payoutProviderName').value = d.name + (d.is_active === false ? ' (معطل)' : '');
+  document.getElementById('payoutFrom').value = from;
+  document.getElementById('payoutTo').value = to;
+  // Pre-fill with suggested amount (user can edit/clear)
+  document.getElementById('payoutAmount').value = suggested > 0 ? Math.round(suggested) : '';
+  document.getElementById('payoutAmount').placeholder = 'المقترح: ' + fmtSY(suggested);
   document.getElementById('payoutNotes').value = '';
 
   renderPayoutHistory(provId);
@@ -1120,7 +1171,37 @@ async function deletePayout(id) {
 
 // ─── Filter changes ───
 async function onFilterChange() {
+  // Clear preset highlight when filter changes (any source - manual or preset)
+  // This is called *after* setPreset has already applied its highlight, so only clear
+  // if no preset button is active or if this came from a non-preset change.
+  // We rely on setPreset to re-apply its highlight after this returns.
+  // Rebuild the provider dropdown in case inactive filter changed
+  rebuildProviderDropdown();
   await loadFilteredData();
+}
+
+// Clear preset highlights when user manually edits date inputs
+function clearPresetHighlight() {
+  document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+}
+
+function rebuildProviderDropdown() {
+  var sel = document.getElementById('providerFilter');
+  if (!sel) return;
+  var current = sel.value || 'all';
+  var inactiveMode = document.getElementById('inactiveFilter').value;
+  var doctorsForDropdown = doctors.filter(function(d){
+    return inactiveMode === 'show' || d.is_active !== false;
+  });
+  sel.innerHTML = '<option value="all">كل الأطباء النشطين</option>' + doctorsForDropdown.map(function(d){
+    var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
+    return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
+  }).join('');
+  if (current === 'all' || doctorsForDropdown.find(function(d){ return d.id === current; })) {
+    sel.value = current;
+  } else {
+    sel.value = 'all';
+  }
 }
 
 async function refresh() {

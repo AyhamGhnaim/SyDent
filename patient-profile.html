@@ -2460,19 +2460,23 @@ function populateProviderPicker() {
     pendingProviderId = null;
     return;
   }
+  // Prefer active doctors for selection; fall back to all if none active.
+  var activeDoctors = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+  var listToShow = activeDoctors.length > 0 ? activeDoctors : CLINIC_DOCTORS;
+
   // Show picker even for a single doctor — gives clarity about who is doing the work,
   // and lets the user switch doctors without going to settings.
   group.style.display = 'block';
   var html = '';
-  CLINIC_DOCTORS.forEach(function(d, idx){
+  listToShow.forEach(function(d){
     var ownerStr = d.is_owner ? ' ⭐' : '';
     var inactiveStr = d.is_active === false ? ' (معطل)' : '';
     html += '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
   });
   select.innerHTML = html;
-  // Default to first (usually owner)
-  if (!pendingProviderId || !CLINIC_DOCTORS.find(function(d){ return d.id === pendingProviderId; })) {
-    pendingProviderId = CLINIC_DOCTORS[0].id;
+  // Default to first active (usually owner). Keep existing pendingProviderId if still valid.
+  if (!pendingProviderId || !listToShow.find(function(d){ return d.id === pendingProviderId; })) {
+    pendingProviderId = listToShow[0].id;
   }
   select.value = pendingProviderId;
 }
@@ -3024,10 +3028,15 @@ async function saveSession() {
   var type = typeVal === '_other' ? (desc || 'أخرى') : (getTreatment(typeVal) ? getTreatment(typeVal).name : typeVal);
   if (!cost||cost<=0){ showToast('⚠️ أدخل التكلفة'); return; }
   if (!date)         { showToast('⚠️ اختر التاريخ'); return; }
-  // Use picker value if visible; otherwise default to first clinic doctor
+  // Use picker value if visible; otherwise default to first active clinic doctor
   var pickerEl = document.getElementById('sProvider');
   var pickedProvider = (pickerEl && pickerEl.value) ? pickerEl.value : null;
-  var defaultProvider = pickedProvider || ((CLINIC_DOCTORS && CLINIC_DOCTORS.length > 0) ? CLINIC_DOCTORS[0].id : null);
+  var fallbackDoctor = null;
+  if (CLINIC_DOCTORS && CLINIC_DOCTORS.length > 0) {
+    var activeFallback = CLINIC_DOCTORS.find(function(d){ return d.is_active !== false; });
+    fallbackDoctor = activeFallback ? activeFallback.id : CLINIC_DOCTORS[0].id;
+  }
+  var defaultProvider = pickedProvider || fallbackDoctor;
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: type, description: desc, cost: cost, date: date, notes: notes,
@@ -3504,20 +3513,22 @@ function openPayModal()     { document.getElementById('payDate').value=toDay(); 
 function openSessionModal() {
   populateSessionTypes();
   document.getElementById('sDate').value = toDay();
-  // Populate provider picker (same logic as tooth modal)
+  // Populate provider picker (prefer active doctors, fall back to all if none active)
   var group = document.getElementById('sessionProviderGroup');
   var select = document.getElementById('sProvider');
   if (group && select) {
     if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
       group.style.display = 'none';
     } else {
+      var activeDoctors = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+      var listToShow = activeDoctors.length > 0 ? activeDoctors : CLINIC_DOCTORS;
       group.style.display = 'block';
-      select.innerHTML = CLINIC_DOCTORS.map(function(d){
+      select.innerHTML = listToShow.map(function(d){
         var ownerStr = d.is_owner ? ' ⭐' : '';
         var inactiveStr = d.is_active === false ? ' (معطل)' : '';
         return '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
       }).join('');
-      select.value = CLINIC_DOCTORS[0].id;
+      select.value = listToShow[0].id;
     }
   }
   openModal('sessionModal');
