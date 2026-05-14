@@ -2003,9 +2003,10 @@ async function undoExtraction(num) {
   // Determine the scope: just this tooth, or the whole bridge unit?
   var isPartOfBridge = isBridgeTooth(num);
   var confirmMsg = isPartOfBridge
-    ? 'إزالة الجسر بالكامل وإعادة الأسنان المقلوعة؟'
+    ? 'إزالة الجسر فقط؟ (الأسنان المقلوعة ستبقى مقلوعة)'
     : 'إلغاء القلع وإعادة السن ' + num + '؟';
   if (!confirm(confirmMsg)) return;
+
   var unitToClear = [num];
   if (isPartOfBridge) {
     var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
@@ -2017,17 +2018,45 @@ async function undoExtraction(num) {
       unitToClear = arch.slice(s, e+1);
     }
   }
-  // Delete only the entries we control (extraction + bridge keys)
+
   for (var i=0; i<unitToClear.length; i++) {
     var tn = String(unitToClear[i]);
     var sm = teethMap[tn] || {};
-    for (var sk in sm) {
-      if (sm[sk] === 'extracted' || sm[sk] === 'bridge') {
-        var dr = await window.sb.from('teeth_status').delete()
-          .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
-          .eq('tooth_num', tn).eq('surface', sk);
-        if (dr.error) console.error('delete teeth_status error:', dr.error);
-        delete teethMap[tn][sk];
+    if (isPartOfBridge) {
+      // Removing a bridge: delete ONLY bridge entries; keep 'extracted' so previously-extracted teeth stay extracted.
+      for (var sk in sm) {
+        if (sm[sk] === 'bridge') {
+          // If the bridge was stored at WHOLE for a tooth that was originally extracted (legacy data),
+          // we need to restore the 'extracted' marker so the tooth shows as missing again.
+          // Heuristic: if this WHOLE='bridge' tooth is in the middle of the unit (not first/last), it was a pontic.
+          var isInteriorTooth = (tn !== String(unitToClear[0]) && tn !== String(unitToClear[unitToClear.length-1]));
+          if (sk === 'WHOLE' && isInteriorTooth) {
+            // Convert WHOLE='bridge' (legacy pontic) back to WHOLE='extracted'
+            var ur = await window.sb.from('teeth_status').upsert({
+              doctor_id: currentUser.id, patient_id: patientId,
+              tooth_num: tn, surface: 'WHOLE', treatment_key: 'extracted'
+            }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+            if (ur.error) console.error('restore extracted error:', ur.error);
+            teethMap[tn][sk] = 'extracted';
+          } else {
+            var dr = await window.sb.from('teeth_status').delete()
+              .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+              .eq('tooth_num', tn).eq('surface', sk);
+            if (dr.error) console.error('delete bridge entry error:', dr.error);
+            delete teethMap[tn][sk];
+          }
+        }
+      }
+    } else {
+      // Undoing a plain extraction: delete the 'extracted' marker only
+      for (var sk2 in sm) {
+        if (sm[sk2] === 'extracted') {
+          var dr2 = await window.sb.from('teeth_status').delete()
+            .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+            .eq('tooth_num', tn).eq('surface', sk2);
+          if (dr2.error) console.error('delete extracted error:', dr2.error);
+          delete teethMap[tn][sk2];
+        }
       }
     }
     if (Object.keys(teethMap[tn] || {}).length === 0) delete teethMap[tn];
