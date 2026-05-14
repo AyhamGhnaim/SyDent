@@ -443,7 +443,7 @@ function render() {
             + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
           + '</div>'
-          + '<div class="treat-icon" style="' + iconBg + 'color:' + textColor + ';border:2px solid ' + fg + ';">' + (t.label || '') + '</div>'
+          + '<div class="treat-icon" style="' + iconBg + 'border:2px solid ' + fg + ';"></div>'
         + '</div>'
         + '<div class="treat-price">' + fmt(t.price) + ' <span class="currency">ل.س</span></div>'
         + '<div class="treat-actions">'
@@ -622,13 +622,10 @@ function pickColor(fill, stroke) {
 }
 
 function updatePreview() {
-  var name = (document.getElementById('tName').value || '').trim();
-  var label = name.replace(/\s+/g, '').charAt(0) || 'ح';
   var p = document.getElementById('previewTooth');
   p.style.background    = pickedFill;
   p.style.borderColor   = pickedStroke;
-  p.style.color         = isLightColor(pickedFill) ? '#0a1628' : '#fff';
-  p.textContent         = label;
+  p.textContent         = '';
 }
 
 // wire up color picker
