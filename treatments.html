@@ -247,6 +247,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="chip" data-filter="crown_full">تاج كامل</button>
       <button class="chip" data-filter="root">جذر</button>
       <button class="chip" data-filter="whole">سن كامل</button>
+      <button class="chip" data-filter="extraction">قلع</button>
+      <button class="chip" data-filter="implant">زراعة</button>
       <button class="chip" data-filter="bridge">جسر</button>
       <button class="chip" data-filter="lab">🧪 مخبر</button>
       <button class="chip" data-filter="custom">مخصصة</button>
@@ -280,6 +282,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <option value="crown_full">علاجات التاج الكامل</option>
             <option value="root">علاجات الجذر</option>
             <option value="whole">علاجات السن كامل</option>
+            <option value="extraction">القلع</option>
+            <option value="implant">الزراعات</option>
             <option value="bridge">الجسور</option>
             <option value="lab">العلاجات التي تحتاج مخبر</option>
             <option value="custom">العلاجات المخصصة فقط</option>
@@ -399,6 +403,27 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             </svg>
             <div class="target-title">جسر</div>
             <div class="target-sub">يربط سن مفقود بأسنان مجاورة</div>
+          </div>
+          <div class="target-opt" data-target="extraction">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="16" y="8" width="32" height="48" rx="6" stroke-dasharray="4,3" fill="rgba(239,83,80,0.15)"/>
+              <line x1="22" y1="32" x2="42" y2="32"/>
+              <line x1="32" y1="22" x2="32" y2="42"/>
+            </svg>
+            <div class="target-title">قلع</div>
+            <div class="target-sub">يخفي السن من المخطط</div>
+          </div>
+          <div class="target-opt" data-target="implant">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Crown on top + screw fixture -->
+              <path d="M16 18 C16 18 13 20 13 26 C13 30 15 32 17 32 L47 32 C49 32 51 30 51 26 C51 20 48 18 48 18 C42 14 36 12 32 12 C28 12 22 14 16 18Z" fill="rgba(99,179,237,0.45)"/>
+              <rect x="22" y="34" width="20" height="22" rx="3" fill="rgba(122,125,130,0.5)"/>
+              <line x1="22" y1="40" x2="42" y2="40"/>
+              <line x1="22" y1="46" x2="42" y2="46"/>
+              <line x1="22" y1="52" x2="42" y2="52"/>
+            </svg>
+            <div class="target-title">زراعة</div>
+            <div class="target-sub">يستبدل السن بلولب معدني + تاج</div>
           </div>
         </div>
       </div>
@@ -567,6 +592,8 @@ function render() {
       'whole':      { text:'سن كامل',     color:'#06b6d4' },
       'crown_full': { text:'التاج كامل',  color:'#fb923c' },
       'bridge':     { text:'جسر',         color:'#dc2626' },
+      'extraction': { text:'قلع',         color:'#ef5350' },
+      'implant':    { text:'زراعة',       color:'#63b3ed' },
       'both':       { text:'تاج وجذر',    color:'#fb923c' }
     };
     var tp = targetMap[t.target_part] || targetMap.crown;
@@ -653,15 +680,16 @@ function editTreatment(id) {
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
-  // Implant/extracted names are fixed and cannot be edited (built-in special treatments)
+  // Only the BUILT-IN extraction/implant/bridge have their names locked.
+  // Custom variants (like "زراعة سويسرية" or "قلع جراحي") are fully editable.
   var nameInput = document.getElementById('tName');
   var lockedKeys = ['implant', 'extracted', 'bridge'];
-  if (lockedKeys.indexOf(t.treatment_key) >= 0) {
+  if (lockedKeys.indexOf(t.treatment_key) >= 0 && t.builtin) {
     nameInput.readOnly = true;
     nameInput.style.opacity = '0.6';
     nameInput.style.cursor = 'not-allowed';
     var lockedNames = { implant: 'الزراعة', extracted: 'القلع', bridge: 'الجسر' };
-    nameInput.title = 'اسم علاج ' + (lockedNames[t.treatment_key] || '') + ' لا يمكن تغييره';
+    nameInput.title = 'اسم علاج ' + (lockedNames[t.treatment_key] || '') + ' الافتراضي لا يمكن تغييره';
   } else {
     nameInput.readOnly = false;
     nameInput.style.opacity = '';
@@ -943,10 +971,10 @@ async function resetToDefaults() {
   if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
   const DEFAULTS = [
     { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', sort_order:1 },
-    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'whole', sort_order:2 },
+    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', sort_order:2 },
     { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', sort_order:3 },
     { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  sort_order:4 },
-    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'whole', sort_order:5 },
+    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'implant', sort_order:5 },
     { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', sort_order:6 },
     { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:6 },
     { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:7 },

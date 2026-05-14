@@ -1400,9 +1400,10 @@ function toothAnatomy(num) {
 /* ── Extraction / Bridge helpers ── */
 function isExtracted(num) {
   var sm = teethMap[String(num)] || {};
-  // any surface marked extracted counts (we save under WHOLE)
+  if (isExtractionKey(sm.WHOLE)) return true;
+  // Legacy: any surface marked as extracted
   for (var k in sm) {
-    if (sm[k] === 'extracted') return true;
+    if (isExtractionKey(sm[k])) return true;
   }
   return false;
 }
@@ -1413,6 +1414,22 @@ function isBridgeKey(key) {
   if (key === 'bridge') return true;
   var tr = getTreatment(key);
   return !!(tr && tr.target_part === 'bridge');
+}
+
+/* Is this stored treatment_key an extraction (built-in 'extracted' or any custom variant)? */
+function isExtractionKey(key) {
+  if (!key) return false;
+  if (key === 'extracted') return true;
+  var tr = getTreatment(key);
+  return !!(tr && tr.target_part === 'extraction');
+}
+
+/* Is this stored treatment_key an implant (built-in 'implant' or any custom variant)? */
+function isImplantKey(key) {
+  if (!key) return false;
+  if (key === 'implant') return true;
+  var tr = getTreatment(key);
+  return !!(tr && tr.target_part === 'implant');
 }
 
 function isBridgeTooth(num) {
@@ -1432,10 +1449,10 @@ function isBridgeAbut(num) {
 /* Is this tooth an implant? */
 function isImplant(num) {
   var sm = teethMap[String(num)] || {};
-  // Primary: WHOLE='implant'. Legacy fallback: any surface marked as implant.
-  if (sm.WHOLE === 'implant') return true;
+  if (isImplantKey(sm.WHOLE)) return true;
+  // Legacy fallback: any surface marked as implant
   for (var k in sm) {
-    if (sm[k] === 'implant') return true;
+    if (isImplantKey(sm[k])) return true;
   }
   return false;
 }
@@ -1539,8 +1556,14 @@ function buildImplantTooth(num, isUpper) {
   var anat = toothAnatomy(num);
   var W = anat.cellW;
   var H = Math.round(W * 2.1);
-  var implantColor = (T_FILL && T_FILL['implant']) || '#a78bfa';
-  var implantStroke = (T_STROKE && T_STROKE['implant']) || '#7c5cbf';
+  // Use the actual stored implant key (could be 'implant' or a custom variant like 'زراعة سويسرية')
+  var sm = teethMap[String(num)] || {};
+  var implantKey = 'implant';
+  for (var k in sm) {
+    if (isImplantKey(sm[k])) { implantKey = sm[k]; break; }
+  }
+  var implantColor = (T_FILL && T_FILL[implantKey]) || '#a78bfa';
+  var implantStroke = (T_STROKE && T_STROKE[implantKey]) || '#7c5cbf';
   var screwBody = '#7a7d82';
   var screwHi = '#c6c9cd';
   var screwLo = '#3e4146';
@@ -1933,7 +1956,7 @@ function renderTeeth() {
     //  (c) marked WHOLE='bridge' AND between two other bridge-marked teeth (legacy data)
     for (var i=0; i<arch.length; i++) {
       var sm = teethMap[String(arch[i])] || {};
-      var isExt = (sm.WHOLE === 'extracted');
+      var isExt = isExtractionKey(sm.WHOLE);
       var isBr = isBridgeKey(sm.WHOLE);
       // Case (a)
       if (isExt && isBridgeKey(sm.PONTIC)) { ponticSet[arch[i]] = true; continue; }
@@ -1943,12 +1966,12 @@ function renderTeeth() {
       for (var L=i-1; L>=0; L--) {
         var smL = teethMap[String(arch[L])] || {};
         if (isBridgeKey(smL.WHOLE)) { hasLeftBr = true; break; }
-        if (smL.WHOLE !== 'extracted') break;
+        if (!isExtractionKey(smL.WHOLE)) break;
       }
       for (var R=i+1; R<arch.length; R++) {
         var smR = teethMap[String(arch[R])] || {};
         if (isBridgeKey(smR.WHOLE)) { hasRightBr = true; break; }
-        if (smR.WHOLE !== 'extracted') break;
+        if (!isExtractionKey(smR.WHOLE)) break;
       }
       // Only mark as pontic if it's in the MIDDLE of a bridge unit (flanked on both sides)
       if (hasLeftBr && hasRightBr) ponticSet[arch[i]] = true;
@@ -2072,13 +2095,13 @@ async function openToothModal(n, surface) {
     if (isAlreadyBridgeAbut) {
       // Can still add any treatment (e.g. root canal) except those that would overwrite the bridge itself
       var tpA = t.target_part || 'crown';
-      return t.id !== 'implant' && t.id !== 'extracted' && tpA !== 'bridge';
+      return tpA !== 'implant' && tpA !== 'extraction' && tpA !== 'bridge';
     }
     if (isAlreadyExtracted) {
       // A missing tooth can only have bridge or implant treatments
       // Match by target_part (so custom bridge variants like "جسر زركون" also work)
       var tp = t.target_part || 'crown';
-      return tp === 'bridge' || t.id === 'implant' || t.id === 'bridge';
+      return tp === 'bridge' || tp === 'implant';
     }
     // Normal tooth — every treatment is allowed; smart routing handles the surface
     return true;
@@ -2176,7 +2199,7 @@ async function undoExtraction(num) {
     } else {
       // Undoing a plain extraction: delete the 'extracted' marker only
       for (var sk2 in sm) {
-        if (sm[sk2] === 'extracted') {
+        if (isExtractionKey(sm[sk2])) {
           var dr2 = await window.sb.from('teeth_status').delete()
             .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
             .eq('tooth_num', tn).eq('surface', sk2);
@@ -2229,9 +2252,9 @@ function pickToothTreatment(status, label) {
   var tr = getTreatment(status);
   var tp = tr ? (tr.target_part || 'crown') : 'crown';
   // Special treatments override:
-  if (status === 'implant' || status === 'bridge') {
+  if (tp === 'implant' || tp === 'bridge') {
     currentSurface = 'WHOLE';
-  } else if (status === 'extracted') {
+  } else if (tp === 'extraction') {
     currentSurface = 'WHOLE';
   } else if (tp === 'root') {
     // Root treatment: default to R1, or keep the root the user already clicked
@@ -2343,9 +2366,10 @@ async function saveToothTreatment() {
       }
     }
   } else {
-    // For IMPLANT: wipe ALL existing surfaces for this tooth first
+    // For IMPLANT (built-in or any custom variant like 'زراعة سويسرية'):
+    // wipe ALL existing surfaces for this tooth first
     // (so old root canals, fillings, etc. don't survive — an implant replaces the natural tooth completely)
-    if (pendingToothStatus === 'implant') {
+    if (pendingTp === 'implant') {
       var dAll = await window.sb.from('teeth_status').delete()
         .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
         .eq('tooth_num', String(currentTooth));
