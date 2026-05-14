@@ -404,6 +404,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>الطبيب المعالج</label>
         <select id="sProvider" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
       </div>
+      <div class="form-group" id="sessionApptGroup" style="display:none;">
+        <label>ربط بموعد (اختياري)</label>
+        <select id="sAppt" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
+      </div>
       <div class="form-group"><label>ملاحظات</label><textarea id="sNotes" placeholder="أي ملاحظات…"></textarea></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('sessionModal')">إلغاء</button><button class="btn-save-m" onclick="saveSession()">حفظ الجلسة</button></div>
@@ -615,6 +619,7 @@ var payments  = [];
 var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: null, L: null, I: null } }
 var labOrders = [];   // lab orders for current patient
 var allLabs   = [];   // all labs for the doctor
+var upcomingAppts = []; // patient's upcoming/today appointments (for session-appointment linking)
 var currentUser = null;
 
 /* ── Lab Orders Constants ── */
@@ -785,6 +790,20 @@ async function loadAll() {
     if (loErr) { console.warn('lab_orders load error:', loErr); labOrders = []; }
     else labOrders = lo || [];
   } catch(e) { console.warn('lab_orders fetch failed:', e); labOrders = []; }
+
+  // upcoming/today appointments — for linking sessions to appointments
+  try {
+    var todayStr = toDay();
+    const { data: ua, error: uaErr } = await window.sb.from('appointments')
+      .select('id, date, time, type, status')
+      .eq('patient_id', patientId)
+      .gte('date', todayStr)
+      .order('date', { ascending: true })
+      .order('time', { ascending: true })
+      .limit(20);
+    if (uaErr) { console.warn('upcoming appts load:', uaErr); upcomingAppts = []; }
+    else upcomingAppts = ua || [];
+  } catch(e) { console.warn('upcoming appts fetch failed:', e); upcomingAppts = []; }
 
   // labs (for select picker)
   try {
@@ -2840,6 +2859,10 @@ function renderSessions() {
     var stLbl = STATUS_LABELS[st] || st;
     var stColor = STATUS_COLORS[st] || '#3b82f6';
     var stBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + stColor + '22;color:' + stColor + ';border:1px solid ' + stColor + '55;margin-right:4px;">' + stLbl + '</span>';
+    var apptBadge = '';
+    if (s.appointment_id) {
+      apptBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(46,232,158,0.15);color:#2ee89e;border:1px solid rgba(46,232,158,0.35);margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
+    }
     var provBadge = '';
     if (showProviderCol && s.provider_id) {
       var prov = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
@@ -2849,7 +2872,7 @@ function renderSessions() {
     }
     rows += '<tr>'
       + '<td>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + provBadge + '</td>'
+      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
@@ -3033,10 +3056,14 @@ async function saveSession() {
   var pickerEl = document.getElementById('sProvider');
   var pickedProvider = (pickerEl && pickerEl.value) ? pickerEl.value : null;
   var defaultProvider = pickedProvider || getDefaultProviderId(CLINIC_DOCTORS);
+  // Optional appointment link
+  var apptEl = document.getElementById('sAppt');
+  var pickedAppt = (apptEl && apptEl.value) ? apptEl.value : null;
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: type, description: desc, cost: cost, date: date, notes: notes,
-    status: 'completed', provider_id: defaultProvider
+    status: 'completed', provider_id: defaultProvider,
+    appointment_id: pickedAppt
   }).select().single();
   if (newSess) sessions.unshift(newSess);
   var updates = {};
@@ -3052,6 +3079,7 @@ async function saveSession() {
   document.getElementById('sType').value=''; document.getElementById('sCost').value='';
   document.getElementById('sDesc').value=''; document.getElementById('sNotes').value='';
   document.getElementById('sDate').value=toDay();
+  if (apptEl) apptEl.value = '';
   showToast('✅ تم حفظ الجلسة');
 }
 
@@ -3525,6 +3553,25 @@ function openSessionModal() {
         return '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
       }).join('');
       select.value = getDefaultProviderId(listToShow);
+    }
+  }
+  // Populate appointment-link dropdown
+  var aGroup = document.getElementById('sessionApptGroup');
+  var aSelect = document.getElementById('sAppt');
+  if (aGroup && aSelect) {
+    if (!upcomingAppts || upcomingAppts.length === 0) {
+      aGroup.style.display = 'none';
+      aSelect.innerHTML = '';
+    } else {
+      aGroup.style.display = 'block';
+      var opts = '<option value="">— لا تربط بموعد —</option>';
+      upcomingAppts.forEach(function(a){
+        var dt = a.date + (a.time ? ' ' + a.time.slice(0,5) : '');
+        var typ = a.type ? ' • ' + escapeHtml(a.type) : '';
+        opts += '<option value="' + a.id + '">' + dt + typ + '</option>';
+      });
+      aSelect.innerHTML = opts;
+      aSelect.value = '';
     }
   }
   openModal('sessionModal');

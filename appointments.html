@@ -574,10 +574,28 @@ textarea { resize: vertical; min-height: 72px; }
             <option value="cancelled">ملغى</option>
           </select>
         </div>
+        <div class="form-group" id="fProviderGroup" style="display:none;">
+          <label>الطبيب</label>
+          <select id="fProvider"></select>
+        </div>
         <div class="form-group full">
           <label>ملاحظات</label>
           <textarea id="fNotes" placeholder="أي ملاحظات إضافية…"></textarea>
         </div>
+      </div>
+
+      <!-- 🦷 Procedures section (visible only when editing an existing appointment) -->
+      <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
+          <div id="apptProcStats" style="font-size:12px;color:var(--text2);"></div>
+        </div>
+        <div id="apptProcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
+          <button type="button" id="addPlannedBtn" onclick="attachPlannedToAppt()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ ربط بالموعد</button>
+        </div>
+        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
       <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
@@ -697,7 +715,47 @@ function hexA(hex, a) {
 
 let appointments = [];
 let labOrdersByPatient = {};   // { patient_id: [lab_orders] } — for lab status icons
+let sessionsByAppt = {};       // { appointment_id: [ledger_sessions] } — procedures attached to each appointment
+let plannedSessionsByPatient = {}; // { patient_id: [planned ledger_sessions with appointment_id IS NULL] }
+let CLINIC_DOCTORS = [];       // for provider picker
 let currentUser  = null;
+
+/* OpenDental 3-tier provider default resolver:
+   1. user_id == currentUser.id  → linked doctor
+   2. is_owner == true            → owner
+   3. first active doctor         → fallback */
+function getDefaultProviderId(pool) {
+  if (!pool || !pool.length) return null;
+  var active = pool.filter(function(d){ return d.is_active !== false; });
+  if (!active.length) active = pool;
+  // 1. linked to current user
+  if (currentUser && currentUser.id) {
+    for (var i=0; i<active.length; i++) if (active[i].user_id === currentUser.id) return active[i].id;
+  }
+  // 2. owner
+  for (var i=0; i<active.length; i++) if (active[i].is_owner === true) return active[i].id;
+  // 3. fallback first active
+  return active[0].id;
+}
+
+function fmtCost(n) {
+  if (n === null || n === undefined || n === '') return '0';
+  var v = parseFloat(n) || 0;
+  return v.toLocaleString('en-US');
+}
+
+async function loadClinicDoctors() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_active, is_owner, user_id, share_percent')
+      .eq('owner_id', currentUser.id)
+      .order('is_active', { ascending: false })
+      .order('name', { ascending: true });
+    if (error) { console.warn('clinic_doctors load:', error); CLINIC_DOCTORS = []; return; }
+    CLINIC_DOCTORS = data || [];
+  } catch(e) { console.warn('clinic_doctors fetch:', e); CLINIC_DOCTORS = []; }
+}
 
 // ─── Load from Supabase ──────────────────────────────
 async function loadAppointments() {
@@ -710,6 +768,26 @@ async function loadAppointments() {
     .order('time', { ascending: true });
   if (error) { showToast('❌ خطأ في تحميل المواعيد'); return; }
   appointments = data || [];
+
+  // Load sessions attached to any appointment + planned unattached sessions per patient
+  sessionsByAppt = {};
+  plannedSessionsByPatient = {};
+  try {
+    const { data: ses, error: sErr } = await window.sb.from('ledger_sessions')
+      .select('id, patient_id, appointment_id, type, description, cost, date, status, tooth_num, surface, provider_id, notes')
+      .eq('doctor_id', currentUser.id);
+    if (!sErr && ses) {
+      ses.forEach(function(s){
+        if (s.appointment_id) {
+          if (!sessionsByAppt[s.appointment_id]) sessionsByAppt[s.appointment_id] = [];
+          sessionsByAppt[s.appointment_id].push(s);
+        } else if (s.status === 'planned' && s.patient_id) {
+          if (!plannedSessionsByPatient[s.patient_id]) plannedSessionsByPatient[s.patient_id] = [];
+          plannedSessionsByPatient[s.patient_id].push(s);
+        }
+      });
+    }
+  } catch(e) { console.warn('sessions for appts:', e); }
 
   // Load active lab orders (for icons on appointments)
   labOrdersByPatient = {};
@@ -728,6 +806,20 @@ async function loadAppointments() {
   } catch(e) { console.warn('lab_orders for appts:', e); }
 
   render();
+}
+
+/* Compute a summary for an appointment's attached procedures.
+   Returns { count, totalCost, plannedCount, completedCount } or null. */
+function getApptProceduresSummary(apptId) {
+  var arr = sessionsByAppt[apptId];
+  if (!arr || !arr.length) return null;
+  var totalCost = 0, planned = 0, completed = 0;
+  arr.forEach(function(s){
+    totalCost += parseFloat(s.cost) || 0;
+    if (s.status === 'planned') planned++;
+    if (s.status === 'completed') completed++;
+  });
+  return { count: arr.length, totalCost: totalCost, plannedCount: planned, completedCount: completed };
 }
 
 async function loadPatientNames() {
@@ -929,12 +1021,16 @@ function renderDay() {
       var lbHtml = lb
         ? `<span style="display:inline-block;background:${lb.color}22;color:${lb.color};border:1px solid ${lb.color}55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${lb.title}">${lb.icon} ${lb.title.split(':')[0] || 'مخبر'}</span>`
         : '';
+      var ps = getApptProceduresSummary(e.id);
+      var psHtml = ps
+        ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
+        : '';
       html += `
         <div class="time-slot">
           <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}</div>
+              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
               <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
               <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
             </div>
@@ -982,12 +1078,16 @@ function renderList() {
       var lbHtml = lb
         ? `<span style="display:inline-block;background:${lb.color}22;color:${lb.color};border:1px solid ${lb.color}55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${lb.title}">${lb.icon}</span>`
         : '';
+      var ps = getApptProceduresSummary(e.id);
+      var psHtml = ps
+        ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
+        : '';
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${(e.time||'').slice(0,5)}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${initials(e.patient_name||'؟')}</div>
           <div class="list-info">
-            <div class="list-name">${e.patient_name||'—'} ${lbHtml}</div>
+            <div class="list-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
             <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
           </div>
           <span class="list-badge ${statusClass(e.status)}">${statusLabel(e.status)}</span>
@@ -1020,7 +1120,12 @@ async function openModal(prefillDate) {
   document.getElementById('fNotes').value    = '';
   // إخفاء زر الحذف عند إضافة موعد جديد
   document.getElementById('deleteApptBtn').style.display = 'none';
+  // إخفاء قسم العلاجات (يظهر فقط في وضع التعديل)
+  document.getElementById('apptProcSection').style.display = 'none';
   updateColorPreview();
+
+  // Populate provider picker (uses OpenDental 3-tier default)
+  await populateApptProviderPicker(null);
 
   // تعبئة قائمة المرضى من Supabase
   const names = await loadPatientNames();
@@ -1054,6 +1159,199 @@ async function editAppt(id) {
   // كذلك تعبئة قائمة المرضى للـ datalist
   const names = await loadPatientNames();
   document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
+
+  // Provider picker — preselect this appt's provider if any
+  await populateApptProviderPicker(a.provider_id || null);
+
+  // Show procedures section + render attached procs + planned options
+  document.getElementById('apptProcSection').style.display = 'block';
+  renderApptProcedures(a);
+}
+
+/* Build the provider <select>. Visible only if >= 1 clinic doctor exists. */
+async function populateApptProviderPicker(preselectId) {
+  await loadClinicDoctors();
+  var group = document.getElementById('fProviderGroup');
+  var sel = document.getElementById('fProvider');
+  if (!sel || !group) return;
+  if (!CLINIC_DOCTORS.length) {
+    group.style.display = 'none';
+    sel.innerHTML = '';
+    return;
+  }
+  group.style.display = 'block';
+  sel.innerHTML = '';
+  // Active first, then inactive
+  var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+  var inactive = CLINIC_DOCTORS.filter(function(d){ return d.is_active === false; });
+  var ordered = active.concat(inactive);
+  ordered.forEach(function(d){
+    var opt = document.createElement('option');
+    opt.value = d.id;
+    var prefix = '';
+    if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
+    else if (d.is_owner) prefix = '⭐ ';
+    opt.textContent = prefix + d.name + (d.is_active === false ? ' (غير نشط)' : '');
+    sel.appendChild(opt);
+  });
+  // Preselect: explicit id if provided, else default
+  var pick = preselectId || getDefaultProviderId(CLINIC_DOCTORS);
+  if (pick) sel.value = pick;
+}
+
+/* Render attached procedures + the dropdown of planned procedures available to attach. */
+function renderApptProcedures(appt) {
+  var listEl = document.getElementById('apptProcList');
+  var statsEl = document.getElementById('apptProcStats');
+  var selEl = document.getElementById('addPlannedSelect');
+  var completeBtn = document.getElementById('completeApptBtn');
+  var addBtn = document.getElementById('addPlannedBtn');
+  if (!listEl || !selEl) return;
+
+  var attached = sessionsByAppt[appt.id] || [];
+  if (attached.length) {
+    var html = '';
+    attached.forEach(function(s){
+      var statusBadge = '';
+      if (s.status === 'planned') statusBadge = '<span style="background:#ef444422;color:#ef4444;border:1px solid #ef444455;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
+      else if (s.status === 'completed') statusBadge = '<span style="background:#3b82f622;color:#3b82f6;border:1px solid #3b82f655;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
+      else statusBadge = '<span style="background:rgba(255,255,255,0.06);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;">' + (s.status||'—') + '</span>';
+      var toothPart = s.tooth_num ? ' • السن ' + s.tooth_num + (s.surface && s.surface !== 'WHOLE' ? '/' + s.surface : '') : '';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + (s.type || s.description || 'علاج') + toothPart + '</div>'
+        + '<div style="font-size:12px;color:var(--text2);">' + fmtCost(s.cost) + ' ل.س</div>'
+        + statusBadge
+        + '<button type="button" onclick="unlinkSessionFromAppt(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="فصل عن الموعد">✕</button>'
+        + '</div>';
+    });
+    listEl.innerHTML = html;
+    var totalC = attached.reduce(function(s,x){ return s + (parseFloat(x.cost)||0); }, 0);
+    var plannedC = attached.filter(function(x){ return x.status === 'planned'; }).length;
+    var completedC = attached.filter(function(x){ return x.status === 'completed'; }).length;
+    statsEl.textContent = attached.length + ' علاج • ' + fmtCost(totalC) + ' ل.س • مخطّط ' + plannedC + ' / منجز ' + completedC;
+    completeBtn.style.display = plannedC > 0 ? 'block' : 'none';
+  } else {
+    listEl.innerHTML = '<div style="padding:8px;color:var(--text2);font-size:12px;text-align:center;">لا توجد علاجات مرتبطة بهذا الموعد بعد</div>';
+    statsEl.textContent = '';
+    completeBtn.style.display = 'none';
+  }
+
+  // Planned sessions dropdown (unattached, same patient)
+  var pid = appt.patient_id;
+  var planned = pid ? (plannedSessionsByPatient[pid] || []) : [];
+  selEl.innerHTML = '';
+  if (!pid) {
+    var opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— هذا الموعد لا يحتوي patient_id (إصدار قديم) —';
+    selEl.appendChild(opt);
+    addBtn.disabled = true;
+    addBtn.style.opacity = '0.4';
+    return;
+  }
+  if (!planned.length) {
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— لا توجد علاجات مخطّطة غير مرتبطة لهذا المريض —';
+    selEl.appendChild(opt0);
+    addBtn.disabled = true;
+    addBtn.style.opacity = '0.4';
+    return;
+  }
+  var placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— اختر علاجاً مخطّطاً —';
+  selEl.appendChild(placeholder);
+  planned.forEach(function(s){
+    var toothPart = s.tooth_num ? ' (سن ' + s.tooth_num + ')' : '';
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = (s.type || s.description || 'علاج') + toothPart + ' — ' + fmtCost(s.cost) + ' ل.س';
+    selEl.appendChild(opt);
+  });
+  addBtn.disabled = false;
+  addBtn.style.opacity = '1';
+}
+
+/* Attach a planned session to the currently-open appointment. */
+async function attachPlannedToAppt() {
+  if (!editingId) { showToast('⚠️ احفظ الموعد أولاً'); return; }
+  var sel = document.getElementById('addPlannedSelect');
+  var sessId = sel ? sel.value : '';
+  if (!sessId) { showToast('⚠️ اختر علاجاً'); return; }
+  const { error } = await window.sb.from('ledger_sessions')
+    .update({ appointment_id: editingId })
+    .eq('id', sessId).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الربط: ' + error.message); return; }
+  showToast('✅ تم ربط العلاج بالموعد');
+  await loadAppointments();
+  var appt = appointments.find(function(a){ return a.id === editingId; });
+  if (appt) renderApptProcedures(appt);
+}
+
+/* Unlink a session from an appointment (sets appointment_id = NULL). */
+async function unlinkSessionFromAppt(sessId) {
+  if (!confirm('فصل هذا العلاج عن الموعد؟ (لن يُحذف العلاج نفسه)')) return;
+  const { error } = await window.sb.from('ledger_sessions')
+    .update({ appointment_id: null })
+    .eq('id', sessId).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الفصل: ' + error.message); return; }
+  showToast('✅ تم فصل العلاج عن الموعد');
+  await loadAppointments();
+  var appt = appointments.find(function(a){ return a.id === editingId; });
+  if (appt) renderApptProcedures(appt);
+}
+
+/* Set Complete: convert all planned attached procedures (+ their teeth_status rows) to completed
+   and set the appointment status to 'confirmed' (the closest existing status). */
+async function completeApptWithProcedures() {
+  if (!editingId) return;
+  var attached = sessionsByAppt[editingId] || [];
+  var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
+  if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
+  if (!confirm('إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟')) return;
+
+  var btn = document.getElementById('completeApptBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإكمال…'; }
+
+  var failed = 0;
+  for (var i=0; i<plannedOnes.length; i++) {
+    var s = plannedOnes[i];
+    // 1) update session
+    var u1 = await window.sb.from('ledger_sessions')
+      .update({ status: 'completed' })
+      .eq('id', s.id).eq('doctor_id', currentUser.id);
+    if (u1.error) { failed++; console.error('session complete err:', u1.error); continue; }
+    // 2) update matching teeth_status row(s) — only if session has tooth_num
+    if (s.tooth_num) {
+      var q = window.sb.from('teeth_status').update({ status: 'completed' })
+        .eq('doctor_id', currentUser.id)
+        .eq('patient_id', s.patient_id)
+        .eq('tooth_num', String(s.tooth_num))
+        .eq('status', 'planned');
+      if (s.surface) q = q.eq('surface', s.surface);
+      var u2 = await q;
+      if (u2.error) console.warn('teeth_status complete warn:', u2.error);
+    }
+  }
+
+  // 3) mark appointment as confirmed (existing schema has no 'completed' value)
+  var u3 = await window.sb.from('appointments')
+    .update({ status: 'confirmed' })
+    .eq('id', editingId).eq('doctor_id', currentUser.id);
+  if (u3.error) console.warn('appt update warn:', u3.error);
+
+  showToast(failed === 0
+    ? '✅ تم إكمال ' + plannedOnes.length + ' علاج'
+    : '⚠️ اكتمل ' + (plannedOnes.length - failed) + ' من ' + plannedOnes.length);
+
+  await loadAppointments();
+  var appt = appointments.find(function(a){ return a.id === editingId; });
+  if (appt) {
+    renderApptProcedures(appt);
+    document.getElementById('fStatus').value = appt.status;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '✅ إكمال الموعد + كل العلاجات المخطّطة'; }
 }
 
 // حذف الموعد من داخل المودال
@@ -1100,9 +1398,26 @@ async function submitAppt(e) {
   const btn = document.getElementById('saveBtn');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
+  var providerSel = document.getElementById('fProvider');
+  var providerId = (providerSel && providerSel.value) ? providerSel.value : getDefaultProviderId(CLINIC_DOCTORS);
+
+  var patientName = document.getElementById('fPatient').value.trim();
+
+  // Lookup patient_id from name (so newer features that rely on it work).
+  // If not found, leave patient_id null — older flow still works.
+  var patientId = null;
+  if (patientName) {
+    try {
+      const { data: prow } = await window.sb.from('patients')
+        .select('id').eq('doctor_id', currentUser.id).eq('name', patientName).maybeSingle();
+      if (prow && prow.id) patientId = prow.id;
+    } catch(_) { /* ignore */ }
+  }
+
   const apptData = {
     doctor_id:    currentUser.id,
-    patient_name: document.getElementById('fPatient').value.trim(),
+    patient_id:   patientId,
+    patient_name: patientName,
     date:         document.getElementById('fDate').value,
     time:         document.getElementById('fTime').value || null,
     duration:     parseInt(document.getElementById('fDuration').value),
@@ -1111,16 +1426,17 @@ async function submitAppt(e) {
     notes:        document.getElementById('fNotes').value.trim(),
     color:        apptColor,
     stroke:       apptStroke,
+    provider_id:  providerId
   };
 
   if (editingId) {
     const { error } = await window.sb.from('appointments').update(apptData)
       .eq('id', editingId).eq('doctor_id', currentUser.id);
-    if (error) { showToast('❌ خطأ في التعديل'); }
+    if (error) { showToast('❌ خطأ في التعديل: ' + error.message); }
     else { showToast('✅ تم تعديل الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
   } else {
     const { error } = await window.sb.from('appointments').insert(apptData);
-    if (error) { showToast('❌ خطأ في الإضافة'); }
+    if (error) { showToast('❌ خطأ في الإضافة: ' + error.message); }
     else { showToast('✅ تمت إضافة الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
   }
 
@@ -1149,6 +1465,7 @@ function showToast(msg) {
   const { data } = await window.sb.auth.getUser();
   if (!data || !data.user) { window.location.href = 'auth.html'; return; }
   currentUser = data.user;
+  await loadClinicDoctors();
   await loadAppointments();
 })();
 
