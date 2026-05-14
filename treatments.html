@@ -241,6 +241,21 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <span class="search-icon">🔍</span>
       <input type="search" id="treatSearch" placeholder="ابحث باسم العلاج..." autocomplete="off">
     </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select id="catFilter" onchange="applyCatFilter()" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">
+        <option value="all">📂 جميع التصنيفات</option>
+        <option value="diagnostic">🔍 تشخيصي</option>
+        <option value="preventive">🛡️ وقائي</option>
+        <option value="restorative">🦷 ترميمي</option>
+        <option value="endodontics">🌱 لب وجذر</option>
+        <option value="surgical">🔪 جراحي</option>
+        <option value="prosthodontics">🔗 تعويضي</option>
+        <option value="implantology">🔩 زراعة</option>
+        <option value="cosmetic">✨ تجميلي</option>
+        <option value="orthodontics">⚓ تقويم</option>
+        <option value="other">📋 أخرى</option>
+      </select>
+    </div>
     <div class="filter-chips" id="filterChips">
       <button class="chip chip-active" data-filter="all">الكل</button>
       <button class="chip" data-filter="crown">تاج (سطح)</button>
@@ -350,6 +365,28 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <span class="lab-toggle-slider"></span>
           </label>
         </label>
+      </div>
+
+      <div class="form-group">
+        <label>التصنيف</label>
+        <select id="tCategory" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
+          <option value="diagnostic">🔍 تشخيصي (أشعة، استشارة)</option>
+          <option value="preventive">🛡️ وقائي (تنظيف، فلوريد)</option>
+          <option value="restorative" selected>🦷 ترميمي (حشوات، تلبيس)</option>
+          <option value="endodontics">🌱 لب وجذر (قناة جذر)</option>
+          <option value="surgical">🔪 جراحي (قلع، جراحة)</option>
+          <option value="prosthodontics">🔗 تعويضي (جسر، طقم)</option>
+          <option value="implantology">🔩 زراعة</option>
+          <option value="cosmetic">✨ تجميلي (تبييض، فينير)</option>
+          <option value="orthodontics">⚓ تقويم</option>
+          <option value="other">📋 أخرى</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>ملاحظات افتراضية للجلسة (اختياري)</label>
+        <textarea id="tDefaultNote" placeholder="نص يُعبأ تلقائياً عند اختيار هذا العلاج (مثلاً: المخدر المستخدم، التقنية...)" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;min-height:60px;resize:vertical;"></textarea>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">يُستخدم عند إنشاء جلسة منجزة. يمكن للطبيب تعديله في كل جلسة.</div>
       </div>
 
       <div class="form-group">
@@ -519,7 +556,9 @@ async function loadTreatments() {
       needs_lab: !!t.needs_lab,
       target_part: t.target_part || 'crown',
       sort_order: t.sort_order,
-      is_active: t.is_active !== false  // default true if column doesn't exist
+      is_active: t.is_active !== false,  // default true if column doesn't exist
+      category: t.category || 'other',
+      default_note: t.default_note || ''
     };
   });
   render();
@@ -532,6 +571,12 @@ function fmt(n) { return Number(n||0).toLocaleString('ar-SY'); }
 // ── Filter + search state ──
 var activeFilter = 'all';
 var searchTerm = '';
+var activeCat = 'all';
+
+function applyCatFilter() {
+  activeCat = document.getElementById('catFilter').value;
+  render();
+}
 
 function filteredTreatments() {
   var q = searchTerm.trim().toLowerCase();
@@ -550,6 +595,10 @@ function filteredTreatments() {
         // target_part filter
         if ((t.target_part || 'crown') !== activeFilter) return false;
       }
+    }
+    // Category filter
+    if (activeCat !== 'all') {
+      if ((t.category || 'other') !== activeCat) return false;
     }
     // Search
     if (q) {
@@ -596,8 +645,21 @@ function render() {
       'implant':    { text:'زراعة',       color:'#63b3ed' },
       'both':       { text:'تاج وجذر',    color:'#fb923c' }
     };
+    var catMap = {
+      'diagnostic':    '🔍 تشخيصي',
+      'preventive':    '🛡️ وقائي',
+      'restorative':   '🦷 ترميمي',
+      'endodontics':   '🌱 لب وجذر',
+      'surgical':      '🔪 جراحي',
+      'prosthodontics':'🔗 تعويضي',
+      'implantology':  '🔩 زراعة',
+      'cosmetic':      '✨ تجميلي',
+      'orthodontics':  '⚓ تقويم',
+      'other':         '📋 أخرى'
+    };
     var tp = targetMap[t.target_part] || targetMap.crown;
     var targetTag = '<span class="treat-target-tag" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:' + tp.color + '22;color:' + tp.color + ';border:1px solid ' + tp.color + '55;margin-right:4px;">🦷 ' + tp.text + '</span>';
+    var catTag = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(156,163,175,.15);color:var(--text2);border:1px solid rgba(156,163,175,.4);margin-right:4px;">' + (catMap[t.category] || catMap.other) + '</span>';
     var isInactive = (t.is_active === false);
     var inactiveStyle = isInactive ? 'opacity:.55;' : '';
     var inactiveBadge = isInactive ? '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(160,160,160,.2);color:#9ca3af;border:1px solid #6b7280;margin-right:4px;">⏸️ معطّل</span>' : '';
@@ -610,7 +672,7 @@ function render() {
       + '<div class="treat-body">'
         + '<div class="treat-head">'
           + '<div>'
-            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + inactiveBadge + '</div>'
+            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + inactiveBadge + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
           + '</div>'
           + '<div class="treat-icon" style="' + iconBg + 'border:2px solid ' + fg + ';"></div>'
@@ -664,6 +726,8 @@ function openAddModal() {
   document.getElementById('tPrice').value = '';
   document.getElementById('tLabel').value = '';
   document.getElementById('tNeedsLab').checked = false;
+  document.getElementById('tCategory').value = 'restorative';
+  document.getElementById('tDefaultNote').value = '';
   pickColor('#2ee89e','#1fba7e');
   pickTarget('crown');
   updatePreview();
@@ -680,6 +744,8 @@ function editTreatment(id) {
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
+  document.getElementById('tCategory').value = t.category || 'other';
+  document.getElementById('tDefaultNote').value = t.default_note || '';
   // Only the BUILT-IN extraction/implant/bridge have their names locked.
   // Custom variants (like "زراعة سويسرية" or "قلع جراحي") are fully editable.
   var nameInput = document.getElementById('tName');
@@ -723,6 +789,8 @@ function duplicateTreatment(id) {
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label || '';
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
+  document.getElementById('tCategory').value = t.category || 'other';
+  document.getElementById('tDefaultNote').value = t.default_note || '';
   // Reset readonly state (duplicate is a new treatment, name editable)
   var nameInputDup = document.getElementById('tName');
   nameInputDup.readOnly = false;
@@ -970,16 +1038,16 @@ async function deleteTreatment(id) {
 async function resetToDefaults() {
   if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
   const DEFAULTS = [
-    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', sort_order:1 },
-    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', sort_order:2 },
-    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', sort_order:3 },
-    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  sort_order:4 },
-    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'implant', sort_order:5 },
-    { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', sort_order:6 },
-    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:6 },
-    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, target_part:'crown', sort_order:7 },
-    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', sort_order:8 },
-    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, target_part:'whole', sort_order:9 }
+    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
+    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
+    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', category:'restorative', sort_order:3 },
+    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  category:'endodontics', sort_order:4 },
+    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'implant', category:'implantology', sort_order:5 },
+    { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', category:'prosthodontics', sort_order:6 },
+    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, target_part:'crown', category:'preventive', sort_order:6 },
+    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, target_part:'crown', category:'cosmetic', sort_order:7 },
+    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:8 },
+    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:9 }
   ];
   // delete all current
   await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
@@ -998,6 +1066,8 @@ async function saveTreatment() {
   var existingLabel = document.getElementById('tLabel').value;
   var label = existingLabel || name.replace(/\s+/g, '').charAt(0) || '·';
   var needsLab = document.getElementById('tNeedsLab').checked;
+  var category = document.getElementById('tCategory').value;
+  var defaultNote = document.getElementById('tDefaultNote').value.trim();
   if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
 
@@ -1005,7 +1075,7 @@ async function saveTreatment() {
     // UPDATE existing
     const { error } = await window.sb
       .from('treatments')
-      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, updated_at: new Date().toISOString() })
+      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, updated_at: new Date().toISOString() })
       .eq('id', editingId);
     if (error) { showToast('⚠️ ' + error.message); return; }
   } else {
@@ -1021,6 +1091,8 @@ async function saveTreatment() {
         fill: pickedFill, stroke: pickedStroke,
         needs_lab: needsLab,
         target_part: pickedTarget,
+        category: category,
+        default_note: defaultNote,
         builtin: false,
         sort_order: maxOrder + 1
       });

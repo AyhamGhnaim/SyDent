@@ -199,6 +199,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;}
 .btn-save-m:hover{background:#26d48e;}
 .tooth-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.status-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.status-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:9px;transition:all .15s;text-align:right;}
+.status-opt:hover{background:rgba(46,232,158,.08);border-color:var(--green);}
+.status-opt.selected{background:rgba(46,232,158,.12);border-color:var(--green);}
+.status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+/* Treatment status badges on chart */
+.tooth-status-badge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:5;}
+.status-planned{background:#ef4444;}
+.status-completed{background:#3b82f6;}
+.status-existing{background:#9ca3af;opacity:.7;}
+.status-referred{background:#f59e0b;}
 .topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
 
@@ -456,6 +467,23 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="toothStep2" style="display:none;">
         <div id="toothStep2Title" style="font-size:14px;font-weight:700;color:var(--green);margin-bottom:14px;text-align:center;"></div>
         <div class="form-group">
+          <label>حالة العلاج</label>
+          <div class="status-picker" id="toothStatusPicker">
+            <button type="button" class="status-opt selected" data-status="completed" onclick="pickStatus('completed')">
+              <span class="status-dot" style="background:#3b82f6;"></span>منجز
+            </button>
+            <button type="button" class="status-opt" data-status="planned" onclick="pickStatus('planned')">
+              <span class="status-dot" style="background:#ef4444;"></span>مخطط
+            </button>
+            <button type="button" class="status-opt" data-status="existing" onclick="pickStatus('existing')">
+              <span class="status-dot" style="background:#9ca3af;"></span>موجود مسبقاً
+            </button>
+            <button type="button" class="status-opt" data-status="referred" onclick="pickStatus('referred')">
+              <span class="status-dot" style="background:#f59e0b;"></span>محوّل
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
           <label>التكلفة (ل.س)</label>
           <input type="number" id="toothCost" placeholder="مثال: 50000" min="0" inputmode="numeric" autofocus>
         </div>
@@ -643,7 +671,10 @@ async function loadTreatmentsFromSupabase() {
                fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin,
                needs_lab: !!t.needs_lab,
                target_part: t.target_part || 'crown',
-               is_active: t.is_active !== false };
+               is_active: t.is_active !== false,
+               category: t.category || 'other',
+               default_note: t.default_note || '',
+               completion_note: t.completion_note || '' };
     });
     localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
   } catch(e){ console.error(e); }
@@ -691,6 +722,9 @@ async function loadAll() {
     var s = t.surface || 'O';
     if (!teethMap[n]) teethMap[n] = {};
     teethMap[n][s] = t.treatment_key;
+    // Store treatment status alongside (default 'completed' for legacy data with no status column)
+    if (!teethMap[n].__status) teethMap[n].__status = {};
+    teethMap[n].__status[s] = t.status || 'completed';
   });
 
   // lab orders (defensive: fail silently if table missing or RLS blocks)
@@ -727,10 +761,22 @@ async function syncPaymentStatus() {
 
 /* ── computeFinancials ── */
 function computeFinancials() {
-  var total = 0, paid = 0;
-  sessions.forEach(function(s){ total += Number(s.cost||0); });
+  var total = 0, paid = 0, plannedTotal = 0, completedTotal = 0;
+  sessions.forEach(function(s){
+    var c = Number(s.cost||0);
+    var st = s.status || 'completed';
+    total += c;
+    if (st === 'planned') plannedTotal += c;
+    else if (st === 'completed') completedTotal += c;
+  });
   payments.forEach(function(p){ paid  += Number(p.amount||0); });
-  return { total: total, paid: paid, balance: total - paid };
+  return {
+    total: total,
+    paid: paid,
+    balance: total - paid,
+    plannedTotal: plannedTotal,
+    completedTotal: completedTotal
+  };
 }
 
 /* ── Seq Number ── */
@@ -1424,6 +1470,32 @@ function isExtractionKey(key) {
   return !!(tr && tr.target_part === 'extraction');
 }
 
+/* Get the treatment status for a surface of a tooth.
+   Returns: 'planned' / 'completed' / 'existing' / 'referred' (default 'completed' for legacy) */
+function getStatus(num, surface) {
+  var sm = teethMap[String(num)] || {};
+  if (sm.__status && sm.__status[surface]) return sm.__status[surface];
+  return 'completed';
+}
+
+/* Get the dominant status for a tooth (used for badge/indicator at tooth level).
+   Priority: planned > completed > existing > referred. */
+function getDominantStatus(num) {
+  var sm = teethMap[String(num)] || {};
+  if (!sm.__status) return 'completed';
+  var statuses = [];
+  for (var k in sm) {
+    if (k === '__status') continue;
+    var st = sm.__status[k] || 'completed';
+    statuses.push(st);
+  }
+  if (statuses.indexOf('planned') >= 0) return 'planned';
+  if (statuses.indexOf('completed') >= 0) return 'completed';
+  if (statuses.indexOf('existing') >= 0) return 'existing';
+  if (statuses.indexOf('referred') >= 0) return 'referred';
+  return 'completed';
+}
+
 /* Is this stored treatment_key an implant (built-in 'implant' or any custom variant)? */
 function isImplantKey(key) {
   if (!key) return false;
@@ -1934,8 +2006,14 @@ function renderLegend() {
   var html = '<div class="leg"><div class="leg-dot" style="background:#e8d5b0;border:1px solid #b8956a;"></div>سليم</div>';
   for (var i=0; i<TREATMENTS.length; i++) {
     var t = TREATMENTS[i];
+    if (t.is_active === false) continue;
     html += '<div class="leg"><div class="leg-dot" style="background:' + t.fill + '"></div>' + t.name + '</div>';
   }
+  // Status legend (small separator)
+  html += '<div class="leg-sep" style="width:1px;height:14px;background:var(--border);margin:0 6px;"></div>';
+  html += '<div class="leg" title="العلاج المخطط (لم يُنجز بعد)"><div class="leg-dot" style="background:#ef4444;border-radius:50%;"></div>مخطط</div>';
+  html += '<div class="leg" title="العلاج الموجود مسبقاً"><div class="leg-dot" style="background:#9ca3af;border-radius:50%;"></div>موجود مسبقاً</div>';
+  html += '<div class="leg" title="العلاج المحوّل لطبيب آخر"><div class="leg-dot" style="background:#f59e0b;border-radius:50%;"></div>محوّل</div>';
   leg.innerHTML = html;
 }
 
@@ -2001,6 +2079,40 @@ function renderTeeth() {
   // Draw bridge connectors after teeth are in DOM
   setTimeout(renderBridges, 0);
   attachSurfaceClicks();
+  addStatusBadges();
+}
+
+/* Add a small color dot on each tooth indicating its dominant treatment status.
+   Skips teeth with no treatments. */
+function addStatusBadges() {
+  var allTeeth = UPPER_T.concat(LOWER_T);
+  for (var i=0; i<allTeeth.length; i++) {
+    var num = allTeeth[i];
+    var sm = teethMap[String(num)] || {};
+    // Skip if no treatments stored
+    var hasTreat = false;
+    for (var k in sm) { if (k !== '__status') { hasTreat = true; break; } }
+    if (!hasTreat) continue;
+    var status = getDominantStatus(num);
+    if (status === 'completed') continue;  // Don't badge completed (default state)
+    var cell = document.querySelector('.tooth-cell[data-tooth-cell="' + num + '"]');
+    if (!cell) continue;
+    // Remove any old badge
+    var old = cell.querySelector('.tooth-status-badge');
+    if (old) old.remove();
+    // Add new badge
+    var badge = document.createElement('div');
+    badge.className = 'tooth-status-badge status-' + status;
+    badge.title = 'الحالة: ' + (STATUS_LABELS[status] || status);
+    cell.appendChild(badge);
+    // Apply visual treatment to the tooth shape
+    var shape = cell.querySelector('.tooth-shape');
+    if (shape) {
+      if (status === 'planned') shape.style.opacity = '0.55';
+      else if (status === 'existing') shape.style.opacity = '0.65';
+      else if (status === 'referred') shape.style.opacity = '0.50';
+    }
+  }
 }
 
 /* Compute the on-screen vertical position of the GINGIVAL THIRD of the crown
@@ -2049,6 +2161,43 @@ var currentTooth = null;
 var currentSurface = null;
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
+var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing' / 'referred'
+
+var STATUS_LABELS = {
+  planned:   'مخطط',
+  completed: 'منجز',
+  existing:  'موجود مسبقاً',
+  referred:  'محوّل'
+};
+var STATUS_COLORS = {
+  planned:   '#ef4444',
+  completed: '#3b82f6',
+  existing:  '#9ca3af',
+  referred:  '#f59e0b'
+};
+
+function pickStatus(s) {
+  pendingTreatStatus = s;
+  // Update visual selection
+  document.querySelectorAll('#toothStatusPicker .status-opt').forEach(function(b){
+    if (b.getAttribute('data-status') === s) b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+  // Auto-fill the notes textarea from the treatment's default/completion note
+  var tr = getTreatment(pendingToothStatus);
+  if (tr) {
+    var notesEl = document.getElementById('toothNotes');
+    var existingNote = (notesEl.value || '').trim();
+    var defNote = (tr.default_note || '').trim();
+    var compNote = (tr.completion_note || '').trim();
+    // If the user hasn't typed anything custom, fill from the appropriate note
+    if (!existingNote || existingNote === defNote || existingNote === compNote) {
+      if (s === 'planned' && defNote) notesEl.value = defNote;
+      else if (s === 'completed' && compNote) notesEl.value = compNote;
+      else if (s === 'completed' && defNote) notesEl.value = defNote;  // fallback
+    }
+  }
+}
 
 async function openToothModal(n, surface) {
   await loadTreatmentsFromSupabase();
@@ -2284,6 +2433,17 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothCost').value  = t ? t.price : '';
   document.getElementById('toothNotes').value = '';
   document.getElementById('toothDate').value  = toDay();
+  // Default status = completed; reset visual selection then call pickStatus to pre-fill note
+  pendingTreatStatus = 'completed';
+  document.querySelectorAll('#toothStatusPicker .status-opt').forEach(function(b){
+    if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+  // Pre-fill notes for completed (uses completion_note if available, else default_note)
+  if (t) {
+    var defaultNote = (t.completion_note || t.default_note || '').trim();
+    if (defaultNote) document.getElementById('toothNotes').value = defaultNote;
+  }
   // Show lab button only for treatments that need a lab
   document.getElementById('toothLabBtn').style.display = needsLab(status) ? 'inline-block' : 'none';
   setTimeout(function(){ document.getElementById('toothCost').focus(); document.getElementById('toothCost').select(); }, 100);
@@ -2332,7 +2492,7 @@ async function saveToothTreatment() {
       if (isAbut) {
         var rA = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey
+          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rA.error) {
           console.error('bridge abutment save error:', rA.error);
@@ -2340,17 +2500,19 @@ async function saveToothTreatment() {
         }
         if (!teethMap[un]) teethMap[un] = {};
         teethMap[un]['WHOLE'] = bridgeKey;
+        if (!teethMap[un].__status) teethMap[un].__status = {};
+        teethMap[un].__status.WHOLE = pendingTreatStatus;
       } else {
         // Try PONTIC surface; if DB rejects (constraint), fallback to WHOLE
         var rP = await window.sb.from('teeth_status').upsert({
           doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey
+          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
         if (rP.error) {
           console.warn('PONTIC surface rejected, falling back to WHOLE:', rP.error);
           var rF = await window.sb.from('teeth_status').upsert({
             doctor_id: currentUser.id, patient_id: patientId,
-            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey
+            tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus
           }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
           if (rF.error) {
             console.error('bridge pontic fallback save error:', rF.error);
@@ -2358,9 +2520,13 @@ async function saveToothTreatment() {
           }
           if (!teethMap[un]) teethMap[un] = {};
           teethMap[un]['WHOLE'] = bridgeKey;
+          if (!teethMap[un].__status) teethMap[un].__status = {};
+          teethMap[un].__status.WHOLE = pendingTreatStatus;
         } else {
           if (!teethMap[un]) teethMap[un] = {};
           teethMap[un]['PONTIC'] = bridgeKey;
+          if (!teethMap[un].__status) teethMap[un].__status = {};
+          teethMap[un].__status.PONTIC = pendingTreatStatus;
           if (teethMap[un]['WHOLE'] !== 'extracted') teethMap[un]['WHOLE'] = 'extracted';
         }
       }
@@ -2379,14 +2545,14 @@ async function saveToothTreatment() {
     // Normal save
     var rN = await window.sb.from('teeth_status').upsert({
       doctor_id: currentUser.id, patient_id: patientId,
-      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
+      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
     if (rN.error) {
       console.warn('teeth_status save failed with surface=' + currentSurface + ', trying WHOLE fallback:', rN.error);
       // Fallback to WHOLE surface
       var rFb = await window.sb.from('teeth_status').upsert({
         doctor_id: currentUser.id, patient_id: patientId,
-        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus
+        tooth_num: String(currentTooth), surface: 'WHOLE', treatment_key: pendingToothStatus, status: pendingTreatStatus
       }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
       if (rFb.error) {
         console.error('teeth_status fallback save error:', rFb.error);
@@ -2394,9 +2560,13 @@ async function saveToothTreatment() {
       }
       if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
       teethMap[String(currentTooth)]['WHOLE'] = pendingToothStatus;
+      if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
+      teethMap[String(currentTooth)].__status.WHOLE = pendingTreatStatus;
     } else {
       if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
       teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
+      if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
+      teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
     }
   }
 
@@ -2424,7 +2594,8 @@ async function saveToothTreatment() {
   var rL = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: pendingToothLabel, description: ledgerDescription,
-    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface
+    cost: cost, date: date, notes: notes, tooth_num: ledgerToothNum, surface: dbSurface,
+    status: pendingTreatStatus
   }).select().single();
   if (rL.error) {
     console.error('ledger insert error:', rL.error);
@@ -2506,9 +2677,13 @@ function renderSessions() {
   var rows = '';
   sessions.forEach(function(s) {
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth_num + '</span>' : '';
+    var st = s.status || 'completed';
+    var stLbl = STATUS_LABELS[st] || st;
+    var stColor = STATUS_COLORS[st] || '#3b82f6';
+    var stBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + stColor + '22;color:' + stColor + ';border:1px solid ' + stColor + '55;margin-right:4px;">' + stLbl + '</span>';
     rows += '<tr>'
       + '<td>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + '</td>'
+      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
@@ -2523,8 +2698,12 @@ function renderPayments() {
   var el = document.getElementById('paymentsContent');
   var f  = computeFinancials();
   var bColor = f.balance > 0 ? 'var(--red)' : f.balance < 0 ? 'var(--yellow)' : 'var(--green)';
+  var plannedHtml = f.plannedTotal > 0
+    ? '<div class="bs-item"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div></div>'
+    : '';
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
+  + plannedHtml
   + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)  + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
   + '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>';
   if (!payments.length) {
