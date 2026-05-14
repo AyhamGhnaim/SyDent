@@ -1678,7 +1678,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   // crown_full: semi-transparent color overlay over entire crown (preserves gradient + details)
   // Bridge abutments use higher opacity so they read as solid crown of bridge color
   if (hasCrownFull) {
-    var cfOpacity = isBridgeAbutment ? 0.92 : 0.70;
+    var cfOpacity = isBridgeAbutment ? 0.92 : 0.85;
     svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="' + cfOpacity + '" '
         +  'stroke="none" pointer-events="none"></path>';
   }
@@ -2222,23 +2222,42 @@ async function saveToothTreatment() {
 }
 
 async function clearToothStatus() {
-  // Build area label that reflects the type
+  // Determine what surfaces to clear.
+  // If the user clicked a crown surface (O, I, B, L, M, D) BUT the tooth actually has
+  // a crown_full / whole treatment stored at WHOLE or CROWN_FULL, we need to clear THAT.
+  var sm = teethMap[String(currentTooth)] || {};
+  var surfacesToClear = [currentSurface];
+  // Check if WHOLE has a treatment that visually covers the area we clicked
+  if (currentSurface !== 'WHOLE' && currentSurface !== 'CROWN_FULL' && !(/^R[123]$/.test(currentSurface))) {
+    // Crown surface click — also clear WHOLE / CROWN_FULL if they represent a full-crown treatment
+    if (sm.WHOLE) {
+      var wt = getTreatment(sm.WHOLE);
+      var wtp = wt ? (wt.target_part || 'whole') : null;
+      if (wtp === 'crown_full' || wtp === 'whole') surfacesToClear.push('WHOLE');
+    }
+    if (sm.CROWN_FULL) surfacesToClear.push('CROWN_FULL');
+  }
+  // Build a friendly label for the confirmation
   var areaLabel;
-  if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
+  if (surfacesToClear.indexOf('WHOLE') >= 0 || surfacesToClear.indexOf('CROWN_FULL') >= 0) {
+    areaLabel = 'تغطية التاج';
+  } else if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
   else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
   if (!confirm('هل تريد إزالة العلاج من ' + areaLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
-  await window.sb.from('teeth_status').delete()
-    .eq('patient_id', patientId)
-    .eq('tooth_num', String(currentTooth))
-    .eq('surface', currentSurface);
-  if (teethMap[String(currentTooth)]) {
-    delete teethMap[String(currentTooth)][currentSurface];
-    // If no surfaces left, remove the tooth entry entirely
-    if (Object.keys(teethMap[String(currentTooth)]).length === 0) {
-      delete teethMap[String(currentTooth)];
-    }
+  // Delete each surface from DB + memory
+  for (var s=0; s<surfacesToClear.length; s++) {
+    var sk = surfacesToClear[s];
+    var dr = await window.sb.from('teeth_status').delete()
+      .eq('patient_id', patientId)
+      .eq('tooth_num', String(currentTooth))
+      .eq('surface', sk);
+    if (dr.error) console.error('clear surface ' + sk + ' error:', dr.error);
+    if (teethMap[String(currentTooth)]) delete teethMap[String(currentTooth)][sk];
+  }
+  if (teethMap[String(currentTooth)] && Object.keys(teethMap[String(currentTooth)]).length === 0) {
+    delete teethMap[String(currentTooth)];
   }
   renderTeeth();
   closeModal('toothModal');
