@@ -1538,7 +1538,8 @@ function buildImplantTooth(num, isUpper) {
   var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
   // Screw geometry: vertical fixture below the cervical line
   var screwTop = crownBot + 2;  // small gap between crown and screw collar
-  var screwBot = 195;            // leave a bit at the apex for the rounded tip
+  // Length = 70% of the natural-root distance (shortened by 30% per design)
+  var screwBot = screwTop + Math.round((195 - screwTop) * 0.70);
   var screwW = (anat.crownR - anat.crownL) * 0.55;  // narrower than crown
   var screwCx = (anat.crownL + anat.crownR) / 2;
   var screwL = screwCx - screwW/2;
