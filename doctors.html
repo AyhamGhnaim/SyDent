@@ -91,9 +91,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .doc-actions .btn-del:hover{color:var(--red);border-color:var(--red);}
 .doc-actions .btn-toggle:hover{color:var(--yellow);border-color:var(--yellow);}
 .doc-actions .btn-make-owner:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
+.doc-actions .btn-link:hover{color:var(--blue);border-color:var(--blue);background:rgba(99,179,237,0.08);}
+.doc-actions .btn-unlink:hover{color:var(--text2);border-color:var(--text2);}
 
 .inactive-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(239,83,80,.15);color:var(--red);border:1px solid rgba(239,83,80,.4);margin-right:4px;}
 .you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(46,232,158,.15);color:var(--green);border:1px solid rgba(46,232,158,.4);margin-right:4px;}
+.linked-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.4);margin-right:4px;}
 
 .empty-state{
   background:var(--bg2);border:2px dashed var(--border);
@@ -381,6 +384,9 @@ function renderList() {
   doctors.forEach(function(d){
     var inactiveBadge = d.is_active === false ? '<span class="inactive-badge">⏸️ معطل</span>' : '';
     var youBadge = d.is_owner ? '<span class="you-badge">⭐ صاحب العيادة</span>' : '';
+    var linkedBadge = (d.user_id === currentUser.id)
+      ? '<span class="linked-badge" title="هذا الطبيب مرتبط بحسابك — سيكون الافتراضي عند تسجيلك للجلسات">🔗 حسابي</span>'
+      : '';
     var roleBadge = d.role ? '<span class="role-badge">' + escapeHtml(d.role) + '</span>' : '';
 
     var sharePart = (d.share_percent !== null && d.share_percent !== undefined) ? ('<b>النسبة:</b> ' + d.share_percent + '%') : '';
@@ -396,6 +402,10 @@ function renderList() {
     var ownerBtn = d.is_owner
       ? ''
       : '<button class="btn-make-owner" onclick="makeOwner(\'' + d.id + '\')">⭐ تعيين كصاحب العيادة</button>';
+    // "Link to my account" button — toggles user_id between current user and null
+    var linkBtn = (d.user_id === currentUser.id)
+      ? '<button class="btn-unlink" onclick="unlinkFromUser(\'' + d.id + '\')" title="فك ربط هذا الطبيب من حسابك">🔓 فك الربط</button>'
+      : '<button class="btn-link" onclick="linkToUser(\'' + d.id + '\')" title="اربط هذا الطبيب بحسابك ليكون الافتراضي عند تسجيلك للجلسات">🔗 اربط بحسابي</button>';
 
     html += '<div class="doc-card">'
       + '<div class="doc-color-bar" style="background:' + (d.color || '#2ee89e') + '"></div>'
@@ -403,7 +413,7 @@ function renderList() {
       + '<div class="doc-head">'
       + '<div class="doc-avatar" style="background:' + (d.color || '#2ee89e') + '">' + initials(d.name) + '</div>'
       + '<div style="flex:1;">'
-      + '<div class="doc-name">' + escapeHtml(d.name) + ' ' + youBadge + ' ' + inactiveBadge + '</div>'
+      + '<div class="doc-name">' + escapeHtml(d.name) + ' ' + youBadge + ' ' + linkedBadge + ' ' + inactiveBadge + '</div>'
       + '<div class="doc-role">' + roleBadge + '</div>'
       + '</div></div>'
       + (metaItems ? '<div class="doc-meta">' + metaItems + '</div>' : '')
@@ -411,6 +421,7 @@ function renderList() {
       + '<div class="doc-actions">'
       + '<button class="btn-edit" onclick="editDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
       + '<button class="btn-toggle" onclick="toggleActive(\'' + d.id + '\')">' + toggleLabel + '</button>'
+      + linkBtn
       + ownerBtn
       + delBtn
       + '</div></div></div>';
@@ -549,6 +560,55 @@ async function makeOwner(id) {
   if (r2.error) { showToast('⚠️ فشل تعيين المالك الجديد: ' + r2.error.message); return; }
 
   showToast('⭐ تم تعيين "' + d.name + '" كصاحب العيادة');
+  await loadDoctors();
+}
+
+// Link a doctor to the current user's account.
+// OpenDental-style: user_id ↔ provider mapping. The linked doctor becomes the
+// default treating provider for sessions created by this logged-in user.
+// Only one doctor at a time can be linked to a given user_id.
+async function linkToUser(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  // Find any other doctor currently linked to me (only one allowed)
+  var currentLinked = doctors.find(function(x){ return x.user_id === currentUser.id && x.id !== id; });
+  var msg = currentLinked
+    ? 'ربط "' + d.name + '" بحسابك بدلاً من "' + currentLinked.name + '"؟\n\nهذا الطبيب سيكون الافتراضي عند تسجيلك لأي جلسة جديدة.'
+    : 'ربط "' + d.name + '" بحسابك؟\n\nهذا الطبيب سيكون الافتراضي عند تسجيلك لأي جلسة جديدة.';
+  if (!confirm(msg)) return;
+
+  // Step 1: unlink previous (if different)
+  if (currentLinked) {
+    var r1 = await window.sb.from('clinic_doctors')
+      .update({ user_id: null, updated_at: new Date().toISOString() })
+      .eq('id', currentLinked.id)
+      .eq('owner_id', currentUser.id);
+    if (r1.error) { showToast('⚠️ فشل فك الربط السابق: ' + r1.error.message); return; }
+  }
+
+  // Step 2: link new one
+  var r2 = await window.sb.from('clinic_doctors')
+    .update({ user_id: currentUser.id, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (r2.error) { showToast('⚠️ فشل الربط: ' + r2.error.message); return; }
+
+  showToast('🔗 تم ربط "' + d.name + '" بحسابك');
+  await loadDoctors();
+}
+
+async function unlinkFromUser(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) return;
+  if (!confirm('فك ربط "' + d.name + '" من حسابك؟\n\nسيتم استخدام الافتراضي الآخر (صاحب العيادة أو أول طبيب نشط) عند تسجيل جلسات جديدة.')) return;
+
+  var r = await window.sb.from('clinic_doctors')
+    .update({ user_id: null, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (r.error) { showToast('⚠️ فشل فك الربط: ' + r.error.message); return; }
+
+  showToast('🔓 تم فك الربط');
   await loadDoctors();
 }
 

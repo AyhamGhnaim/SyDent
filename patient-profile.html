@@ -691,7 +691,7 @@ async function loadTreatmentsFromSupabase() {
   // Load clinic doctors
   try {
     var dRes = await window.sb.from('clinic_doctors')
-      .select('id, name, color, is_owner, is_active')
+      .select('id, name, color, is_owner, is_active, user_id')
       .eq('owner_id', currentUser.id)
       .order('is_owner', { ascending: false })
       .order('created_at', { ascending: true });
@@ -2450,6 +2450,30 @@ function isLightColor(hex) {
   return (r*299 + g*587 + b*114)/1000 > 155;
 }
 
+// OpenDental-style default provider resolver.
+// Priority order (matches OpenDental's documented logic):
+//   1. The provider linked to the currently logged-in user (user_id === currentUser.id)
+//   2. The clinic owner (is_owner === true)
+//   3. First active doctor in the list
+// Returns null if no doctors at all.
+// `pool` is the list to search (e.g. CLINIC_DOCTORS or a filtered subset).
+function getDefaultProviderId(pool) {
+  if (!pool || pool.length === 0) return null;
+  // Prefer active doctors at each tier
+  var active = pool.filter(function(d){ return d.is_active !== false; });
+  var searchPool = active.length > 0 ? active : pool;
+  // 1) User-linked provider
+  if (currentUser && currentUser.id) {
+    var linked = searchPool.find(function(d){ return d.user_id === currentUser.id; });
+    if (linked) return linked.id;
+  }
+  // 2) Clinic owner
+  var owner = searchPool.find(function(d){ return d.is_owner; });
+  if (owner) return owner.id;
+  // 3) First active (or first if none active)
+  return searchPool[0].id;
+}
+
 function populateProviderPicker() {
   var group = document.getElementById('providerPickerGroup');
   var select = document.getElementById('toothProvider');
@@ -2474,12 +2498,10 @@ function populateProviderPicker() {
     html += '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
   });
   select.innerHTML = html;
-  // Default to owner first, then first active doctor.
-  // Industry-standard (OpenDental/Dentrix): logged-in user/owner is the default treating provider.
-  // Keep existing pendingProviderId if it's still valid in the list.
+  // Default via OpenDental-style resolver (user-link → owner → first active).
+  // Keep existing pendingProviderId if it's still valid in the list (user pre-selected).
   if (!pendingProviderId || !listToShow.find(function(d){ return d.id === pendingProviderId; })) {
-    var owner = listToShow.find(function(d){ return d.is_owner; });
-    pendingProviderId = owner ? owner.id : listToShow[0].id;
+    pendingProviderId = getDefaultProviderId(listToShow);
   }
   select.value = pendingProviderId;
 }
@@ -3031,18 +3053,10 @@ async function saveSession() {
   var type = typeVal === '_other' ? (desc || 'أخرى') : (getTreatment(typeVal) ? getTreatment(typeVal).name : typeVal);
   if (!cost||cost<=0){ showToast('⚠️ أدخل التكلفة'); return; }
   if (!date)         { showToast('⚠️ اختر التاريخ'); return; }
-  // Use picker value if visible; otherwise default to owner, then first active doctor
+  // Use picker value if visible; otherwise use OpenDental-style default
   var pickerEl = document.getElementById('sProvider');
   var pickedProvider = (pickerEl && pickerEl.value) ? pickerEl.value : null;
-  var fallbackDoctor = null;
-  if (CLINIC_DOCTORS && CLINIC_DOCTORS.length > 0) {
-    var ownerFallback = CLINIC_DOCTORS.find(function(d){ return d.is_owner && d.is_active !== false; });
-    var activeFallback = CLINIC_DOCTORS.find(function(d){ return d.is_active !== false; });
-    fallbackDoctor = (ownerFallback && ownerFallback.id)
-      || (activeFallback && activeFallback.id)
-      || CLINIC_DOCTORS[0].id;
-  }
-  var defaultProvider = pickedProvider || fallbackDoctor;
+  var defaultProvider = pickedProvider || getDefaultProviderId(CLINIC_DOCTORS);
   const { data: newSess } = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: type, description: desc, cost: cost, date: date, notes: notes,
@@ -3519,7 +3533,7 @@ function openPayModal()     { document.getElementById('payDate').value=toDay(); 
 function openSessionModal() {
   populateSessionTypes();
   document.getElementById('sDate').value = toDay();
-  // Populate provider picker (prefer owner first, then active doctors)
+  // Populate provider picker (OpenDental-style default: user-link → owner → first active)
   var group = document.getElementById('sessionProviderGroup');
   var select = document.getElementById('sProvider');
   if (group && select) {
@@ -3534,9 +3548,7 @@ function openSessionModal() {
         var inactiveStr = d.is_active === false ? ' (معطل)' : '';
         return '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
       }).join('');
-      // Default to owner first (OpenDental/Dentrix standard)
-      var owner = listToShow.find(function(d){ return d.is_owner; });
-      select.value = owner ? owner.id : listToShow[0].id;
+      select.value = getDefaultProviderId(listToShow);
     }
   }
   openModal('sessionModal');
