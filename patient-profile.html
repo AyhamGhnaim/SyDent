@@ -84,6 +84,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat-val.green{color:var(--green);}
 .stat-val.red{color:var(--red);}
 .stat-val.yellow{color:var(--yellow);}
+.stat-val.blue{color:var(--blue);}
 .stat-lbl{font-size:11px;color:var(--text2);}
 
 /* ── Tabs ── */
@@ -1077,8 +1078,32 @@ function renderStats() {
   document.getElementById('sTotal').textContent  = fmt(f.total);
   document.getElementById('sPaid').textContent   = fmt(f.paid);
   var bEl = document.getElementById('sBalance');
-  bEl.textContent = fmt(f.balance);
-  bEl.className   = 'stat-val ' + (f.balance > 0 ? 'red' : f.balance < 0 ? 'yellow' : 'green');
+  // OpenDental-style direction-aware balance display.
+  // When unearned credit exists (Migration 3 splits), prefer the "prepayment"
+  // framing — it's more precise than the generic "owes patient" label.
+  var unearned = computeUnearnedTotal();
+  var lblEl = bEl.parentNode.querySelector('.stat-lbl');
+  if (f.balance > 0) {
+    // Patient owes us
+    bEl.textContent = fmt(f.balance);
+    bEl.className   = 'stat-val red';
+    if (lblEl) lblEl.textContent = 'على المريض ل.س';
+  } else if (unearned > 0) {
+    // Patient has a prepayment credit (precise — from payment_splits)
+    bEl.textContent = fmt(unearned);
+    bEl.className   = 'stat-val blue';
+    if (lblEl) lblEl.textContent = 'رصيد مقدّم ل.س';
+  } else if (f.balance < 0) {
+    // Clinic owes patient (legacy: no splits or all splits are session-attached)
+    bEl.textContent = fmt(Math.abs(f.balance));
+    bEl.className   = 'stat-val yellow';
+    if (lblEl) lblEl.textContent = 'يستحقّه المريض ل.س';
+  } else {
+    // Settled (balance === 0)
+    bEl.textContent = fmt(0);
+    bEl.className   = 'stat-val green';
+    if (lblEl) lblEl.textContent = 'الحساب مكتمل';
+  }
 }
 
 /* ── TOOTH CHART ── */
@@ -3077,7 +3102,15 @@ function renderSessions() {
 function renderPayments() {
   var el = document.getElementById('paymentsContent');
   var f  = computeFinancials();
-  var bColor = f.balance > 0 ? 'var(--red)' : f.balance < 0 ? 'var(--yellow)' : 'var(--green)';
+  // OpenDental-style "Est Bal" coloring (bold red when patient owes):
+  //   balance > 0 → patient owes us            → RED   "على المريض"
+  //   balance < 0 → clinic owes patient         → YELLOW "يستحقّه المريض"
+  //   balance = 0 → settled                     → GREEN  "الحساب مكتمل"
+  var bColor, bLabel, bIcon;
+  if (f.balance > 0)       { bColor = 'var(--red)';    bLabel = 'على المريض';      bIcon = '⚠️'; }
+  else if (f.balance < 0)  { bColor = 'var(--yellow)'; bLabel = 'يستحقّه المريض'; bIcon = '💸'; }
+  else                     { bColor = 'var(--green)';  bLabel = 'الحساب مكتمل';    bIcon = '✓';  }
+
   var plannedHtml = f.plannedTotal > 0
     ? '<div class="bs-item"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div></div>'
     : '';
@@ -3086,14 +3119,16 @@ function renderPayments() {
   // actually an unallocated balance.
   var unearned = computeUnearnedTotal();
   var unearnedHtml = unearned > 0
-    ? '<div class="bs-item"><div class="bs-val" style="color:var(--blue)">' + fmt(unearned) + ' ل.س</div><div class="bs-lbl">رصيد مقدّم</div></div>'
+    ? '<div class="bs-item"><div class="bs-val" style="color:var(--blue)">' + fmt(unearned) + ' ل.س</div><div class="bs-lbl">💳 رصيد مقدّم</div></div>'
     : '';
-  // Avoid showing both "رصيد زائد" (legacy generic credit) and "رصيد مقدّم"
-  // (precise unearned credit from splits) — they mean the same thing.
-  // When unearned exists, the unearned card is more accurate; skip the generic one.
+  // Avoid showing both "يستحقّه المريض" (legacy generic credit) and "رصيد مقدّم"
+  // (precise unearned credit from splits) — they overlap conceptually.
+  // When unearned exists, the unearned card is more accurate; skip the generic credit.
   var showBalanceCard = !(unearned > 0 && f.balance < 0);
+  // When balance is 0 AND there's no production yet, hide the card (not informative)
+  if (f.balance === 0 && f.total === 0) showBalanceCard = false;
   var balanceCard = showBalanceCard
-    ? '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>'
+    ? '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + (f.balance === 0 ? bIcon : fmt(Math.abs(f.balance)) + ' ل.س') + '</div><div class="bs-lbl">' + bIcon + ' ' + bLabel + '</div></div>'
     : '';
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
