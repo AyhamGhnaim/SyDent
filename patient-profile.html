@@ -602,10 +602,25 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="form-group">
         <label>ربط بموعد (اختياري)</label>
-        <select id="labOrderAppointment">
+        <select id="labOrderAppointment" onchange="onLabApptChange()">
           <option value="">— غير مربوط بموعد —</option>
         </select>
         <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
+        <!-- Inline new-appointment fields (shown when "تحديد موعد التركيب" is chosen) -->
+        <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.3);border-radius:9px;">
+          <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;">📅 موعد التركيب الجديد</div>
+          <div class="form-row" style="margin:0;">
+            <div class="form-group" style="margin:0;">
+              <label>التاريخ</label>
+              <input type="date" id="labNewApptDate">
+            </div>
+            <div class="form-group" style="margin:0;">
+              <label>الساعة</label>
+              <input type="time" id="labNewApptTime">
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px;">سيُنشأ موعد جديد تلقائياً (المدة 30 دقيقة، النوع = نوع العمل) ويُربط بطلب المخبر.</div>
+        </div>
       </div>
       <div class="form-group">
         <label>المخبر</label>
@@ -3921,19 +3936,26 @@ function fmtLabApptOption(appt) {
 }
 
 /* Populate the appointment-link dropdown in the lab order modal.
-   Patient is always the current patient (this is a patient-profile page),
-   so we just list this patient's upcoming/today appointments.
-   The special value '__auto__' means: at save time, resolve to the patient's
-   next active upcoming appointment (or null if there isn't one). */
+   Order:
+     1. ''         → not linked (DEFAULT — safest)
+     2. '__auto__' → auto-link to next active appointment (optional)
+     3. '__new__'  → create a new appointment inline (optional)
+     4. (any existing upcoming appointments for this patient)
+   Patient is always the current patient (this is a patient-profile page). */
 function populateLabAppointmentSelect(selectedApptId) {
   var sel = document.getElementById('labOrderAppointment');
   if (!sel) return;
   sel.innerHTML = '';
   var list = Array.isArray(upcomingAppts) ? upcomingAppts.slice() : [];
 
-  // Option 1: auto-link to the next appointment.
-  // Show the resolved target in parentheses so the user sees exactly which appointment
-  // will be linked when they click Save.
+  // Option 1: not linked (the safe default)
+  var noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '— غير مربوط بموعد —';
+  sel.appendChild(noneOpt);
+
+  // Option 2: auto-link to the next appointment.
+  // Always show, even when there's no upcoming appointment (we surface that fact in the label).
   var autoOpt = document.createElement('option');
   autoOpt.value = '__auto__';
   if (list.length > 0) {
@@ -3943,13 +3965,13 @@ function populateLabAppointmentSelect(selectedApptId) {
   }
   sel.appendChild(autoOpt);
 
-  // Option 2: explicit "not linked"
-  var noneOpt = document.createElement('option');
-  noneOpt.value = '';
-  noneOpt.textContent = '— غير مربوط بموعد —';
-  sel.appendChild(noneOpt);
+  // Option 3: create a new appointment inline. Selecting this reveals date+time fields.
+  var newOpt = document.createElement('option');
+  newOpt.value = '__new__';
+  newOpt.textContent = '📅 تحديد موعد التركيب الآن…';
+  sel.appendChild(newOpt);
 
-  // Options 3+: specific upcoming appointments
+  // Options 4+: existing upcoming appointments for this patient
   list.forEach(function(a){
     var opt = document.createElement('option');
     opt.value = a.id;
@@ -3958,8 +3980,8 @@ function populateLabAppointmentSelect(selectedApptId) {
   });
 
   // Restore previous selection if any
-  if (selectedApptId === '__auto__') {
-    sel.value = '__auto__';
+  if (selectedApptId === '__auto__' || selectedApptId === '__new__') {
+    sel.value = selectedApptId;
   } else if (selectedApptId && list.some(function(a){ return a.id === selectedApptId; })) {
     sel.value = selectedApptId;
   } else if (selectedApptId) {
@@ -3971,9 +3993,25 @@ function populateLabAppointmentSelect(selectedApptId) {
     sel.appendChild(opt2);
     sel.value = selectedApptId;
   } else {
-    // No previous selection — default to NOT linked (safer; explicit auto-link
-    // is only the default when opened from "save + send to lab" flow).
     sel.value = '';
+  }
+
+  // Sync the inline new-appointment panel visibility with the current selection.
+  onLabApptChange();
+}
+
+/* Show/hide the inline "new appointment" date+time fields based on the dropdown choice. */
+function onLabApptChange() {
+  var sel = document.getElementById('labOrderAppointment');
+  var box = document.getElementById('labNewApptBox');
+  if (!sel || !box) return;
+  if (sel.value === '__new__') {
+    box.style.display = 'block';
+    // Pre-fill date with today if empty, to reduce friction
+    var dateIn = document.getElementById('labNewApptDate');
+    if (dateIn && !dateIn.value) dateIn.value = toDay();
+  } else {
+    box.style.display = 'none';
   }
 }
 
@@ -3985,13 +4023,16 @@ async function openLabOrderModal(prefill) {
   document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
   populateLabWorkTypes(prefill.treatment_key);
   populateLabSelect();
-  // Default: auto-link to next upcoming appointment (caller can override via prefill.appointment_id).
-  // This is the most common case: a treatment was just saved → its lab work belongs to the next visit.
+  // Default link: NOT linked (the safest default per д.أيهم's request).
+  // The user can opt in to auto-link, create-new, or pick a specific appointment.
   var apptDefault = prefill.appointment_id;
-  if (apptDefault === undefined || apptDefault === null || apptDefault === '') {
-    apptDefault = '__auto__';
-  }
+  if (apptDefault === undefined || apptDefault === null) apptDefault = '';
   populateLabAppointmentSelect(apptDefault);
+  // Reset inline new-appointment fields so a previous open doesn't leak values
+  var nDate = document.getElementById('labNewApptDate');
+  var nTime = document.getElementById('labNewApptTime');
+  if (nDate) nDate.value = '';
+  if (nTime) nTime.value = '';
   document.getElementById('labOrderTooth').value = prefill.tooth_num || '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
@@ -4030,6 +4071,11 @@ async function editLabOrder(id) {
   populateLabWorkTypes(lo.treatment_key);
   populateLabSelect(lo.lab_id);
   populateLabAppointmentSelect(lo.appointment_id || '');
+  // Reset inline new-appointment fields (edit mode never creates a new appointment)
+  var nDate2 = document.getElementById('labNewApptDate');
+  var nTime2 = document.getElementById('labNewApptTime');
+  if (nDate2) nDate2.value = '';
+  if (nTime2) nTime2.value = '';
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
@@ -4040,6 +4086,18 @@ async function editLabOrder(id) {
 }
 
 async function saveLabOrder() {
+  // Disable the save button immediately to prevent double-submit (especially
+  // important when __new__ creates an appointment — a double-click would create two).
+  var saveBtn = document.getElementById('labOrderSaveBtn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    await _saveLabOrderInner();
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ'; }
+  }
+}
+
+async function _saveLabOrderInner() {
   var id = document.getElementById('labOrderId').value;
   var toothRaw = document.getElementById('labOrderTooth').value.trim();
   var workSel = document.getElementById('labOrderWorkType');
@@ -4078,6 +4136,66 @@ async function saveLabOrder() {
       apptId = null;
       showToast('ℹ️ لا يوجد موعد قادم — تم الحفظ بدون ربط');
     }
+  }
+
+  // Resolve "create new appointment now" sentinel: insert a new appointment row first,
+  // then link the lab order to its id. Fixed duration = 30 minutes (per design choice).
+  // Type = workName (e.g. "تاج زركون"). Behavior matches saveAppt() exactly so the
+  // new appointment shows up correctly in the calendar (color/stroke/provider/etc.).
+  if (apptId === '__new__') {
+    var nDate = document.getElementById('labNewApptDate').value;
+    var nTime = document.getElementById('labNewApptTime').value;
+    if (!nDate) { showToast('⚠️ اختر تاريخ موعد التركيب'); return; }
+    if (!nTime) { showToast('⚠️ اختر ساعة موعد التركيب'); return; }
+    // Match the lab work-type treatment to inherit colors/treatment_id when possible.
+    var trObj = workKey ? getTreatment(workKey) : null;
+    var apptColor  = trObj ? trObj.fill   : '#2ee89e';
+    var apptStroke = trObj ? trObj.stroke : '#1fba7e';
+    // Provider: prefer the most-recent provider used on this patient's sessions
+    // (so the new appointment isn't orphaned), else fall back to the clinic default.
+    var bestProvider = null;
+    for (var si = 0; si < sessions.length; si++) {
+      if (sessions[si].provider_id) { bestProvider = sessions[si].provider_id; break; }
+    }
+    if (!bestProvider && typeof getDefaultProviderId === 'function' && Array.isArray(CLINIC_DOCTORS)) {
+      bestProvider = getDefaultProviderId(CLINIC_DOCTORS);
+    }
+    var apptIns = {
+      doctor_id: currentUser.id,
+      patient_id: patientId,
+      patient_name: (patient && patient.name) ? patient.name : null,
+      date: nDate,
+      time: nTime,
+      duration: 30,
+      type: workName,
+      treatment_id: (trObj && trObj.dbId) ? trObj.dbId : null,
+      status: 'scheduled',
+      color: apptColor,
+      stroke: apptStroke,
+      notes: 'موعد تركيب — أُنشئ تلقائياً من طلب المخبر',
+      provider_id: bestProvider
+    };
+    var apptRes = await window.sb.from('appointments').insert(apptIns).select().single();
+    if (apptRes.error || !apptRes.data) {
+      showToast('⚠️ فشل إنشاء الموعد: ' + (apptRes.error && apptRes.error.message ? apptRes.error.message : 'سبب غير معروف'));
+      return;
+    }
+    apptId = apptRes.data.id;
+    // Keep the in-memory cache in sync so the patient profile (and the next time
+    // the lab modal is opened) immediately sees the new appointment.
+    if (nDate >= toDay()) {
+      upcomingAppts.push({
+        id: apptRes.data.id,
+        date: apptRes.data.date,
+        time: apptRes.data.time,
+        type: apptRes.data.type,
+        status: apptRes.data.status
+      });
+      upcomingAppts.sort(function(a, b){
+        return (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''));
+      });
+    }
+    showToast('📅 تم إنشاء موعد التركيب');
   }
 
   var payload = {
