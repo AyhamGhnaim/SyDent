@@ -385,7 +385,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label>التاريخ</label><input type="date" id="payDate"></div>
       <div class="form-group"><label>ملاحظات (اختياري)</label><textarea id="payNotes" placeholder="أي ملاحظات…"></textarea></div>
     </div>
-    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('payModal')">إلغاء</button><button class="btn-save-m" onclick="savePayment()">تسجيل الدفعة</button></div>
+    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('payModal')">إلغاء</button><button class="btn-save-m" id="payModalSaveBtn" onclick="savePayment()">تسجيل الدفعة</button></div>
   </div>
 </div>
 
@@ -692,19 +692,25 @@ function _isPaymentSplitsTableMissing(err) {
      - For each session, compute remaining = cost - already-paid.
      - Allocate min(payment_remaining, session_remaining) to that session.
      - When payment runs out, stop.
-     - If payment money is left after all sessions are fully paid → unearned. */
+     - If payment money is left after all sessions are fully paid → unearned.
+   Implementation note: all math is done in integer (whole units of currency)
+   to avoid float drift. Inputs are rounded once on the way in; the sum of all
+   split amounts is guaranteed to equal Math.round(payment.amount) exactly. */
 function buildFifoSplits(payment, sessionsList, existingSplits) {
-  var paymentRem = parseFloat(payment.amount) || 0;
+  // Round once on entry, then work with integers only.
+  var paymentRem = Math.max(0, Math.round(parseFloat(payment.amount) || 0));
   if (paymentRem <= 0) return [];
 
   // Sum existing splits per session, so we know what's already paid.
+  // Existing amounts in DB are already integers (BIGINT).
   var paidBySession = {};
   (existingSplits || []).forEach(function(s){
-    if (s.session_id) paidBySession[s.session_id] = (paidBySession[s.session_id] || 0) + (parseFloat(s.amount) || 0);
+    if (s.session_id) {
+      paidBySession[s.session_id] = (paidBySession[s.session_id] || 0) + (parseInt(s.amount, 10) || 0);
+    }
   });
 
   // Sort sessions: completed first (planned shouldn't take payments), then oldest date first.
-  // We allocate to any session with cost > 0 and remaining > 0.
   var eligible = (sessionsList || []).slice().filter(function(s){
     return s && s.id && (parseFloat(s.cost) || 0) > 0;
   });
@@ -714,8 +720,8 @@ function buildFifoSplits(payment, sessionsList, existingSplits) {
     var bDone = b.status === 'completed' ? 0 : 1;
     if (aDone !== bDone) return aDone - bDone;
     // Within the same bucket, older first
-    var ad = (a.date || '9999');
-    var bd = (b.date || '9999');
+    var ad = String(a.date || '9999');
+    var bd = String(b.date || '9999');
     if (ad < bd) return -1;
     if (ad > bd) return 1;
     return 0;
@@ -725,31 +731,32 @@ function buildFifoSplits(payment, sessionsList, existingSplits) {
   for (var i = 0; i < eligible.length && paymentRem > 0; i++) {
     var sess = eligible[i];
     var alreadyPaid = paidBySession[sess.id] || 0;
-    var remaining = (parseFloat(sess.cost) || 0) - alreadyPaid;
+    var sessCost = Math.round(parseFloat(sess.cost) || 0);
+    var remaining = sessCost - alreadyPaid;
     if (remaining <= 0) continue;
-    var take = Math.min(paymentRem, remaining);
+    var take = Math.min(paymentRem, remaining);   // integer min(integer, integer) = integer
     newSplits.push({
       doctor_id:    payment.doctor_id,
       payment_id:   payment.id,
       patient_id:   payment.patient_id,
       session_id:   sess.id,
       provider_id:  sess.provider_id || null,
-      amount:       Math.round(take),
+      amount:       take,
       is_unearned:  false,
       payment_date: payment.date || null
     });
     paymentRem -= take;
   }
 
-  // Overpayment → unearned
-  if (paymentRem > 0.5) {  // small epsilon for rounding
+  // Any remainder (overpayment) → unearned. Integer compare, no epsilon needed.
+  if (paymentRem > 0) {
     newSplits.push({
       doctor_id:    payment.doctor_id,
       payment_id:   payment.id,
       patient_id:   payment.patient_id,
       session_id:   null,
       provider_id:  null,
-      amount:       Math.round(paymentRem),
+      amount:       paymentRem,
       is_unearned:  true,
       payment_date: payment.date || null
     });
@@ -3081,12 +3088,19 @@ function renderPayments() {
   var unearnedHtml = unearned > 0
     ? '<div class="bs-item"><div class="bs-val" style="color:var(--blue)">' + fmt(unearned) + ' ل.س</div><div class="bs-lbl">رصيد مقدّم</div></div>'
     : '';
+  // Avoid showing both "رصيد زائد" (legacy generic credit) and "رصيد مقدّم"
+  // (precise unearned credit from splits) — they mean the same thing.
+  // When unearned exists, the unearned card is more accurate; skip the generic one.
+  var showBalanceCard = !(unearned > 0 && f.balance < 0);
+  var balanceCard = showBalanceCard
+    ? '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>'
+    : '';
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
   + plannedHtml
   + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)  + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
-  + (unearnedHtml)
-  + '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>';
+  + unearnedHtml
+  + balanceCard;
   if (!payments.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>لا توجد مدفوعات مسجّلة بعد</div>';
     return;
@@ -3174,9 +3188,56 @@ async function delSession(id) {
   if (!confirm('حذف هذه الجلسة؟')) return;
   // find session to check tooth+surface
   var sess = sessions.find(function(s){ return s.id === id; });
-  await window.sb.from('ledger_sessions').delete().eq('id', id);
+
+  // STEP 1: Convert payment_splits attached to this session to unearned credit
+  // BEFORE deleting the session. If we deleted the session first, the FK's
+  // ON DELETE SET NULL would briefly leave splits in an invalid state
+  // (session_id=NULL, is_unearned=false). Updating first guarantees that
+  // either everything succeeds, or the deletion is aborted and nothing is lost.
+  var orphans = paymentSplits.filter(function(s){ return s.session_id === id && !s.is_unearned; });
+  if (orphans.length) {
+    try {
+      var orphanIds = orphans.map(function(s){ return s.id; });
+      var upd = await window.sb.from('payment_splits')
+        .update({ session_id: null, is_unearned: true })
+        .in('id', orphanIds)
+        .eq('doctor_id', currentUser.id)
+        .select();
+      if (upd.error) {
+        if (!_isPaymentSplitsTableMissing(upd.error)) {
+          console.warn('paysplit orphan->unearned:', upd.error);
+          showToast('⚠️ تعذّر حذف الجلسة (مشكلة في تحويل الدفعات)');
+          return; // abort — better to leave the session than corrupt payments
+        }
+        // Table missing (pre-Migration-3) → nothing to convert, continue safely.
+      } else if (upd.data) {
+        // Reflect the change in memory.
+        var byId = {};
+        upd.data.forEach(function(d){ byId[d.id] = d; });
+        for (var k = 0; k < paymentSplits.length; k++) {
+          if (byId[paymentSplits[k].id]) paymentSplits[k] = byId[paymentSplits[k].id];
+        }
+      }
+    } catch(e) {
+      console.warn('orphan splits update threw:', e);
+      showToast('⚠️ تعذّر حذف الجلسة');
+      return;
+    }
+  }
+
+  // STEP 2: Now delete the session itself.
+  var delRes = await window.sb.from('ledger_sessions').delete()
+    .eq('id', id).eq('doctor_id', currentUser.id);
+  if (delRes.error) {
+    console.warn('delSession failed:', delRes.error);
+    showToast('⚠️ فشل حذف الجلسة');
+    // Note: we already promoted splits to unearned. That's the safe direction —
+    // the user can re-attach them manually later if needed.
+    return;
+  }
   sessions = sessions.filter(function(s){ return s.id !== id; });
-  // if no other session uses this tooth+surface, clear that surface's status
+
+  // STEP 3: if no other session uses this tooth+surface, clear that surface's status
   if (sess && sess.tooth_num) {
     var sessSurface = sess.surface || centerSurface(sess.tooth_num);
     var stillUsed = sessions.some(function(s){
@@ -3203,7 +3264,19 @@ async function delSession(id) {
 
 async function delPayment(id) {
   if (!confirm('حذف هذه الدفعة؟')) return;
-  await window.sb.from('ledger_payments').delete().eq('id', id);
+  try {
+    var res = await window.sb.from('ledger_payments').delete()
+      .eq('id', id).eq('doctor_id', currentUser.id);
+    if (res.error) {
+      console.warn('delPayment failed:', res.error);
+      showToast('⚠️ فشل حذف الدفعة');
+      return;
+    }
+  } catch(e) {
+    console.warn('delPayment threw:', e);
+    showToast('⚠️ فشل حذف الدفعة');
+    return;
+  }
   payments = payments.filter(function(p){ return p.id !== id; });
   // payment_splits.payment_id has ON DELETE CASCADE → DB cleans them up.
   // Sync the in-memory cache so renderPayments doesn't show stale data.
@@ -3215,32 +3288,48 @@ async function delPayment(id) {
 
 /* ── Save Payment ── */
 async function savePayment() {
+  var saveBtn = document.getElementById('payModalSaveBtn');
+  if (saveBtn && saveBtn.disabled) return;  // already in flight
   var amount = parseFloat(document.getElementById('payAmount').value);
   var method = document.getElementById('payMethod').value;
   var date   = document.getElementById('payDate').value;
   var notes  = document.getElementById('payNotes').value.trim();
   if (!amount||amount<=0) { showToast('⚠️ أدخل مبلغاً صحيحاً'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
-  const { data: newPay } = await window.sb.from('ledger_payments').insert({
-    doctor_id: currentUser.id, patient_id: patientId,
-    amount: amount, method: method, date: date, notes: notes
-  }).select().single();
-  if (newPay) {
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    var res = await window.sb.from('ledger_payments').insert({
+      doctor_id: currentUser.id, patient_id: patientId,
+      amount: amount, method: method, date: date, notes: notes
+    }).select().single();
+    if (res.error || !res.data) {
+      console.warn('savePayment failed:', res.error);
+      showToast('⚠️ فشل تسجيل الدفعة: ' + (res.error && res.error.message ? res.error.message : 'سبب غير معروف'));
+      return;
+    }
+    var newPay = res.data;
     payments.unshift(newPay);
     // OpenDental-style: auto-allocate the payment via FIFO across the patient's
     // sessions (oldest completed first, then oldest planned). Overpayment becomes
-    // unearned income. Failure is non-fatal (the payment is already saved).
+    // unearned income. Failure here is non-fatal — the payment itself is already
+    // saved; we just warn so it can be re-allocated later.
     var splitRows = buildFifoSplits(newPay, sessions, paymentSplits);
-    await persistPaymentSplits(splitRows);
+    var ok = await persistPaymentSplits(splitRows);
+    if (!ok) {
+      showToast('⚠️ تم حفظ الدفعة لكن تعذّر توزيعها على الجلسات');
+      // Continue anyway — the payment is saved, splits will be empty.
+    }
+    patient.payment_manual = false;
+    await syncPaymentStatus();
+    renderStats(); renderInfo(); renderPayments();
+    closeModal('payModal');
+    document.getElementById('payAmount').value = '';
+    document.getElementById('payNotes').value  = '';
+    document.getElementById('payDate').value   = toDay();
+    if (ok) showToast('✅ تم تسجيل الدفعة');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'تسجيل الدفعة'; }
   }
-  patient.payment_manual = false;
-  await syncPaymentStatus();
-  renderStats(); renderInfo(); renderPayments();
-  closeModal('payModal');
-  document.getElementById('payAmount').value = '';
-  document.getElementById('payNotes').value  = '';
-  document.getElementById('payDate').value   = toDay();
-  showToast('✅ تم تسجيل الدفعة');
 }
 
 /* ── Save Session ── */
@@ -3844,7 +3933,13 @@ function closeModal(id) {
   el.style.display = 'none';
   setTimeout(function(){ el.style.display=''; }, 50);
 }
-function openPayModal()     { document.getElementById('payDate').value=toDay(); openModal('payModal'); }
+function openPayModal()     {
+  // Reset modal state (save button might be disabled from a previous interrupted save)
+  var saveBtn = document.getElementById('payModalSaveBtn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'تسجيل الدفعة'; }
+  document.getElementById('payDate').value=toDay();
+  openModal('payModal');
+}
 function openSessionModal() {
   populateSessionTypes();
   document.getElementById('sDate').value = toDay();
