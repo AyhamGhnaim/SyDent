@@ -807,19 +807,33 @@ async function loadAppointments() {
   // fall back to legacy patient-only behavior so the page keeps working.
   labOrdersByPatient = {};
   labOrdersByAppt    = {};
+  // Helper: detect "column doesn't exist" errors specifically for appointment_id.
+  function _labLoadIsMissingAppt(err) {
+    if (!err) return false;
+    var msg = (err.message || '').toLowerCase();
+    if (msg.indexOf('appointment_id') === -1) return false;
+    if (err.code === '42703' || err.code === 'PGRST204') return true;
+    return msg.indexOf('column') !== -1
+        || msg.indexOf('schema cache') !== -1
+        || msg.indexOf('does not exist') !== -1
+        || msg.indexOf('not found') !== -1;
+  }
   try {
     var sel = 'patient_id, appointment_id, status, date_due, work_type, lab_name, lab_id, tooth_num';
     var res = await window.sb.from('lab_orders')
       .select(sel)
       .eq('doctor_id', currentUser.id)
       .in('status', ['sent','received','checked']);
-    if (res.error) {
+    if (res.error && _labLoadIsMissingAppt(res.error)) {
       // Retry without appointment_id (pre-Migration-4 schema)
-      console.warn('lab_orders select fell back to legacy schema:', res.error.message);
+      console.warn('lab_orders.appointment_id missing — falling back to legacy schema. Run Migration 4 to enable.');
       res = await window.sb.from('lab_orders')
         .select('patient_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
         .eq('doctor_id', currentUser.id)
         .in('status', ['sent','received','checked']);
+    } else if (res.error) {
+      // Some other error — surface it instead of masking with a retry.
+      console.warn('lab_orders for appts:', res.error);
     }
     if (!res.error && res.data) {
       res.data.forEach(function(o){
@@ -1452,7 +1466,16 @@ async function completeApptWithProcedures() {
   var attached = sessionsByAppt[editingId] || [];
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
   if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
-  if (!confirm('إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟')) return;
+
+  // Build confirmation message that also mentions lab orders that will be auto-completed.
+  var linkedLabsForPrompt = (labOrdersByAppt[editingId] || []).filter(function(o){
+    return o.status === 'sent' || o.status === 'received' || o.status === 'checked';
+  });
+  var promptMsg = 'إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟';
+  if (linkedLabsForPrompt.length) {
+    promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "سُلِّم للمريض".';
+  }
+  if (!confirm(promptMsg)) return;
 
   var btn = document.getElementById('completeApptBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإكمال…'; }
@@ -1484,14 +1507,43 @@ async function completeApptWithProcedures() {
     .eq('id', editingId).eq('doctor_id', currentUser.id);
   if (u3.error) console.warn('appt update warn:', u3.error);
 
-  showToast(failed === 0
-    ? '✅ تم إكمال ' + plannedOnes.length + ' علاج'
-    : '⚠️ اكتمل ' + (plannedOnes.length - failed) + ' من ' + plannedOnes.length);
+  // 4) OpenDental-style: when an appointment is set complete, the lab cases attached
+  //    to it are also marked complete (delivered). If any of them are still in
+  //    'sent' or 'received' or 'checked' status, advance them to 'delivered' since
+  //    the patient is leaving the chair with the work done.
+  //    We use the same column names labs.html already writes (date_delivered) and
+  //    guard against missing column / missing migration silently.
+  var linkedLabs = labOrdersByAppt[editingId] || [];
+  var labFailed = 0;
+  var labUpdated = 0;
+  for (var k=0; k<linkedLabs.length; k++) {
+    var lo = linkedLabs[k];
+    if (lo.status === 'sent' || lo.status === 'received' || lo.status === 'checked') {
+      try {
+        var labRes = await window.sb.from('lab_orders')
+          .update({ status: 'delivered', date_delivered: new Date().toISOString() })
+          .eq('id', lo.id).eq('doctor_id', currentUser.id);
+        if (labRes.error) { labFailed++; console.warn('auto-complete lab order err:', labRes.error); }
+        else labUpdated++;
+      } catch(e) { labFailed++; console.warn('auto-complete linked lab order:', e); }
+    }
+  }
+
+  var msg;
+  if (failed === 0 && labFailed === 0) {
+    msg = '✅ تم إكمال ' + plannedOnes.length + ' علاج';
+    if (labUpdated > 0) msg += ' + ' + labUpdated + ' طلب مخبر';
+  } else {
+    msg = '⚠️ اكتمل ' + (plannedOnes.length - failed) + ' من ' + plannedOnes.length + ' علاج';
+    if (labFailed > 0) msg += ' • تعذّر تحديث ' + labFailed + ' طلب مخبر';
+  }
+  showToast(msg);
 
   await loadAppointments();
   var appt = appointments.find(function(a){ return a.id === editingId; });
   if (appt) {
     renderApptProcedures(appt);
+    renderApptLabOrders(appt);
     document.getElementById('fStatus').value = appt.status;
   }
   if (btn) { btn.disabled = false; btn.textContent = '✅ إكمال الموعد + كل العلاجات المخطّطة'; }

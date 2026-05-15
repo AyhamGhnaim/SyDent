@@ -762,6 +762,10 @@ function fmtD(ds) {
   return new Date(ds).toLocaleDateString('ar-SY', { year:'numeric', month:'short', day:'numeric' });
 }
 function toDay() { return new Date().toISOString().slice(0,10); }
+// Local-time YYYY-MM-DD (use when comparing against appointment dates).
+function dateStrLocal(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 function escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, function(c){
@@ -849,10 +853,11 @@ async function loadAll() {
 
   // Load appointments (today onwards, plus a small look-back for in-progress jobs)
   // used to populate the "link to appointment" dropdown.
+  // Use local-time date so the lookback window matches the user's clock (Syria UTC+3).
   try {
     var lookback = new Date();
     lookback.setDate(lookback.getDate() - 7);
-    var fromDate = lookback.toISOString().slice(0,10);
+    var fromDate = dateStrLocal(lookback);
     const { data: ap, error: apErr } = await window.sb.from('appointments')
       .select('id, patient_id, patient_name, date, time, type, status')
       .eq('doctor_id', currentUser.id)
