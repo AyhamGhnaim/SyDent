@@ -3669,16 +3669,21 @@ async function saveSession() {
   // Optional appointment link
   var apptEl = document.getElementById('sAppt');
   var pickedAppt = (apptEl && apptEl.value) ? apptEl.value : null;
-  const { data: newSess } = await window.sb.from('ledger_sessions').insert({
+  var sessRes = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: type, description: desc, cost: cost, date: date, notes: notes,
     status: 'completed', provider_id: defaultProvider,
     appointment_id: pickedAppt
   }).select().single();
-  if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
+  if (sessRes.error || !sessRes.data) {
+    console.warn('saveSession failed:', sessRes.error);
+    showToast('⚠️ فشل حفظ الجلسة: ' + (sessRes.error && sessRes.error.message ? sessRes.error.message : 'سبب غير معروف'));
+    return;
+  }
+  var newSess = sessRes.data;
+  sessions.unshift(newSess); sortByDateDesc(sessions);
   // Reallocate funds: if there was unearned credit, it auto-flows to this new session.
-  // Skip if insert failed (newSess null) — sessions array unchanged, no point.
-  if (newSess) await reallocatePatientFunds();
+  await reallocatePatientFunds();
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
   if (patient.status === 'جديد') updates.status = 'تحت العلاج';
@@ -4190,14 +4195,20 @@ async function saveToothAndOpenLab() {
   else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
   else areaForLabDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
 
-  const { data: newSess } = await window.sb.from('ledger_sessions').insert({
+  var sessRes2 = await window.sb.from('ledger_sessions').insert({
     doctor_id: currentUser.id, patient_id: patientId,
     type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForLabDesc,
     cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
-  if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
+  if (sessRes2.error || !sessRes2.data) {
+    console.warn('tooth+lab session insert failed:', sessRes2.error);
+    showToast('⚠️ فشل حفظ الجلسة: ' + (sessRes2.error && sessRes2.error.message ? sessRes2.error.message : 'سبب غير معروف'));
+    return;
+  }
+  var newSess = sessRes2.data;
+  sessions.unshift(newSess); sortByDateDesc(sessions);
   // Reallocate funds: if there was unearned credit, it auto-flows to this session.
-  if (newSess) await reallocatePatientFunds();
+  await reallocatePatientFunds();
 
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
