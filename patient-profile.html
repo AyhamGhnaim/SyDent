@@ -3954,12 +3954,24 @@ function populateLabAppointmentSelect(selectedApptId) {
   noneOpt.textContent = '— غير مربوط بموعد —';
   sel.appendChild(noneOpt);
 
-  // Option 2: auto-link to the next appointment.
-  // Always show, even when there's no upcoming appointment (we surface that fact in the label).
+  // Option 2: auto-link to the next ACTIVE upcoming appointment.
+  // We filter the same way __auto__ resolution does at save time, so the
+  // label in the dropdown matches exactly what will be linked on Save.
+  var todayStrUI = toDay();
+  var INACTIVE_UI = ['cancelled', 'broken', 'no_show', 'completed'];
+  var nextActiveUI = null;
+  for (var li = 0; li < list.length; li++) {
+    var lap = list[li];
+    if (!lap || !lap.date) continue;
+    if (lap.date < todayStrUI) continue;
+    if (lap.status && INACTIVE_UI.indexOf(lap.status) !== -1) continue;
+    nextActiveUI = lap;
+    break;
+  }
   var autoOpt = document.createElement('option');
   autoOpt.value = '__auto__';
-  if (list.length > 0) {
-    autoOpt.textContent = '🔄 الموعد القادم تلقائياً — (' + fmtLabApptOption(list[0]) + ')';
+  if (nextActiveUI) {
+    autoOpt.textContent = '🔄 الموعد القادم تلقائياً — (' + fmtLabApptOption(nextActiveUI) + ')';
   } else {
     autoOpt.textContent = '🔄 الموعد القادم تلقائياً — (لا يوجد موعد قادم)';
   }
@@ -4088,12 +4100,22 @@ async function editLabOrder(id) {
 async function saveLabOrder() {
   // Disable the save button immediately to prevent double-submit (especially
   // important when __new__ creates an appointment — a double-click would create two).
+  // Respect the button's prior state so we don't accidentally re-enable a button
+  // that populateLabSelect intentionally left disabled (e.g. when no labs exist).
   var saveBtn = document.getElementById('labOrderSaveBtn');
+  var wasDisabled = saveBtn ? saveBtn.disabled : false;
+  var origText = saveBtn ? saveBtn.textContent : 'حفظ';
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…'; }
   try {
     await _saveLabOrderInner();
+  } catch (err) {
+    // Catch any unexpected runtime error (e.g. a typo, an unhandled null deref).
+    // Without this, the user would see no toast and the modal would stay open
+    // looking like everything worked.
+    console.error('saveLabOrder failed:', err);
+    showToast('⚠️ خطأ غير متوقع: ' + (err && err.message ? err.message : 'حاول مجدداً'));
   } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ'; }
+    if (saveBtn) { saveBtn.disabled = wasDisabled; saveBtn.textContent = origText; }
   }
 }
 
@@ -4127,11 +4149,26 @@ async function _saveLabOrderInner() {
   var apptId  = apptSel ? (apptSel.value || null) : null;
 
   // Resolve the special "auto-link" sentinel to the patient's next active appointment.
-  // upcomingAppts is pre-sorted ascending (oldest-future first) and already excludes
-  // cancelled / broken / no-show / completed appointments.
+  // upcomingAppts is pre-sorted ascending (oldest-first), but it may contain
+  // older/inactive appointments injected on-the-fly by editLabOrder when an archived
+  // lab order references one. We defensively filter to "today or later" + active
+  // status so __auto__ never lands on a stale appointment.
   if (apptId === '__auto__') {
-    if (Array.isArray(upcomingAppts) && upcomingAppts.length > 0) {
-      apptId = upcomingAppts[0].id;
+    var todayStr2 = toDay();
+    var INACTIVE = ['cancelled', 'broken', 'no_show', 'completed'];
+    var nextActive = null;
+    if (Array.isArray(upcomingAppts)) {
+      for (var ai = 0; ai < upcomingAppts.length; ai++) {
+        var ap = upcomingAppts[ai];
+        if (!ap || !ap.date) continue;
+        if (ap.date < todayStr2) continue;
+        if (ap.status && INACTIVE.indexOf(ap.status) !== -1) continue;
+        nextActive = ap;
+        break;
+      }
+    }
+    if (nextActive) {
+      apptId = nextActive.id;
     } else {
       apptId = null;
       showToast('ℹ️ لا يوجد موعد قادم — تم الحفظ بدون ربط');
@@ -4169,7 +4206,9 @@ async function _saveLabOrderInner() {
       duration: 30,
       type: workName,
       treatment_id: (trObj && trObj.dbId) ? trObj.dbId : null,
-      status: 'scheduled',
+      // Match the system's existing appointment-status convention (pending/confirmed/cancelled).
+      // 'pending' is the same default saveAppt() and the calendar UI use.
+      status: 'pending',
       color: apptColor,
       stroke: apptStroke,
       notes: 'موعد تركيب — أُنشئ تلقائياً من طلب المخبر',
