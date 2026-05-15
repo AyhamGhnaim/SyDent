@@ -99,8 +99,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
 
 /* ── Card ── */
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(46,232,158,0.03);}
+/* No overflow:hidden — would clip hover-tooltips on the last row of a table.
+   border-radius on the .card alone is enough to round corners; the only
+   element that could overflow visually is .card-head's background, which
+   is contained by its own bounds (it doesn't extend past the card). */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(46,232,158,0.03);border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);}
 .card-title{font-size:14px;font-weight:700;color:var(--green);}
 .irow{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;border-bottom:1px solid rgba(46,232,158,0.05);font-size:13px;}
 .irow:last-child{border-bottom:none;}
@@ -246,6 +250,51 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   .stats-row{flex-wrap:wrap;gap:10px;}
   .form-row{grid-template-columns:1fr;}
   .data-table th:nth-child(3),.data-table td:nth-child(3){display:none;}
+}
+
+/* ── Custom hover tooltip (replaces native title attribute) ──
+   Used to show full timestamp on date cells. Positioned BELOW the cell so
+   it doesn't clip against parent .card { overflow: hidden } on the first
+   row of a table, and so it stays clear of the cursor (which sits inside
+   the cell during hover). Small arrow points up at the cell. No JS. */
+.tip{position:relative;}
+.tip::after{
+  content:attr(data-tip);
+  position:absolute;
+  top:calc(100% + 8px);
+  left:50%;
+  transform:translateX(-50%) translateY(-4px);
+  background:var(--bg3);
+  color:var(--text);
+  border:1px solid var(--border);
+  padding:6px 10px;
+  border-radius:8px;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s ease, transform .15s ease;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  z-index:100;
+}
+.tip::before{
+  content:'';
+  position:absolute;
+  top:calc(100% + 3px);
+  left:50%;
+  transform:translateX(-50%) translateY(-4px);
+  border:5px solid transparent;
+  border-bottom-color:var(--bg3);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .15s ease, transform .15s ease;
+  z-index:100;
+}
+.tip:hover::after,
+.tip:hover::before{
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
 }
 </style>
 </head>
@@ -978,15 +1027,39 @@ function fmtDT(ts) {
     return datePart + ' — ' + timePart;
   } catch(e) { return ''; }
 }
-/* Return HTML attributes (title + cursor:help) for hover-timestamp on a
-   date cell. Returns empty string when there's no created_at, so legacy
-   rows don't show a help cursor that leads nowhere. */
+/* Return HTML attributes for hover-timestamp on a date cell.
+   Uses the .tip CSS class (custom tooltip above the cell) instead of the
+   native title attribute, so the tooltip floats above the date with an
+   arrow and a smooth fade — no '?' help cursor. Returns empty when
+   created_at is missing so legacy rows look normal. */
 function dtHoverAttrs(ts) {
   var formatted = fmtDT(ts);
   if (!formatted) return '';
-  return ' title="' + formatted + '" style="cursor:help;"';
+  return ' class="tip" data-tip="' + formatted + '"';
 }
 function toDay() { return new Date().toISOString().slice(0,10); }
+
+/* Sort an array of records in display order: newest first by date, then by
+   created_at (so two items entered the same day appear in the order they
+   were actually created, with the most recent at the top). Mutates the
+   array in place. Used after insert so the newly-added row settles into
+   its correct slot regardless of dating. */
+function sortByDateDesc(arr) {
+  if (!Array.isArray(arr)) return;
+  arr.sort(function(a, b){
+    var ad = String(a.date || '0000-01-01');
+    var bd = String(b.date || '0000-01-01');
+    if (ad > bd) return -1;
+    if (ad < bd) return 1;
+    // Same date → newer created_at first
+    var ac = String(a.created_at || '');
+    var bc = String(b.created_at || '');
+    if (ac > bc) return -1;
+    if (ac < bc) return 1;
+    return 0;
+  });
+}
+
 function calcAge(dob) {
   if (!dob) return '—';
   return Math.floor((Date.now()-new Date(dob))/(365.25*864e5)) + ' سنة';
@@ -1083,14 +1156,20 @@ async function loadAll() {
     .eq('doctor_id', currentUser.id).order('created_at', { ascending: true });
   patients = allPats || [];
 
-  // sessions
+  // sessions — display newest first (Dentrix Ascend convention).
+  // Tiebreak same-day items by created_at DESC so just-added rows always
+  // appear at the top regardless of how the user dates them.
   const { data: sd } = await window.sb.from('ledger_sessions').select('*')
-    .eq('patient_id', patientId).order('date', { ascending: false });
+    .eq('patient_id', patientId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
   sessions = sd || [];
 
-  // payments
+  // payments — same newest-first display order
   const { data: pd2 } = await window.sb.from('ledger_payments').select('*')
-    .eq('patient_id', patientId).order('date', { ascending: false });
+    .eq('patient_id', patientId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
   payments = pd2 || [];
 
   // payment_splits (Migration 3) — graceful: skip silently if table missing.
@@ -3143,7 +3222,7 @@ async function saveToothTreatment() {
       showToast('⚠️ تسجيل الجلسة فشل: ' + rL.error.message);
     }
     newSess = rL.data;
-    if (newSess) sessions.unshift(newSess);
+    if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
   }
 
   // Reallocate funds: if there was unearned credit, it auto-flows to this session.
@@ -3547,6 +3626,7 @@ async function savePayment() {
     }
     var newPay = res.data;
     payments.unshift(newPay);
+    sortByDateDesc(payments);
     // OpenDental-style: rebuild ALL splits for this patient chronologically.
     // This handles any payment order correctly and re-distributes any prior
     // unearned credit to new sessions automatically.
@@ -3594,7 +3674,7 @@ async function saveSession() {
     status: 'completed', provider_id: defaultProvider,
     appointment_id: pickedAppt
   }).select().single();
-  if (newSess) sessions.unshift(newSess);
+  if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
   // Reallocate funds: if there was unearned credit, it auto-flows to this new session.
   // Skip if insert failed (newSess null) — sessions array unchanged, no point.
   if (newSess) await reallocatePatientFunds();
@@ -4114,7 +4194,7 @@ async function saveToothAndOpenLab() {
     type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForLabDesc,
     cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
-  if (newSess) sessions.unshift(newSess);
+  if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
   // Reallocate funds: if there was unearned credit, it auto-flows to this session.
   if (newSess) await reallocatePatientFunds();
 
