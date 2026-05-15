@@ -3368,6 +3368,25 @@ async function editLabOrder(id) {
   await loadTreatmentsFromSupabase();
   var lo = labOrders.find(function(x){ return x.id === id; });
   if (!lo) return;
+
+  // If this order is linked to an appointment that's outside our upcoming-cache
+  // (e.g. an old appointment, or the user is viewing an archived order), fetch
+  // it on demand so the link isn't silently lost when saving.
+  if (lo.appointment_id) {
+    var inCache = Array.isArray(upcomingAppts) && upcomingAppts.some(function(a){ return a.id === lo.appointment_id; });
+    if (!inCache) {
+      try {
+        const { data: ext, error: extErr } = await window.sb.from('appointments')
+          .select('id, date, time, type, status')
+          .eq('id', lo.appointment_id)
+          .eq('doctor_id', currentUser.id)
+          .eq('patient_id', patientId)
+          .maybeSingle();
+        if (!extErr && ext) upcomingAppts.push(ext);
+      } catch(e) { console.warn('fetch linked appt:', e); }
+    }
+  }
+
   document.getElementById('labOrderTitle').textContent = '🧪 تعديل طلب المخبر';
   document.getElementById('labOrderId').value = lo.id;
   document.getElementById('labOrderTreatmentKey').value = lo.treatment_key || '';

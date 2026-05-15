@@ -1529,15 +1529,17 @@ async function completeApptWithProcedures() {
     }
   }
 
-  var msg;
-  if (failed === 0 && labFailed === 0) {
-    msg = '✅ تم إكمال ' + plannedOnes.length + ' علاج';
-    if (labUpdated > 0) msg += ' + ' + labUpdated + ' طلب مخبر';
+  // Build a complete summary that covers both sessions and labs, success and failure.
+  var parts = [];
+  if (failed === 0) {
+    parts.push('تم إكمال ' + plannedOnes.length + ' علاج');
   } else {
-    msg = '⚠️ اكتمل ' + (plannedOnes.length - failed) + ' من ' + plannedOnes.length + ' علاج';
-    if (labFailed > 0) msg += ' • تعذّر تحديث ' + labFailed + ' طلب مخبر';
+    parts.push('اكتمل ' + (plannedOnes.length - failed) + ' من ' + plannedOnes.length + ' علاج');
   }
-  showToast(msg);
+  if (labUpdated > 0) parts.push(labUpdated + ' طلب مخبر');
+  if (labFailed > 0)  parts.push('تعذّر تحديث ' + labFailed + ' طلب مخبر');
+  var icon = (failed === 0 && labFailed === 0) ? '✅' : '⚠️';
+  showToast(icon + ' ' + parts.join(' • '));
 
   await loadAppointments();
   var appt = appointments.find(function(a){ return a.id === editingId; });
