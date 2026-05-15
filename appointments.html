@@ -803,15 +803,26 @@ async function loadAppointments() {
   // Two indices are built:
   //   labOrdersByAppt    — preferred when appointment_id is set on the order
   //   labOrdersByPatient — fallback for orders not yet linked to a specific appointment
+  // Graceful fallback: if the appointment_id column doesn't exist yet (migration not run),
+  // fall back to legacy patient-only behavior so the page keeps working.
   labOrdersByPatient = {};
   labOrdersByAppt    = {};
   try {
-    const { data: lo, error: loErr } = await window.sb.from('lab_orders')
-      .select('patient_id, appointment_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
+    var sel = 'patient_id, appointment_id, status, date_due, work_type, lab_name, lab_id, tooth_num';
+    var res = await window.sb.from('lab_orders')
+      .select(sel)
       .eq('doctor_id', currentUser.id)
       .in('status', ['sent','received','checked']);
-    if (!loErr && lo) {
-      lo.forEach(function(o){
+    if (res.error) {
+      // Retry without appointment_id (pre-Migration-4 schema)
+      console.warn('lab_orders select fell back to legacy schema:', res.error.message);
+      res = await window.sb.from('lab_orders')
+        .select('patient_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
+        .eq('doctor_id', currentUser.id)
+        .in('status', ['sent','received','checked']);
+    }
+    if (!res.error && res.data) {
+      res.data.forEach(function(o){
         if (o.appointment_id) {
           if (!labOrdersByAppt[o.appointment_id]) labOrdersByAppt[o.appointment_id] = [];
           labOrdersByAppt[o.appointment_id].push(o);
@@ -863,31 +874,45 @@ let selectedColor = 'green';
 // so the badge appears only on the appointment it concerns.
 function getApptLabBadge(appt) {
   if (!appt || !appt.id) return null;
-  var apptDate = appt.date;
-  if (!apptDate) return null;
+  if (!appt.date) return null;
+  // Normalize to YYYY-MM-DD for safe lexical comparison against date_due slices.
+  var apptDate = String(appt.date).slice(0,10);
 
   // Combine direct + unassigned orders for this patient
   var direct      = labOrdersByAppt[appt.id] || [];
   var unassigned  = (appt.patient_id && labOrdersByPatient[appt.patient_id]) ? labOrdersByPatient[appt.patient_id] : [];
-  var orders      = direct.concat(unassigned);
-  if (!orders.length) return null;
+  if (!direct.length && !unassigned.length) return null;
 
-  // A direct link signals stronger intent — used to slightly bump the urgency message.
+  // A direct link signals stronger intent — used to slightly bump the urgency message,
+  // and to treat the appointment date itself as the implicit deadline when no date_due is set.
   var hasDirect = direct.length > 0;
 
   var hasReady   = false;   // status checked
-  var hasOverdue = false;   // status sent/received & date_due < apptDate
+  var hasOverdue = false;   // status sent/received & deadline <= apptDate
   var hasPending = false;   // status sent/received
 
-  orders.forEach(function(o){
-    if (o.status === 'checked') {
-      hasReady = true;
-    } else if (o.status === 'sent' || o.status === 'received') {
+  // For "directly linked" orders, the appointment date itself is the implicit deadline
+  // (the user explicitly tied this lab work to this visit). For unassigned orders,
+  // we keep the legacy behavior that relies on date_due being set.
+  function isOrderLate(o, linkedDirectly) {
+    if (o.status !== 'sent' && o.status !== 'received') return false;
+    var deadline = o.date_due ? o.date_due.slice(0,10) : (linkedDirectly ? apptDate : null);
+    if (!deadline) return false;
+    return deadline <= apptDate;
+  }
+
+  direct.forEach(function(o){
+    if (o.status === 'checked') hasReady = true;
+    else if (o.status === 'sent' || o.status === 'received') {
       hasPending = true;
-      // Overdue = the order is supposed to be ready BEFORE the appointment, but not received/checked yet
-      if (o.date_due && o.date_due.slice(0,10) <= apptDate) {
-        hasOverdue = true;
-      }
+      if (isOrderLate(o, true)) hasOverdue = true;
+    }
+  });
+  unassigned.forEach(function(o){
+    if (o.status === 'checked') hasReady = true;
+    else if (o.status === 'sent' || o.status === 'received') {
+      hasPending = true;
+      if (isOrderLate(o, false)) hasOverdue = true;
     }
   });
 
@@ -1338,7 +1363,7 @@ function renderApptLabOrders(appt) {
     return;
   }
   section.style.display = 'block';
-  var apptDate = appt.date || '';
+  var apptDate = appt.date ? String(appt.date).slice(0,10) : '';
   var html = '';
   orders.forEach(function(o){
     var statusAr  = '—';
@@ -1348,7 +1373,9 @@ function renderApptLabOrders(appt) {
     else if (o.status === 'received')  { statusAr = 'مستلَم';       statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
     else if (o.status === 'checked')   { statusAr = 'جاهز للتركيب'; statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
 
-    var late = (o.date_due && apptDate && o.date_due.slice(0,10) <= apptDate && (o.status === 'sent' || o.status === 'received'));
+    // Direct-linked orders: appointment date is the implicit deadline if no date_due is set.
+    var deadline = o.date_due ? o.date_due.slice(0,10) : apptDate;
+    var late = (apptDate && deadline && deadline <= apptDate && (o.status === 'sent' || o.status === 'received'));
     var lateTag = late ? '<span style="background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.4);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⚠️ متأخر</span>' : '';
 
     var toothPart = o.tooth_num ? ' • السن ' + o.tooth_num : '';

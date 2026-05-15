@@ -1095,38 +1095,28 @@ function populateLabSelect(selectedLabId) {
   if (selectedLabId) sel.value = selectedLabId;
 }
 
-/* Appointment dropdown — filtered by current selected patient. */
+/* Appointment dropdown — filtered by current selected patient.
+   Contract:
+     - selectedApptId is preserved ONLY if it belongs to patientId.
+     - Cross-patient mismatches are silently dropped (caller is expected to clear
+       the selection when switching patients via onLabOrderPatientChange). */
 function populateAppointmentSelect(selectedApptId, patientId) {
   var sel = document.getElementById('labOrderAppointment');
   if (!sel) return;
   sel.innerHTML = '<option value="">— غير مربوط بموعد —</option>';
-  // If no patient picked yet, leave only the placeholder.
-  if (!patientId) {
-    if (selectedApptId) {
-      // Edge case: editing an order whose appointment_id exists but patient is being changed
-      var a = getAppointmentById(selectedApptId);
-      if (a) {
-        var o = document.createElement('option');
-        o.value = a.id; o.textContent = fmtApptOption(a);
-        sel.appendChild(o); sel.value = a.id;
-      }
-    }
-    return;
-  }
+  if (!patientId) return; // no patient → only placeholder
+
   var list = allAppointments.filter(function(a){ return a.patient_id === patientId; });
-  // If the currently selected appointment is for a different patient (or older than the look-back window),
-  // still show it so the user can keep / clear it explicitly.
-  if (selectedApptId && !list.some(function(a){ return a.id === selectedApptId; })) {
-    var a2 = getAppointmentById(selectedApptId);
-    if (a2) list = list.concat([a2]);
-  }
   list.forEach(function(a){
     var opt = document.createElement('option');
     opt.value = a.id;
     opt.textContent = fmtApptOption(a);
     sel.appendChild(opt);
   });
-  if (selectedApptId) sel.value = selectedApptId;
+  // Only restore selection if the appointment actually belongs to this patient.
+  if (selectedApptId && list.some(function(a){ return a.id === selectedApptId; })) {
+    sel.value = selectedApptId;
+  }
 }
 
 /* When patient changes, rebuild appointment dropdown for that patient. */
@@ -1164,9 +1154,24 @@ function openLabOrderModal() {
   openModal('labOrderModal');
 }
 
-function editLabOrder(id) {
+async function editLabOrder(id) {
   var lo = allOrders.find(function(x){ return x.id === id; });
   if (!lo) return;
+
+  // If this order is linked to an appointment that's outside our cached window
+  // (e.g. an old job linked to an appointment that already happened), fetch it
+  // on demand so we don't silently lose the link when saving.
+  if (lo.appointment_id && !getAppointmentById(lo.appointment_id)) {
+    try {
+      const { data: ext, error: extErr } = await window.sb.from('appointments')
+        .select('id, patient_id, patient_name, date, time, type, status')
+        .eq('id', lo.appointment_id)
+        .eq('doctor_id', currentUser.id)
+        .maybeSingle();
+      if (!extErr && ext) allAppointments.push(ext);
+    } catch(e) { console.warn('fetch linked appt:', e); }
+  }
+
   document.getElementById('labOrderTitle').textContent = '🧪 تعديل طلب المخبر';
   document.getElementById('labOrderId').value = lo.id;
   populatePatientSelect(lo.patient_id);
@@ -1237,21 +1242,43 @@ async function saveLabOrder() {
     date_due:       dateDue || null
   };
 
+  // Helper: detect "column doesn't exist" style errors from PostgREST so we can
+  // gracefully fall back to a payload without appointment_id (pre-Migration-4 schema).
+  function isMissingApptColumn(err) {
+    if (!err || !err.message) return false;
+    var m = err.message.toLowerCase();
+    return m.indexOf('appointment_id') !== -1 && (m.indexOf('column') !== -1 || m.indexOf('schema') !== -1 || m.indexOf('not found') !== -1);
+  }
+
   if (id) {
-    const { data, error } = await window.sb.from('lab_orders')
+    var res = await window.sb.from('lab_orders')
       .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
-    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
-    if (data) {
+    if (res.error && isMissingApptColumn(res.error)) {
+      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      var legacyPayload = Object.assign({}, payload);
+      delete legacyPayload.appointment_id;
+      res = await window.sb.from('lab_orders')
+        .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+    }
+    if (res.error) { showToast('⚠️ فشل الحفظ: ' + res.error.message); return; }
+    if (res.data) {
       var idx = allOrders.findIndex(function(x){ return x.id === id; });
-      if (idx !== -1) allOrders[idx] = data;
+      if (idx !== -1) allOrders[idx] = res.data;
     }
     showToast('✅ تم تحديث الطلب');
   } else {
     payload.status = 'sent';
-    const { data, error } = await window.sb.from('lab_orders')
+    var res2 = await window.sb.from('lab_orders')
       .insert(payload).select().single();
-    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
-    if (data) allOrders.unshift(data);
+    if (res2.error && isMissingApptColumn(res2.error)) {
+      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      var legacyPayload2 = Object.assign({}, payload);
+      delete legacyPayload2.appointment_id;
+      res2 = await window.sb.from('lab_orders')
+        .insert(legacyPayload2).select().single();
+    }
+    if (res2.error) { showToast('⚠️ فشل الحفظ: ' + res2.error.message); return; }
+    if (res2.data) allOrders.unshift(res2.data);
     showToast('✅ تم إرسال الطلب للمخبر');
   }
 
