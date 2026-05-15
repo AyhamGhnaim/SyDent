@@ -789,6 +789,84 @@ async function persistPaymentSplits(splitRows) {
   }
 }
 
+/* ── OpenDental-style automatic reallocation ──
+   Recomputes ALL payment_splits for this patient from scratch using FIFO logic.
+   Called silently after any session/payment insert/delete so the allocation is
+   always correct regardless of the order events were entered.
+
+   How it works:
+     1. DELETE all existing splits for the patient.
+     2. Walk payments oldest-first by date.
+     3. For each payment, run buildFifoSplits against current sessions + splits
+        already built for earlier payments (chronological correctness).
+     4. INSERT the freshly-computed splits in one bulk call.
+
+   Failure is non-fatal: legacy mode (pre-Migration-3) just skips silently. */
+async function reallocatePatientFunds() {
+  if (!patientId || !currentUser) return;
+
+  if (!Array.isArray(payments) || !payments.length) {
+    // No payments: clear any in-memory splits (DB already has nothing or
+    // will be cleaned below if there were orphans).
+    paymentSplits = [];
+    return;
+  }
+
+  try {
+    // 1. Delete all existing splits for this patient.
+    var delRes = await window.sb.from('payment_splits').delete()
+      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
+    if (delRes.error) {
+      if (_isPaymentSplitsTableMissing(delRes.error)) {
+        // Pre-Migration-3 DB: silently skip. The app still works in legacy mode.
+        return;
+      }
+      console.warn('reallocate: delete splits failed:', delRes.error);
+      return;
+    }
+    paymentSplits = [];
+
+    // 2. Sort payments oldest-first (by date, then id as tiebreaker).
+    var sortedPayments = payments.slice().sort(function(a, b){
+      var ad = String(a.date || '9999-12-31');
+      var bd = String(b.date || '9999-12-31');
+      if (ad < bd) return -1;
+      if (ad > bd) return 1;
+      // Same date: fall back to id for stable ordering
+      var ai = String(a.id || '');
+      var bi = String(b.id || '');
+      if (ai < bi) return -1;
+      if (ai > bi) return 1;
+      return 0;
+    });
+
+    // 3. Walk payments and build splits chronologically.
+    // Each iteration uses the accumulated splits as "existing" so later
+    // payments only see capacity that's actually left on each session.
+    var accumulated = [];
+    for (var i = 0; i < sortedPayments.length; i++) {
+      var splits = buildFifoSplits(sortedPayments[i], sessions, accumulated);
+      if (splits.length) {
+        for (var j = 0; j < splits.length; j++) accumulated.push(splits[j]);
+      }
+    }
+
+    // 4. Bulk-insert the new splits.
+    if (accumulated.length) {
+      var insRes = await window.sb.from('payment_splits')
+        .insert(accumulated).select();
+      if (insRes.error) {
+        if (_isPaymentSplitsTableMissing(insRes.error)) return;
+        console.warn('reallocate: insert splits failed:', insRes.error);
+        return;
+      }
+      paymentSplits = insRes.data || [];
+    }
+  } catch(e) {
+    console.warn('reallocate threw:', e);
+  }
+}
+
 /* ── Lab Orders Constants ── */
 // Fallback list — used only if treatment doesn't have needs_lab set in DB
 var LAB_REQUIRED_KEYS = ['crown', 'bridge', 'denture', 'denture_full', 'denture_partial', 'veneer', 'ortho_plate'];
@@ -2989,6 +3067,10 @@ async function saveToothTreatment() {
     if (newSess) sessions.unshift(newSess);
   }
 
+  // Reallocate funds: if there was unearned credit, it auto-flows to this session.
+  // Safe even when no session was created (early return inside the function).
+  if (newSess) await reallocatePatientFunds();
+
   // 3. Update last_visit + status
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
@@ -3296,55 +3378,24 @@ async function delSession(id) {
   // find session to check tooth+surface
   var sess = sessions.find(function(s){ return s.id === id; });
 
-  // STEP 1: Convert payment_splits attached to this session to unearned credit
-  // BEFORE deleting the session. If we deleted the session first, the FK's
-  // ON DELETE SET NULL would briefly leave splits in an invalid state
-  // (session_id=NULL, is_unearned=false). Updating first guarantees that
-  // either everything succeeds, or the deletion is aborted and nothing is lost.
-  var orphans = paymentSplits.filter(function(s){ return s.session_id === id && !s.is_unearned; });
-  if (orphans.length) {
-    try {
-      var orphanIds = orphans.map(function(s){ return s.id; });
-      var upd = await window.sb.from('payment_splits')
-        .update({ session_id: null, is_unearned: true })
-        .in('id', orphanIds)
-        .eq('doctor_id', currentUser.id)
-        .select();
-      if (upd.error) {
-        if (!_isPaymentSplitsTableMissing(upd.error)) {
-          console.warn('paysplit orphan->unearned:', upd.error);
-          showToast('⚠️ تعذّر حذف الجلسة (مشكلة في تحويل الدفعات)');
-          return; // abort — better to leave the session than corrupt payments
-        }
-        // Table missing (pre-Migration-3) → nothing to convert, continue safely.
-      } else if (upd.data) {
-        // Reflect the change in memory.
-        var byId = {};
-        upd.data.forEach(function(d){ byId[d.id] = d; });
-        for (var k = 0; k < paymentSplits.length; k++) {
-          if (byId[paymentSplits[k].id]) paymentSplits[k] = byId[paymentSplits[k].id];
-        }
-      }
-    } catch(e) {
-      console.warn('orphan splits update threw:', e);
-      showToast('⚠️ تعذّر حذف الجلسة');
-      return;
-    }
-  }
-
-  // STEP 2: Now delete the session itself.
+  // Delete the session itself. payment_splits.session_id has ON DELETE SET NULL
+  // — surviving splits become orphans (session_id=NULL) but we immediately
+  // call reallocatePatientFunds() which rebuilds everything from scratch FIFO,
+  // so any payments attached to this session flow forward to other sessions
+  // (or become unearned credit). This is OpenDental "Income Transfer" behavior.
   var delRes = await window.sb.from('ledger_sessions').delete()
     .eq('id', id).eq('doctor_id', currentUser.id);
   if (delRes.error) {
     console.warn('delSession failed:', delRes.error);
     showToast('⚠️ فشل حذف الجلسة');
-    // Note: we already promoted splits to unearned. That's the safe direction —
-    // the user can re-attach them manually later if needed.
     return;
   }
   sessions = sessions.filter(function(s){ return s.id !== id; });
 
-  // STEP 3: if no other session uses this tooth+surface, clear that surface's status
+  // Rebuild all splits chronologically — handles every edge case automatically.
+  await reallocatePatientFunds();
+
+  // If no other session uses this tooth+surface, clear that surface's status
   if (sess && sess.tooth_num) {
     var sessSurface = sess.surface || centerSurface(sess.tooth_num);
     var stillUsed = sessions.some(function(s){
@@ -3385,9 +3436,10 @@ async function delPayment(id) {
     return;
   }
   payments = payments.filter(function(p){ return p.id !== id; });
-  // payment_splits.payment_id has ON DELETE CASCADE → DB cleans them up.
-  // Sync the in-memory cache so renderPayments doesn't show stale data.
-  paymentSplits = paymentSplits.filter(function(s){ return s.payment_id !== id; });
+  // payment_splits.payment_id has ON DELETE CASCADE → DB already cleaned them up.
+  // Rebuild splits chronologically so remaining payments redistribute correctly
+  // (e.g., a later payment may now cover a session that the deleted one had paid).
+  await reallocatePatientFunds();
   await syncPaymentStatus();
   renderStats(); renderPayments();
   showToast('🗑️ تم حذف الدفعة');
@@ -3416,16 +3468,10 @@ async function savePayment() {
     }
     var newPay = res.data;
     payments.unshift(newPay);
-    // OpenDental-style: auto-allocate the payment via FIFO across the patient's
-    // sessions (oldest completed first, then oldest planned). Overpayment becomes
-    // unearned income. Failure here is non-fatal — the payment itself is already
-    // saved; we just warn so it can be re-allocated later.
-    var splitRows = buildFifoSplits(newPay, sessions, paymentSplits);
-    var ok = await persistPaymentSplits(splitRows);
-    if (!ok) {
-      showToast('⚠️ تم حفظ الدفعة لكن تعذّر توزيعها على الجلسات');
-      // Continue anyway — the payment is saved, splits will be empty.
-    }
+    // OpenDental-style: rebuild ALL splits for this patient chronologically.
+    // This handles any payment order correctly and re-distributes any prior
+    // unearned credit to new sessions automatically.
+    await reallocatePatientFunds();
     patient.payment_manual = false;
     await syncPaymentStatus();
     renderStats(); renderInfo(); renderPayments();
@@ -3433,7 +3479,7 @@ async function savePayment() {
     document.getElementById('payAmount').value = '';
     document.getElementById('payNotes').value  = '';
     document.getElementById('payDate').value   = toDay();
-    if (ok) showToast('✅ تم تسجيل الدفعة');
+    showToast('✅ تم تسجيل الدفعة');
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'تسجيل الدفعة'; }
   }
@@ -3464,6 +3510,8 @@ async function saveSession() {
     appointment_id: pickedAppt
   }).select().single();
   if (newSess) sessions.unshift(newSess);
+  // Reallocate funds: if there was unearned credit, it auto-flows to this new session.
+  await reallocatePatientFunds();
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
   if (patient.status === 'جديد') updates.status = 'تحت العلاج';
@@ -3981,6 +4029,8 @@ async function saveToothAndOpenLab() {
     cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
   }).select().single();
   if (newSess) sessions.unshift(newSess);
+  // Reallocate funds: if there was unearned credit, it auto-flows to this session.
+  if (newSess) await reallocatePatientFunds();
 
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
