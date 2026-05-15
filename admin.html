@@ -396,7 +396,12 @@ async function deleteAccount(id, email) {
   var r = allRequests.find(function(x){ return x.id === id; });
   var uid = r ? r.user_id : null;
 
-  await window.sb.from('trial_requests').delete().eq('id', id);
+  var delRes = await window.sb.from('trial_requests').delete().eq('id', id);
+  if (delRes.error) {
+    console.warn('delete trial_request failed:', delRes.error);
+    alert('⚠️ فشل حذف الطلب: ' + delRes.error.message);
+    return;
+  }
 
   if (uid && SERVICE_KEY) {
     try {

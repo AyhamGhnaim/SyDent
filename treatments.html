@@ -1175,8 +1175,13 @@ async function resetToDefaults() {
     { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:8 },
     { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:9 }
   ];
-  // delete all current
-  await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
+  // delete all current — abort if it fails so we don't insert defaults on top of leftovers
+  var delRes = await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
+  if (delRes.error) {
+    console.warn('reset: delete old treatments failed:', delRes.error);
+    showToast('⚠️ تعذّر حذف العلاجات القديمة: ' + delRes.error.message);
+    return;
+  }
   // insert defaults
   const rows = DEFAULTS.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
   const { error } = await window.sb.from('treatments').insert(rows);

@@ -414,19 +414,37 @@ async function confirmDelete() {
   }
 
   // 2. حذف كل البيانات (الـ RLS يضمن أنه يحذف فقط بيانات هذا المستخدم)
+  // نتتبع أي جدول فشل في الحذف. لا نتوقّف عند أول خطأ — كل جدول مستقل،
+  // ونريد إنجاز أقصى ما يمكن، ثم نُبلغ المستخدم بصراحة إذا بقي شي.
   const uid = currentUser.id;
-  try {
-    await window.sb.from('teeth_status').delete().eq('doctor_id', uid);
-    await window.sb.from('ledger_payments').delete().eq('doctor_id', uid);
-    await window.sb.from('ledger_sessions').delete().eq('doctor_id', uid);
-    await window.sb.from('appointments').delete().eq('doctor_id', uid);
-    await window.sb.from('patients').delete().eq('doctor_id', uid);
-    await window.sb.from('trial_requests').delete().eq('user_id', uid);
-    // احتياط: حذف بالإيميل إذا user_id كان NULL
-    if (currentUser.email) {
-      await window.sb.from('trial_requests').delete().eq('email', currentUser.email);
+  var deleteFailures = [];
+  async function tryDelete(table, key, value) {
+    try {
+      var res = await window.sb.from(table).delete().eq(key, value);
+      if (res.error) {
+        console.warn('wipe: ' + table + ' delete failed:', res.error);
+        deleteFailures.push(table);
+      }
+    } catch(e) {
+      console.warn('wipe: ' + table + ' delete threw:', e);
+      deleteFailures.push(table);
     }
-  } catch(e) { console.error('Delete data error:', e); }
+  }
+  await tryDelete('teeth_status',    'doctor_id', uid);
+  await tryDelete('ledger_payments', 'doctor_id', uid);
+  await tryDelete('ledger_sessions', 'doctor_id', uid);
+  await tryDelete('appointments',    'doctor_id', uid);
+  await tryDelete('patients',        'doctor_id', uid);
+  await tryDelete('trial_requests',  'user_id',   uid);
+  // احتياط: حذف بالإيميل إذا user_id كان NULL
+  if (currentUser.email) {
+    await tryDelete('trial_requests', 'email', currentUser.email);
+  }
+  if (deleteFailures.length) {
+    // نواصل لمحاولة حذف الـ auth user — لكن نُبلغ المستخدم بصراحة أنه قد تبقى بيانات
+    console.warn('wipe: failed tables:', deleteFailures);
+    showToast('⚠️ تعذّر حذف بعض البيانات (' + deleteFailures.length + ' جداول). قد تبقى بقايا.', true);
+  }
 
   // 3. حذف الحساب نفسه عبر RPC (انظر ملاحظة الإعداد أدناه)
   // ملاحظة: لحذف auth.users يحتاج Edge Function أو RPC مع service_role
