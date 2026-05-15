@@ -1209,12 +1209,15 @@ async function loadAll() {
   } catch(e) { console.warn('lab_orders fetch failed:', e); labOrders = []; }
 
   // upcoming/today appointments — for linking sessions to appointments
+  // Exclude cancelled / broken / no-show / completed so "auto-link to next appointment"
+  // always lands on a real, active future appointment.
   try {
     var todayStr = toDay();
     const { data: ua, error: uaErr } = await window.sb.from('appointments')
       .select('id, date, time, type, status')
       .eq('patient_id', patientId)
       .gte('date', todayStr)
+      .not('status', 'in', '(cancelled,broken,no_show,completed)')
       .order('date', { ascending: true })
       .order('time', { ascending: true })
       .limit(20);
@@ -3919,19 +3922,45 @@ function fmtLabApptOption(appt) {
 
 /* Populate the appointment-link dropdown in the lab order modal.
    Patient is always the current patient (this is a patient-profile page),
-   so we just list this patient's upcoming/today appointments. */
+   so we just list this patient's upcoming/today appointments.
+   The special value '__auto__' means: at save time, resolve to the patient's
+   next active upcoming appointment (or null if there isn't one). */
 function populateLabAppointmentSelect(selectedApptId) {
   var sel = document.getElementById('labOrderAppointment');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— غير مربوط بموعد —</option>';
+  sel.innerHTML = '';
   var list = Array.isArray(upcomingAppts) ? upcomingAppts.slice() : [];
+
+  // Option 1: auto-link to the next appointment.
+  // Show the resolved target in parentheses so the user sees exactly which appointment
+  // will be linked when they click Save.
+  var autoOpt = document.createElement('option');
+  autoOpt.value = '__auto__';
+  if (list.length > 0) {
+    autoOpt.textContent = '🔄 الموعد القادم تلقائياً — (' + fmtLabApptOption(list[0]) + ')';
+  } else {
+    autoOpt.textContent = '🔄 الموعد القادم تلقائياً — (لا يوجد موعد قادم)';
+  }
+  sel.appendChild(autoOpt);
+
+  // Option 2: explicit "not linked"
+  var noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '— غير مربوط بموعد —';
+  sel.appendChild(noneOpt);
+
+  // Options 3+: specific upcoming appointments
   list.forEach(function(a){
     var opt = document.createElement('option');
     opt.value = a.id;
     opt.textContent = fmtLabApptOption(a);
     sel.appendChild(opt);
   });
-  if (selectedApptId && list.some(function(a){ return a.id === selectedApptId; })) {
+
+  // Restore previous selection if any
+  if (selectedApptId === '__auto__') {
+    sel.value = '__auto__';
+  } else if (selectedApptId && list.some(function(a){ return a.id === selectedApptId; })) {
     sel.value = selectedApptId;
   } else if (selectedApptId) {
     // The linked appointment isn't in the cache (older than today, or was deleted).
@@ -3941,6 +3970,10 @@ function populateLabAppointmentSelect(selectedApptId) {
     opt2.textContent = '⚠️ موعد مرتبط (غير متاح حالياً)';
     sel.appendChild(opt2);
     sel.value = selectedApptId;
+  } else {
+    // No previous selection — default to NOT linked (safer; explicit auto-link
+    // is only the default when opened from "save + send to lab" flow).
+    sel.value = '';
   }
 }
 
@@ -3952,7 +3985,13 @@ async function openLabOrderModal(prefill) {
   document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
   populateLabWorkTypes(prefill.treatment_key);
   populateLabSelect();
-  populateLabAppointmentSelect(prefill.appointment_id || '');
+  // Default: auto-link to next upcoming appointment (caller can override via prefill.appointment_id).
+  // This is the most common case: a treatment was just saved → its lab work belongs to the next visit.
+  var apptDefault = prefill.appointment_id;
+  if (apptDefault === undefined || apptDefault === null || apptDefault === '') {
+    apptDefault = '__auto__';
+  }
+  populateLabAppointmentSelect(apptDefault);
   document.getElementById('labOrderTooth').value = prefill.tooth_num || '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
@@ -4028,6 +4067,18 @@ async function saveLabOrder() {
 
   var apptSel = document.getElementById('labOrderAppointment');
   var apptId  = apptSel ? (apptSel.value || null) : null;
+
+  // Resolve the special "auto-link" sentinel to the patient's next active appointment.
+  // upcomingAppts is pre-sorted ascending (oldest-future first) and already excludes
+  // cancelled / broken / no-show / completed appointments.
+  if (apptId === '__auto__') {
+    if (Array.isArray(upcomingAppts) && upcomingAppts.length > 0) {
+      apptId = upcomingAppts[0].id;
+    } else {
+      apptId = null;
+      showToast('ℹ️ لا يوجد موعد قادم — تم الحفظ بدون ربط');
+    }
+  }
 
   var payload = {
     doctor_id: currentUser.id,
@@ -4174,41 +4225,65 @@ async function delLabOrder(id) {
 }
 
 async function saveToothAndOpenLab() {
-  // First save the tooth treatment as session
-  var cost  = parseFloat(document.getElementById('toothCost').value);
+  // First save the tooth treatment as session — same fields/logic as saveToothTreatment,
+  // so status (planned/completed/existing/referred) and provider_id are preserved.
+  // Cost is OPTIONAL for all statuses (consistent with saveToothTreatment).
+  var costRaw = parseFloat(document.getElementById('toothCost').value);
+  var cost = (costRaw && costRaw > 0) ? costRaw : 0;
   var date  = document.getElementById('toothDate').value;
   var notes = document.getElementById('toothNotes').value.trim();
-  if (!cost || cost <= 0) { showToast('⚠️ أدخل التكلفة'); return; }
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
-  // Save tooth status + session (same logic as saveToothTreatment)
-  await window.sb.from('teeth_status').upsert({
+  // 1. Save tooth status (surface + treatment_key + clinical status + treating provider)
+  var rTs = await window.sb.from('teeth_status').upsert({
     doctor_id: currentUser.id, patient_id: patientId,
-    tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus
+    tooth_num: String(currentTooth), surface: currentSurface,
+    treatment_key: pendingToothStatus,
+    status: pendingTreatStatus,
+    provider_id: pendingProviderId
   }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+  if (rTs.error) {
+    console.error('tooth+lab teeth_status save error:', rTs.error);
+    showToast('⚠️ خطأ حفظ حالة السن: ' + rTs.error.message);
+    return;
+  }
   if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
   teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
+  if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
+  teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
 
   // Build description that reflects the area type
   var areaForLabDesc;
   if (currentSurface === 'WHOLE') areaForLabDesc = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaForLabDesc = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
   else areaForLabDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
 
-  var sessRes2 = await window.sb.from('ledger_sessions').insert({
-    doctor_id: currentUser.id, patient_id: patientId,
-    type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForLabDesc,
-    cost: cost, date: date, notes: notes, tooth_num: String(currentTooth), surface: currentSurface
-  }).select().single();
-  if (sessRes2.error || !sessRes2.data) {
-    console.warn('tooth+lab session insert failed:', sessRes2.error);
-    showToast('⚠️ فشل حفظ الجلسة: ' + (sessRes2.error && sessRes2.error.message ? sessRes2.error.message : 'سبب غير معروف'));
-    return;
+  // 2. Insert ledger session — only for planned/completed (existing/referred are clinical notes, not billable).
+  // CRITICAL: pass status + provider_id so the user's choices are preserved.
+  // Without these, DB defaults (status='completed', provider_id=NULL) silently overwrite them.
+  var newSess = null;
+  if (pendingTreatStatus === 'completed' || pendingTreatStatus === 'planned') {
+    var sessRes2 = await window.sb.from('ledger_sessions').insert({
+      doctor_id: currentUser.id, patient_id: patientId,
+      type: pendingToothLabel, description: 'السن رقم ' + currentTooth + ' — ' + areaForLabDesc,
+      cost: cost, date: date, notes: notes,
+      tooth_num: String(currentTooth), surface: currentSurface,
+      status: pendingTreatStatus,
+      provider_id: pendingProviderId
+    }).select().single();
+    if (sessRes2.error) {
+      console.warn('tooth+lab session insert failed:', sessRes2.error);
+      showToast('⚠️ فشل حفظ الجلسة: ' + (sessRes2.error.message || 'سبب غير معروف'));
+      return;
+    }
+    newSess = sessRes2.data;
+    if (newSess) {
+      sessions.unshift(newSess); sortByDateDesc(sessions);
+      // Reallocate funds: if there was unearned credit, it auto-flows to this session.
+      await reallocatePatientFunds();
+    }
   }
-  var newSess = sessRes2.data;
-  sessions.unshift(newSess); sortByDateDesc(sessions);
-  // Reallocate funds: if there was unearned credit, it auto-flows to this session.
-  await reallocatePatientFunds();
 
   var updates = {};
   if (!patient.last_visit || date > patient.last_visit) updates.last_visit = date;
@@ -4226,6 +4301,8 @@ async function saveToothAndOpenLab() {
   var sessionNotes = notes;
   closeModal('toothModal');
 
+  // appointment_id is left undefined so openLabOrderModal defaults to '__auto__'
+  // (auto-link to next upcoming appointment).
   openLabOrderModal({
     tooth_num: toothNum,
     treatment_key: treatmentKey,
