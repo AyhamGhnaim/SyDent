@@ -623,7 +623,14 @@ td.patient-link a:hover { text-decoration: underline; }
       </div>
       <div class="form-group">
         <label>المريض</label>
-        <select id="labOrderPatient"></select>
+        <select id="labOrderPatient" onchange="onLabOrderPatientChange()"></select>
+      </div>
+      <div class="form-group">
+        <label>ربط بموعد (اختياري)</label>
+        <select id="labOrderAppointment" onchange="onLabOrderAppointmentChange()">
+          <option value="">— غير مربوط بموعد —</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -712,6 +719,7 @@ var currentUser = null;
 var allOrders   = [];
 var allPatients = [];
 var allLabs     = [];
+var allAppointments = []; // upcoming appointments (today onwards) — used to link lab orders
 var TREATMENTS  = [];
 var currentFilter = 'all';
 var searchQuery   = '';
@@ -784,6 +792,23 @@ function getLabName(id, fallbackName) {
   if (l) return l.name;
   return fallbackName || '—';
 }
+function getAppointmentById(id) {
+  if (!id) return null;
+  for (var i = 0; i < allAppointments.length; i++) {
+    if (allAppointments[i].id === id) return allAppointments[i];
+  }
+  return null;
+}
+function fmtApptOption(appt) {
+  // human label for dropdown option, e.g. "2026-05-20 — 14:30 — حشوة"
+  var d  = appt.date || '';
+  var t  = (appt.time || '').slice(0,5);
+  var tp = appt.type || '';
+  var parts = [d];
+  if (t)  parts.push(t);
+  if (tp) parts.push(tp);
+  return parts.join(' — ');
+}
 
 /* Load */
 async function loadAll() {
@@ -821,6 +846,23 @@ async function loadAll() {
     if (error) { console.warn('lab_orders:', error); allOrders = []; }
     else allOrders = lo || [];
   } catch(e) { console.warn(e); allOrders = []; }
+
+  // Load appointments (today onwards, plus a small look-back for in-progress jobs)
+  // used to populate the "link to appointment" dropdown.
+  try {
+    var lookback = new Date();
+    lookback.setDate(lookback.getDate() - 7);
+    var fromDate = lookback.toISOString().slice(0,10);
+    const { data: ap, error: apErr } = await window.sb.from('appointments')
+      .select('id, patient_id, patient_name, date, time, type, status')
+      .eq('doctor_id', currentUser.id)
+      .gte('date', fromDate)
+      .neq('status', 'cancelled')
+      .order('date', { ascending: true })
+      .order('time', { ascending: true });
+    if (apErr) { console.warn('appointments:', apErr); allAppointments = []; }
+    else allAppointments = ap || [];
+  } catch(e) { console.warn(e); allAppointments = []; }
 
   renderLabs();
   renderStats();
@@ -928,8 +970,16 @@ function renderTable() {
     var overdueTag = overdue ? '<span class="overdue-tag">متأخر</span>' : '';
     var rowClass = overdue ? 'row-overdue' : '';
 
+    // Linked-appointment badge
+    var apptBadge = '';
+    if (lo.appointment_id) {
+      var linkedAppt = getAppointmentById(lo.appointment_id);
+      var apptLabel  = linkedAppt ? fmtApptOption(linkedAppt) : 'موعد مرتبط';
+      apptBadge = '<span class="appt-badge" title="' + escapeHtml(apptLabel) + '" style="display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.4);padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;">📅</span>';
+    }
+
     rows += '<tr class="' + rowClass + '">'
-      + '<td class="patient-link">' + pLink + '</td>'
+      + '<td class="patient-link">' + apptBadge + pLink + '</td>'
       + '<td>' + (lo.tooth_num ? '<span class="tooth-badge">سن ' + lo.tooth_num + '</span>' : '—') + '</td>'
       + '<td>' + escapeHtml(lo.work_type || '—') + '</td>'
       + '<td style="color:var(--text2)">' + escapeHtml(labNm) + '</td>'
@@ -943,7 +993,7 @@ function renderTable() {
 
     cardHtml += '<div class="order-card' + (overdue ? ' overdue' : '') + '">'
       + '<div class="oc-row">'
-      +   '<div class="oc-patient">' + pLink + '</div>'
+      +   '<div class="oc-patient">' + apptBadge + pLink + '</div>'
       +   pill
       + '</div>'
       + '<div class="oc-info">'
@@ -1045,6 +1095,58 @@ function populateLabSelect(selectedLabId) {
   if (selectedLabId) sel.value = selectedLabId;
 }
 
+/* Appointment dropdown — filtered by current selected patient. */
+function populateAppointmentSelect(selectedApptId, patientId) {
+  var sel = document.getElementById('labOrderAppointment');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— غير مربوط بموعد —</option>';
+  // If no patient picked yet, leave only the placeholder.
+  if (!patientId) {
+    if (selectedApptId) {
+      // Edge case: editing an order whose appointment_id exists but patient is being changed
+      var a = getAppointmentById(selectedApptId);
+      if (a) {
+        var o = document.createElement('option');
+        o.value = a.id; o.textContent = fmtApptOption(a);
+        sel.appendChild(o); sel.value = a.id;
+      }
+    }
+    return;
+  }
+  var list = allAppointments.filter(function(a){ return a.patient_id === patientId; });
+  // If the currently selected appointment is for a different patient (or older than the look-back window),
+  // still show it so the user can keep / clear it explicitly.
+  if (selectedApptId && !list.some(function(a){ return a.id === selectedApptId; })) {
+    var a2 = getAppointmentById(selectedApptId);
+    if (a2) list = list.concat([a2]);
+  }
+  list.forEach(function(a){
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = fmtApptOption(a);
+    sel.appendChild(opt);
+  });
+  if (selectedApptId) sel.value = selectedApptId;
+}
+
+/* When patient changes, rebuild appointment dropdown for that patient. */
+function onLabOrderPatientChange() {
+  var pid = document.getElementById('labOrderPatient').value;
+  populateAppointmentSelect('', pid);
+}
+
+/* When appointment changes, auto-sync patient if needed. */
+function onLabOrderAppointmentChange() {
+  var aid = document.getElementById('labOrderAppointment').value;
+  if (!aid) return;
+  var a = getAppointmentById(aid);
+  if (!a) return;
+  var patSel = document.getElementById('labOrderPatient');
+  if (patSel && a.patient_id && patSel.value !== a.patient_id) {
+    patSel.value = a.patient_id;
+  }
+}
+
 /* CRUD: Lab Orders */
 function openLabOrderModal() {
   document.getElementById('labOrderTitle').textContent = '🧪 طلب مخبر جديد';
@@ -1052,6 +1154,7 @@ function openLabOrderModal() {
   populatePatientSelect();
   populateWorkTypeSelect();
   populateLabSelect();
+  populateAppointmentSelect('', '');
   document.getElementById('labOrderTooth').value = '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
@@ -1069,6 +1172,7 @@ function editLabOrder(id) {
   populatePatientSelect(lo.patient_id);
   populateWorkTypeSelect(lo.treatment_key);
   populateLabSelect(lo.lab_id);
+  populateAppointmentSelect(lo.appointment_id || '', lo.patient_id || '');
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
@@ -1095,6 +1199,8 @@ async function saveLabOrder() {
   var labObj   = allLabs.find(function(x){ return x.id === labId; });
   var labName  = labObj ? labObj.name : null;
 
+  var apptId   = document.getElementById('labOrderAppointment').value || null;
+
   var shade    = document.getElementById('labOrderShade').value.trim();
   var cost     = parseFloat(document.getElementById('labOrderCost').value) || 0;
   var dateSent = document.getElementById('labOrderDateSent').value;
@@ -1106,19 +1212,29 @@ async function saveLabOrder() {
   if (!workName || workName === '—') { showToast('⚠️ اختر نوع العمل'); return; }
   if (!dateSent)  { showToast('⚠️ اختر تاريخ الإرسال'); return; }
 
+  // Sanity: if appointment is linked, it must belong to the same patient.
+  if (apptId) {
+    var apptObj = getAppointmentById(apptId);
+    if (apptObj && apptObj.patient_id && apptObj.patient_id !== patientId) {
+      showToast('⚠️ الموعد المختار يعود لمريض آخر');
+      return;
+    }
+  }
+
   var payload = {
-    doctor_id:     currentUser.id,
-    patient_id:    patientId,
-    tooth_num:     toothRaw ? parseInt(toothRaw, 10) : null,
-    treatment_key: workKey,
-    lab_id:        labId,
-    lab_name:      labName,
-    work_type:     workName,
-    shade:         shade || null,
-    cost:          cost,
-    notes:         notes || null,
-    date_sent:     dateSent,
-    date_due:      dateDue || null
+    doctor_id:      currentUser.id,
+    patient_id:     patientId,
+    appointment_id: apptId,
+    tooth_num:      toothRaw ? parseInt(toothRaw, 10) : null,
+    treatment_key:  workKey,
+    lab_id:         labId,
+    lab_name:       labName,
+    work_type:      workName,
+    shade:          shade || null,
+    cost:           cost,
+    notes:          notes || null,
+    date_sent:      dateSent,
+    date_due:       dateDue || null
   };
 
   if (id) {

@@ -597,6 +597,15 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
+
+      <!-- 🧪 Lab orders section (visible only when editing + lab orders exist) -->
+      <div id="apptLabSection" style="display:none;margin-top:12px;padding:14px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-weight:700;color:var(--text);">🧪 المخبر — مرتبط بهذا الموعد</div>
+          <a href="labs.html" style="font-size:12px;color:#63b3ed;text-decoration:none;">إدارة المخابر ←</a>
+        </div>
+        <div id="apptLabList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
       <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
         <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">🗑️ حذف</button>
@@ -714,7 +723,8 @@ function hexA(hex, a) {
 }
 
 let appointments = [];
-let labOrdersByPatient = {};   // { patient_id: [lab_orders] } — for lab status icons
+let labOrdersByPatient = {};   // { patient_id: [lab_orders] } — for lab status icons (legacy fallback)
+let labOrdersByAppt    = {};   // { appointment_id: [lab_orders] } — preferred (direct link)
 let sessionsByAppt = {};       // { appointment_id: [ledger_sessions] } — procedures attached to each appointment
 let plannedSessionsByPatient = {}; // { patient_id: [planned ledger_sessions with appointment_id IS NULL] }
 let CLINIC_DOCTORS = [];       // for provider picker
@@ -789,18 +799,26 @@ async function loadAppointments() {
     }
   } catch(e) { console.warn('sessions for appts:', e); }
 
-  // Load active lab orders (for icons on appointments)
+  // Load active lab orders (for icons on appointments).
+  // Two indices are built:
+  //   labOrdersByAppt    — preferred when appointment_id is set on the order
+  //   labOrdersByPatient — fallback for orders not yet linked to a specific appointment
   labOrdersByPatient = {};
+  labOrdersByAppt    = {};
   try {
     const { data: lo, error: loErr } = await window.sb.from('lab_orders')
-      .select('patient_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
+      .select('patient_id, appointment_id, status, date_due, work_type, lab_name, lab_id, tooth_num')
       .eq('doctor_id', currentUser.id)
       .in('status', ['sent','received','checked']);
     if (!loErr && lo) {
       lo.forEach(function(o){
-        if (!o.patient_id) return;
-        if (!labOrdersByPatient[o.patient_id]) labOrdersByPatient[o.patient_id] = [];
-        labOrdersByPatient[o.patient_id].push(o);
+        if (o.appointment_id) {
+          if (!labOrdersByAppt[o.appointment_id]) labOrdersByAppt[o.appointment_id] = [];
+          labOrdersByAppt[o.appointment_id].push(o);
+        } else if (o.patient_id) {
+          if (!labOrdersByPatient[o.patient_id]) labOrdersByPatient[o.patient_id] = [];
+          labOrdersByPatient[o.patient_id].push(o);
+        }
       });
     }
   } catch(e) { console.warn('lab_orders for appts:', e); }
@@ -837,13 +855,25 @@ let editingId   = null;
 let selectedColor = 'green';
 
 // ─── Lab badge helper ──────────────────────────────
-// Returns { icon, color, title } for an appointment based on patient's active lab orders, or null
+// Returns { icon, color, title } for an appointment based on lab orders, or null.
+// Priority of sources:
+//   1) Orders directly linked to this appointment (via lab_orders.appointment_id) — most accurate
+//   2) Orders for this patient with NO appointment_id — legacy / unassigned fallback
+// Orders linked to a DIFFERENT appointment of the same patient are intentionally ignored,
+// so the badge appears only on the appointment it concerns.
 function getApptLabBadge(appt) {
-  if (!appt || !appt.patient_id) return null;
-  var orders = labOrdersByPatient[appt.patient_id];
-  if (!orders || !orders.length) return null;
+  if (!appt || !appt.id) return null;
   var apptDate = appt.date;
   if (!apptDate) return null;
+
+  // Combine direct + unassigned orders for this patient
+  var direct      = labOrdersByAppt[appt.id] || [];
+  var unassigned  = (appt.patient_id && labOrdersByPatient[appt.patient_id]) ? labOrdersByPatient[appt.patient_id] : [];
+  var orders      = direct.concat(unassigned);
+  if (!orders.length) return null;
+
+  // A direct link signals stronger intent — used to slightly bump the urgency message.
+  var hasDirect = direct.length > 0;
 
   var hasReady   = false;   // status checked
   var hasOverdue = false;   // status sent/received & date_due < apptDate
@@ -861,12 +891,24 @@ function getApptLabBadge(appt) {
     }
   });
 
-  // Priority: overdue (red) > ready (green) > pending (no badge unless soon)
+  // Priority: overdue (red) > ready (green) > pending (blue dot if soon)
   if (hasOverdue) {
-    return { icon: '⚠️', color: '#ef5350', title: 'تنبيه: طلب مخبر لم يصل قبل الموعد' };
+    return {
+      icon: '⚠️',
+      color: '#ef5350',
+      title: hasDirect
+        ? 'تنبيه: المخبر لم يصل قبل هذا الموعد (مرتبط مباشرة)'
+        : 'تنبيه: طلب مخبر لم يصل قبل الموعد'
+    };
   }
   if (hasReady) {
-    return { icon: '🧪', color: '#2ee89e', title: 'يوجد شغل جاهز للتركيب من المخبر' };
+    return {
+      icon: '🧪',
+      color: '#2ee89e',
+      title: hasDirect
+        ? 'شغل المخبر جاهز للتركيب في هذا الموعد'
+        : 'يوجد شغل جاهز للتركيب من المخبر'
+    };
   }
   // Pending but not overdue → subtle blue dot only if appt is within 3 days
   if (hasPending) {
@@ -874,7 +916,13 @@ function getApptLabBadge(appt) {
     var nowT  = new Date().setHours(0,0,0,0);
     var diffDays = Math.floor((apptT - nowT) / 86400000);
     if (diffDays >= 0 && diffDays <= 3) {
-      return { icon: '🧪', color: '#63b3ed', title: 'طلب مخبر قيد العمل' };
+      return {
+        icon: '🧪',
+        color: '#63b3ed',
+        title: hasDirect
+          ? 'طلب مخبر مرتبط بهذا الموعد قيد العمل'
+          : 'طلب مخبر قيد العمل'
+      };
     }
   }
   return null;
@@ -1122,6 +1170,8 @@ async function openModal(prefillDate) {
   document.getElementById('deleteApptBtn').style.display = 'none';
   // إخفاء قسم العلاجات (يظهر فقط في وضع التعديل)
   document.getElementById('apptProcSection').style.display = 'none';
+  // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
+  document.getElementById('apptLabSection').style.display = 'none';
   updateColorPreview();
 
   // Populate provider picker (uses OpenDental 3-tier default)
@@ -1166,6 +1216,9 @@ async function editAppt(id) {
   // Show procedures section + render attached procs + planned options
   document.getElementById('apptProcSection').style.display = 'block';
   renderApptProcedures(a);
+
+  // Show lab orders section (if any orders are linked to this appointment)
+  renderApptLabOrders(a);
 }
 
 /* Build the provider <select>. Visible only if >= 1 clinic doctor exists. */
@@ -1271,6 +1324,46 @@ function renderApptProcedures(appt) {
   });
   addBtn.disabled = false;
   addBtn.style.opacity = '1';
+}
+
+/* Render lab orders linked to the currently-edited appointment (read-only). */
+function renderApptLabOrders(appt) {
+  var section = document.getElementById('apptLabSection');
+  var listEl  = document.getElementById('apptLabList');
+  if (!section || !listEl) return;
+  var orders = (appt && appt.id) ? (labOrdersByAppt[appt.id] || []) : [];
+  if (!orders.length) {
+    section.style.display = 'none';
+    listEl.innerHTML = '';
+    return;
+  }
+  section.style.display = 'block';
+  var apptDate = appt.date || '';
+  var html = '';
+  orders.forEach(function(o){
+    var statusAr  = '—';
+    var statusBg  = 'rgba(255,255,255,0.06)';
+    var statusCol = 'var(--text2)';
+    if (o.status === 'sent')     { statusAr = 'قيد العمل';    statusBg = 'rgba(99,179,237,0.15)';  statusCol = '#63b3ed'; }
+    else if (o.status === 'received')  { statusAr = 'مستلَم';       statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
+    else if (o.status === 'checked')   { statusAr = 'جاهز للتركيب'; statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
+
+    var late = (o.date_due && apptDate && o.date_due.slice(0,10) <= apptDate && (o.status === 'sent' || o.status === 'received'));
+    var lateTag = late ? '<span style="background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.4);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⚠️ متأخر</span>' : '';
+
+    var toothPart = o.tooth_num ? ' • السن ' + o.tooth_num : '';
+    var dueDate   = o.date_due ? new Date(o.date_due).toLocaleDateString('ar-SY', { year:'numeric', month:'short', day:'numeric' }) : '—';
+    var labLabel  = o.lab_name || '—';
+
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">'
+      + '<div style="flex:1;min-width:160px;font-size:13px;color:var(--text);">' + (o.work_type || 'طلب مخبر') + toothPart + '</div>'
+      + '<div style="font-size:11px;color:var(--text2);">المخبر: ' + labLabel + '</div>'
+      + '<div style="font-size:11px;color:var(--text2);">استحقاق: ' + dueDate + '</div>'
+      + lateTag
+      + '<span style="background:' + statusBg + ';color:' + statusCol + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + statusAr + '</span>'
+      + '</div>';
+  });
+  listEl.innerHTML = html;
 }
 
 /* Attach a planned session to the currently-open appointment. */
