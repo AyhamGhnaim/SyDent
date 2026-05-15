@@ -964,6 +964,28 @@ function fmtD(ds) {
   if (!ds) return '—';
   return new Date(ds).toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'});
 }
+/* Format a full timestamp (e.g. created_at) as "15 أيار 2026 — 02:45 م".
+   Used as hover tooltip on date cells so the precise creation time is
+   accessible without cluttering the table. Matches Dentrix Ascend's
+   optional "Show timestamp" pattern. */
+function fmtDT(ts) {
+  if (!ts) return '';
+  try {
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
+    var datePart = d.toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'});
+    var timePart = d.toLocaleTimeString('ar-SY',{hour:'2-digit',minute:'2-digit',hour12:true});
+    return datePart + ' — ' + timePart;
+  } catch(e) { return ''; }
+}
+/* Return HTML attributes (title + cursor:help) for hover-timestamp on a
+   date cell. Returns empty string when there's no created_at, so legacy
+   rows don't show a help cursor that leads nowhere. */
+function dtHoverAttrs(ts) {
+  var formatted = fmtDT(ts);
+  if (!formatted) return '';
+  return ' title="' + formatted + '" style="cursor:help;"';
+}
 function toDay() { return new Date().toISOString().slice(0,10); }
 function calcAge(dob) {
   if (!dob) return '—';
@@ -3280,7 +3302,7 @@ function renderSessions() {
     var costColor = fullyPaid ? 'var(--green)' : partiallyPaid ? 'var(--yellow)' : 'var(--red)';
     var costStyle = 'text-align:left;color:' + costColor + ';font-weight:700;';
     rows += '<tr>'
-      + '<td>' + fmtD(s.date) + '</td>'
+      + '<td' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</td>'
       + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
@@ -3340,7 +3362,7 @@ function renderPayments() {
   var rows = '';
   payments.forEach(function(p) {
     rows += '<tr>'
-      + '<td>' + fmtD(p.date) + '</td>'
+      + '<td' + dtHoverAttrs(p.created_at) + '>' + fmtD(p.date) + '</td>'
       + '<td><span class="tag tag-green">' + (p.method||'—') + '</span></td>'
       + '<td style="color:var(--text2)">' + (p.notes||'—') + '</td>'
       + '<td class="amount-green" style="text-align:left;">' + fmt(p.amount) + ' ل.س</td>'
@@ -3383,7 +3405,7 @@ function renderRecentSessions() {
       + '</div>'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
         + '<span>' + (s.description || '—') + '</span>'
-        + '<span>' + fmtD(s.date) + '</span>'
+        + '<span' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</span>'
       + '</div>'
     + '</div>';
   });
@@ -3724,7 +3746,7 @@ function renderLabOrders() {
       if (lObj) labDisplay = lObj.name;
     }
     rows += '<tr>'
-      + '<td>' + fmtD(lo.date_sent) + '</td>'
+      + '<td' + dtHoverAttrs(lo.created_at) + '>' + fmtD(lo.date_sent) + '</td>'
       + '<td>' + (lo.tooth_num ? '<span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:11px;font-weight:700;">سن ' + lo.tooth_num + '</span>' : '—') + '</td>'
       + '<td>' + (lo.work_type || '—') + '</td>'
       + '<td style="color:var(--text2)">' + labDisplay + '</td>'
