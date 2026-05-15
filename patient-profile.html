@@ -712,6 +712,8 @@ function buildFifoSplits(payment, sessionsList, existingSplits) {
   });
 
   // Sort sessions: completed first (planned shouldn't take payments), then oldest date first.
+  // Same-date sessions are tiebroken by created_at (DateTStamp in OpenDental terms),
+  // then by id, so the order is fully deterministic and reflects the true creation sequence.
   var eligible = (sessionsList || []).slice().filter(function(s){
     return s && s.id && (parseFloat(s.cost) || 0) > 0;
   });
@@ -720,11 +722,21 @@ function buildFifoSplits(payment, sessionsList, existingSplits) {
     var aDone = a.status === 'completed' ? 0 : 1;
     var bDone = b.status === 'completed' ? 0 : 1;
     if (aDone !== bDone) return aDone - bDone;
-    // Within the same bucket, older first
-    var ad = String(a.date || '9999');
-    var bd = String(b.date || '9999');
+    // Within the same bucket, older date first
+    var ad = String(a.date || '9999-12-31');
+    var bd = String(b.date || '9999-12-31');
     if (ad < bd) return -1;
     if (ad > bd) return 1;
+    // Same date → use created_at timestamp (FIFO tiebreaker, matches OpenDental DateTStamp)
+    var ac = String(a.created_at || '');
+    var bc = String(b.created_at || '');
+    if (ac < bc) return -1;
+    if (ac > bc) return 1;
+    // Still tied → use id for stability
+    var ai = String(a.id || '');
+    var bi = String(b.id || '');
+    if (ai < bi) return -1;
+    if (ai > bi) return 1;
     return 0;
   });
 
@@ -847,13 +859,20 @@ async function reallocatePatientFunds() {
     }
     paymentSplits = [];
 
-    // 2. Sort payments oldest-first (by date, then id as tiebreaker).
+    // 2. Sort payments oldest-first (by date, then created_at as tiebreaker).
+    // Same-date payments are ordered by their actual creation timestamp
+    // (matches OpenDental DateTStamp behavior — deterministic FIFO).
     var sortedPayments = payments.slice().sort(function(a, b){
       var ad = String(a.date || '9999-12-31');
       var bd = String(b.date || '9999-12-31');
       if (ad < bd) return -1;
       if (ad > bd) return 1;
-      // Same date: fall back to id for stable ordering
+      // Same date → use created_at timestamp (true FIFO order)
+      var ac = String(a.created_at || '');
+      var bc = String(b.created_at || '');
+      if (ac < bc) return -1;
+      if (ac > bc) return 1;
+      // Still tied → use id for stability
       var ai = String(a.id || '');
       var bi = String(b.id || '');
       if (ai < bi) return -1;
