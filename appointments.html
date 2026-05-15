@@ -914,8 +914,10 @@ function getApptLabBadge(appt) {
   // Unassigned orders retain legacy behavior: they need an explicit date_due.
   // Use local-time dateStr (not UTC) so the "today" boundary matches the user's clock.
   var todayStr = dateStr(new Date());
+  // Only 'sent' is at risk: 'received' means the work has physically arrived from
+  // the lab — even if the due date has passed, there's nothing to warn about.
   function isOrderLate(o, linkedDirectly) {
-    if (o.status !== 'sent' && o.status !== 'received') return false;
+    if (o.status !== 'sent') return false;
     if (o.date_due) {
       return o.date_due.slice(0,10) <= apptDate;
     }
@@ -1398,14 +1400,15 @@ function renderApptLabOrders(appt) {
     else if (o.status === 'received')  { statusAr = 'مستلَم';       statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
     else if (o.status === 'checked')   { statusAr = 'جاهز للتركيب'; statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
 
-    // Late if: explicit date_due passed the appointment day, OR
-    //          no date_due AND the appointment day has arrived/passed.
-    // Status must still be in-flight (sent/received).
+    // Late tag only applies when work hasn't physically arrived yet (status='sent').
+    // Once received/checked, the lab work is at the clinic — no point warning "late".
+    // Direct-linked orders without an explicit date_due become late once the
+    // appointment day has arrived (the user tied this work to that visit).
     // Use local-time dateStr so the "today" boundary matches the user's clock.
-    var inFlight = (o.status === 'sent' || o.status === 'received');
+    var atRisk = (o.status === 'sent');
     var todayStr = dateStr(new Date());
     var late;
-    if (!inFlight) {
+    if (!atRisk) {
       late = false;
     } else if (o.date_due) {
       late = (apptDate && o.date_due.slice(0,10) <= apptDate);
