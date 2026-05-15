@@ -415,6 +415,7 @@ var currentUser = null;
 var doctors = [];           // clinic_doctors
 var sessions = [];          // ledger_sessions in date range
 var payments = [];          // ledger_payments in date range
+var paymentSplits = [];     // payment_splits in date range (Migration 3) — empty on legacy DBs
 var labOrders = [];         // lab_orders for cost matching
 var payouts = [];           // provider_payouts for history
 var basis = 'production';   // 'production' | 'net' | 'collection'
@@ -590,6 +591,33 @@ async function loadFilteredData() {
     .lte('date', to);
   payments = (pRes.data) || [];
 
+  // Load payment_splits for these payments (Migration 3).
+  // Filter by payment_id (the in-range payments we just loaded) — this is more
+  // robust than filtering by payment_date because splits could theoretically
+  // have a NULL payment_date if a legacy payment was missing one, and we'd
+  // rather count it under its parent payment's date than drop it silently.
+  // Graceful fallback to empty array on pre-Migration-3 DBs; computeProviderStats
+  // automatically falls back to proportional in that case.
+  paymentSplits = [];
+  if (payments.length) {
+    try {
+      var paymentIds = payments.map(function(p){ return p.id; });
+      var psRes = await window.sb.from('payment_splits')
+        .select('payment_id,session_id,provider_id,amount,is_unearned')
+        .eq('doctor_id', currentUser.id)
+        .in('payment_id', paymentIds);
+      if (psRes.error) {
+        var msg = (psRes.error.message || '').toLowerCase();
+        var missing = psRes.error.code === '42P01' || psRes.error.code === 'PGRST205'
+          || msg.indexOf('payment_splits') !== -1;
+        if (!missing) console.warn('payment_splits load:', psRes.error);
+        // Either missing table or other error — empty array triggers fallback.
+      } else {
+        paymentSplits = psRes.data || [];
+      }
+    } catch(e) { console.warn('payment_splits load threw:', e); }
+  }
+
   // Load all lab_orders (we filter per session by patient+tooth)
   // Use status filter: include only sent/received/checked/delivered (not rejected)
   try {
@@ -677,30 +705,59 @@ function computeProviderStats(provId, sharedMatchedSet) {
 
   var net = production - labCost;
 
-  // 3. Collection allocation:
-  // For each patient, sum total production (across all providers) in date range,
-  // compute this provider's share, then allocate that share of patient's payments.
+  // 3. Collection allocation.
+  // Preferred (Migration 3+): sum payment_splits.amount where provider_id matches.
+  // This is exact — each split records the actual amount that flowed to a
+  // specific session under a specific provider, computed FIFO when the payment
+  // was made. Matches OpenDental's "Daily Payments Report — Show splits by
+  // provider separately" semantics.
+  // Fallback (legacy / pre-Migration-3 / payments without splits): proportional
+  // ratio of patient production. Kept so old payments don't disappear from
+  // reports.
   var collection = 0;
-  // Group sessions by patient (all sessions in range, not just this provider's)
-  var byPatient = {};
-  sessions.forEach(function(s){
-    if (!byPatient[s.patient_id]) byPatient[s.patient_id] = { total: 0, provTotal: 0 };
-    byPatient[s.patient_id].total += Number(s.cost) || 0;
-    if ((provId === '_unassigned' && !s.provider_id) || s.provider_id === provId) {
-      byPatient[s.patient_id].provTotal += Number(s.cost) || 0;
-    }
+  // Build a set of payment_ids that have at least one split, so we know which
+  // payments to allocate via splits vs proportional fallback.
+  var paymentIdsWithSplits = {};
+  for (var k = 0; k < paymentSplits.length; k++) {
+    paymentIdsWithSplits[paymentSplits[k].payment_id] = true;
+  }
+  // Part A — splits-based attribution (exact).
+  // is_unearned splits have provider_id = null and don't belong to any provider.
+  for (var i = 0; i < paymentSplits.length; i++) {
+    var sp = paymentSplits[i];
+    if (sp.is_unearned) continue;
+    var matchesProv = (provId === '_unassigned')
+      ? !sp.provider_id
+      : sp.provider_id === provId;
+    if (matchesProv) collection += Number(sp.amount) || 0;
+  }
+  // Part B — proportional fallback for payments without splits (legacy data).
+  // Filter payments to only those NOT covered by splits, then apply the old
+  // ratio formula on this subset.
+  var legacyPayments = payments.filter(function(p){
+    return !paymentIdsWithSplits[p.id];
   });
-  // Sum payments per patient
-  var paymentsByPatient = {};
-  payments.forEach(function(p){
-    paymentsByPatient[p.patient_id] = (paymentsByPatient[p.patient_id] || 0) + (Number(p.amount) || 0);
-  });
-  Object.keys(byPatient).forEach(function(pid){
-    var rec = byPatient[pid];
-    if (rec.total <= 0 || rec.provTotal <= 0) return;
-    var ratio = rec.provTotal / rec.total;
-    collection += (paymentsByPatient[pid] || 0) * ratio;
-  });
+  if (legacyPayments.length) {
+    var byPatient = {};
+    sessions.forEach(function(s){
+      if (!byPatient[s.patient_id]) byPatient[s.patient_id] = { total: 0, provTotal: 0 };
+      byPatient[s.patient_id].total += Number(s.cost) || 0;
+      if ((provId === '_unassigned' && !s.provider_id) || s.provider_id === provId) {
+        byPatient[s.patient_id].provTotal += Number(s.cost) || 0;
+      }
+    });
+    var legacyPaymentsByPatient = {};
+    legacyPayments.forEach(function(p){
+      legacyPaymentsByPatient[p.patient_id] =
+        (legacyPaymentsByPatient[p.patient_id] || 0) + (Number(p.amount) || 0);
+    });
+    Object.keys(byPatient).forEach(function(pid){
+      var rec = byPatient[pid];
+      if (rec.total <= 0 || rec.provTotal <= 0) return;
+      var ratio = rec.provTotal / rec.total;
+      collection += (legacyPaymentsByPatient[pid] || 0) * ratio;
+    });
+  }
 
   return {
     sessionCount: sessionCount,
