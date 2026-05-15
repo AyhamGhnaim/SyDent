@@ -999,10 +999,14 @@ async function loadAll() {
 
 /* ── Sync patient payment status ── */
 async function syncPaymentStatus() {
-  var total = 0, paid = 0;
-  sessions.forEach(function(s){ total += Number(s.cost||0); });
-  payments.forEach(function(p){ paid  += Number(p.amount||0); });
-  var newStatus = (total > 0 && paid >= total) ? 'مسدّد' : 'متبقي';
+  // Use the same OpenDental-precise computation as computeFinancials so the
+  // status field stays in sync with the displayed balance card.
+  // A patient is "مسدّد" only when production is fully covered by attributed
+  // payments AND there's no leftover unearned credit waiting to be allocated.
+  // Just summing payments.amount would mark a patient with an unallocated
+  // prepayment as paid-up even when their actual session is still unpaid.
+  var f = computeFinancials();
+  var newStatus = (f.total > 0 && f.trueBalance <= 0.5 && f.unearnedCredit <= 0.5) ? 'مسدّد' : 'متبقي';
   if (!patient.payment_manual && patient.payment !== newStatus) {
     await window.sb.from('patients').update({ payment: newStatus })
       .eq('id', patientId).eq('doctor_id', currentUser.id);
@@ -1021,12 +1025,39 @@ function computeFinancials() {
     else if (st === 'completed') completedTotal += c;
   });
   payments.forEach(function(p){ paid  += Number(p.amount||0); });
+
+  // OpenDental-style precise balance (Phase 1 splits-aware):
+  //   allocatedToProduction = paid amount actually attached to sessions
+  //   unearnedCredit        = paid amount sitting as prepayment (no session)
+  //   trueBalance           = total production - allocated (NOT minus unearned)
+  // When no splits exist (legacy / pre-Migration-3), allocated = paid,
+  // unearned = 0, and trueBalance == legacy balance. So this is fully
+  // backward compatible.
+  var allocatedToProduction = 0;
+  var unearnedCredit = 0;
+  if (Array.isArray(paymentSplits) && paymentSplits.length) {
+    for (var i = 0; i < paymentSplits.length; i++) {
+      var sp = paymentSplits[i];
+      var a = parseFloat(sp.amount) || 0;
+      if (sp.is_unearned) unearnedCredit += a;
+      else                allocatedToProduction += a;
+    }
+  } else {
+    // No splits → assume all paid is "allocated" (legacy behavior)
+    allocatedToProduction = paid;
+  }
+  var trueBalance = total - allocatedToProduction;
+
   return {
     total: total,
     paid: paid,
-    balance: total - paid,
+    balance: total - paid,        // legacy field — kept for backward compat
     plannedTotal: plannedTotal,
-    completedTotal: completedTotal
+    completedTotal: completedTotal,
+    // New (OpenDental-precise) fields:
+    allocatedToProduction: allocatedToProduction,
+    unearnedCredit: unearnedCredit,
+    trueBalance: trueBalance      // remaining due on production, ignoring prepayments
   };
 }
 
@@ -1078,29 +1109,37 @@ function renderStats() {
   document.getElementById('sTotal').textContent  = fmt(f.total);
   document.getElementById('sPaid').textContent   = fmt(f.paid);
   var bEl = document.getElementById('sBalance');
-  // OpenDental-style direction-aware balance display.
-  // When unearned credit exists (Migration 3 splits), prefer the "prepayment"
-  // framing — it's more precise than the generic "owes patient" label.
-  var unearned = computeUnearnedTotal();
   var lblEl = bEl.parentNode.querySelector('.stat-lbl');
-  if (f.balance > 0) {
-    // Patient owes us
-    bEl.textContent = fmt(f.balance);
+  // OpenDental-style header semantics. The 3rd stat box can only show one
+  // value, so we pick the most important state. When BOTH "owed by patient"
+  // and "prepayment" exist (rare — happens when prepayment hasn't been
+  // re-allocated to a newly-added session), prefer showing the OWED amount
+  // (red) since that's what action the doctor needs to take: re-allocate or
+  // collect. The full breakdown is visible in the payments tab.
+  // Priority:
+  //   1. trueBalance > 0 → patient owes for un-attached production → RED
+  //   2. unearned > 0    → patient has a prepayment credit          → BLUE
+  //   3. trueBalance < 0 → legacy/credit (no splits to attribute)   → YELLOW
+  //   4. all zero        → settled                                  → GREEN
+  // Small epsilon to avoid float drift bouncing between states.
+  var tb = f.trueBalance;
+  var unearned = f.unearnedCredit;
+  if (tb > 0.5) {
+    bEl.textContent = fmt(tb);
     bEl.className   = 'stat-val red';
-    if (lblEl) lblEl.textContent = 'على المريض ل.س';
-  } else if (unearned > 0) {
-    // Patient has a prepayment credit (precise — from payment_splits)
+    if (lblEl) lblEl.textContent = unearned > 0.5
+      ? '⚠️ على المريض ل.س (مع رصيد مقدّم)'
+      : '⚠️ على المريض ل.س';
+  } else if (unearned > 0.5) {
     bEl.textContent = fmt(unearned);
     bEl.className   = 'stat-val blue';
-    if (lblEl) lblEl.textContent = 'رصيد مقدّم ل.س';
-  } else if (f.balance < 0) {
-    // Clinic owes patient (legacy: no splits or all splits are session-attached)
-    bEl.textContent = fmt(Math.abs(f.balance));
+    if (lblEl) lblEl.textContent = '💳 رصيد مقدّم ل.س';
+  } else if (tb < -0.5) {
+    bEl.textContent = fmt(Math.abs(tb));
     bEl.className   = 'stat-val yellow';
-    if (lblEl) lblEl.textContent = 'يستحقّه المريض ل.س';
+    if (lblEl) lblEl.textContent = '💸 يستحقّه المريض ل.س';
   } else {
-    // Settled (balance === 0)
-    bEl.textContent = fmt(0);
+    bEl.textContent = '✓';
     bEl.className   = 'stat-val green';
     if (lblEl) lblEl.textContent = 'الحساب مكتمل';
   }
@@ -3102,34 +3141,38 @@ function renderSessions() {
 function renderPayments() {
   var el = document.getElementById('paymentsContent');
   var f  = computeFinancials();
-  // OpenDental-style "Est Bal" coloring (bold red when patient owes):
-  //   balance > 0 → patient owes us            → RED   "على المريض"
-  //   balance < 0 → clinic owes patient         → YELLOW "يستحقّه المريض"
-  //   balance = 0 → settled                     → GREEN  "الحساب مكتمل"
-  var bColor, bLabel, bIcon;
-  if (f.balance > 0)       { bColor = 'var(--red)';    bLabel = 'على المريض';      bIcon = '⚠️'; }
-  else if (f.balance < 0)  { bColor = 'var(--yellow)'; bLabel = 'يستحقّه المريض'; bIcon = '💸'; }
-  else                     { bColor = 'var(--green)';  bLabel = 'الحساب مكتمل';    bIcon = '✓';  }
+  // Use OpenDental-precise semantics (matches header):
+  //   trueBalance = total production - allocated-to-production
+  //   unearned    = prepayments not yet attributed to a session
+  var tb = f.trueBalance;
+  var unearned = f.unearnedCredit;
+  // Small epsilon to avoid float drift bouncing between states.
+  var EPS = 0.5;
 
   var plannedHtml = f.plannedTotal > 0
     ? '<div class="bs-item"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div></div>'
     : '';
-  // OpenDental-style "unearned income" card: shows when patient has prepaid more
-  // than current production. Only renders when Migration 3 is active and there's
-  // actually an unallocated balance.
-  var unearned = computeUnearnedTotal();
-  var unearnedHtml = unearned > 0
+  // OpenDental-style "Unearned/Prepayment" card — always shown when > 0,
+  // independent of the balance card.
+  var unearnedHtml = unearned > EPS
     ? '<div class="bs-item"><div class="bs-val" style="color:var(--blue)">' + fmt(unearned) + ' ل.س</div><div class="bs-lbl">💳 رصيد مقدّم</div></div>'
     : '';
-  // Avoid showing both "يستحقّه المريض" (legacy generic credit) and "رصيد مقدّم"
-  // (precise unearned credit from splits) — they overlap conceptually.
-  // When unearned exists, the unearned card is more accurate; skip the generic credit.
-  var showBalanceCard = !(unearned > 0 && f.balance < 0);
-  // When balance is 0 AND there's no production yet, hide the card (not informative)
-  if (f.balance === 0 && f.total === 0) showBalanceCard = false;
-  var balanceCard = showBalanceCard
-    ? '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + (f.balance === 0 ? bIcon : fmt(Math.abs(f.balance)) + ' ل.س') + '</div><div class="bs-lbl">' + bIcon + ' ' + bLabel + '</div></div>'
-    : '';
+
+  // Balance card: shows the true remaining-due on production.
+  // - tb > 0  → patient owes for unattached production (red)
+  // - tb < 0  → legacy credit with no unearned to attribute (yellow) — rare
+  // - tb ≈ 0  → all production paid (green) — hide if patient is brand new
+  var balanceCard = '';
+  if (tb > EPS) {
+    balanceCard = '<div class="bs-item"><div class="bs-val" style="color:var(--red)">' + fmt(tb) + ' ل.س</div><div class="bs-lbl">⚠️ على المريض</div></div>';
+  } else if (tb < -EPS && unearned <= EPS) {
+    // Legacy credit (no splits to attribute the overpayment)
+    balanceCard = '<div class="bs-item"><div class="bs-val" style="color:var(--yellow)">' + fmt(Math.abs(tb)) + ' ل.س</div><div class="bs-lbl">💸 يستحقّه المريض</div></div>';
+  } else if (Math.abs(tb) <= EPS && unearned <= EPS && f.total > 0) {
+    // Settled — only show when there's actual production (otherwise hide for new patients)
+    balanceCard = '<div class="bs-item"><div class="bs-val" style="color:var(--green)">✓</div><div class="bs-lbl">الحساب مكتمل</div></div>';
+  }
+  // When unearned > 0, the unearnedHtml card carries the message; no balance card needed.
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
   + plannedHtml
