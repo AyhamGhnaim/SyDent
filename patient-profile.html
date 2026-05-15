@@ -636,11 +636,150 @@ var patient   = null;
 var patients  = [];   // all doctor's patients (for seq numbering)
 var sessions  = [];
 var payments  = [];
+var paymentSplits = [];   // payment_splits for current patient (OpenDental-style allocation)
 var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: null, L: null, I: null } }
 var labOrders = [];   // lab orders for current patient
 var allLabs   = [];   // all labs for the doctor
 var upcomingAppts = []; // patient's upcoming/today appointments (for session-appointment linking)
 var currentUser = null;
+
+/* ── Payment Splits (OpenDental-style FIFO allocation) ──
+   Helper: how much has been paid towards a specific session, based on payment_splits.
+   Returns 0 if the session has no splits yet (legacy / pre-Migration-3 data).
+   Caller can fall back to the legacy patient-level paid-total when needed. */
+function computeSessionPaid(sessionId) {
+  if (!sessionId || !Array.isArray(paymentSplits)) return 0;
+  var total = 0;
+  for (var i = 0; i < paymentSplits.length; i++) {
+    if (paymentSplits[i].session_id === sessionId) {
+      total += parseFloat(paymentSplits[i].amount) || 0;
+    }
+  }
+  return total;
+}
+
+/* Helper: total amount that's been allocated as "unearned" (overpayment / prepayment)
+   for this patient. Useful for showing "credit balance" hints. */
+function computeUnearnedTotal() {
+  if (!Array.isArray(paymentSplits)) return 0;
+  var total = 0;
+  for (var i = 0; i < paymentSplits.length; i++) {
+    if (paymentSplits[i].is_unearned) {
+      total += parseFloat(paymentSplits[i].amount) || 0;
+    }
+  }
+  return total;
+}
+
+/* Helper: detect "table doesn't exist" errors so we can skip splits gracefully
+   on pre-Migration-3 databases. */
+function _isPaymentSplitsTableMissing(err) {
+  if (!err) return false;
+  if (err.code === '42P01' || err.code === 'PGRST205') return true; // undefined_table / not in schema cache
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('payment_splits') !== -1
+      && (m.indexOf('does not exist') !== -1
+       || m.indexOf('not found') !== -1
+       || m.indexOf('schema cache') !== -1
+       || m.indexOf('relation') !== -1);
+}
+
+/* Core FIFO allocator (OpenDental-style).
+   Given a freshly-inserted payment and the patient's current sessions+splits,
+   returns the array of new split rows to insert.
+   Rules:
+     - Walk completed sessions in date ASC order (oldest first).
+     - For each session, compute remaining = cost - already-paid.
+     - Allocate min(payment_remaining, session_remaining) to that session.
+     - When payment runs out, stop.
+     - If payment money is left after all sessions are fully paid → unearned. */
+function buildFifoSplits(payment, sessionsList, existingSplits) {
+  var paymentRem = parseFloat(payment.amount) || 0;
+  if (paymentRem <= 0) return [];
+
+  // Sum existing splits per session, so we know what's already paid.
+  var paidBySession = {};
+  (existingSplits || []).forEach(function(s){
+    if (s.session_id) paidBySession[s.session_id] = (paidBySession[s.session_id] || 0) + (parseFloat(s.amount) || 0);
+  });
+
+  // Sort sessions: completed first (planned shouldn't take payments), then oldest date first.
+  // We allocate to any session with cost > 0 and remaining > 0.
+  var eligible = (sessionsList || []).slice().filter(function(s){
+    return s && s.id && (parseFloat(s.cost) || 0) > 0;
+  });
+  eligible.sort(function(a, b){
+    // Completed before non-completed (OpenDental allocates to actual production first)
+    var aDone = a.status === 'completed' ? 0 : 1;
+    var bDone = b.status === 'completed' ? 0 : 1;
+    if (aDone !== bDone) return aDone - bDone;
+    // Within the same bucket, older first
+    var ad = (a.date || '9999');
+    var bd = (b.date || '9999');
+    if (ad < bd) return -1;
+    if (ad > bd) return 1;
+    return 0;
+  });
+
+  var newSplits = [];
+  for (var i = 0; i < eligible.length && paymentRem > 0; i++) {
+    var sess = eligible[i];
+    var alreadyPaid = paidBySession[sess.id] || 0;
+    var remaining = (parseFloat(sess.cost) || 0) - alreadyPaid;
+    if (remaining <= 0) continue;
+    var take = Math.min(paymentRem, remaining);
+    newSplits.push({
+      doctor_id:    payment.doctor_id,
+      payment_id:   payment.id,
+      patient_id:   payment.patient_id,
+      session_id:   sess.id,
+      provider_id:  sess.provider_id || null,
+      amount:       Math.round(take),
+      is_unearned:  false,
+      payment_date: payment.date || null
+    });
+    paymentRem -= take;
+  }
+
+  // Overpayment → unearned
+  if (paymentRem > 0.5) {  // small epsilon for rounding
+    newSplits.push({
+      doctor_id:    payment.doctor_id,
+      payment_id:   payment.id,
+      patient_id:   payment.patient_id,
+      session_id:   null,
+      provider_id:  null,
+      amount:       Math.round(paymentRem),
+      is_unearned:  true,
+      payment_date: payment.date || null
+    });
+  }
+  return newSplits;
+}
+
+/* Persist splits for a payment. Returns true on success (or graceful no-op),
+   false if a real error occurred (other than missing-table). */
+async function persistPaymentSplits(splitRows) {
+  if (!splitRows || !splitRows.length) return true;
+  try {
+    var res = await window.sb.from('payment_splits').insert(splitRows).select();
+    if (res.error) {
+      if (_isPaymentSplitsTableMissing(res.error)) {
+        console.warn('payment_splits table missing — running in legacy mode. Run Migration 3 to enable per-session allocation.');
+        return true; // graceful no-op
+      }
+      console.warn('payment_splits insert error:', res.error);
+      return false;
+    }
+    if (res.data) {
+      for (var i = 0; i < res.data.length; i++) paymentSplits.push(res.data[i]);
+    }
+    return true;
+  } catch(e) {
+    console.warn('payment_splits insert failed:', e);
+    return false;
+  }
+}
 
 /* ── Lab Orders Constants ── */
 // Fallback list — used only if treatment doesn't have needs_lab set in DB
@@ -788,6 +927,20 @@ async function loadAll() {
   const { data: pd2 } = await window.sb.from('ledger_payments').select('*')
     .eq('patient_id', patientId).order('date', { ascending: false });
   payments = pd2 || [];
+
+  // payment_splits (Migration 3) — graceful: skip silently if table missing.
+  paymentSplits = [];
+  try {
+    var psRes = await window.sb.from('payment_splits').select('*')
+      .eq('patient_id', patientId);
+    if (psRes.error) {
+      if (!_isPaymentSplitsTableMissing(psRes.error)) {
+        console.warn('payment_splits load error:', psRes.error);
+      }
+    } else {
+      paymentSplits = psRes.data || [];
+    }
+  } catch(e) { console.warn('payment_splits fetch:', e); }
 
   // teeth — group by tooth_num then by surface
   const { data: td } = await window.sb.from('teeth_status').select('*')
@@ -2890,9 +3043,20 @@ function renderSessions() {
         provBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + (prov.color || '#2ee89e') + '22;color:' + (prov.color || '#2ee89e') + ';border:1px solid ' + (prov.color || '#2ee89e') + '55;margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
       }
     }
+    // OpenDental-style: show per-session paid amount when payment_splits exist.
+    // Shows nothing for sessions on pre-Migration-3 data (paymentSplits empty).
+    var paidBadge = '';
+    var sessPaid = computeSessionPaid(s.id);
+    if (sessPaid > 0) {
+      var sessCost = parseFloat(s.cost) || 0;
+      var fullyPaid = sessPaid >= sessCost;
+      var badgeColor = fullyPaid ? '#2ee89e' : '#f5c842';
+      var badgeText = fullyPaid ? '💰 مدفوع' : '💰 ' + fmt(sessPaid) + '/' + fmt(sessCost);
+      paidBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + badgeColor + '22;color:' + badgeColor + ';border:1px solid ' + badgeColor + '55;margin-right:4px;" title="مدفوع من هذه الجلسة">' + badgeText + '</span>';
+    }
     rows += '<tr>'
       + '<td>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + '</td>'
+      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td class="amount-red" style="text-align:left;">' + fmt(s.cost) + ' ل.س</td>'
@@ -2910,10 +3074,18 @@ function renderPayments() {
   var plannedHtml = f.plannedTotal > 0
     ? '<div class="bs-item"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div></div>'
     : '';
+  // OpenDental-style "unearned income" card: shows when patient has prepaid more
+  // than current production. Only renders when Migration 3 is active and there's
+  // actually an unallocated balance.
+  var unearned = computeUnearnedTotal();
+  var unearnedHtml = unearned > 0
+    ? '<div class="bs-item"><div class="bs-val" style="color:var(--blue)">' + fmt(unearned) + ' ل.س</div><div class="bs-lbl">رصيد مقدّم</div></div>'
+    : '';
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
   + plannedHtml
   + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)  + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
+  + (unearnedHtml)
   + '<div class="bs-item"><div class="bs-val" style="color:' + bColor + '">' + fmt(Math.abs(f.balance)) + ' ل.س</div><div class="bs-lbl">' + (f.balance<0?'رصيد زائد':'المتبقي') + '</div></div>';
   if (!payments.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>لا توجد مدفوعات مسجّلة بعد</div>';
@@ -3033,6 +3205,9 @@ async function delPayment(id) {
   if (!confirm('حذف هذه الدفعة؟')) return;
   await window.sb.from('ledger_payments').delete().eq('id', id);
   payments = payments.filter(function(p){ return p.id !== id; });
+  // payment_splits.payment_id has ON DELETE CASCADE → DB cleans them up.
+  // Sync the in-memory cache so renderPayments doesn't show stale data.
+  paymentSplits = paymentSplits.filter(function(s){ return s.payment_id !== id; });
   await syncPaymentStatus();
   renderStats(); renderPayments();
   showToast('🗑️ تم حذف الدفعة');
@@ -3050,7 +3225,14 @@ async function savePayment() {
     doctor_id: currentUser.id, patient_id: patientId,
     amount: amount, method: method, date: date, notes: notes
   }).select().single();
-  if (newPay) payments.unshift(newPay);
+  if (newPay) {
+    payments.unshift(newPay);
+    // OpenDental-style: auto-allocate the payment via FIFO across the patient's
+    // sessions (oldest completed first, then oldest planned). Overpayment becomes
+    // unearned income. Failure is non-fatal (the payment is already saved).
+    var splitRows = buildFifoSplits(newPay, sessions, paymentSplits);
+    await persistPaymentSplits(splitRows);
+  }
   patient.payment_manual = false;
   await syncPaymentStatus();
   renderStats(); renderInfo(); renderPayments();
