@@ -551,6 +551,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
       <div class="form-group">
+        <label>ربط بموعد (اختياري)</label>
+        <select id="labOrderAppointment">
+          <option value="">— غير مربوط بموعد —</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
+      </div>
+      <div class="form-group">
         <label>المخبر</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
           <select id="labOrderLabSelect" style="flex:1;"></select>
@@ -3301,6 +3308,44 @@ function populateLabSelect(selectedLabId) {
   if (selectedLabId) sel.value = selectedLabId;
 }
 
+/* Format an appointment for display in the lab-order link dropdown. */
+function fmtLabApptOption(appt) {
+  var d  = appt.date || '';
+  var t  = (appt.time || '').slice(0,5);
+  var tp = appt.type || '';
+  var parts = [d];
+  if (t)  parts.push(t);
+  if (tp) parts.push(tp);
+  return parts.join(' — ');
+}
+
+/* Populate the appointment-link dropdown in the lab order modal.
+   Patient is always the current patient (this is a patient-profile page),
+   so we just list this patient's upcoming/today appointments. */
+function populateLabAppointmentSelect(selectedApptId) {
+  var sel = document.getElementById('labOrderAppointment');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— غير مربوط بموعد —</option>';
+  var list = Array.isArray(upcomingAppts) ? upcomingAppts.slice() : [];
+  list.forEach(function(a){
+    var opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = fmtLabApptOption(a);
+    sel.appendChild(opt);
+  });
+  if (selectedApptId && list.some(function(a){ return a.id === selectedApptId; })) {
+    sel.value = selectedApptId;
+  } else if (selectedApptId) {
+    // The linked appointment isn't in the cache (older than today, or was deleted).
+    // Inject a placeholder so we don't silently lose the link on save.
+    var opt2 = document.createElement('option');
+    opt2.value = selectedApptId;
+    opt2.textContent = '⚠️ موعد مرتبط (غير متاح حالياً)';
+    sel.appendChild(opt2);
+    sel.value = selectedApptId;
+  }
+}
+
 async function openLabOrderModal(prefill) {
   await loadTreatmentsFromSupabase();
   prefill = prefill || {};
@@ -3309,6 +3354,7 @@ async function openLabOrderModal(prefill) {
   document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
   populateLabWorkTypes(prefill.treatment_key);
   populateLabSelect();
+  populateLabAppointmentSelect(prefill.appointment_id || '');
   document.getElementById('labOrderTooth').value = prefill.tooth_num || '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
@@ -3327,6 +3373,7 @@ async function editLabOrder(id) {
   document.getElementById('labOrderTreatmentKey').value = lo.treatment_key || '';
   populateLabWorkTypes(lo.treatment_key);
   populateLabSelect(lo.lab_id);
+  populateLabAppointmentSelect(lo.appointment_id || '');
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
@@ -3362,9 +3409,13 @@ async function saveLabOrder() {
   if (!workName || workName === '—') { showToast('⚠️ اختر نوع العمل'); return; }
   if (!dateSent) { showToast('⚠️ اختر تاريخ الإرسال'); return; }
 
+  var apptSel = document.getElementById('labOrderAppointment');
+  var apptId  = apptSel ? (apptSel.value || null) : null;
+
   var payload = {
     doctor_id: currentUser.id,
     patient_id: patientId,
+    appointment_id: apptId,
     tooth_num: toothRaw ? parseInt(toothRaw, 10) : null,
     treatment_key: workKey,
     lab_id: labId,
@@ -3377,21 +3428,50 @@ async function saveLabOrder() {
     date_due: dateDue || null
   };
 
+  // Detect "column doesn't exist" so the page keeps working before Migration 4 SQL is run.
+  function isMissingApptColumn(err) {
+    if (!err) return false;
+    if (err.code === '42703' || err.code === 'PGRST204') {
+      var msg = (err.message || '').toLowerCase();
+      return msg.indexOf('appointment_id') !== -1;
+    }
+    var m = (err.message || '').toLowerCase();
+    if (m.indexOf('appointment_id') === -1) return false;
+    return m.indexOf('column') !== -1
+        || m.indexOf('schema cache') !== -1
+        || m.indexOf('does not exist') !== -1
+        || m.indexOf('not found') !== -1;
+  }
+
   if (id) {
-    const { data, error } = await window.sb.from('lab_orders')
+    var res = await window.sb.from('lab_orders')
       .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
-    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
-    if (data) {
+    if (res.error && isMissingApptColumn(res.error)) {
+      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      var legacyPayload = Object.assign({}, payload);
+      delete legacyPayload.appointment_id;
+      res = await window.sb.from('lab_orders')
+        .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+    }
+    if (res.error) { showToast('⚠️ فشل الحفظ: ' + res.error.message); return; }
+    if (res.data) {
       var idx = labOrders.findIndex(function(x){ return x.id === id; });
-      if (idx !== -1) labOrders[idx] = data;
+      if (idx !== -1) labOrders[idx] = res.data;
     }
     showToast('✅ تم تحديث الطلب');
   } else {
     payload.status = 'sent';
-    const { data, error } = await window.sb.from('lab_orders')
+    var res2 = await window.sb.from('lab_orders')
       .insert(payload).select().single();
-    if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
-    if (data) labOrders.unshift(data);
+    if (res2.error && isMissingApptColumn(res2.error)) {
+      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      var legacyPayload2 = Object.assign({}, payload);
+      delete legacyPayload2.appointment_id;
+      res2 = await window.sb.from('lab_orders')
+        .insert(legacyPayload2).select().single();
+    }
+    if (res2.error) { showToast('⚠️ فشل الحفظ: ' + res2.error.message); return; }
+    if (res2.data) labOrders.unshift(res2.data);
     showToast('✅ تم إرسال الطلب للمخبر');
   }
 

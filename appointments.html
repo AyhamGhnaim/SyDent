@@ -891,14 +891,25 @@ function getApptLabBadge(appt) {
   var hasOverdue = false;   // status sent/received & deadline <= apptDate
   var hasPending = false;   // status sent/received
 
-  // For "directly linked" orders, the appointment date itself is the implicit deadline
-  // (the user explicitly tied this lab work to this visit). For unassigned orders,
-  // we keep the legacy behavior that relies on date_due being set.
+  // For "directly linked" orders, the appointment date itself is the implicit deadline.
+  // The order is "late" only when:
+  //   - explicit date_due is set and falls on/before the appointment date, OR
+  //   - no date_due is set, the order is directly linked, AND the appointment date
+  //     has arrived or passed (today or earlier) — because the user explicitly tied
+  //     this work to that visit and it isn't ready yet.
+  // Unassigned orders retain legacy behavior: they need an explicit date_due.
+  // Use local-time dateStr (not UTC) so the "today" boundary matches the user's clock.
+  var todayStr = dateStr(new Date());
   function isOrderLate(o, linkedDirectly) {
     if (o.status !== 'sent' && o.status !== 'received') return false;
-    var deadline = o.date_due ? o.date_due.slice(0,10) : (linkedDirectly ? apptDate : null);
-    if (!deadline) return false;
-    return deadline <= apptDate;
+    if (o.date_due) {
+      return o.date_due.slice(0,10) <= apptDate;
+    }
+    if (linkedDirectly) {
+      // No explicit deadline → only overdue once the appointment day has arrived.
+      return apptDate <= todayStr;
+    }
+    return false;
   }
 
   direct.forEach(function(o){
@@ -1373,9 +1384,21 @@ function renderApptLabOrders(appt) {
     else if (o.status === 'received')  { statusAr = 'مستلَم';       statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
     else if (o.status === 'checked')   { statusAr = 'جاهز للتركيب'; statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
 
-    // Direct-linked orders: appointment date is the implicit deadline if no date_due is set.
-    var deadline = o.date_due ? o.date_due.slice(0,10) : apptDate;
-    var late = (apptDate && deadline && deadline <= apptDate && (o.status === 'sent' || o.status === 'received'));
+    // Late if: explicit date_due passed the appointment day, OR
+    //          no date_due AND the appointment day has arrived/passed.
+    // Status must still be in-flight (sent/received).
+    // Use local-time dateStr so the "today" boundary matches the user's clock.
+    var inFlight = (o.status === 'sent' || o.status === 'received');
+    var todayStr = dateStr(new Date());
+    var late;
+    if (!inFlight) {
+      late = false;
+    } else if (o.date_due) {
+      late = (apptDate && o.date_due.slice(0,10) <= apptDate);
+    } else {
+      // Direct-linked (this list is always direct) without explicit due → late once appt day arrives.
+      late = (apptDate && apptDate <= todayStr);
+    }
     var lateTag = late ? '<span style="background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.4);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">⚠️ متأخر</span>' : '';
 
     var toothPart = o.tooth_num ? ' • السن ' + o.tooth_num : '';

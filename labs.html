@@ -1161,6 +1161,7 @@ async function editLabOrder(id) {
   // If this order is linked to an appointment that's outside our cached window
   // (e.g. an old job linked to an appointment that already happened), fetch it
   // on demand so we don't silently lose the link when saving.
+  var fetchFailed = false;
   if (lo.appointment_id && !getAppointmentById(lo.appointment_id)) {
     try {
       const { data: ext, error: extErr } = await window.sb.from('appointments')
@@ -1168,8 +1169,10 @@ async function editLabOrder(id) {
         .eq('id', lo.appointment_id)
         .eq('doctor_id', currentUser.id)
         .maybeSingle();
-      if (!extErr && ext) allAppointments.push(ext);
-    } catch(e) { console.warn('fetch linked appt:', e); }
+      if (extErr) { console.warn('fetch linked appt error:', extErr); fetchFailed = true; }
+      else if (ext) allAppointments.push(ext);
+      else fetchFailed = true; // returned null → appointment no longer exists or RLS blocks
+    } catch(e) { console.warn('fetch linked appt:', e); fetchFailed = true; }
   }
 
   document.getElementById('labOrderTitle').textContent = '🧪 تعديل طلب المخبر';
@@ -1178,6 +1181,21 @@ async function editLabOrder(id) {
   populateWorkTypeSelect(lo.treatment_key);
   populateLabSelect(lo.lab_id);
   populateAppointmentSelect(lo.appointment_id || '', lo.patient_id || '');
+
+  // Safety net: if the linked appointment couldn't be fetched, inject a
+  // disabled placeholder option so the user sees the link exists and
+  // doesn't silently lose it on save. The dropdown remembers the value.
+  if (lo.appointment_id && fetchFailed) {
+    var sel = document.getElementById('labOrderAppointment');
+    if (sel && !Array.prototype.some.call(sel.options, function(o){ return o.value === lo.appointment_id; })) {
+      var opt = document.createElement('option');
+      opt.value = lo.appointment_id;
+      opt.textContent = '⚠️ موعد مرتبط (غير متاح حالياً)';
+      sel.appendChild(opt);
+      sel.value = lo.appointment_id;
+    }
+  }
+
   document.getElementById('labOrderTooth').value = lo.tooth_num || '';
   document.getElementById('labOrderShade').value = lo.shade || '';
   document.getElementById('labOrderCost').value = lo.cost || '';
@@ -1242,12 +1260,25 @@ async function saveLabOrder() {
     date_due:       dateDue || null
   };
 
-  // Helper: detect "column doesn't exist" style errors from PostgREST so we can
+  // Helper: detect "column doesn't exist" style errors from PostgREST/Postgres so we can
   // gracefully fall back to a payload without appointment_id (pre-Migration-4 schema).
+  // Known signals:
+  //   - Postgres error code 42703 (undefined_column)
+  //   - PostgREST code PGRST204 (column not found in schema cache)
+  //   - Message text mentioning appointment_id + (column | schema cache | does not exist | not found)
   function isMissingApptColumn(err) {
-    if (!err || !err.message) return false;
-    var m = err.message.toLowerCase();
-    return m.indexOf('appointment_id') !== -1 && (m.indexOf('column') !== -1 || m.indexOf('schema') !== -1 || m.indexOf('not found') !== -1);
+    if (!err) return false;
+    if (err.code === '42703' || err.code === 'PGRST204') {
+      // Only treat as our problem if the message points at appointment_id (avoid masking other missing columns).
+      var msg = (err.message || '').toLowerCase();
+      return msg.indexOf('appointment_id') !== -1;
+    }
+    var m = (err.message || '').toLowerCase();
+    if (m.indexOf('appointment_id') === -1) return false;
+    return m.indexOf('column') !== -1
+        || m.indexOf('schema cache') !== -1
+        || m.indexOf('does not exist') !== -1
+        || m.indexOf('not found') !== -1;
   }
 
   if (id) {
