@@ -255,6 +255,11 @@ body {
 .status-confirmed { background: rgba(46,232,158,0.2);  color: var(--green); }
 .status-pending   { background: rgba(245,200,66,0.2);  color: var(--yellow); }
 .status-cancelled { background: rgba(239,83,80,0.2);   color: var(--red); }
+/* Gap 1: new lifecycle statuses */
+.status-completed { background: rgba(141,160,189,0.22); color: var(--text2); }
+.status-scheduled { background: rgba(99,179,237,0.20);  color: #63b3ed; }
+.status-broken    { background: rgba(251,146,60,0.22);  color: #fb923c; }
+.status-noshow    { background: rgba(239,83,80,0.32);   color: var(--red); }
 
 /* ─── List View ─── */
 .list-group { margin-bottom: 24px; }
@@ -571,6 +576,7 @@ textarea { resize: vertical; min-height: 72px; }
           <select id="fStatus">
             <option value="confirmed">مؤكد</option>
             <option value="pending">معلّق</option>
+            <option value="completed">مكتمل</option>
             <option value="cancelled">ملغى</option>
           </select>
         </div>
@@ -1022,8 +1028,33 @@ function initials(name) {
   const p=name.trim().split(' ');
   return p.length>=2?p[0][0]+p[1][0]:p[0].slice(0,2);
 }
-function statusLabel(s) { return s==='confirmed'?'مؤكد':s==='pending'?'معلّق':'ملغى'; }
-function statusClass(s)  { return s==='confirmed'?'status-confirmed':s==='pending'?'status-pending':'status-cancelled'; }
+// Gap 1: full lifecycle status labels (OpenDental parity).
+// Migration required: appointments.status check constraint must include
+//   'scheduled','confirmed','pending','completed','cancelled','broken','no_show'.
+function statusLabel(s) {
+  if (s === 'confirmed') return 'مؤكد';
+  if (s === 'pending')   return 'معلّق';
+  if (s === 'cancelled') return 'ملغى';
+  if (s === 'completed') return 'مكتمل';
+  if (s === 'scheduled') return 'مجدول';
+  if (s === 'broken')    return 'مكسور';   // booked for gap 5; safe label today
+  if (s === 'no_show')   return 'لم يحضر'; // booked for gap 5; safe label today
+  return s || '—';
+}
+function statusClass(s) {
+  if (s === 'confirmed') return 'status-confirmed';
+  if (s === 'pending')   return 'status-pending';
+  if (s === 'cancelled') return 'status-cancelled';
+  if (s === 'completed') return 'status-completed';
+  if (s === 'scheduled') return 'status-scheduled';
+  if (s === 'broken')    return 'status-broken';
+  if (s === 'no_show')   return 'status-noshow';
+  return 'status-pending';
+}
+// Statuses considered "finished" — used to hide from upcoming-list view.
+function isFinishedStatus(s) {
+  return s === 'completed' || s === 'cancelled' || s === 'broken' || s === 'no_show';
+}
 
 // ─── Render ──────────────────────────────────────────
 function render() {
@@ -1143,11 +1174,12 @@ function renderDay() {
 
 function renderList() {
   document.getElementById('calMonth').textContent = MONTHS_AR[currentDate.getMonth()]+' '+currentDate.getFullYear();
-  // group by date, next 30 days
+  // group by date, next 30 days — Gap 1: exclude finished statuses
+  // (completed/cancelled/broken/no_show) since they're not "upcoming" anymore.
   const today = new Date(); today.setHours(0,0,0,0);
   const groups = {};
   appointments
-    .filter(a => new Date(a.date) >= today)
+    .filter(a => new Date(a.date) >= today && !isFinishedStatus(a.status))
     .sort((a,b) => (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))
     .forEach(a => {
       if (!groups[a.date]) groups[a.date] = [];
@@ -1462,19 +1494,69 @@ async function unlinkSessionFromAppt(sessId) {
   if (appt) renderApptProcedures(appt);
 }
 
-/* Set Complete: convert all planned attached procedures (+ their teeth_status rows) to completed
-   and set the appointment status to 'confirmed' (the closest existing status). */
+/* Set Complete: convert all planned attached procedures (+ their teeth_status rows)
+   to completed and set the appointment status to 'completed' (Gap 1).
+   Gap 2: warn before completing if any attached procedure has a provider that
+   doesn't match the appointment's provider, with three choices:
+     - Proceed as-is  (keep each procedure's own provider)
+     - Unify          (rewrite all attached procedures to the appointment's provider)
+     - Cancel         (do nothing)
+   Mirrors OpenDental: "If the appointment provider does not match the provider on
+   at least one attached procedure, there is a prompt." */
 async function completeApptWithProcedures() {
   if (!editingId) return;
   var attached = sessionsByAppt[editingId] || [];
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
   if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
 
+  // ── Gap 2: provider-mismatch check ────────────────────────────────────────
+  // The appointment's provider is the source of truth. Only flag mismatches
+  // when the procedure has an explicit provider that differs (NULL means
+  // "use the appointment's provider" → not a mismatch).
+  var apptObj = appointments.find(function(a){ return a.id === editingId; });
+  var apptProviderId = apptObj ? (apptObj.provider_id || null) : null;
+  var mismatched = plannedOnes.filter(function(s){
+    return s.provider_id && apptProviderId && s.provider_id !== apptProviderId;
+  });
+  var unifyProviders = false;  // becomes true if user picks "Unify"
+
+  if (mismatched.length > 0) {
+    var apptProvName = '—';
+    if (apptProviderId) {
+      var ap = CLINIC_DOCTORS.find(function(d){ return d.id === apptProviderId; });
+      if (ap) apptProvName = ap.name;
+    } else {
+      apptProvName = '(لا يوجد طبيب على الموعد)';
+    }
+    // OK = unify everything to the appointment provider (the safe default).
+    // Cancel = open the manual choice prompt: proceed as-is or abort.
+    var msg = '⚠️ تنبيه: ' + mismatched.length + ' من العلاجات المرفقة مسجّلة لطبيب مختلف عن طبيب الموعد.\n\n'
+            + 'طبيب الموعد: ' + apptProvName + '\n\n'
+            + 'هل تريد توحيد كل العلاجات لطبيب الموعد؟\n\n'
+            + '• موافق  → توحيد لطبيب الموعد\n'
+            + '• إلغاء → خيارات أخرى (متابعة كما هو / إلغاء العملية)';
+    if (confirm(msg)) {
+      unifyProviders = true;
+    } else {
+      // Second prompt — OK = proceed as-is, Cancel = abort entirely.
+      var msg2 = 'متابعة الإكمال مع احتفاظ كل علاج بطبيبه الحالي؟\n\n'
+               + '• موافق  → متابعة كما هو\n'
+               + '• إلغاء → إلغاء العملية';
+      if (!confirm(msg2)) {
+        return;  // user aborted
+      }
+      // else: proceed as-is
+    }
+  }
+
   // Build confirmation message that also mentions lab orders that will be auto-completed.
   var linkedLabsForPrompt = (labOrdersByAppt[editingId] || []).filter(function(o){
     return o.status === 'sent' || o.status === 'received' || o.status === 'checked';
   });
   var promptMsg = 'إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟';
+  if (unifyProviders) {
+    promptMsg += '\n\nسيتم أيضاً توحيد طبيب جميع العلاجات لطبيب الموعد.';
+  }
   if (linkedLabsForPrompt.length) {
     promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "تم التركيب".';
   }
@@ -1486,14 +1568,18 @@ async function completeApptWithProcedures() {
   var failed = 0;
   for (var i=0; i<plannedOnes.length; i++) {
     var s = plannedOnes[i];
-    // 1) update session
+    // 1) update session — also rewrite provider_id when unifying.
+    var sessPatch = { status: 'completed' };
+    if (unifyProviders && apptProviderId) sessPatch.provider_id = apptProviderId;
     var u1 = await window.sb.from('ledger_sessions')
-      .update({ status: 'completed' })
+      .update(sessPatch)
       .eq('id', s.id).eq('doctor_id', currentUser.id);
     if (u1.error) { failed++; console.error('session complete err:', u1.error); continue; }
     // 2) update matching teeth_status row(s) — only if session has tooth_num
     if (s.tooth_num) {
-      var q = window.sb.from('teeth_status').update({ status: 'completed' })
+      var teethPatch = { status: 'completed' };
+      if (unifyProviders && apptProviderId) teethPatch.provider_id = apptProviderId;
+      var q = window.sb.from('teeth_status').update(teethPatch)
         .eq('doctor_id', currentUser.id)
         .eq('patient_id', s.patient_id)
         .eq('tooth_num', String(s.tooth_num))
@@ -1504,11 +1590,27 @@ async function completeApptWithProcedures() {
     }
   }
 
-  // 3) mark appointment as confirmed (existing schema has no 'completed' value)
+  // 3) Mark appointment as 'completed' (Gap 1).
+  //    If the DB constraint hasn't been migrated yet, the UPDATE will fail —
+  //    fall back to 'confirmed' so the rest of the workflow keeps working.
   var u3 = await window.sb.from('appointments')
-    .update({ status: 'confirmed' })
+    .update({ status: 'completed' })
     .eq('id', editingId).eq('doctor_id', currentUser.id);
-  if (u3.error) console.warn('appt update warn:', u3.error);
+  var migrationMissing = false;
+  if (u3.error) {
+    // 23514 = check_violation (PostgreSQL); also handle the generic message.
+    var errMsg = (u3.error.message || '') + ' ' + (u3.error.code || '');
+    if (/check constraint|23514|appointments_status_check/i.test(errMsg)) {
+      migrationMissing = true;
+      console.warn("appointments.status='completed' rejected — falling back to 'confirmed'. Run Migration: ALTER TABLE appointments DROP CONSTRAINT appointments_status_check; ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','pending','completed','cancelled','broken','no_show'));");
+      var u3b = await window.sb.from('appointments')
+        .update({ status: 'confirmed' })
+        .eq('id', editingId).eq('doctor_id', currentUser.id);
+      if (u3b.error) console.warn('appt update fallback warn:', u3b.error);
+    } else {
+      console.warn('appt update warn:', u3.error);
+    }
+  }
 
   // 4) OpenDental-style: when an appointment is set complete, the lab cases attached
   //    to it are also marked complete (delivered). If any of them are still in
@@ -1541,7 +1643,8 @@ async function completeApptWithProcedures() {
   }
   if (labUpdated > 0) parts.push(labUpdated + ' طلب مخبر');
   if (labFailed > 0)  parts.push('تعذّر تحديث ' + labFailed + ' طلب مخبر');
-  var icon = (failed === 0 && labFailed === 0) ? '✅' : '⚠️';
+  if (migrationMissing) parts.push('حالة الموعد محفوظة كـ "مؤكد" (يلزم ترقية قاعدة البيانات)');
+  var icon = (failed === 0 && labFailed === 0 && !migrationMissing) ? '✅' : '⚠️';
   showToast(icon + ' ' + parts.join(' • '));
 
   await loadAppointments();
