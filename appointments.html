@@ -1833,6 +1833,14 @@ async function applyNoShowFeeFromModal() {
   if (!confirm(msg)) return;
   var reason = prompt('سبب عدم الحضور (اختياري):', '') || '';
 
+  // Guard: the user may have closed this modal during the confirm/prompt
+  // dialogs (esc, click outside, or opened another appointment). If so,
+  // bail out — we don't want to silently apply a fee to a different appt.
+  if (editingId !== appt.id) {
+    console.info('No-show fee canceled — modal switched during prompt.');
+    return;
+  }
+
   var btn = document.getElementById('noShowFeeBtn');
   var originalText = '';
   if (btn) {
@@ -1866,6 +1874,10 @@ async function applyNoShowFeeFromModal() {
 //   2. appt has a patient_id
 //   3. clinic settings: no-show fee enabled with amount > 0
 //   4. no existing no-show fee session linked to this appointment
+// Stale-update guard: by the time the async checks finish, the user might
+// have closed this modal and opened another appointment. We compare appt.id
+// to editingId before touching the DOM so a slow DB call can't leak the
+// button into a different appointment's modal.
 async function updateNoShowFeeBtnVisibility(appt) {
   var btn = document.getElementById('noShowFeeBtn');
   if (!btn) return;
@@ -1873,8 +1885,11 @@ async function updateNoShowFeeBtnVisibility(appt) {
   if (!appt || appt.status !== 'no_show' || !appt.patient_id) return;
   try {
     var feeCfg = await getNoShowFeeConfig();
+    // Guard: editingId may have changed while we awaited the DB.
+    if (editingId !== appt.id) return;
     if (!feeCfg.enabled || feeCfg.amount <= 0) return;
     var alreadyApplied = await noShowFeeAlreadyApplied(appt.id);
+    if (editingId !== appt.id) return;  // re-check after second await
     if (alreadyApplied) return;
     // Update label with the amount so the doctor sees the cost up-front
     btn.textContent = '💸 تطبيق رسم لم يحضر (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
