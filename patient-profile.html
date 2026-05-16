@@ -1042,7 +1042,15 @@ async function reallocatePatientFunds() {
       return true;
     }
 
-    // Bug #3: Identify manually-allocated payments — their splits are preserved.
+    // Bug #3: Identify manually-allocated payments — their ALLOCATED splits
+    // (is_unearned=false) are preserved. UNEARNED splits from manual payments
+    // are still mobile capacity — they should flow into new sessions just like
+    // FIFO unearned credits do (OpenDental "Income Transfer" behavior).
+    //
+    // Without this distinction: a user who manually allocates 30k of a 100k
+    // payment to one session would have the leftover 70k frozen as "credit",
+    // and a new 25k completed session wouldn't get auto-paid. That's a UX bug.
+    //
     // The manual_allocation column may not exist on pre-Migration-8 DBs;
     // truthy check handles undefined gracefully.
     var manualPaymentIds = [];
@@ -1050,14 +1058,36 @@ async function reallocatePatientFunds() {
       if (payments[mi].manual_allocation === true) manualPaymentIds.push(payments[mi].id);
     }
 
-    // 1. Delete existing splits for this patient — but NOT the manual ones.
-    // PostgREST: use .not('payment_id', 'in', '(...)') to exclude manual splits.
+    // Split current splits into two groups:
+    //   - manualAllocatedSplits: is_unearned=false from manual payments (PRESERVED)
+    //   - manualUnearnedSplits:  is_unearned=true  from manual payments (REBUILT — may
+    //                            be re-consumed by new sessions or stay unearned)
+    var manualAllocatedSplitIds = {};   // map: split.id -> true (for DB-side filter)
+    var manualAllocatedSplits   = [];   // kept verbatim
+    var manualUnearnedAmountByPayment = {};   // amount of unearned per manual payment
+    for (var si = 0; si < paymentSplits.length; si++) {
+      var sp = paymentSplits[si];
+      if (manualPaymentIds.indexOf(sp.payment_id) === -1) continue;
+      if (sp.is_unearned === true) {
+        // This unearned chunk is mobile — drop the DB row and add the amount back
+        // to the manual payment's "still to allocate" pool for FIFO rebuild.
+        manualUnearnedAmountByPayment[sp.payment_id] =
+          (manualUnearnedAmountByPayment[sp.payment_id] || 0) + (parseInt(sp.amount, 10) || 0);
+      } else {
+        // This allocated split is the user's explicit choice — keep it.
+        manualAllocatedSplitIds[sp.id] = true;
+        manualAllocatedSplits.push(sp);
+      }
+    }
+
+    // 1. DELETE existing splits — but keep manual ALLOCATED splits.
+    // PostgREST has no clean "in.()" on UUID list with extra clauses, so we use
+    // two filters: not.in payment_id list AND not.in split id list.
+    // Simpler approach: delete by patient, then re-insert the preserved manual
+    // allocated splits along with the new FIFO splits. This is atomic-enough
+    // for our use because we only swap rows owned by a single patient.
     var delQuery = window.sb.from('payment_splits').delete()
       .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
-    if (manualPaymentIds.length) {
-      // PostgREST in/not.in syntax: comma-separated list of UUIDs wrapped in parentheses.
-      delQuery = delQuery.not('payment_id', 'in', '(' + manualPaymentIds.join(',') + ')');
-    }
     var delRes = await delQuery;
     if (delRes.error) {
       if (_isPaymentSplitsTableMissing(delRes.error)) {
@@ -1068,22 +1098,12 @@ async function reallocatePatientFunds() {
       return false;
     }
 
-    // Sync memory: drop non-manual splits, keep manual ones.
-    if (manualPaymentIds.length) {
-      paymentSplits = paymentSplits.filter(function(sp){
-        return manualPaymentIds.indexOf(sp.payment_id) !== -1;
-      });
-    } else {
-      paymentSplits = [];
-    }
+    // Sync memory: start from scratch; we'll repopulate as we go.
+    paymentSplits = [];
 
-    // 2. Sort NON-manual payments oldest-first (by date, then created_at as tiebreaker).
-    // Same-date payments are ordered by their actual creation timestamp
-    // (matches OpenDental DateTStamp behavior — deterministic FIFO).
-    var nonManualPayments = payments.filter(function(p){
-      return p.manual_allocation !== true;
-    });
-    var sortedPayments = nonManualPayments.slice().sort(function(a, b){
+    // 2. Sort ALL payments oldest-first. Manual payments still participate so
+    // their unearned chunks get re-allocated in chronological position.
+    var sortedPayments = payments.slice().sort(function(a, b){
       var ad = String(a.date || '9999-12-31');
       var bd = String(b.date || '9999-12-31');
       if (ad < bd) return -1;
@@ -1102,22 +1122,45 @@ async function reallocatePatientFunds() {
     });
 
     // 3. Walk payments and build splits chronologically.
-    // Each iteration uses the accumulated splits as "existing" so later
-    // payments only see capacity that's actually left on each session.
-    // Bug #3: Pre-seed with manual splits so their capacity is already counted.
-    var accumulated = paymentSplits.slice();   // manual splits as initial capacity
+    // For manual payments: pass the synthetic "unearned remainder" as the
+    // effective amount, so FIFO only redistributes what wasn't manually pinned.
+    // Pre-seed accumulated with manual ALLOCATED splits so their session capacity
+    // is correctly counted.
+    var accumulated = manualAllocatedSplits.slice();
+    var splitsToInsert = manualAllocatedSplits.slice();   // these need re-INSERT after the DELETE
     for (var i = 0; i < sortedPayments.length; i++) {
-      var splits = buildFifoSplits(sortedPayments[i], sessions, accumulated);
+      var pay = sortedPayments[i];
+      var isManual = manualPaymentIds.indexOf(pay.id) !== -1;
+      var effectiveAmount;
+      if (isManual) {
+        // Only the unearned portion is mobile; allocated portion is already in
+        // `accumulated` and `splitsToInsert`.
+        effectiveAmount = manualUnearnedAmountByPayment[pay.id] || 0;
+        if (effectiveAmount <= 0) continue;   // nothing to redistribute for this manual payment
+      } else {
+        effectiveAmount = Math.round(parseFloat(pay.amount) || 0);
+      }
+      // Synthesize a payment-like object so buildFifoSplits sees the right amount.
+      var payForFifo = Object.assign({}, pay, { amount: effectiveAmount });
+      var splits = buildFifoSplits(payForFifo, sessions, accumulated);
       if (splits.length) {
-        for (var j = 0; j < splits.length; j++) accumulated.push(splits[j]);
+        for (var j = 0; j < splits.length; j++) {
+          accumulated.push(splits[j]);
+          splitsToInsert.push(splits[j]);
+        }
       }
     }
 
-    // Compute the splits to INSERT — only the new (non-manual) ones.
-    // accumulated may include manual splits at the start; skip those.
-    var newSplitsToInsert = accumulated.filter(function(sp){
-      return manualPaymentIds.indexOf(sp.payment_id) === -1;
+    // The manual allocated splits we preserved still carry their DB id from before
+    // the DELETE. Strip the id so INSERT generates fresh ones. (Postgres will reject
+    // an INSERT with a duplicate primary key.)
+    splitsToInsert = splitsToInsert.map(function(sp){
+      var copy = Object.assign({}, sp);
+      delete copy.id;
+      return copy;
     });
+
+    var newSplitsToInsert = splitsToInsert;
 
     // 4. Bulk-insert the new splits. One retry on failure because DELETE has
     // already committed — leaving DB empty would corrupt the balance display.
@@ -1138,11 +1181,11 @@ async function reallocatePatientFunds() {
           }
           return false;
         }
-        // Append new splits to memory (manual splits already preserved above).
-        for (var k = 0; k < (retry.data || []).length; k++) paymentSplits.push(retry.data[k]);
+        // Append new splits to memory.
+          for (var k = 0; k < (retry.data || []).length; k++) paymentSplits.push(retry.data[k]);
         return true;
       }
-      // Append new splits to memory (manual splits already preserved above).
+      // Append new splits to memory.
       for (var k2 = 0; k2 < (insRes.data || []).length; k2++) paymentSplits.push(insRes.data[k2]);
     }
     return true;

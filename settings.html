@@ -1391,28 +1391,40 @@ async function _backfillOnePatient(patientId) {
 
     if (!payments.length) return true;   // nothing to do
 
-    // Identify manual payment IDs (preserved during rebuild).
+    // Identify manual payment IDs. Their ALLOCATED splits (is_unearned=false)
+    // are preserved verbatim; their UNEARNED splits (is_unearned=true) are
+    // re-distributed by FIFO into new sessions just like normal payments.
+    // See patient-profile.html's reallocatePatientFunds() for the same logic.
     var manualPayIds = {};
     for (var mi = 0; mi < payments.length; mi++) {
       if (payments[mi].manual_allocation === true) manualPayIds[payments[mi].id] = true;
     }
 
-    // 1. DELETE non-manual splits for this patient.
-    var manualIdList = Object.keys(manualPayIds);
-    var delQuery = window.sb.from('payment_splits').delete()
-      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
-    if (manualIdList.length) {
-      delQuery = delQuery.not('payment_id', 'in', '(' + manualIdList.join(',') + ')');
+    // Partition existing splits.
+    var manualAllocatedSplits = [];
+    var manualUnearnedAmountByPayment = {};
+    for (var si = 0; si < splits.length; si++) {
+      var sp = splits[si];
+      if (!manualPayIds[sp.payment_id]) continue;
+      if (sp.is_unearned === true) {
+        manualUnearnedAmountByPayment[sp.payment_id] =
+          (manualUnearnedAmountByPayment[sp.payment_id] || 0) + (parseInt(sp.amount, 10) || 0);
+      } else {
+        manualAllocatedSplits.push(sp);
+      }
     }
-    var delRes = await delQuery;
+
+    // 1. DELETE all splits for this patient. We'll re-insert the preserved
+    // manual allocated splits along with fresh FIFO splits.
+    var delRes = await window.sb.from('payment_splits').delete()
+      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
     if (delRes.error) {
       console.warn('backfill ' + patientId + ': delete failed', delRes.error);
       return false;
     }
 
-    // 2. Build FIFO splits for non-manual payments, chronologically.
-    var nonManualPayments = payments.filter(function(p){ return !manualPayIds[p.id]; });
-    nonManualPayments.sort(function(a, b){
+    // 2. Sort ALL payments oldest-first (manual + non-manual together).
+    var sortedPayments = payments.slice().sort(function(a, b){
       var ad = String(a.date || '9999-12-31');
       var bd = String(b.date || '9999-12-31');
       if (ad < bd) return -1;
@@ -1428,16 +1440,34 @@ async function _backfillOnePatient(patientId) {
       return 0;
     });
 
-    // Pre-seed with manual splits (already-consumed capacity).
-    var accumulated = splits.filter(function(sp){ return manualPayIds[sp.payment_id]; });
+    // Pre-seed accumulated with manual allocated splits (session capacity consumed).
+    var accumulated = manualAllocatedSplits.slice();
+    var toInsert    = manualAllocatedSplits.slice();   // these need re-INSERT
 
-    for (var i = 0; i < nonManualPayments.length; i++) {
-      var splitRows = _backfillBuildFifo(nonManualPayments[i], sessions, accumulated);
-      for (var j = 0; j < splitRows.length; j++) accumulated.push(splitRows[j]);
+    for (var i = 0; i < sortedPayments.length; i++) {
+      var pay = sortedPayments[i];
+      var effectiveAmount;
+      if (manualPayIds[pay.id]) {
+        effectiveAmount = manualUnearnedAmountByPayment[pay.id] || 0;
+        if (effectiveAmount <= 0) continue;
+      } else {
+        effectiveAmount = Math.round(parseFloat(pay.amount) || 0);
+      }
+      var payForFifo = Object.assign({}, pay, { amount: effectiveAmount });
+      var splitRows = _backfillBuildFifo(payForFifo, sessions, accumulated);
+      for (var j = 0; j < splitRows.length; j++) {
+        accumulated.push(splitRows[j]);
+        toInsert.push(splitRows[j]);
+      }
     }
 
-    // Filter to only the NEW splits we need to insert (skip manual ones).
-    var toInsert = accumulated.filter(function(sp){ return !manualPayIds[sp.payment_id]; });
+    // Strip 'id' from preserved manual splits so INSERT generates fresh primary keys.
+    toInsert = toInsert.map(function(sp){
+      var copy = Object.assign({}, sp);
+      delete copy.id;
+      return copy;
+    });
+
     if (!toInsert.length) return true;
 
     var insRes = await window.sb.from('payment_splits').insert(toInsert);
