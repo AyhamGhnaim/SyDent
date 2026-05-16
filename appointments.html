@@ -1103,6 +1103,10 @@ async function getNoShowFeeConfig() {
   }
 }
 
+// Canonical label for the auto-inserted fee session. Searched by exact match
+// in noShowFeeAlreadyApplied(), so don't change without a data migration.
+var NO_SHOW_FEE_TYPE_LABEL = 'رسم موعد لم يحضر';
+
 // Returns true if a no-show fee session has already been recorded for this
 // appointment, so we don't double-charge if the user flips the status back
 // and forth. We look for any session linked to the appointment whose type
@@ -1122,10 +1126,6 @@ async function noShowFeeAlreadyApplied(apptId) {
     return false;
   }
 }
-
-// Canonical label for the auto-inserted fee session. Searched by exact match
-// in noShowFeeAlreadyApplied(), so don't change without a data migration.
-var NO_SHOW_FEE_TYPE_LABEL = 'رسم موعد لم يحضر';
 
 // Apply the no-show fee: INSERT a ledger_sessions row for the patient at the
 // appointment's provider. Returns true on success.
