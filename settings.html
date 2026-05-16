@@ -793,18 +793,20 @@ function renderApptTypesList() {
     // second line if at least one of the two is set — keeps cards compact
     // when the doctor hasn't filled them in. Display a "deleted" hint when
     // the FK still has a UUID but the lookup misses (rare: linked entity
-    // was deleted after the template was saved).
+    // was deleted after the template was saved). NOTE: we use square brackets
+    // for the placeholder text — angle brackets here would be parsed as a
+    // (broken) HTML tag by innerHTML and the message would vanish from the DOM.
     var extras = [];
     if (t.default_provider_id) {
       var docName = docMap[t.default_provider_id]
         ? String(docMap[t.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        : '<طبيب محذوف>';
+        : '[طبيب محذوف]';
       extras.push('👨‍⚕️ ' + docName);
     }
     if (t.default_lab_id) {
       var labName = labMap[t.default_lab_id]
         ? String(labMap[t.default_lab_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        : '<مخبر محذوف>';
+        : '[مخبر محذوف]';
       extras.push('🧪 ' + labName);
     }
     var extrasLine = extras.length
@@ -854,11 +856,48 @@ function editApptType(id) {
   document.getElementById('fAtDuration').value = String(t.default_duration_min || 30);
   populateApptTypeTreatmentSelect();
   document.getElementById('fAtTreatment').value = t.default_treatment_id || '';
-  // Gap 8.2: pre-fill provider + lab from the stored template
+  // Gap 8.2: pre-fill provider + lab from the stored template.
+  // Safety: if the FK points to a doctor/lab that's no longer in the active
+  // list (e.g. the doctor was deactivated AFTER this template was saved),
+  // the <select>.value would silently drop to '' — and a careless "save"
+  // would zero out the FK. We inject a temporary placeholder option so the
+  // value sticks AND the user can see why ("[غير نشط]").
   populateApptTypeProviderSelect();
-  document.getElementById('fAtProvider').value = t.default_provider_id || '';
+  var fAtProv = document.getElementById('fAtProvider');
+  if (t.default_provider_id) {
+    var provInActive = false;
+    for (var pi = 0; pi < fAtProv.options.length; pi++) {
+      if (fAtProv.options[pi].value === t.default_provider_id) { provInActive = true; break; }
+    }
+    if (!provInActive) {
+      var ghostOpt = document.createElement('option');
+      ghostOpt.value = t.default_provider_id;
+      ghostOpt.textContent = '[طبيب غير نشط — احتفظ بالحالي]';
+      fAtProv.appendChild(ghostOpt);
+    }
+    fAtProv.value = t.default_provider_id;
+  } else {
+    fAtProv.value = '';
+  }
+
   populateApptTypeLabSelect();
-  document.getElementById('fAtLab').value = t.default_lab_id || '';
+  var fAtLb = document.getElementById('fAtLab');
+  if (t.default_lab_id) {
+    var labInActive = false;
+    for (var li2 = 0; li2 < fAtLb.options.length; li2++) {
+      if (fAtLb.options[li2].value === t.default_lab_id) { labInActive = true; break; }
+    }
+    if (!labInActive) {
+      var ghostLab = document.createElement('option');
+      ghostLab.value = t.default_lab_id;
+      ghostLab.textContent = '[مخبر غير نشط — احتفظ بالحالي]';
+      fAtLb.appendChild(ghostLab);
+    }
+    fAtLb.value = t.default_lab_id;
+  } else {
+    fAtLb.value = '';
+  }
+
   document.getElementById('apptTypeModal').classList.add('open');
   setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
 }
