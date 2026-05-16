@@ -294,7 +294,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
     <div class="modal-title" id="apptTypeModalTitle">إضافة قالب جديد</div>
     <div class="form-group">
       <label>اسم القالب</label>
-      <input type="text" id="fAtName" placeholder="مثال: تنظيف أسنان" maxlength="80" autocomplete="off">
+      <input type="text" id="fAtName" placeholder="مثال: تنظيف أسنان" maxlength="80" autocomplete="off" oninput="onApptTypeNameInput()">
     </div>
     <div class="form-group">
       <label>المدة (دقيقة)</label>
@@ -302,7 +302,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
     </div>
     <div class="form-group">
       <label>العلاج الافتراضي</label>
-      <select id="fAtTreatment">
+      <select id="fAtTreatment" onchange="onApptTypeTreatmentChange()">
         <option value="">— بدون علاج افتراضي —</option>
       </select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يستخدم لتحديد اللون والسعر تلقائياً</div>
@@ -619,6 +619,12 @@ var _apptTypesLabs = [];        // Gap 8.2: cached active labs for picker
 var _editingApptTypeId = null;  // id of the template currently being edited
 var _gap8TableMissing = false;  // true once we detect pre-migration state
 var _gap82ColumnsMissing = false; // Gap 8.2: provider/lab columns not yet migrated
+// Gap 8.3: tracks the last name value we auto-filled from a treatment, so we
+// can keep #fAtName in sync as the user changes the treatment dropdown, but
+// stop tracking the moment the user types a custom name. null = no auto-fill
+// is currently active (either the field was edited by the user, or never
+// auto-filled in this session).
+var _autoFilledName = null;
 
 // Detects pre-migration state. PostgREST returns 42P01/PGRST205 for missing
 // relations; we treat any "appointment_types does not exist" mention the same.
@@ -759,6 +765,57 @@ function populateApptTypeLabSelect() {
   sel.innerHTML = html;
 }
 
+// Gap 8.3: Smart auto-fill for the template name.
+// Behavior (option B chosen by user):
+//   • If name is empty OR equals the previously auto-filled value → update
+//     it to match the newly-selected treatment's name.
+//   • If the user typed a custom name (current value != last auto-fill) →
+//     leave it alone. They've claimed authorship of that text.
+//   • Clearing the treatment ("— بدون علاج —") also clears the name iff
+//     the name is still the previous auto-fill (otherwise we don't touch it).
+// _autoFilledName tracks the last value WE wrote to the field; oninput on
+// #fAtName resets it to null the moment the user types, so we stop following.
+function onApptTypeTreatmentChange() {
+  var nameInput = document.getElementById('fAtName');
+  var sel = document.getElementById('fAtTreatment');
+  if (!nameInput || !sel) return;
+  var current = nameInput.value || '';
+  // Find the selected treatment in our cache to get its display name
+  var treatmentId = sel.value;
+  var newName = '';
+  if (treatmentId) {
+    for (var i = 0; i < _apptTypesTreatments.length; i++) {
+      if (_apptTypesTreatments[i].id === treatmentId) {
+        newName = _apptTypesTreatments[i].name || '';
+        break;
+      }
+    }
+  }
+  // Decision: only overwrite if the field is empty or still our previous auto-fill
+  if (current === '' || current === _autoFilledName) {
+    nameInput.value = newName;
+    _autoFilledName = newName || null;  // null when cleared, so next typing
+                                         // starts fresh
+  }
+  // else: user has authored a custom name — respect it, do nothing
+}
+
+// Gap 8.3: When the user types into the name field manually, stop tracking
+// auto-fill — any subsequent treatment change should NOT overwrite their input.
+// We deliberately compare against _autoFilledName: if they happen to type the
+// exact auto-filled string character by character, we still treat it as user
+// authorship (no harm — next treatment change just won't track).
+function onApptTypeNameInput() {
+  var nameInput = document.getElementById('fAtName');
+  if (!nameInput) return;
+  // The user is touching the field — release the auto-fill claim.
+  // We only do this when the value actually diverges, so that programmatic
+  // sets (from openApptTypeModal/editApptType) don't accidentally clear it.
+  if (nameInput.value !== _autoFilledName) {
+    _autoFilledName = null;
+  }
+}
+
 // Renders the list of saved templates. Each row has edit + delete buttons.
 // HTML-escapes the name so a user-supplied "<script>" can't break out.
 function renderApptTypesList() {
@@ -832,6 +889,8 @@ function openApptTypeModal() {
     return;
   }
   _editingApptTypeId = null;
+  // Gap 8.3: empty name + null tracker → next treatment pick will auto-fill
+  _autoFilledName = null;
   document.getElementById('apptTypeModalTitle').textContent = 'إضافة قالب جديد';
   document.getElementById('fAtName').value = '';
   document.getElementById('fAtDuration').value = '30';
@@ -856,6 +915,21 @@ function editApptType(id) {
   document.getElementById('fAtDuration').value = String(t.default_duration_min || 30);
   populateApptTypeTreatmentSelect();
   document.getElementById('fAtTreatment').value = t.default_treatment_id || '';
+  // Gap 8.3: figure out the auto-fill claim for edit mode. If the stored
+  // name happens to match the current treatment's name, we treat it as
+  // auto-fill territory — changing the treatment will update the name too
+  // (consistent with option B). Otherwise the name is "user-authored" and
+  // we leave _autoFilledName = null so future treatment picks won't touch it.
+  _autoFilledName = null;
+  if (t.default_treatment_id && t.name) {
+    for (var ai = 0; ai < _apptTypesTreatments.length; ai++) {
+      if (_apptTypesTreatments[ai].id === t.default_treatment_id
+          && _apptTypesTreatments[ai].name === t.name) {
+        _autoFilledName = t.name;  // tracked → next treatment change will follow
+        break;
+      }
+    }
+  }
   // Gap 8.2: pre-fill provider + lab from the stored template.
   // Safety: if the FK points to a doctor/lab that's no longer in the active
   // list (e.g. the doctor was deactivated AFTER this template was saved),
