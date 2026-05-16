@@ -2651,6 +2651,60 @@ async function submitAppt(e) {
     is_planned:   isPlannedNow
   };
 
+  // ── Gap 6: Auto-fill timestamps based on status ─────────────────────────
+  // Keep status semantics in sync with the time-tracking journey:
+  //   • status='confirmed' (live appt, not planned) and confirmed_at is empty
+  //     → stamp confirmed_at = now() and set confirmation_status='confirmed'.
+  //     Fixes the surprise UX where a brand-new appointment defaulted to
+  //     'confirmed' but the 📞 button kept showing.
+  //   • status='completed' (live appt) → stamp dismissed_at if empty AND
+  //     backfill confirmed_at if empty (a completed visit must have been
+  //     confirmed at some point). We deliberately do NOT auto-stamp
+  //     arrived_at/seated_at: leaving them blank is honest about the fact
+  //     that the secretary skipped those steps. They can fill them by
+  //     double-clicking the badge if they care.
+  // Planned appointments (is_planned=true) have no real date/time → skip.
+  // Pre-Gap-6 rows (no _at columns yet) → graceful fallback below strips
+  // these fields on retry if the DB rejects them.
+  if (!isPlannedNow) {
+    var _g6NowIso = new Date().toISOString();
+    var _g6Existing = editingId
+      ? appointments.find(function(a){ return a.id === editingId; })
+      : null;
+    var _g6PrevConfirmedAt = _g6Existing ? _g6Existing.confirmed_at : null;
+    var _g6PrevDismissedAt = _g6Existing ? _g6Existing.dismissed_at : null;
+
+    if (apptData.status === 'confirmed' && !_g6PrevConfirmedAt) {
+      apptData.confirmed_at = _g6NowIso;
+      apptData.confirmation_status = 'confirmed';
+    }
+    if (apptData.status === 'completed') {
+      if (!_g6PrevDismissedAt) apptData.dismissed_at = _g6NowIso;
+      if (!_g6PrevConfirmedAt) {
+        apptData.confirmed_at = _g6NowIso;
+        apptData.confirmation_status = 'confirmed';
+      }
+    }
+  }
+
+  // Detects "column does not exist" or "confirmation_valid violated" errors,
+  // both of which signal the Gap 6 migration is missing. Used by the
+  // INSERT/UPDATE retry path below to silently strip auto-fill fields and
+  // try again so the save still succeeds.
+  function _g6IsAutoFillRejection(err) {
+    if (!err) return false;
+    var msg = (err.message || '') + ' ' + (err.code || '');
+    return /42703|23514|confirmation_valid|confirmed_at|dismissed_at|confirmation_status/i.test(msg);
+  }
+  function _g6StripAutoFillFields(obj) {
+    var clone = Object.assign({}, obj);
+    delete clone.confirmed_at;
+    delete clone.dismissed_at;
+    delete clone.confirmation_status;
+    return clone;
+  }
+  var _g6HasAutoFill = ('confirmed_at' in apptData) || ('dismissed_at' in apptData) || ('confirmation_status' in apptData);
+
   // ── Gap 5: No-show fee workflow ─────────────────────────────────────────
   // Trigger conditions (all must be true):
   //   1. new status is 'no_show'
@@ -2768,6 +2822,22 @@ async function submitAppt(e) {
       upd = await window.sb.from('appointments').update(fallback)
         .eq('id', editingId).eq('doctor_id', currentUser.id);
     }
+    // Gap 6 retry: if auto-fill timestamps/confirmation_status caused the
+    // rejection (pre-migration row or unexpected schema), strip them and
+    // retry. The user still gets their appointment saved with the chosen
+    // status; only the silent journey-tracking metadata is lost.
+    if (upd.error && _g6HasAutoFill && _g6IsAutoFillRejection(upd.error)) {
+      console.warn('Gap 6: auto-fill fields rejected on UPDATE — retrying without them. Run the Gap 6 migration to enable auto-stamping.');
+      var stripped = _g6StripAutoFillFields(apptData);
+      if (plannedMigrationMissing) {
+        delete stripped.is_planned;
+        if (stripped.date === null) stripped.date = dateStr(new Date());
+        if (stripped.time === null) stripped.time = '12:00';
+      }
+      if (migrationMissing) stripped.status = 'confirmed';
+      upd = await window.sb.from('appointments').update(stripped)
+        .eq('id', editingId).eq('doctor_id', currentUser.id);
+    }
     if (upd.error) {
       showToast('❌ خطأ في التعديل: ' + upd.error.message);
     } else {
@@ -2841,6 +2911,19 @@ async function submitAppt(e) {
         if (fallbackIns.time === null) fallbackIns.time = '12:00';
       }
       ins = await window.sb.from('appointments').insert(fallbackIns).select().single();
+    }
+    // Gap 6 retry on INSERT: mirror the UPDATE path. Strip the auto-fill
+    // fields and try again so the appointment is still created.
+    if (ins.error && _g6HasAutoFill && _g6IsAutoFillRejection(ins.error)) {
+      console.warn('Gap 6: auto-fill fields rejected on INSERT — retrying without them. Run the Gap 6 migration to enable auto-stamping.');
+      var strippedIns = _g6StripAutoFillFields(apptData);
+      if (plannedMigrationMissing) {
+        delete strippedIns.is_planned;
+        if (strippedIns.date === null) strippedIns.date = dateStr(new Date());
+        if (strippedIns.time === null) strippedIns.time = '12:00';
+      }
+      if (migrationMissing) strippedIns.status = 'confirmed';
+      ins = await window.sb.from('appointments').insert(strippedIns).select().single();
     }
     if (ins.error) {
       showToast('❌ خطأ في الإضافة: ' + ins.error.message);
