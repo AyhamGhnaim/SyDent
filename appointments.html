@@ -323,6 +323,97 @@ body {
 .list-action-btn:hover { border-color: var(--green); color: var(--green); }
 .list-action-btn.danger:hover { border-color: var(--red); color: var(--red); }
 
+/* ─── Gap 7: Planned Appointments ──────────────────── */
+.main-tabs {
+  display: flex; gap: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.main-tab {
+  flex: 0 0 auto;
+  padding: 10px 22px;
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700;
+  background: transparent; border: none; color: var(--text2);
+  cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; gap: 8px;
+}
+.main-tab.active { background: var(--green-dim); color: var(--green); }
+.main-tab .count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 7px;
+  border-radius: 11px; font-size: 11px; font-weight: 800;
+  background: rgba(46,232,158,0.22); color: var(--green);
+}
+.main-tab.active .count-badge { background: var(--green); color: #0a1628; }
+
+.planned-empty {
+  text-align: center; padding: 60px 20px; color: var(--text2);
+}
+.planned-empty .icon { font-size: 48px; margin-bottom: 12px; }
+.planned-empty .title { font-size: 16px; color: var(--text); margin-bottom: 6px; }
+.planned-empty .hint { font-size: 13px; }
+
+.planned-item {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-right: 3px solid var(--blue);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 14px;
+  transition: all .2s;
+}
+.planned-item:hover { border-color: var(--blue); }
+.planned-icon {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(99,179,237,0.18);
+  font-size: 18px; flex-shrink: 0;
+}
+.planned-info { flex: 1; min-width: 0; }
+.planned-name { font-size: 14px; font-weight: 700; }
+.planned-reason {
+  font-size: 12px; color: var(--text2); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.planned-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.planned-actions .btn-schedule {
+  padding: 7px 14px; border-radius: 8px;
+  background: var(--green); color: #0a1628; border: none;
+  font-family: 'Cairo', sans-serif; font-size: 12px; font-weight: 800;
+  cursor: pointer; transition: all .2s;
+  white-space: nowrap;
+}
+.planned-actions .btn-schedule:hover { opacity: .88; }
+
+/* "Planned" toggle inside the appointment modal */
+.planned-toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; margin-bottom: 14px;
+  background: rgba(99,179,237,0.08);
+  border: 1px solid rgba(99,179,237,0.25);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.planned-toggle input[type=checkbox] {
+  width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue);
+}
+.planned-toggle .pt-text { flex: 1; }
+.planned-toggle .pt-title { font-size: 13px; font-weight: 700; color: var(--blue); }
+.planned-toggle .pt-hint { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+.planned-note {
+  padding: 10px 12px;
+  background: rgba(99,179,237,0.06);
+  border: 1px dashed rgba(99,179,237,0.3);
+  border-radius: 8px;
+  font-size: 12px; color: var(--text2);
+  margin-bottom: 14px;
+}
+
 /* ─── Modal ─── */
 .modal-overlay {
   display: none; position: fixed; inset: 0;
@@ -492,6 +583,20 @@ textarea { resize: vertical; min-height: 72px; }
   <!-- Content -->
   <div class="content">
 
+    <!-- Gap 7: Main tabs (Schedule | Planned) -->
+    <div class="main-tabs">
+      <button class="main-tab active" id="mainTabSchedule" onclick="setMainTab('schedule')">
+        📅 جدول المواعيد
+      </button>
+      <button class="main-tab" id="mainTabPlanned" onclick="setMainTab('planned')">
+        📋 مواعيد مخطّطة
+        <span class="count-badge" id="plannedCountBadge">0</span>
+      </button>
+    </div>
+
+    <!-- ═══ Schedule view (date-based) ═══ -->
+    <div id="scheduleView">
+
     <!-- Calendar Nav -->
     <div class="cal-header">
       <div class="cal-nav">
@@ -536,6 +641,13 @@ textarea { resize: vertical; min-height: 72px; }
       <div id="listContent"></div>
     </div>
 
+    </div><!-- /scheduleView -->
+
+    <!-- ═══ Gap 7: Planned view (no dates, ready to schedule) ═══ -->
+    <div id="plannedView" style="display:none;">
+      <div id="plannedContent"></div>
+    </div>
+
   </div><!-- /content -->
 </div><!-- /main -->
 
@@ -547,19 +659,36 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <form onsubmit="submitAppt(event)">
+
+      <!-- Gap 7: Planned-appointment toggle (shown only when creating, not when editing scheduled appts) -->
+      <label class="planned-toggle" id="plannedToggleWrap" for="fIsPlanned" style="display:none;">
+        <input type="checkbox" id="fIsPlanned" onchange="onPlannedToggle()">
+        <div class="pt-text">
+          <div class="pt-title">📋 موعد مخطّط (بدون تاريخ محدّد)</div>
+          <div class="pt-hint">يُحفظ كموعد قادم بدون قفل تاريخ — تُجدوله لاحقاً عند تأكيد المريض.</div>
+        </div>
+      </label>
+      <div class="planned-note" id="plannedNote" style="display:none;">
+        ⓘ هذا موعد مخطّط — لا حاجة لإدخال التاريخ والوقت الآن. اضغط على "📅 جدولة الآن" لاحقاً لتحديدهما.
+      </div>
+
       <div class="form-grid">
         <div class="form-group full">
           <label>اسم المريض *</label>
           <input type="text" id="fPatient" placeholder="ابحث أو اكتب الاسم…" list="patientsList" required>
           <datalist id="patientsList"></datalist>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="fDateGroup">
           <label>التاريخ *</label>
-          <input type="date" id="fDate" required>
+          <input type="date" id="fDate">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="fTimeGroup">
           <label>الوقت *</label>
-          <input type="time" id="fTime" required>
+          <input type="time" id="fTime">
+        </div>
+        <div class="form-group full" id="fReasonGroup" style="display:none;">
+          <label>السبب / نوع العلاج المخطّط</label>
+          <input type="text" id="fReason" placeholder="مثال: تركيب تلبيستين على 16 و 26، أو متابعة علاج عصب…">
         </div>
         <div class="form-group">
           <label>المدة (دقيقة)</label>
@@ -625,6 +754,7 @@ textarea { resize: vertical; min-height: 72px; }
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
         <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">🗑️ حذف</button>
         <span style="flex:1;"></span>
+        <button type="button" class="btn-save" id="scheduleNowBtn" onclick="scheduleNowFromModal()" style="display:none;background:#63b3ed;">📅 جدولة الآن</button>
         <button type="submit" class="btn-save" id="saveBtn">حفظ الموعد</button>
       </div>
     </form>
@@ -863,6 +993,10 @@ async function loadAppointments() {
     }
   } catch(e) { console.warn('lab_orders for appts:', e); }
 
+  // Gap 7: refresh the planned-count badge + re-render planned view if visible
+  refreshPlannedCount();
+  if (mainTab === 'planned') renderPlanned();
+
   render();
 }
 
@@ -893,6 +1027,8 @@ let currentDate = new Date();
 let selectedDate= new Date();
 let editingId   = null;
 let selectedColor = 'green';
+// Gap 7: which top-level tab is active — 'schedule' or 'planned'
+let mainTab     = 'schedule';
 
 // ─── Lab badge helper ──────────────────────────────
 // Returns { icon, color, title } for an appointment based on lab orders, or null.
@@ -1006,6 +1142,163 @@ function setView(v) {
   render();
 }
 
+// ─── Gap 7: Main tab switching (Schedule vs Planned) ─────────────────────────
+// Two top-level views:
+//   'schedule' — calendar/list of date-bound appointments (the original page)
+//   'planned'  — bucket of planned-but-not-yet-scheduled appointments
+// View toggles (month/day/list) live inside 'schedule' only.
+function setMainTab(tab) {
+  mainTab = tab;
+  var schedEl   = document.getElementById('scheduleView');
+  var plannedEl = document.getElementById('plannedView');
+  var schedBtn  = document.getElementById('mainTabSchedule');
+  var planBtn   = document.getElementById('mainTabPlanned');
+  if (tab === 'planned') {
+    if (schedEl)   schedEl.style.display   = 'none';
+    if (plannedEl) plannedEl.style.display = 'block';
+    if (schedBtn)  schedBtn.classList.remove('active');
+    if (planBtn)   planBtn.classList.add('active');
+    renderPlanned();
+  } else {
+    if (schedEl)   schedEl.style.display   = 'block';
+    if (plannedEl) plannedEl.style.display = 'none';
+    if (schedBtn)  schedBtn.classList.add('active');
+    if (planBtn)   planBtn.classList.remove('active');
+    render();
+  }
+}
+
+// True when an appointment is "planned" (no date/time, awaiting scheduling).
+// Defensive check: a real planned row should have is_planned===true AND no date,
+// but legacy rows might be inconsistent — treat is_planned as the source of truth.
+function isPlannedAppt(a) {
+  return !!(a && a.is_planned === true);
+}
+
+// Update the count badge on the Planned tab. Called after every reload.
+function refreshPlannedCount() {
+  var n = appointments.filter(isPlannedAppt).length;
+  var badge = document.getElementById('plannedCountBadge');
+  if (badge) badge.textContent = n;
+}
+
+// Render the planned-appointments bucket. Sorted by patient name (most natural
+// for receptionists reviewing the list while calling patients to schedule).
+function renderPlanned() {
+  var container = document.getElementById('plannedContent');
+  if (!container) return;
+  var planned = appointments.filter(isPlannedAppt)
+    .sort(function(a,b){ return (a.patient_name||'').localeCompare(b.patient_name||''); });
+
+  if (planned.length === 0) {
+    container.innerHTML =
+      '<div class="planned-empty">'
+      + '<div class="icon">📋</div>'
+      + '<div class="title">لا توجد مواعيد مخطّطة</div>'
+      + '<div class="hint">أضف موعداً جديداً وفعّل "📋 موعد مخطّط" لتسجيله هنا حتى يحين وقت الجدولة.</div>'
+      + '</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < planned.length; i++) {
+    var p = planned[i];
+    var reason = (p.notes || '').trim();
+    var typeStr = p.type ? ('🦷 ' + p.type) : '';
+    var reasonLine = [typeStr, reason].filter(function(s){ return !!s; }).join(' — ');
+    html += '<div class="planned-item">'
+      + '<div class="planned-icon">📋</div>'
+      + '<div class="planned-info">'
+      +   '<div class="planned-name">' + (p.patient_name || '—') + '</div>'
+      +   '<div class="planned-reason" title="' + reasonLine.replace(/"/g,'&quot;') + '">'
+      +     (reasonLine || '<span style="opacity:.5;">بدون تفاصيل</span>')
+      +   '</div>'
+      + '</div>'
+      + '<div class="planned-actions">'
+      +   '<button class="list-action-btn" onclick="editAppt(\'' + p.id + '\')" title="تعديل">✏️</button>'
+      +   '<button class="btn-schedule" onclick="quickSchedulePlanned(\'' + p.id + '\')">📅 جدولة الآن</button>'
+      +   '<button class="list-action-btn danger" onclick="deleteAppt(\'' + p.id + '\')" title="حذف">🗑️</button>'
+      + '</div>'
+      + '</div>';
+  }
+  container.innerHTML = html;
+}
+
+// Quick-schedule from the planned-list row: opens the modal pre-filled with the
+// planned appointment so the user just sets date + time and saves.
+function quickSchedulePlanned(id) {
+  editAppt(id);
+}
+
+// Handler for the "📋 موعد مخطّط" checkbox inside the modal. Toggles date/time
+// requiredness and visibility, and shows the explanatory note.
+function onPlannedToggle() {
+  var chk = document.getElementById('fIsPlanned');
+  if (!chk) return;
+  var planned = !!chk.checked;
+  var dateGrp   = document.getElementById('fDateGroup');
+  var timeGrp   = document.getElementById('fTimeGroup');
+  var reasonGrp = document.getElementById('fReasonGroup');
+  var note      = document.getElementById('plannedNote');
+  var dateInp   = document.getElementById('fDate');
+  var timeInp   = document.getElementById('fTime');
+  if (planned) {
+    if (dateGrp)   dateGrp.style.display   = 'none';
+    if (timeGrp)   timeGrp.style.display   = 'none';
+    if (reasonGrp) reasonGrp.style.display = 'block';
+    if (note)      note.style.display      = 'block';
+    // Strip required so HTML5 validation doesn't block submission
+    if (dateInp) { dateInp.removeAttribute('required'); }
+    if (timeInp) { timeInp.removeAttribute('required'); }
+  } else {
+    if (dateGrp)   dateGrp.style.display   = '';
+    if (timeGrp)   timeGrp.style.display   = '';
+    if (reasonGrp) reasonGrp.style.display = 'none';
+    if (note)      note.style.display      = 'none';
+    if (dateInp && !dateInp.value) {
+      // restore a sensible default so the user doesn't see a blank required field
+      dateInp.value = dateStr(new Date());
+    }
+  }
+  // Gap 7 (audit R6 fix): re-show the "Schedule now" button if the user toggles
+  // planned back ON while editing an existing planned appt — otherwise pressing
+  // "Schedule now" once and then re-checking the box would leave them stuck
+  // with no way to commit changes via the schedule button. The button matters
+  // only in edit mode AND when the current state is planned.
+  var schedBtn = document.getElementById('scheduleNowBtn');
+  if (schedBtn) {
+    // editingId is the appointments.html-level state; if we're editing an existing
+    // row AND the toggle is currently planned, the button is meaningful.
+    if (planned && editingId) {
+      schedBtn.style.display = 'inline-block';
+    } else {
+      schedBtn.style.display = 'none';
+    }
+  }
+}
+
+// "📅 جدولة الآن" button inside the modal (visible only while editing a planned
+// appointment). Uncheck the planned flag, restore date/time inputs, scroll to
+// date so the user can complete the fields.
+function scheduleNowFromModal() {
+  var chk = document.getElementById('fIsPlanned');
+  if (chk) { chk.checked = false; }
+  onPlannedToggle();
+  // Default to today if no date set yet
+  var dateInp = document.getElementById('fDate');
+  if (dateInp && !dateInp.value) dateInp.value = dateStr(new Date());
+  // Hide the schedule-now button now that we're in "scheduling" mode
+  var schedBtn = document.getElementById('scheduleNowBtn');
+  if (schedBtn) schedBtn.style.display = 'none';
+  // Update modal title so user knows what's happening
+  var title = document.getElementById('modalTitle');
+  if (title) title.textContent = 'جدولة موعد مخطّط';
+  var saveBtn = document.getElementById('saveBtn');
+  if (saveBtn) saveBtn.textContent = 'جدولة الموعد';
+  // Focus date input
+  if (dateInp) { try { dateInp.focus(); } catch(_){} }
+  showToast('✏️ أدخل التاريخ والوقت ثم اضغط "جدولة الموعد"');
+}
+
 // ─── Navigation ──────────────────────────────────────
 function prevPeriod() {
   if (view==='month') { currentDate.setMonth(currentDate.getMonth()-1); }
@@ -1026,7 +1319,14 @@ const DAYS_AR   = ['الأحد','الاثنين','الثلاثاء','الأرب�
 function dateStr(d) {
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function apptsByDate(ds) { return appointments.filter(a => a.date === ds); }
+// Gap 7: exclude planned appointments — they have no date so they'd otherwise
+// "leak" into the schedule once they accidentally got assigned today's string.
+function apptsByDate(ds) {
+  return appointments.filter(function(a){
+    if (isPlannedAppt(a)) return false;
+    return a.date === ds;
+  });
+}
 
 function avatarColor(name) {
   const CLRS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
@@ -1302,10 +1602,11 @@ function renderList() {
   document.getElementById('calMonth').textContent = MONTHS_AR[currentDate.getMonth()]+' '+currentDate.getFullYear();
   // group by date, next 30 days — Gap 1: exclude finished statuses
   // (completed/cancelled/broken/no_show) since they're not "upcoming" anymore.
+  // Gap 7: also exclude planned appointments (they live in their own tab).
   const today = new Date(); today.setHours(0,0,0,0);
   const groups = {};
   appointments
-    .filter(a => new Date(a.date) >= today && !isFinishedStatus(a.status))
+    .filter(a => !isPlannedAppt(a) && a.date && new Date(a.date) >= today && !isFinishedStatus(a.status))
     .sort((a,b) => (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')))
     .forEach(a => {
       if (!groups[a.date]) groups[a.date] = [];
@@ -1385,6 +1686,17 @@ async function openModal(prefillDate) {
   // إخفاء زر "تطبيق رسم لم يحضر" (يظهر فقط في التعديل عند الحاجة)
   var noShowBtn = document.getElementById('noShowFeeBtn');
   if (noShowBtn) noShowBtn.style.display = 'none';
+  // Gap 7: planned-appointment fields — show toggle, reset state
+  var plannedWrap = document.getElementById('plannedToggleWrap');
+  if (plannedWrap) plannedWrap.style.display = 'flex';
+  var plannedChk = document.getElementById('fIsPlanned');
+  if (plannedChk) plannedChk.checked = false;
+  var reasonInp = document.getElementById('fReason');
+  if (reasonInp) reasonInp.value = '';
+  // Hide schedule-now button (only meaningful when editing existing planned)
+  var schedNowBtn = document.getElementById('scheduleNowBtn');
+  if (schedNowBtn) schedNowBtn.style.display = 'none';
+  onPlannedToggle();  // sync visibility of date/time/reason/note
   updateColorPreview();
 
   // Populate provider picker (uses OpenDental 3-tier default)
@@ -1402,14 +1714,27 @@ async function editAppt(id) {
   if (!a) return;
   editingId = id;
   selectedColor = a.color;
-  document.getElementById('modalTitle').textContent = 'تعديل الموعد';
-  document.getElementById('saveBtn').textContent    = 'حفظ التعديلات';
+  // Gap 7: distinguish planned vs scheduled when editing
+  var isPlanned = isPlannedAppt(a);
+  document.getElementById('modalTitle').textContent = isPlanned ? 'تعديل موعد مخطّط' : 'تعديل الموعد';
+  document.getElementById('saveBtn').textContent    = isPlanned ? 'حفظ التعديلات' : 'حفظ التعديلات';
   document.getElementById('fPatient').value  = a.patient_name || '';
-  document.getElementById('fDate').value     = a.date;
+  document.getElementById('fDate').value     = a.date || '';
   document.getElementById('fTime').value     = a.time || '';
   document.getElementById('fDuration').value = a.duration;
+  // Gap 7: configure planned-related UI before showing modal
+  var plannedWrap = document.getElementById('plannedToggleWrap');
+  if (plannedWrap) plannedWrap.style.display = 'flex';
+  var plannedChk = document.getElementById('fIsPlanned');
+  if (plannedChk) plannedChk.checked = isPlanned;
+  var reasonInp = document.getElementById('fReason');
+  if (reasonInp) reasonInp.value = (isPlanned ? (a.notes || '') : '');
+  onPlannedToggle();
   // أظهر المودال أولاً
   document.getElementById('deleteApptBtn').style.display = 'inline-block';
+  // Gap 7: show "Schedule now" button only when editing a planned appt
+  var schedNowBtn = document.getElementById('scheduleNowBtn');
+  if (schedNowBtn) schedNowBtn.style.display = isPlanned ? 'inline-block' : 'none';
   document.getElementById('modalOverlay').classList.add('open');
   // ثم انتظر تحميل العلاجات قبل ضبط النوع
   await populateApptTypes();
@@ -1418,7 +1743,8 @@ async function editAppt(id) {
   document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   updateColorPreview();
   document.getElementById('fStatus').value = a.status;
-  document.getElementById('fNotes').value  = a.notes||'';
+  // For planned: reason is the primary note; for scheduled: notes is the note.
+  document.getElementById('fNotes').value  = isPlanned ? '' : (a.notes || '');
   // كذلك تعبئة قائمة المرضى للـ datalist
   const names = await loadPatientNames();
   document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
@@ -1427,15 +1753,30 @@ async function editAppt(id) {
   await populateApptProviderPicker(a.provider_id || null);
 
   // Show procedures section + render attached procs + planned options
-  document.getElementById('apptProcSection').style.display = 'block';
-  renderApptProcedures(a);
+  // Gap 7: hide the procedures section for planned appointments — they have
+  // no date yet, so attaching procedures + "Set Complete" don't make sense.
+  // User must schedule first, then manage procedures.
+  document.getElementById('apptProcSection').style.display = isPlanned ? 'none' : 'block';
+  if (!isPlanned) renderApptProcedures(a);
 
   // Show lab orders section (if any orders are linked to this appointment)
-  renderApptLabOrders(a);
+  // Gap 7: also hide on planned — lab orders require a real appointment date.
+  if (isPlanned) {
+    var labSec = document.getElementById('apptLabSection');
+    if (labSec) labSec.style.display = 'none';
+  } else {
+    renderApptLabOrders(a);
+  }
 
   // Show/hide the no-show fee button based on current state (Gap 5).
   // Fire-and-forget — fetches settings + checks for existing fee in DB.
-  updateNoShowFeeBtnVisibility(a);
+  // Gap 7: no-show fee doesn't apply to planned appointments (no chair time).
+  if (isPlanned) {
+    var nsb = document.getElementById('noShowFeeBtn');
+    if (nsb) nsb.style.display = 'none';
+  } else {
+    updateNoShowFeeBtnVisibility(a);
+  }
 }
 
 /* Build the provider <select>. Visible only if >= 1 clinic doctor exists. */
@@ -1638,6 +1979,13 @@ async function unlinkSessionFromAppt(sessId) {
    at least one attached procedure, there is a prompt." */
 async function completeApptWithProcedures() {
   if (!editingId) return;
+  // Gap 7: Set Complete is meaningless on a planned appointment — it has no
+  // date, no time, no chair-side reality. Force the user to schedule it first.
+  var _curAppt = appointments.find(function(a){ return a.id === editingId; });
+  if (_curAppt && isPlannedAppt(_curAppt)) {
+    showToast('⚠️ يجب جدولة الموعد أولاً قبل إكماله');
+    return;
+  }
   var attached = sessionsByAppt[editingId] || [];
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
   if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
@@ -1954,6 +2302,10 @@ async function submitAppt(e) {
   const btn = document.getElementById('saveBtn');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
+  // Gap 7: read planned flag once (used throughout this function)
+  var plannedChk = document.getElementById('fIsPlanned');
+  var isPlannedNow = !!(plannedChk && plannedChk.checked);
+
   var providerSel = document.getElementById('fProvider');
   var providerId = (providerSel && providerSel.value) ? providerSel.value : getDefaultProviderId(CLINIC_DOCTORS);
 
@@ -1970,19 +2322,42 @@ async function submitAppt(e) {
     } catch(_) { /* ignore */ }
   }
 
+  // Gap 7: compute date/time/notes based on planned vs scheduled mode.
+  //   - planned : date/time MUST be null; reason goes into notes
+  //   - scheduled: original behavior (date+time required by HTML5)
+  var dateVal, timeVal, notesVal;
+  if (isPlannedNow) {
+    dateVal  = null;
+    timeVal  = null;
+    var reasonVal = (document.getElementById('fReason').value || '').trim();
+    notesVal = reasonVal;
+  } else {
+    dateVal  = document.getElementById('fDate').value || null;
+    timeVal  = document.getElementById('fTime').value || null;
+    notesVal = document.getElementById('fNotes').value.trim();
+    // Safety guard: if user somehow submitted with empty date/time but planned
+    // toggle is off, refuse — would violate the DB CHECK constraint anyway.
+    if (!dateVal || !timeVal) {
+      showToast('⚠️ التاريخ والوقت مطلوبان للموعد المجدول');
+      btn.disabled = false; btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ الموعد';
+      return;
+    }
+  }
+
   const apptData = {
     doctor_id:    currentUser.id,
     patient_id:   patientId,
     patient_name: patientName,
-    date:         document.getElementById('fDate').value,
-    time:         document.getElementById('fTime').value || null,
+    date:         dateVal,
+    time:         timeVal,
     duration:     parseInt(document.getElementById('fDuration').value),
     type:         typeName,
     status:       document.getElementById('fStatus').value,
-    notes:        document.getElementById('fNotes').value.trim(),
+    notes:        notesVal,
     color:        apptColor,
     stroke:       apptStroke,
-    provider_id:  providerId
+    provider_id:  providerId,
+    is_planned:   isPlannedNow
   };
 
   // ── Gap 5: No-show fee workflow ─────────────────────────────────────────
@@ -1992,10 +2367,11 @@ async function submitAppt(e) {
   //   3. patient is identified (no point charging an unknown name)
   //   4. clinic has enabled the fee with a positive amount
   //   5. no existing fee row is linked to this appointment (no double-charge)
+  //   6. Gap 7: not a planned appointment (planned has no date → can't no-show)
   // If all met, show a confirm prompt + optional reason field.
   // Fee is OPTIONAL: the user can choose "without fee" and still mark no-show.
   var pendingNoShowFee = null;  // {amount, reason} if user opted in, else null
-  if (apptData.status === 'no_show') {
+  if (apptData.status === 'no_show' && !isPlannedNow) {
     var previousStatus = null;
     if (editingId) {
       var prevAppt = appointments.find(function(a){ return a.id === editingId; });
@@ -2040,8 +2416,25 @@ async function submitAppt(e) {
     var msg = (err.message || '') + ' ' + (err.code || '');
     return /check constraint|23514|appointments_status_check/i.test(msg);
   }
+  // Gap 7: detect "is_planned column / planned constraint not migrated yet".
+  //   - 42703  : column does not exist
+  //   - PGRST204: schema cache miss for the column
+  //   - 23514  : check constraint violation (e.g. scheduled_has_date for legacy rows)
+  // When this fires we strip is_planned/null-date/null-time and retry.
+  function isPlannedMigrationMissing(err) {
+    if (!err) return false;
+    var msg = (err.message || '').toLowerCase() + ' ' + (err.code || '');
+    var isPlannedCol = msg.indexOf('is_planned') !== -1;
+    var notNullDate  = /violates not-null constraint.*"date"|"time"/i.test(err.message || '');
+    var schedHasDate = msg.indexOf('scheduled_has_date') !== -1;
+    if (isPlannedCol && (err.code === '42703' || err.code === 'PGRST204' || msg.indexOf('does not exist') !== -1 || msg.indexOf('schema cache') !== -1)) return true;
+    if (notNullDate) return true;     // pre-migration DB has NOT NULL on date/time
+    if (schedHasDate) return true;    // very unlikely but covers stale-constraint case
+    return false;
+  }
   var newStatuses = ['completed','scheduled','broken','no_show'];
   var migrationMissing = false;
+  var plannedMigrationMissing = false;
 
   if (editingId) {
     // .select() forces PostgREST to return the rows actually updated.
@@ -2058,11 +2451,29 @@ async function submitAppt(e) {
       btn.disabled = false; btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ الموعد';
       return;
     }
+    // Gap 7 retry: planned migration not applied → strip is_planned and force
+    // date/time to today's defaults so the legacy NOT NULL columns are happy.
+    if (upd.error && isPlannedMigrationMissing(upd.error)) {
+      plannedMigrationMissing = true;
+      console.warn('Gap 7: appointments.is_planned / nullable date/time not migrated yet. Falling back to legacy behavior. Run the migration: ALTER TABLE appointments ADD COLUMN is_planned BOOLEAN NOT NULL DEFAULT FALSE; ALTER TABLE appointments ALTER COLUMN date DROP NOT NULL; ALTER TABLE appointments ALTER COLUMN time DROP NOT NULL; ALTER TABLE appointments ADD CONSTRAINT scheduled_has_date CHECK (is_planned = TRUE OR (date IS NOT NULL AND time IS NOT NULL));');
+      var legacy = Object.assign({}, apptData);
+      delete legacy.is_planned;
+      if (legacy.date === null) legacy.date = dateStr(new Date());
+      if (legacy.time === null) legacy.time = '12:00';
+      upd = await window.sb.from('appointments').update(legacy)
+        .eq('id', editingId).eq('doctor_id', currentUser.id).select();
+    }
     // Retry with 'confirmed' if the DB rejects a new lifecycle status.
     if (upd.error && isStatusConstraintError(upd.error) && newStatuses.indexOf(apptData.status) !== -1) {
       migrationMissing = true;
       console.warn("appointments.status='" + apptData.status + "' rejected on UPDATE — falling back to 'confirmed'. Run: ALTER TABLE appointments DROP CONSTRAINT appointments_status_check; ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','pending','completed','cancelled','broken','no_show'));");
       var fallback = Object.assign({}, apptData, { status: 'confirmed' });
+      // Also strip planned fields if we're falling back to legacy
+      if (plannedMigrationMissing) {
+        delete fallback.is_planned;
+        if (fallback.date === null) fallback.date = dateStr(new Date());
+        if (fallback.time === null) fallback.time = '12:00';
+      }
       upd = await window.sb.from('appointments').update(fallback)
         .eq('id', editingId).eq('doctor_id', currentUser.id);
     }
@@ -2082,24 +2493,62 @@ async function submitAppt(e) {
           apptDate:   apptData.date
         });
       }
-      if (migrationMissing) {
+      // Gap 7: was-planned → now-scheduled means the user used "Schedule now".
+      // Tailor the toast accordingly.
+      var prevWasPlanned = false;
+      if (editingId) {
+        var _prev = appointments.find(function(a){ return a.id === editingId; });
+        if (_prev) prevWasPlanned = isPlannedAppt(_prev);
+      }
+      if (plannedMigrationMissing) {
+        showToast('⚠️ تم الحفظ كموعد عادي — يلزم ترقية قاعدة البيانات لميزة "مخطّط"');
+      } else if (migrationMissing) {
         showToast('⚠️ تم الحفظ كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
       } else if (pendingNoShowFee) {
         showToast('✅ تم الحفظ + تطبيق رسم لم يحضر');
+      } else if (prevWasPlanned && !isPlannedNow) {
+        showToast('✅ تم جدولة الموعد المخطّط');
+      } else if (isPlannedNow) {
+        showToast('✅ تم حفظ الموعد المخطّط');
       } else {
         showToast('✅ تم تعديل الموعد');
       }
-      selectedDate = new Date(apptData.date + 'T12:00:00');
-      currentDate  = new Date(apptData.date + 'T12:00:00');
+      // Gap 7: only navigate the calendar to apptData.date if it's a real date
+      // (planned appointments don't have one — stay on whatever the user was viewing).
+      if (apptData.date) {
+        selectedDate = new Date(apptData.date + 'T12:00:00');
+        currentDate  = new Date(apptData.date + 'T12:00:00');
+      }
       closeModal();
+      // Gap 7: if user just scheduled a planned appt, jump them to schedule tab
+      if (prevWasPlanned && !isPlannedNow && apptData.date) {
+        setMainTab('schedule');
+      } else if (isPlannedNow) {
+        setMainTab('planned');
+      }
       await loadAppointments();
     }
   } else {
     var ins = await window.sb.from('appointments').insert(apptData).select().single();
+    // Gap 7 retry: same fallback as UPDATE path
+    if (ins.error && isPlannedMigrationMissing(ins.error)) {
+      plannedMigrationMissing = true;
+      console.warn('Gap 7: planned-appointments migration not applied yet (INSERT). See UPDATE-path warning for the migration SQL.');
+      var legacyIns = Object.assign({}, apptData);
+      delete legacyIns.is_planned;
+      if (legacyIns.date === null) legacyIns.date = dateStr(new Date());
+      if (legacyIns.time === null) legacyIns.time = '12:00';
+      ins = await window.sb.from('appointments').insert(legacyIns).select().single();
+    }
     if (ins.error && isStatusConstraintError(ins.error) && newStatuses.indexOf(apptData.status) !== -1) {
       migrationMissing = true;
       console.warn("appointments.status='" + apptData.status + "' rejected on INSERT — falling back to 'confirmed'.");
       var fallbackIns = Object.assign({}, apptData, { status: 'confirmed' });
+      if (plannedMigrationMissing) {
+        delete fallbackIns.is_planned;
+        if (fallbackIns.date === null) fallbackIns.date = dateStr(new Date());
+        if (fallbackIns.time === null) fallbackIns.time = '12:00';
+      }
       ins = await window.sb.from('appointments').insert(fallbackIns).select().single();
     }
     if (ins.error) {
@@ -2117,16 +2566,24 @@ async function submitAppt(e) {
           apptDate:   apptData.date
         });
       }
-      if (migrationMissing) {
+      if (plannedMigrationMissing) {
+        showToast('⚠️ تمت الإضافة كموعد عادي — يلزم ترقية قاعدة البيانات لميزة "مخطّط"');
+      } else if (migrationMissing) {
         showToast('⚠️ تمت الإضافة كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
       } else if (pendingNoShowFee) {
         showToast('✅ تمت الإضافة + تطبيق رسم لم يحضر');
+      } else if (isPlannedNow) {
+        showToast('✅ تمت إضافة موعد مخطّط');
       } else {
         showToast('✅ تمت إضافة الموعد');
       }
-      selectedDate = new Date(apptData.date + 'T12:00:00');
-      currentDate  = new Date(apptData.date + 'T12:00:00');
+      if (apptData.date) {
+        selectedDate = new Date(apptData.date + 'T12:00:00');
+        currentDate  = new Date(apptData.date + 'T12:00:00');
+      }
       closeModal();
+      // Gap 7: after adding a planned appt, jump straight to planned tab
+      if (isPlannedNow) setMainTab('planned');
       await loadAppointments();
     }
   }

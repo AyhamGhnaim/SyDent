@@ -234,6 +234,28 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .lab-action-btn.reject:hover{background:rgba(239,83,80,.1);}
 .btn-lab{padding:9px 18px;background:transparent;border:1px solid #63b3ed;color:#63b3ed;border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
 .btn-lab:hover{background:rgba(99,179,237,.12);}
+
+/* ─── Gap 7: Planned Appointments (in patient profile) ─── */
+.planned-pp-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-right:3px solid #63b3ed;border-radius:10px;margin-bottom:8px;transition:all .2s;}
+.planned-pp-row:hover{background:rgba(99,179,237,0.10);}
+.planned-pp-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(99,179,237,0.18);font-size:16px;flex-shrink:0;}
+.planned-pp-info{flex:1;min-width:0;}
+.planned-pp-title{font-size:13px;font-weight:700;color:var(--text);}
+.planned-pp-reason{font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.planned-pp-actions{display:flex;gap:6px;flex-shrink:0;}
+.planned-pp-actions button{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
+.planned-pp-actions .btn-schedule-pp{background:var(--green);color:#0a1628;border-color:var(--green);}
+.planned-pp-actions .btn-schedule-pp:hover{opacity:.88;}
+.planned-pp-actions .btn-delete-pp:hover{border-color:var(--red);color:var(--red);}
+
+/* Toggle inside the appointment modal — same visual language as appointments.html */
+.planned-toggle-pp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:9px;cursor:pointer;}
+.planned-toggle-pp input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:#63b3ed;}
+.planned-toggle-pp .ptpp-text{flex:1;}
+.planned-toggle-pp .ptpp-title{font-size:12px;font-weight:700;color:#63b3ed;}
+.planned-toggle-pp .ptpp-hint{font-size:10px;color:var(--text2);margin-top:1px;}
+.planned-note-pp{padding:8px 11px;background:rgba(99,179,237,0.06);border:1px dashed rgba(99,179,237,0.3);border-radius:7px;font-size:11px;color:var(--text2);margin-bottom:12px;}
+
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
@@ -375,6 +397,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
 
+    <!-- Gap 7: Planned Appointments card (hidden when patient has none) -->
+    <div class="card" id="plannedApptsCard" style="display:none;">
+      <div class="card-head">
+        <span class="card-title">📋 مواعيد مخطّطة <span id="plannedApptsCount" style="font-size:11px;color:var(--text2);font-weight:500;">(0)</span></span>
+        <button class="btn btn-outline btn-sm" onclick="openPlannedApptModal()">＋ موعد مخطّط جديد</button>
+      </div>
+      <div id="plannedApptsList"></div>
+    </div>
+
     <div class="chart-card">
       <div class="chart-card-head">
         <span class="chart-card-title">🦷 مخطط الأسنان</span>
@@ -470,15 +501,31 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: موعد -->
 <div class="modal-overlay" id="apptModal">
   <div class="modal-box">
-    <div class="modal-head"><h3>📅 موعد جديد</h3><button class="modal-close" onclick="closeModal('apptModal')">✕</button></div>
+    <div class="modal-head"><h3 id="apptModalTitle">📅 موعد جديد</h3><button class="modal-close" onclick="closeModal('apptModal')">✕</button></div>
     <div class="modal-body">
+      <!-- Gap 7: Planned-appointment toggle -->
+      <label class="planned-toggle-pp" for="aIsPlanned">
+        <input type="checkbox" id="aIsPlanned" onchange="onApptPlannedToggle()">
+        <div class="ptpp-text">
+          <div class="ptpp-title">📋 موعد مخطّط (بدون تاريخ محدّد)</div>
+          <div class="ptpp-hint">يُحفظ للمتابعة، يُجدول لاحقاً عند تأكيد المريض.</div>
+        </div>
+      </label>
+      <div class="planned-note-pp" id="aPlannedNote" style="display:none;">
+        ⓘ هذا موعد مخطّط — لا حاجة لإدخال التاريخ والوقت الآن.
+      </div>
+
       <div class="form-row">
         <div class="form-group"><label>نوع الموعد</label><select id="aType"></select></div>
         <div class="form-group"><label>المدة</label><select id="aDur"><option value="30">30 دقيقة</option><option value="45">45 دقيقة</option><option value="60" selected>ساعة</option><option value="90">ساعة ونصف</option><option value="120">ساعتان</option></select></div>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="aDateTimeRow">
         <div class="form-group"><label>التاريخ</label><input type="date" id="aDate"></div>
         <div class="form-group"><label>الوقت</label><input type="time" id="aTime" value="09:00"></div>
+      </div>
+      <div class="form-group" id="aReasonGroup" style="display:none;">
+        <label>السبب / نوع العلاج المخطّط</label>
+        <input type="text" id="aReason" placeholder="مثال: تركيب تلبيستين على 16 و 26…">
       </div>
       <div class="form-row">
         <div class="form-group"><label>الحالة</label>
@@ -495,7 +542,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="form-group"><label>ملاحظات</label><textarea id="aNotes" placeholder="أي ملاحظات…"></textarea></div>
     </div>
-    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('apptModal')">إلغاء</button><button class="btn-save-m" onclick="saveAppt()">حفظ الموعد</button></div>
+    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('apptModal')">إلغاء</button><button class="btn-save-m" id="aSaveBtn" onclick="saveAppt()">حفظ الموعد</button></div>
   </div>
 </div>
 
@@ -712,6 +759,8 @@ var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: nu
 var labOrders = [];   // lab orders for current patient
 var allLabs   = [];   // all labs for the doctor
 var upcomingAppts = []; // patient's upcoming/today appointments (for session-appointment linking)
+var plannedAppts  = []; // Gap 7: patient's planned (no-date) appointments
+var editingApptId = null; // Gap 7: id of appointment currently being edited in modal (null = create)
 var currentUser = null;
 
 /* ── Payment Splits (OpenDental-style FIFO allocation) ──
@@ -1245,6 +1294,29 @@ async function loadAll() {
     if (uaErr) { console.warn('upcoming appts load:', uaErr); upcomingAppts = []; }
     else upcomingAppts = ua || [];
   } catch(e) { console.warn('upcoming appts fetch failed:', e); upcomingAppts = []; }
+
+  // Gap 7: planned appointments for this patient (no date, awaiting scheduling).
+  // Wrapped in try/catch + column-missing detection so pre-migration DBs
+  // gracefully degrade to "no planned appointments" instead of breaking the page.
+  plannedAppts = [];
+  try {
+    var papRes = await window.sb.from('appointments')
+      .select('id, type, duration, status, notes, provider_id, created_at, is_planned')
+      .eq('patient_id', patientId)
+      .eq('doctor_id', currentUser.id)
+      .eq('is_planned', true)
+      .order('created_at', { ascending: false });
+    if (papRes.error) {
+      var msg = (papRes.error.message || '').toLowerCase() + ' ' + (papRes.error.code || '');
+      var isMissing = msg.indexOf('is_planned') !== -1
+        && (papRes.error.code === '42703' || papRes.error.code === 'PGRST204'
+            || msg.indexOf('does not exist') !== -1 || msg.indexOf('schema cache') !== -1);
+      if (!isMissing) console.warn('planned appts load:', papRes.error);
+      // Either way, fall back to an empty list — don't break the profile page.
+    } else {
+      plannedAppts = papRes.data || [];
+    }
+  } catch(e) { console.warn('planned appts fetch failed:', e); plannedAppts = []; }
 
   // labs (for select picker)
   try {
@@ -3831,13 +3903,26 @@ async function saveSession() {
   showToast('✅ تم حفظ الجلسة');
 }
 
-/* ── Save Appointment ── */
+/* ── Save Appointment ──
+   Gap 7-aware: handles three workflows:
+     1. Create scheduled appt   (editingApptId=null,  isPlanned=false)
+     2. Create planned appt     (editingApptId=null,  isPlanned=true) — no date/time
+     3. Edit/schedule planned   (editingApptId!=null, isPlanned=false) — promotes
+        existing planned row into a real scheduled appointment
+   Pre-migration fallback: if is_planned column or nullable date/time isn't
+   applied yet, falls back to legacy behavior (today's date, 12:00) with a
+   warning toast, mirroring the appointments.html pattern. */
 async function saveAppt() {
   var typeVal    = document.getElementById('aType').value;
   var _t         = getTreatment(typeVal);
   var type       = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
   var apptColor  = _t ? _t.fill   : '#2ee89e';
   var apptStroke = _t ? _t.stroke : '#1fba7e';
+
+  // Gap 7: planned mode toggles whether date/time are required
+  var chk = document.getElementById('aIsPlanned');
+  var isPlannedNow = !!(chk && chk.checked);
+
   var date  = document.getElementById('aDate').value;
   var time  = document.getElementById('aTime').value;
   var dur   = document.getElementById('aDur').value;
@@ -3846,35 +3931,303 @@ async function saveAppt() {
   var apptStatus = (statusEl && statusEl.value) ? statusEl.value : 'confirmed';
   var provEl = document.getElementById('aProvider');
   var provId = (provEl && provEl.value) ? provEl.value : getDefaultProviderId(CLINIC_DOCTORS);
-  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
-  const { data: newAppt, error: aErr } = await window.sb.from('appointments').insert({
-    doctor_id:   currentUser.id,
-    patient_id:  patientId,
-    patient_name: patient.name,
-    date: date, time: time || null,
-    duration: parseInt(dur) || 30,
-    type: type,
-    treatment_id: (_t && _t.dbId) ? _t.dbId : null,
-    status: apptStatus,
-    color: apptColor, stroke: apptStroke,
-    notes: notes,
-    provider_id: provId
-  }).select().single();
-  if (aErr) { showToast('❌ خطأ في حفظ الموعد: ' + aErr.message); return; }
-  // Refresh the in-memory list of upcoming appts so the new one shows in the
-  // session-link dropdown immediately (only if it's today or later).
-  if (newAppt && date >= toDay()) {
-    upcomingAppts.push({
-      id: newAppt.id, date: newAppt.date, time: newAppt.time,
-      type: newAppt.type, status: newAppt.status
-    });
-    upcomingAppts.sort(function(a,b){
-      return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
-    });
+
+  // Gap 7: compute final date/time/notes by mode
+  var finalDate, finalTime, finalNotes;
+  if (isPlannedNow) {
+    finalDate = null;
+    finalTime = null;
+    // Reason field is the planned note. If the user typed in notes too, append.
+    var reasonVal = (document.getElementById('aReason').value || '').trim();
+    finalNotes = [reasonVal, notes].filter(function(s){ return !!s; }).join(' — ');
+  } else {
+    if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+    finalDate  = date;
+    finalTime  = time || null;
+    finalNotes = notes;
   }
+
+  var apptData = {
+    doctor_id:    currentUser.id,
+    patient_id:   patientId,
+    patient_name: patient.name,
+    date:         finalDate,
+    time:         finalTime,
+    duration:     parseInt(dur) || 30,
+    type:         type,
+    treatment_id: (_t && _t.dbId) ? _t.dbId : null,
+    status:       apptStatus,
+    color:        apptColor,
+    stroke:       apptStroke,
+    notes:        finalNotes,
+    provider_id:  provId,
+    is_planned:   isPlannedNow
+  };
+
+  // Gap 7: detect "is_planned column missing / NOT NULL on date|time" errors
+  // so we can transparently fall back to a legacy insert.
+  function isPlannedMigrationMissing(err) {
+    if (!err) return false;
+    var emsg = (err.message || '').toLowerCase();
+    var code = err.code || '';
+    var isPlannedCol = emsg.indexOf('is_planned') !== -1;
+    var notNullDate  = /violates not-null constraint.*"(date|time)"/i.test(err.message || '');
+    var schedHasDate = emsg.indexOf('scheduled_has_date') !== -1;
+    if (isPlannedCol && (code === '42703' || code === 'PGRST204' || emsg.indexOf('does not exist') !== -1 || emsg.indexOf('schema cache') !== -1)) return true;
+    if (notNullDate || schedHasDate) return true;
+    return false;
+  }
+  function buildLegacyRow(src) {
+    var row = Object.assign({}, src);
+    delete row.is_planned;
+    if (row.date === null) row.date = toDay();
+    if (row.time === null) row.time = '12:00';
+    return row;
+  }
+
+  var migrationMissing = false;
+  var savedRow = null;
+
+  if (editingApptId) {
+    // UPDATE path — used when editing/scheduling an existing planned appt.
+    var upd = await window.sb.from('appointments').update(apptData)
+      .eq('id', editingApptId).eq('doctor_id', currentUser.id)
+      .select().single();
+    if (upd.error && isPlannedMigrationMissing(upd.error)) {
+      migrationMissing = true;
+      console.warn('Gap 7: planned migration not applied — falling back. Migration SQL: ALTER TABLE appointments ADD COLUMN is_planned BOOLEAN NOT NULL DEFAULT FALSE; ALTER TABLE appointments ALTER COLUMN date DROP NOT NULL; ALTER TABLE appointments ALTER COLUMN time DROP NOT NULL;');
+      upd = await window.sb.from('appointments').update(buildLegacyRow(apptData))
+        .eq('id', editingApptId).eq('doctor_id', currentUser.id)
+        .select().single();
+    }
+    if (upd.error) { showToast('❌ خطأ في حفظ الموعد: ' + upd.error.message); return; }
+    savedRow = upd.data;
+  } else {
+    var ins = await window.sb.from('appointments').insert(apptData).select().single();
+    if (ins.error && isPlannedMigrationMissing(ins.error)) {
+      migrationMissing = true;
+      console.warn('Gap 7: planned migration not applied (INSERT) — falling back.');
+      ins = await window.sb.from('appointments').insert(buildLegacyRow(apptData)).select().single();
+    }
+    if (ins.error) { showToast('❌ خطأ في حفظ الموعد: ' + ins.error.message); return; }
+    savedRow = ins.data;
+  }
+
+  // Update local lists so UI is consistent without a full reload.
+  // - Planned row: append to plannedAppts
+  // - Scheduled row (today or later): append to upcomingAppts
+  // - Edit case: replace existing entry in whichever list it belonged to
+  if (savedRow) {
+    // Strip from both lists first (in case the row moved between lists)
+    plannedAppts  = plannedAppts.filter(function(p){ return p.id !== savedRow.id; });
+    upcomingAppts = upcomingAppts.filter(function(u){ return u.id !== savedRow.id; });
+
+    if (savedRow.is_planned === true && !migrationMissing) {
+      plannedAppts.unshift(savedRow);
+    } else if (savedRow.date && savedRow.date >= toDay()) {
+      upcomingAppts.push({
+        id: savedRow.id, date: savedRow.date, time: savedRow.time,
+        type: savedRow.type, status: savedRow.status
+      });
+      upcomingAppts.sort(function(a,b){
+        return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
+      });
+    }
+  }
+
   closeModal('apptModal');
-  document.getElementById('aNotes').value='';
-  showToast('✅ تم حفظ الموعد في التقويم');
+  document.getElementById('aNotes').value = '';
+  document.getElementById('aReason').value = '';
+  if (chk) chk.checked = false;
+  // Capture intent BEFORE clearing editingApptId so the toast branch is correct.
+  var wasEditing  = (editingApptId !== null);
+  editingApptId = null;
+
+  renderPlannedAppts();
+
+  if (migrationMissing) {
+    showToast('⚠️ تم الحفظ كموعد عادي — يلزم ترقية قاعدة البيانات لميزة "مخطّط"');
+  } else if (isPlannedNow) {
+    // wasEditing distinguishes "edited a planned" from "created a planned"
+    showToast(wasEditing ? '✅ تم حفظ التعديلات' : '✅ تم حفظ الموعد المخطّط');
+  } else if (wasEditing) {
+    // Came in via quickSchedulePlannedFromProfile or editPlannedFromProfile,
+    // then unchecked the planned flag → user just scheduled a planned appt.
+    showToast('✅ تم جدولة الموعد المخطّط');
+  } else {
+    showToast('✅ تم حفظ الموعد في التقويم');
+  }
+}
+
+/* ─── Gap 7: Planned-appointments UI in patient profile ───────────────────── */
+
+/* Render the planned-appointments card. Hides the entire card when there are
+   no planned rows so the file tab stays clean for typical patients. */
+function renderPlannedAppts() {
+  var card = document.getElementById('plannedApptsCard');
+  var list = document.getElementById('plannedApptsList');
+  var cnt  = document.getElementById('plannedApptsCount');
+  if (!card || !list) return;
+  var planned = (plannedAppts || []).filter(function(p){ return p.is_planned === true; });
+  if (cnt) cnt.textContent = '(' + planned.length + ')';
+  if (planned.length === 0) {
+    card.style.display = 'none';
+    list.innerHTML = '';
+    return;
+  }
+  card.style.display = '';
+  var html = '';
+  for (var i = 0; i < planned.length; i++) {
+    var p = planned[i];
+    var typeStr = p.type ? ('🦷 ' + escapeHtml(p.type)) : '';
+    var noteStr = (p.notes || '').trim();
+    var reasonLine = [typeStr, escapeHtml(noteStr)].filter(function(s){ return !!s; }).join(' — ');
+    html += '<div class="planned-pp-row">'
+      + '<div class="planned-pp-icon">📋</div>'
+      + '<div class="planned-pp-info">'
+      +   '<div class="planned-pp-title">موعد مخطّط</div>'
+      +   '<div class="planned-pp-reason" title="' + reasonLine.replace(/"/g,'&quot;') + '">'
+      +     (reasonLine || '<span style="opacity:.5;">بدون تفاصيل</span>')
+      +   '</div>'
+      + '</div>'
+      + '<div class="planned-pp-actions">'
+      +   '<button class="btn-schedule-pp" onclick="quickSchedulePlannedFromProfile(\'' + p.id + '\')">📅 جدولة الآن</button>'
+      +   '<button onclick="editPlannedFromProfile(\'' + p.id + '\')" title="تعديل">✏️</button>'
+      +   '<button class="btn-delete-pp" onclick="deletePlannedFromProfile(\'' + p.id + '\')" title="حذف">🗑️</button>'
+      + '</div>'
+      + '</div>';
+  }
+  list.innerHTML = html;
+}
+
+/* Open the appointment modal pre-filled to create a planned (no-date) appt. */
+function openPlannedApptModal() {
+  editingApptId = null;
+  // Reset modal to fresh state for create-planned
+  populateApptTypes();
+  document.getElementById('aDate').value = toDay();   // dummy default; hidden
+  document.getElementById('aTime').value = '09:00';
+  document.getElementById('aStatus').value = 'confirmed';
+  document.getElementById('aReason').value = '';
+  document.getElementById('aNotes').value  = '';
+  // Title + checkbox
+  var t = document.getElementById('apptModalTitle');
+  if (t) t.textContent = '📋 موعد مخطّط جديد';
+  var saveBtn = document.getElementById('aSaveBtn');
+  if (saveBtn) saveBtn.textContent = 'حفظ المخطّط';
+  var chk = document.getElementById('aIsPlanned');
+  if (chk) { chk.checked = true; }
+  // Provider picker (reuse openApptModal's logic by inlining the same setup)
+  setupApptProviderPicker(null);
+  onApptPlannedToggle();   // sync field visibility
+  openModal('apptModal');
+}
+
+/* Edit an existing planned appointment — opens modal pre-filled. */
+function editPlannedFromProfile(id) {
+  var p = (plannedAppts || []).find(function(x){ return x.id === id; });
+  if (!p) { showToast('⚠️ الموعد غير موجود'); return; }
+  editingApptId = id;
+  populateApptTypes();
+  // Pre-fill type by name → option id (treatments dropdown uses treatment_key as value)
+  var _foundT = null;
+  for (var i = 0; i < TREATMENTS.length; i++) if (TREATMENTS[i].name === p.type) { _foundT = TREATMENTS[i]; break; }
+  if (_foundT) document.getElementById('aType').value = _foundT.id;
+  document.getElementById('aDur').value = String(p.duration || 60);
+  document.getElementById('aDate').value = toDay();   // hidden while planned
+  document.getElementById('aTime').value = '09:00';
+  document.getElementById('aStatus').value = p.status || 'confirmed';
+  document.getElementById('aReason').value = p.notes || '';
+  document.getElementById('aNotes').value  = '';
+  var t = document.getElementById('apptModalTitle');
+  if (t) t.textContent = '📋 تعديل موعد مخطّط';
+  var saveBtn = document.getElementById('aSaveBtn');
+  if (saveBtn) saveBtn.textContent = 'حفظ التعديلات';
+  var chk = document.getElementById('aIsPlanned');
+  if (chk) { chk.checked = true; }
+  setupApptProviderPicker(p.provider_id || null);
+  onApptPlannedToggle();
+  openModal('apptModal');
+}
+
+/* Quick-schedule from the planned list: opens the modal in "scheduling" mode —
+   the planned flag is off, date/time visible, ready for the user to set them. */
+function quickSchedulePlannedFromProfile(id) {
+  var p = (plannedAppts || []).find(function(x){ return x.id === id; });
+  if (!p) { showToast('⚠️ الموعد غير موجود'); return; }
+  editingApptId = id;
+  populateApptTypes();
+  var _foundT = null;
+  for (var i = 0; i < TREATMENTS.length; i++) if (TREATMENTS[i].name === p.type) { _foundT = TREATMENTS[i]; break; }
+  if (_foundT) document.getElementById('aType').value = _foundT.id;
+  document.getElementById('aDur').value = String(p.duration || 60);
+  document.getElementById('aDate').value = toDay();
+  document.getElementById('aTime').value = '09:00';
+  document.getElementById('aStatus').value = p.status || 'confirmed';
+  document.getElementById('aReason').value = '';
+  // Carry the planned reason forward into the regular notes field so it isn't lost.
+  document.getElementById('aNotes').value = p.notes || '';
+  var t = document.getElementById('apptModalTitle');
+  if (t) t.textContent = '📅 جدولة موعد مخطّط';
+  var saveBtn = document.getElementById('aSaveBtn');
+  if (saveBtn) saveBtn.textContent = 'جدولة الموعد';
+  var chk = document.getElementById('aIsPlanned');
+  if (chk) { chk.checked = false; }
+  setupApptProviderPicker(p.provider_id || null);
+  onApptPlannedToggle();
+  openModal('apptModal');
+  showToast('✏️ أدخل التاريخ والوقت ثم اضغط "جدولة الموعد"');
+}
+
+/* Delete a planned appointment (with confirm). */
+async function deletePlannedFromProfile(id) {
+  if (!confirm('حذف هذا الموعد المخطّط؟')) return;
+  var res = await window.sb.from('appointments').delete()
+    .eq('id', id).eq('doctor_id', currentUser.id);
+  if (res.error) { showToast('❌ خطأ في الحذف: ' + res.error.message); return; }
+  plannedAppts = plannedAppts.filter(function(p){ return p.id !== id; });
+  renderPlannedAppts();
+  showToast('🗑️ تم حذف الموعد المخطّط');
+}
+
+/* Toggle handler for the planned-flag checkbox inside the appt modal.
+   Shows/hides date+time row and the reason field. */
+function onApptPlannedToggle() {
+  var chk = document.getElementById('aIsPlanned');
+  if (!chk) return;
+  var planned   = !!chk.checked;
+  var dateRow   = document.getElementById('aDateTimeRow');
+  var reasonGrp = document.getElementById('aReasonGroup');
+  var note      = document.getElementById('aPlannedNote');
+  if (dateRow)   dateRow.style.display   = planned ? 'none' : '';
+  if (reasonGrp) reasonGrp.style.display = planned ? 'block' : 'none';
+  if (note)      note.style.display      = planned ? 'block' : 'none';
+}
+
+/* Provider picker setup, extracted so openApptModal/openPlannedApptModal/
+   editPlannedFromProfile/quickSchedulePlannedFromProfile can all share it.
+   `preselect` = clinic_doctors.id to highlight, or null for the OpenDental
+   3-tier default. */
+function setupApptProviderPicker(preselect) {
+  var pGroup = document.getElementById('apptProviderGroup');
+  var pSel = document.getElementById('aProvider');
+  if (!pGroup || !pSel) return;
+  if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
+    pGroup.style.display = 'none';
+    pSel.innerHTML = '';
+    return;
+  }
+  var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+  var listToShow = active.length > 0 ? active : CLINIC_DOCTORS;
+  pGroup.style.display = 'block';
+  pSel.innerHTML = listToShow.map(function(d){
+    var prefix = '';
+    if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
+    else if (d.is_owner) prefix = '⭐ ';
+    var inactiveStr = d.is_active === false ? ' (معطل)' : '';
+    return '<option value="' + d.id + '">' + prefix + escapeHtml(d.name) + inactiveStr + '</option>';
+  }).join('');
+  pSel.value = preselect || getDefaultProviderId(listToShow);
 }
 
 /* ── Populate selects ── */
@@ -4666,30 +5019,26 @@ function openSessionModal() {
   openModal('sessionModal');
 }
 function openApptModal() {
+  // Gap 7: reset editing state — this is the "+ موعد جديد" header button,
+  // a brand-new appointment flow. Any prior editingApptId must be cleared
+  // so saveAppt() takes the INSERT path (not UPDATE).
+  editingApptId = null;
   populateApptTypes();
   document.getElementById('aDate').value = toDay();
   document.getElementById('aStatus').value = 'confirmed';
-  // Populate provider picker (OpenDental-style default: user-link → owner → first active)
-  var pGroup = document.getElementById('apptProviderGroup');
-  var pSel = document.getElementById('aProvider');
-  if (pGroup && pSel) {
-    if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
-      pGroup.style.display = 'none';
-      pSel.innerHTML = '';
-    } else {
-      var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
-      var listToShow = active.length > 0 ? active : CLINIC_DOCTORS;
-      pGroup.style.display = 'block';
-      pSel.innerHTML = listToShow.map(function(d){
-        var prefix = '';
-        if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
-        else if (d.is_owner) prefix = '⭐ ';
-        var inactiveStr = d.is_active === false ? ' (معطل)' : '';
-        return '<option value="' + d.id + '">' + prefix + escapeHtml(d.name) + inactiveStr + '</option>';
-      }).join('');
-      pSel.value = getDefaultProviderId(listToShow);
-    }
-  }
+  document.getElementById('aReason').value = '';
+  document.getElementById('aNotes').value  = '';
+  // Reset modal title/save button to default labels
+  var t = document.getElementById('apptModalTitle');
+  if (t) t.textContent = '📅 موعد جديد';
+  var saveBtn = document.getElementById('aSaveBtn');
+  if (saveBtn) saveBtn.textContent = 'حفظ الموعد';
+  // Gap 7: planned flag unchecked by default for this entry point
+  var chk = document.getElementById('aIsPlanned');
+  if (chk) chk.checked = false;
+  onApptPlannedToggle();   // make sure date/time row is visible, reason hidden
+  // Provider picker (OpenDental-style default: user-link → owner → first active)
+  setupApptProviderPicker(null);
   openModal('apptModal');
 }
 
@@ -4719,6 +5068,8 @@ async function init() {
   safe(renderRecentSessions, 'renderRecentSessions');
   safe(renderPayments,       'renderPayments');
   safe(renderLabOrders,      'renderLabOrders');
+  // Gap 7: render planned-appointments card (hides itself when list is empty)
+  safe(renderPlannedAppts,   'renderPlannedAppts');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
