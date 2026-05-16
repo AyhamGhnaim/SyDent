@@ -110,6 +110,27 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-danger { background: var(--red); color: #fff; }
 .btn-danger:hover { opacity: .88; }
 
+/* ── Bug #2: Maintenance card (backfill orphaned splits) ── */
+.maint-card{background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:16px;margin-top:14px;}
+.maint-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.maint-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.maint-sub{font-size:12px;color:var(--text2);line-height:1.6;}
+.btn-maint-refresh{background:transparent;border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:8px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}
+.btn-maint-refresh:hover{border-color:var(--green);color:var(--green);}
+.btn-maint-refresh:disabled{opacity:.5;cursor:wait;}
+.maint-status{display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:var(--bg2);border-radius:8px;border:1px solid var(--border);}
+.maint-row{display:flex;justify-content:space-between;font-size:13px;}
+.maint-lbl{color:var(--text2);font-weight:600;}
+.maint-val{font-weight:700;}
+.maint-val.muted{color:var(--text2);}
+.maint-val.green{color:var(--green);}
+.maint-val.yellow{color:var(--yellow);}
+.maint-val.red{color:var(--red);}
+.maint-progress{margin-top:12px;}
+.maint-progress-bar{width:100%;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.maint-progress-fill{height:100%;background:linear-gradient(90deg,var(--green),#26d48e);width:0%;transition:width .3s;}
+.maint-progress-text{text-align:center;font-size:12px;color:var(--text2);margin-top:6px;font-weight:600;}
+
 .toast {
   position: fixed; bottom: 24px; left: 50%;
   transform: translateX(-50%) translateY(80px);
@@ -241,6 +262,30 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
       <div class="section-sub">قوالب جاهزة لتسريع حجز المواعيد الشائعة (تنظيف، علاج عصب، إلخ). كل قالب يحدد المدة الافتراضية والعلاج المرتبط.</div>
       <button type="button" class="btn btn-primary" onclick="openApptTypeModal()" id="btnNewApptType">+ إضافة قالب جديد</button>
       <div id="apptTypesList" style="margin-top:18px;"></div>
+    </div>
+
+    <!-- Bug #2: Backfill orphaned payment splits -->
+    <div class="section">
+      <div class="section-title">🛠️ صيانة البيانات</div>
+      <div class="section-sub">أدوات لمعالجة بيانات قديمة قد تحتاج إعادة معالجة.</div>
+
+      <div class="maint-card" id="backfillCard">
+        <div class="maint-head">
+          <div>
+            <div class="maint-title">📦 توزيع الدفعات القديمة</div>
+            <div class="maint-sub">الدفعات المسجَّلة قبل ترقية النظام (Migration 3) قد لا تملك توزيعاً تلقائياً على الجلسات، مما يُفقد دقّة التقارير المالية.</div>
+          </div>
+          <button type="button" class="btn-maint-refresh" onclick="scanOrphanedPayments()" title="فحص الدفعات بدون توزيع">🔍 فحص</button>
+        </div>
+        <div class="maint-status" id="backfillStatus">
+          <div class="maint-row"><span class="maint-lbl">الحالة:</span><span class="maint-val muted" id="backfillStatusText">لم يتم الفحص بعد</span></div>
+        </div>
+        <div class="maint-progress" id="backfillProgress" style="display:none;">
+          <div class="maint-progress-bar"><div class="maint-progress-fill" id="backfillProgressFill"></div></div>
+          <div class="maint-progress-text" id="backfillProgressText">0 / 0</div>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnBackfillRun" onclick="runBackfill()" disabled style="margin-top:12px;">🔧 توزيع الدفعات تلقائياً</button>
+      </div>
     </div>
 
     <!-- 2. تغيير البريد -->
@@ -387,6 +432,8 @@ function showToast(msg, isError = false) {
   await loadAppointmentSettings();
   // Gap 8: load appointment-type templates + treatments dropdown
   await loadAppointmentTypes();
+  // Bug #2: auto-scan for orphaned payment splits (fault-tolerant)
+  await scanOrphanedPayments();
 })();
 
 // ─── Gap 5: Appointment settings (no-show fee) ───
@@ -1118,6 +1165,363 @@ async function deleteApptType(id) {
     console.error('deleteApptType exception:', e);
     showToast('❌ خطأ غير متوقع', true);
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Bug #2: Backfill orphaned payment splits
+   ─────────────────────────────────────────────────────────────────────────
+   On pre-Migration-3 databases, payments existed without payment_splits.
+   After Migration 3 was applied, any NEW session/payment add/delete triggers
+   reallocatePatientFunds() in patient-profile.html which fixes that patient.
+   But quiet patients (no recent activity) keep their orphaned payments — and
+   provider-reports.html falls back to the less-precise proportional logic.
+
+   This UI lets the user scan + fix all orphaned payments in one click. It's
+   purely UI here; the actual FIFO rebuild logic is inlined below (mirrors
+   reallocatePatientFunds but operates per patient one at a time).
+
+   No competitor (OpenDental, Dentrix Ascend, Curve) ships an equivalent
+   one-click backfill because they don't have the same Migration history.
+   This is a SyDent-specific tool. */
+
+var _orphanScan = {
+  payments: [],          // payments without any splits
+  affectedPatients: [],  // unique patient_ids
+  scannedAt: null
+};
+var _backfillInFlight = false;
+
+/* Detect missing-table / missing-column errors so we can degrade gracefully. */
+function _isSplitsTableMissing(err) {
+  if (!err) return false;
+  if (err.code === '42P01' || err.code === 'PGRST205') return true;
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('payment_splits') !== -1 && (m.indexOf('does not exist') !== -1 || m.indexOf('not found') !== -1 || m.indexOf('schema cache') !== -1);
+}
+function _isManualAllocMissing(err) {
+  if (!err) return false;
+  if (err.code === '42703' || err.code === 'PGRST204') return true;
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('manual_allocation') !== -1;
+}
+
+/* Scan for payments that have no splits attached. Two passes:
+     1. Load all payments for this doctor (id, amount, date, patient_id, manual_allocation).
+     2. Load all payment_splits.payment_id for the same doctor.
+     3. Diff in JS: payments where id is NOT in the splits-payment-id set.
+   Then group by patient_id for the affected count. */
+async function scanOrphanedPayments() {
+  if (!currentUser) {
+    showToast('⚠️ بيانات الحساب غير متاحة', true);
+    return;
+  }
+  var btnScan = document.querySelector('#backfillCard .btn-maint-refresh');
+  var btnRun  = document.getElementById('btnBackfillRun');
+  if (btnScan) { btnScan.disabled = true; btnScan.textContent = '⏳ يفحص…'; }
+  if (btnRun)  { btnRun.disabled = true; }
+
+  try {
+    // 1. Load all payments. select '*' so manual_allocation comes back if column exists.
+    var payRes = await window.sb.from('ledger_payments')
+      .select('id, amount, date, patient_id, created_at, manual_allocation')
+      .eq('doctor_id', currentUser.id);
+    // Graceful: if manual_allocation column missing, retry without it.
+    if (payRes.error && _isManualAllocMissing(payRes.error)) {
+      payRes = await window.sb.from('ledger_payments')
+        .select('id, amount, date, patient_id, created_at')
+        .eq('doctor_id', currentUser.id);
+    }
+    if (payRes.error) {
+      console.warn('scanOrphans: payments load failed:', payRes.error);
+      setBackfillStatus('فشل تحميل الدفعات', 'red');
+      return;
+    }
+    var allPayments = payRes.data || [];
+
+    // 2. Load all splits to know which payments DO have splits.
+    var spRes = await window.sb.from('payment_splits')
+      .select('payment_id')
+      .eq('doctor_id', currentUser.id);
+    if (spRes.error) {
+      if (_isSplitsTableMissing(spRes.error)) {
+        setBackfillStatus('قاعدة البيانات تحتاج Migration 3 أولاً', 'yellow');
+        return;
+      }
+      console.warn('scanOrphans: splits load failed:', spRes.error);
+      setBackfillStatus('فشل تحميل التوزيعات', 'red');
+      return;
+    }
+    var splitPayIds = {};
+    (spRes.data || []).forEach(function(sp){ splitPayIds[sp.payment_id] = true; });
+
+    // 3. Filter to payments WITHOUT any splits AND not flagged as manual_allocation.
+    // (Manual payments with zero splits is theoretically valid: 100% unearned that
+    //  the user explicitly cleared. We don't touch those.)
+    var orphans = allPayments.filter(function(p){
+      if (splitPayIds[p.id]) return false;
+      if (p.manual_allocation === true) return false;
+      return true;
+    });
+
+    // Group by patient.
+    var patSet = {};
+    orphans.forEach(function(p){ if (p.patient_id) patSet[p.patient_id] = true; });
+    var patientCount = Object.keys(patSet).length;
+
+    _orphanScan.payments         = orphans;
+    _orphanScan.affectedPatients = Object.keys(patSet);
+    _orphanScan.scannedAt        = new Date();
+
+    // Render status
+    var statusEl = document.getElementById('backfillStatus');
+    if (statusEl) {
+      var statusColor = orphans.length === 0 ? 'green' : 'yellow';
+      var statusText  = orphans.length === 0
+        ? '✓ كل الدفعات موزّعة بشكل صحيح'
+        : 'يوجد ' + orphans.length + ' دفعة تحتاج إعادة توزيع';
+      statusEl.innerHTML =
+          '<div class="maint-row"><span class="maint-lbl">الحالة:</span><span class="maint-val ' + statusColor + '">' + statusText + '</span></div>'
+        + '<div class="maint-row"><span class="maint-lbl">📊 الدفعات بدون توزيع:</span><span class="maint-val yellow">' + orphans.length + '</span></div>'
+        + '<div class="maint-row"><span class="maint-lbl">👥 المرضى المتأثرين:</span><span class="maint-val yellow">' + patientCount + '</span></div>';
+    }
+
+    if (btnRun) btnRun.disabled = (orphans.length === 0);
+  } finally {
+    if (btnScan) { btnScan.disabled = false; btnScan.textContent = '🔍 فحص'; }
+  }
+}
+
+function setBackfillStatus(text, color) {
+  var statusEl = document.getElementById('backfillStatus');
+  if (!statusEl) return;
+  statusEl.innerHTML = '<div class="maint-row"><span class="maint-lbl">الحالة:</span><span class="maint-val ' + (color || 'muted') + '">' + text + '</span></div>';
+}
+
+/* Run FIFO allocation for every affected patient.
+   For each patient: load their sessions + payments + existing splits, then
+   run the same chronological FIFO rebuild as reallocatePatientFunds in
+   patient-profile.html (inlined here to avoid duplicating loaded state). */
+async function runBackfill() {
+  if (_backfillInFlight) return;
+  if (!_orphanScan.affectedPatients.length) {
+    showToast('لا توجد دفعات تحتاج توزيع', false);
+    return;
+  }
+  if (!confirm('سيتم توزيع ' + _orphanScan.payments.length + ' دفعة على ' + _orphanScan.affectedPatients.length + ' مريض بنظام FIFO تلقائي.\n\nالدفعات الموزّعة يدوياً لن تتأثر.\n\nمتابعة؟')) return;
+
+  _backfillInFlight = true;
+  var btnRun  = document.getElementById('btnBackfillRun');
+  var btnScan = document.querySelector('#backfillCard .btn-maint-refresh');
+  if (btnRun)  { btnRun.disabled = true; btnRun.textContent = '⏳ جارٍ التوزيع…'; }
+  if (btnScan) { btnScan.disabled = true; }
+  var progressEl   = document.getElementById('backfillProgress');
+  var progressFill = document.getElementById('backfillProgressFill');
+  var progressText = document.getElementById('backfillProgressText');
+  if (progressEl) progressEl.style.display = 'block';
+
+  var totalPatients = _orphanScan.affectedPatients.length;
+  var done = 0;
+  var successCount = 0;
+  var failCount = 0;
+
+  try {
+    for (var pi = 0; pi < _orphanScan.affectedPatients.length; pi++) {
+      var patientId = _orphanScan.affectedPatients[pi];
+      var ok = await _backfillOnePatient(patientId);
+      if (ok) successCount++;
+      else failCount++;
+      done++;
+      if (progressFill) progressFill.style.width = Math.round((done / totalPatients) * 100) + '%';
+      if (progressText) progressText.textContent = done + ' / ' + totalPatients + ' مريض';
+    }
+
+    if (failCount === 0) {
+      showToast('✅ تم توزيع كل الدفعات بنجاح (' + successCount + ' مريض)');
+    } else {
+      showToast('⚠️ تم توزيع ' + successCount + ' بنجاح، فشل ' + failCount, true);
+    }
+
+    // Re-scan to refresh the counts (should now be zero on success).
+    await scanOrphanedPayments();
+  } finally {
+    _backfillInFlight = false;
+    if (btnRun)  { btnRun.disabled = false; btnRun.textContent = '🔧 توزيع الدفعات تلقائياً'; }
+    if (btnScan) { btnScan.disabled = false; }
+    // Keep the progress visible so user sees the result; reset on next scan.
+  }
+}
+
+/* FIFO rebuild for a single patient. Inlined from patient-profile.html's
+   buildFifoSplits + reallocatePatientFunds.  Returns true on success. */
+async function _backfillOnePatient(patientId) {
+  if (!patientId || !currentUser) return false;
+  try {
+    // Load this patient's sessions + payments + existing splits in parallel.
+    var sessP = window.sb.from('ledger_sessions')
+      .select('id, cost, status, date, created_at, provider_id')
+      .eq('doctor_id', currentUser.id)
+      .eq('patient_id', patientId);
+    // For payments we need manual_allocation; same graceful retry as scan.
+    var payP = window.sb.from('ledger_payments')
+      .select('id, amount, date, created_at, patient_id, doctor_id, manual_allocation')
+      .eq('doctor_id', currentUser.id)
+      .eq('patient_id', patientId);
+    var spP = window.sb.from('payment_splits')
+      .select('id, payment_id, session_id, amount, is_unearned, provider_id')
+      .eq('doctor_id', currentUser.id)
+      .eq('patient_id', patientId);
+
+    var sessRes = await sessP;
+    var payRes  = await payP;
+    if (payRes.error && _isManualAllocMissing(payRes.error)) {
+      payRes = await window.sb.from('ledger_payments')
+        .select('id, amount, date, created_at, patient_id, doctor_id')
+        .eq('doctor_id', currentUser.id)
+        .eq('patient_id', patientId);
+    }
+    var spRes   = await spP;
+
+    if (sessRes.error || payRes.error || spRes.error) {
+      console.warn('backfill ' + patientId + ': load failed', sessRes.error || payRes.error || spRes.error);
+      return false;
+    }
+    var sessions = sessRes.data || [];
+    var payments = payRes.data || [];
+    var splits   = spRes.data || [];
+
+    if (!payments.length) return true;   // nothing to do
+
+    // Identify manual payment IDs (preserved during rebuild).
+    var manualPayIds = {};
+    for (var mi = 0; mi < payments.length; mi++) {
+      if (payments[mi].manual_allocation === true) manualPayIds[payments[mi].id] = true;
+    }
+
+    // 1. DELETE non-manual splits for this patient.
+    var manualIdList = Object.keys(manualPayIds);
+    var delQuery = window.sb.from('payment_splits').delete()
+      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
+    if (manualIdList.length) {
+      delQuery = delQuery.not('payment_id', 'in', '(' + manualIdList.join(',') + ')');
+    }
+    var delRes = await delQuery;
+    if (delRes.error) {
+      console.warn('backfill ' + patientId + ': delete failed', delRes.error);
+      return false;
+    }
+
+    // 2. Build FIFO splits for non-manual payments, chronologically.
+    var nonManualPayments = payments.filter(function(p){ return !manualPayIds[p.id]; });
+    nonManualPayments.sort(function(a, b){
+      var ad = String(a.date || '9999-12-31');
+      var bd = String(b.date || '9999-12-31');
+      if (ad < bd) return -1;
+      if (ad > bd) return 1;
+      var ac = String(a.created_at || '');
+      var bc = String(b.created_at || '');
+      if (ac < bc) return -1;
+      if (ac > bc) return 1;
+      var ai = String(a.id || '');
+      var bi = String(b.id || '');
+      if (ai < bi) return -1;
+      if (ai > bi) return 1;
+      return 0;
+    });
+
+    // Pre-seed with manual splits (already-consumed capacity).
+    var accumulated = splits.filter(function(sp){ return manualPayIds[sp.payment_id]; });
+
+    for (var i = 0; i < nonManualPayments.length; i++) {
+      var splitRows = _backfillBuildFifo(nonManualPayments[i], sessions, accumulated);
+      for (var j = 0; j < splitRows.length; j++) accumulated.push(splitRows[j]);
+    }
+
+    // Filter to only the NEW splits we need to insert (skip manual ones).
+    var toInsert = accumulated.filter(function(sp){ return !manualPayIds[sp.payment_id]; });
+    if (!toInsert.length) return true;
+
+    var insRes = await window.sb.from('payment_splits').insert(toInsert);
+    if (insRes.error) {
+      console.warn('backfill ' + patientId + ': insert failed', insRes.error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('backfill ' + patientId + ' threw:', e);
+    return false;
+  }
+}
+
+/* Same FIFO algorithm as patient-profile.html's buildFifoSplits.
+   Kept in sync — if you change one, change the other.
+   Integer math throughout (BIGINT in DB). */
+function _backfillBuildFifo(payment, sessionsList, existingSplits) {
+  var paymentRem = Math.max(0, Math.round(parseFloat(payment.amount) || 0));
+  if (paymentRem <= 0) return [];
+
+  var paidBySession = {};
+  (existingSplits || []).forEach(function(s){
+    if (s.session_id) {
+      paidBySession[s.session_id] = (paidBySession[s.session_id] || 0) + (parseInt(s.amount, 10) || 0);
+    }
+  });
+
+  var eligible = (sessionsList || []).slice().filter(function(s){
+    return s && s.id && (parseFloat(s.cost) || 0) > 0;
+  });
+  eligible.sort(function(a, b){
+    var aDone = a.status === 'completed' ? 0 : 1;
+    var bDone = b.status === 'completed' ? 0 : 1;
+    if (aDone !== bDone) return aDone - bDone;
+    var ad = String(a.date || '9999-12-31');
+    var bd = String(b.date || '9999-12-31');
+    if (ad < bd) return -1;
+    if (ad > bd) return 1;
+    var ac = String(a.created_at || '');
+    var bc = String(b.created_at || '');
+    if (ac < bc) return -1;
+    if (ac > bc) return 1;
+    var ai = String(a.id || '');
+    var bi = String(b.id || '');
+    if (ai < bi) return -1;
+    if (ai > bi) return 1;
+    return 0;
+  });
+
+  var newSplits = [];
+  for (var i = 0; i < eligible.length && paymentRem > 0; i++) {
+    var sess = eligible[i];
+    var alreadyPaid = paidBySession[sess.id] || 0;
+    var sessCost = Math.round(parseFloat(sess.cost) || 0);
+    var remaining = sessCost - alreadyPaid;
+    if (remaining <= 0) continue;
+    var take = Math.min(paymentRem, remaining);
+    newSplits.push({
+      doctor_id:    payment.doctor_id || currentUser.id,
+      payment_id:   payment.id,
+      patient_id:   payment.patient_id,
+      session_id:   sess.id,
+      provider_id:  sess.provider_id || null,
+      amount:       take,
+      is_unearned:  false,
+      payment_date: payment.date || null
+    });
+    paymentRem -= take;
+  }
+
+  if (paymentRem > 0) {
+    newSplits.push({
+      doctor_id:    payment.doctor_id || currentUser.id,
+      payment_id:   payment.id,
+      patient_id:   payment.patient_id,
+      session_id:   null,
+      provider_id:  null,
+      amount:       paymentRem,
+      is_unearned:  true,
+      payment_date: payment.date || null
+    });
+  }
+  return newSplits;
 }
 
 initSidebar('settings');
