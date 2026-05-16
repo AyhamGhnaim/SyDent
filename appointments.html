@@ -2060,8 +2060,10 @@ async function submitAppt(e) {
   var migrationMissing = false;
 
   if (editingId) {
+    console.info('[save-appt] UPDATE attempting:', { id: editingId, status: apptData.status });
     var upd = await window.sb.from('appointments').update(apptData)
       .eq('id', editingId).eq('doctor_id', currentUser.id);
+    console.info('[save-appt] UPDATE result:', upd.error ? ('ERROR: ' + upd.error.message) : 'OK');
     // Retry with 'confirmed' if the DB rejects a new lifecycle status.
     if (upd.error && isStatusConstraintError(upd.error) && newStatuses.indexOf(apptData.status) !== -1) {
       migrationMissing = true;
