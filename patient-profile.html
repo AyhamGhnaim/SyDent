@@ -211,13 +211,63 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-opt.selected{background:rgba(46,232,158,.12);border-color:var(--green);}
 .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
 /* Treatment status badges on chart */
-.tooth-status-badge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:5;}
+.tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);cursor:help;}
 .status-planned{background:#ef4444;}
 .status-completed{background:#3b82f6;}
-.status-existing_current{background:#10b981;opacity:.75;}  /* EC — done in our clinic */
-.status-existing_other{background:#9ca3af;opacity:.55;}    /* EO — done elsewhere */
+.status-existing_current{background:#10b981;opacity:.85;}  /* EC — done in our clinic */
+.status-existing_other{background:#9ca3af;opacity:.65;}    /* EO — done elsewhere */
 .status-existing{background:#9ca3af;opacity:.7;}           /* legacy fallback (pre-migration) */
 .status-referred{background:#f59e0b;}
+
+/* Custom status tooltip: appears on tooth-cell hover (not just badge),
+   positioned ABOVE the tooth so the doctor sees full text without precise aim.
+   The data-status-tip attribute carries the Arabic label.
+   Tooth cells are ~30-44px wide; tooltip can extend wider since pointer-events:none. */
+.tooth-cell[data-status-tip]::after{
+  content: attr(data-status-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.92);
+  background: var(--bg);
+  color: var(--text);
+  border: 1.5px solid var(--green);
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Cairo',sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s, transform .15s;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  direction: rtl;
+}
+.tooth-cell[data-status-tip]:hover::after{
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+/* Near the right edge of the chart, flip tooltip to the left to keep it on-screen.
+   Teeth 16/17/18 (upper-right) and 46/47/48 (lower-right) get this class via JS. */
+.tooth-cell.tip-flip-left[data-status-tip]::after{
+  left: auto;
+  right: 0;
+  transform: translateX(0) scale(0.92);
+}
+.tooth-cell.tip-flip-left[data-status-tip]:hover::after{
+  transform: translateX(0) scale(1);
+}
+/* Near the left edge, flip right (teeth 28/27/26 and 38/37/36) */
+.tooth-cell.tip-flip-right[data-status-tip]::after{
+  left: 0;
+  right: auto;
+  transform: translateX(0) scale(0.92);
+}
+.tooth-cell.tip-flip-right[data-status-tip]:hover::after{
+  transform: translateX(0) scale(1);
+}
 .topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
 
@@ -2671,6 +2721,13 @@ function renderTeeth() {
 /* Add a small color dot on each tooth indicating its dominant treatment status.
    Skips teeth with no treatments. */
 function addStatusBadges() {
+  // Clean slate: remove any stale tooltips/flip classes from a previous render.
+  // Without this, a tooth that lost its badge (status changed to 'completed' or
+  // treatment was removed) would still show its old hover tooltip.
+  document.querySelectorAll('.tooth-cell[data-status-tip]').forEach(function(c){
+    c.removeAttribute('data-status-tip');
+    c.classList.remove('tip-flip-left','tip-flip-right');
+  });
   var allTeeth = UPPER_T.concat(LOWER_T);
   for (var i=0; i<allTeeth.length; i++) {
     var num = allTeeth[i];
@@ -2686,11 +2743,25 @@ function addStatusBadges() {
     // Remove any old badge
     var old = cell.querySelector('.tooth-status-badge');
     if (old) old.remove();
-    // Add new badge
+    // Add new badge (no native title — we use custom CSS tooltip on the whole cell)
     var badge = document.createElement('div');
     badge.className = 'tooth-status-badge status-' + status;
-    badge.title = 'الحالة: ' + (STATUS_LABELS[status] || status);
     cell.appendChild(badge);
+    // Custom tooltip — visible when hovering anywhere on the tooth cell, not just the small badge.
+    // The :after pseudo-element on .tooth-cell uses this attribute as its content.
+    cell.setAttribute('data-status-tip', STATUS_LABELS[status] || status);
+    // Auto-flip the tooltip near chart edges so it never gets clipped off-screen.
+    // FDI numbering: rightmost-upper = 18/17/16, rightmost-lower = 48/47/46.
+    // Leftmost-upper = 28/27/26, leftmost-lower = 38/37/36.
+    cell.classList.remove('tip-flip-left','tip-flip-right');
+    var numInt = parseInt(num, 10);
+    if (numInt === 18 || numInt === 17 || numInt === 16
+        || numInt === 48 || numInt === 47 || numInt === 46) {
+      cell.classList.add('tip-flip-left');
+    } else if (numInt === 28 || numInt === 27 || numInt === 26
+        || numInt === 38 || numInt === 37 || numInt === 36) {
+      cell.classList.add('tip-flip-right');
+    }
     // Apply visual treatment to the tooth shape
     var shape = cell.querySelector('.tooth-shape');
     if (shape) {
