@@ -211,7 +211,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-opt.selected{background:rgba(46,232,158,.12);border-color:var(--green);}
 .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
 /* Treatment status badges on chart */
-.tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);cursor:help;}
+.tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);pointer-events:none;}
 .status-planned{background:#ef4444;}
 .status-completed{background:#3b82f6;}
 .status-existing_current{background:#10b981;opacity:.85;}  /* EC — done in our clinic */
@@ -2686,11 +2686,14 @@ function addStatusBadges() {
     // Remove any old badge
     var old = cell.querySelector('.tooth-status-badge');
     if (old) old.remove();
-    // Add new badge with native title tooltip (browser shows it under the cursor)
+    // Add new badge — pointer-events:none so the cell beneath receives the hover.
+    // The browser tooltip is attached to the cell itself for a wider hover target.
     var badge = document.createElement('div');
     badge.className = 'tooth-status-badge status-' + status;
-    badge.title = STATUS_LABELS[status] || status;
     cell.appendChild(badge);
+    // Native browser tooltip on the cell — appears under the cursor automatically,
+    // never gets clipped at screen edges (the browser handles positioning).
+    cell.title = STATUS_LABELS[status] || status;
     // Apply visual treatment to the tooth shape
     var shape = cell.querySelector('.tooth-shape');
     if (shape) {
@@ -2757,8 +2760,8 @@ var BUNDLE_ITEMS = [];
 var STATUS_LABELS = {
   planned:          'مخطط',
   completed:        'منجز',
-  existing_current: 'موجود — من عيادتنا',
-  existing_other:   'موجود — من عيادة أخرى',
+  existing_current: 'من عيادتنا',
+  existing_other:   'من عيادة أخرى',
   existing:         'موجود مسبقاً',           // legacy: pre-migration rows
   referred:         'محوّل'
 };
