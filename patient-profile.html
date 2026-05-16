@@ -481,8 +481,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-row">
         <div class="form-group"><label>الحالة</label>
           <select id="aStatus">
-            <option value="confirmed">مؤكد</option>
-            <option value="pending" selected>معلّق</option>
+            <option value="confirmed" selected>مؤكد</option>
+            <option value="pending">معلّق</option>
             <option value="cancelled">ملغى</option>
           </select>
         </div>
@@ -3748,7 +3748,7 @@ async function saveAppt() {
   var dur   = document.getElementById('aDur').value;
   var notes = document.getElementById('aNotes').value.trim();
   var statusEl = document.getElementById('aStatus');
-  var apptStatus = (statusEl && statusEl.value) ? statusEl.value : 'pending';
+  var apptStatus = (statusEl && statusEl.value) ? statusEl.value : 'confirmed';
   var provEl = document.getElementById('aProvider');
   var provId = (provEl && provEl.value) ? provEl.value : getDefaultProviderId(CLINIC_DOCTORS);
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
@@ -4224,8 +4224,9 @@ async function _saveLabOrderInner() {
       type: workName,
       treatment_id: (trObj && trObj.dbId) ? trObj.dbId : null,
       // Match the system's existing appointment-status convention (pending/confirmed/cancelled).
-      // 'pending' is the same default saveAppt() and the calendar UI use.
-      status: 'pending',
+      // 'confirmed' is the same default saveAppt() and the calendar UI use — new appointments
+      // start as confirmed; the doctor can manually change to pending/cancelled if needed.
+      status: 'confirmed',
       color: apptColor,
       stroke: apptStroke,
       notes: 'موعد تركيب — أُنشئ تلقائياً من طلب المخبر',
@@ -4571,7 +4572,7 @@ function openSessionModal() {
 function openApptModal() {
   populateApptTypes();
   document.getElementById('aDate').value = toDay();
-  document.getElementById('aStatus').value = 'pending';
+  document.getElementById('aStatus').value = 'confirmed';
   // Populate provider picker (OpenDental-style default: user-link → owner → first active)
   var pGroup = document.getElementById('apptProviderGroup');
   var pSel = document.getElementById('aProvider');
