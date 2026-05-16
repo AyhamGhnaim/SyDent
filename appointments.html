@@ -972,8 +972,8 @@ function getApptLabBadge(appt) {
         icon: '🧪',
         color: '#63b3ed',
         title: hasDirect
-          ? 'طلب مخبر مرتبط بهذا الموعد قيد العمل'
-          : 'طلب مخبر قيد العمل'
+          ? 'طلب مخبر مرتبط بهذا الموعد'
+          : 'طلب مخبر نشط'
       };
     }
   }
@@ -1396,9 +1396,9 @@ function renderApptLabOrders(appt) {
     var statusAr  = '—';
     var statusBg  = 'rgba(255,255,255,0.06)';
     var statusCol = 'var(--text2)';
-    if (o.status === 'sent')     { statusAr = 'قيد العمل';    statusBg = 'rgba(99,179,237,0.15)';  statusCol = '#63b3ed'; }
-    else if (o.status === 'received')  { statusAr = 'مستلَم';       statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
-    else if (o.status === 'checked')   { statusAr = 'جاهز للتركيب'; statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
+    if (o.status === 'sent')     { statusAr = 'تم التسليم للمخبر';    statusBg = 'rgba(99,179,237,0.15)';  statusCol = '#63b3ed'; }
+    else if (o.status === 'received')  { statusAr = 'تم الاستلام من المخبر'; statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
+    else if (o.status === 'checked')   { statusAr = 'تم الفحص';              statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
 
     // Late tag only applies when work hasn't physically arrived yet (status='sent').
     // Once received/checked, the lab work is at the clinic — no point warning "late".
@@ -1476,7 +1476,7 @@ async function completeApptWithProcedures() {
   });
   var promptMsg = 'إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟';
   if (linkedLabsForPrompt.length) {
-    promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "سُلِّم للمريض".';
+    promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "تم التركيب".';
   }
   if (!confirm(promptMsg)) return;
 

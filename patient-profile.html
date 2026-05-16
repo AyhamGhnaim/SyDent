@@ -1009,17 +1009,17 @@ function needsLab(treatmentKey) {
 }
 
 var LAB_STATUSES = {
-  'sent':      { ar: 'قيد العمل',     color: '#63b3ed', bg: 'rgba(99,179,237,0.15)' },
-  'received':  { ar: 'مستلَم',         color: '#f5c842', bg: 'rgba(245,200,66,0.15)' },
-  'checked':   { ar: 'جاهز للتركيب',  color: '#2ee89e', bg: 'rgba(46,232,158,0.15)' },
-  'delivered': { ar: 'سُلِّم للمريض',   color: '#a3a3a3', bg: 'rgba(163,163,163,0.15)' },
-  'rejected':  { ar: 'مرفوض',         color: '#ef5350', bg: 'rgba(239,83,80,0.15)' }
+  'sent':      { ar: 'تم التسليم للمخبر',    color: '#63b3ed', bg: 'rgba(99,179,237,0.15)' },
+  'received':  { ar: 'تم الاستلام من المخبر', color: '#f5c842', bg: 'rgba(245,200,66,0.15)' },
+  'checked':   { ar: 'تم الفحص',              color: '#2ee89e', bg: 'rgba(46,232,158,0.15)' },
+  'delivered': { ar: 'تم التركيب',            color: '#a3a3a3', bg: 'rgba(163,163,163,0.15)' },
+  'rejected':  { ar: 'مرفوض',                  color: '#ef5350', bg: 'rgba(239,83,80,0.15)' }
 };
 
 var LAB_NEXT_STATUS = {
-  'sent':     { next: 'received',  label: '📦 وصل من المخبر' },
+  'sent':     { next: 'received',  label: '📦 تم الاستلام من المخبر' },
   'received': { next: 'checked',   label: '✓ تم الفحص' },
-  'checked':  { next: 'delivered', label: '🤝 سُلِّم للمريض' }
+  'checked':  { next: 'delivered', label: '🤝 تم التركيب' }
 };
 
 /* ── Utils ── */
