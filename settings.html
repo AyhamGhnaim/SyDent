@@ -307,6 +307,20 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
       </select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يستخدم لتحديد اللون والسعر تلقائياً</div>
     </div>
+    <div class="form-group" id="fAtProviderWrap">
+      <label>👨‍⚕️ الطبيب الافتراضي</label>
+      <select id="fAtProvider">
+        <option value="">— بدون طبيب افتراضي —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار القالب</div>
+    </div>
+    <div class="form-group" id="fAtLabWrap">
+      <label>🧪 المخبر الافتراضي</label>
+      <select id="fAtLab">
+        <option value="">— بدون مخبر —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعلاجات التي تحتاج مخبر (تلبيسة، جسر، إلخ)</div>
+    </div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeApptTypeModal()">إلغاء</button>
       <button type="button" class="btn btn-primary" id="btnSaveApptType" onclick="saveApptType()">💾 حفظ</button>
@@ -600,8 +614,11 @@ async function confirmDelete() {
 
 var _apptTypes = [];            // cached templates for the list
 var _apptTypesTreatments = [];  // cached treatments for the dropdown
+var _apptTypesProviders = [];   // Gap 8.2: cached active doctors for picker
+var _apptTypesLabs = [];        // Gap 8.2: cached active labs for picker
 var _editingApptTypeId = null;  // id of the template currently being edited
 var _gap8TableMissing = false;  // true once we detect pre-migration state
+var _gap82ColumnsMissing = false; // Gap 8.2: provider/lab columns not yet migrated
 
 // Detects pre-migration state. PostgREST returns 42P01/PGRST205 for missing
 // relations; we treat any "appointment_types does not exist" mention the same.
@@ -638,6 +655,37 @@ async function loadAppointmentTypes() {
     _apptTypesTreatments = [];
   }
   populateApptTypeTreatmentSelect();
+
+  // 1.5. Gap 8.2: Clinic doctors (for the optional provider picker).
+  // Mirrors the existing pattern from appointments.html: clinic_doctors uses
+  // owner_id, filtered by active+sorted. Best-effort: empty list just hides
+  // the dropdown gracefully via populateApptTypeProviderSelect().
+  try {
+    var docRes = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_active')
+      .eq('owner_id', currentUser.id)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    _apptTypesProviders = (docRes && docRes.data) ? docRes.data : [];
+  } catch (e) {
+    console.warn('Gap 8.2: clinic_doctors load failed (continuing):', e);
+    _apptTypesProviders = [];
+  }
+  populateApptTypeProviderSelect();
+
+  // 1.6. Gap 8.2: Labs (for the optional lab picker).
+  // Same pattern as labs.html: select active labs, RLS gates by user.
+  try {
+    var labRes = await window.sb.from('labs')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    _apptTypesLabs = (labRes && labRes.data) ? labRes.data : [];
+  } catch (e) {
+    console.warn('Gap 8.2: labs load failed (continuing):', e);
+    _apptTypesLabs = [];
+  }
+  populateApptTypeLabSelect();
 
   // 2. Templates
   try {
@@ -681,6 +729,36 @@ function populateApptTypeTreatmentSelect() {
   sel.innerHTML = html;
 }
 
+// Gap 8.2: Populate the doctor <select>. If there are zero active doctors,
+// we still render the "no doctor" option — the dropdown is just inert. We
+// don't hide the wrapper because the doctor's expectation is "pickers are
+// always there" (matches the lab picker behavior — choice was option A).
+function populateApptTypeProviderSelect() {
+  var sel = document.getElementById('fAtProvider');
+  if (!sel) return;
+  var html = '<option value="">— بدون طبيب افتراضي —</option>';
+  for (var i = 0; i < _apptTypesProviders.length; i++) {
+    var d = _apptTypesProviders[i];
+    var safeName = String(d.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + d.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+// Gap 8.2: Populate the lab <select>. Same pattern as the provider one —
+// users see this even when no labs exist yet, keeping the layout stable.
+function populateApptTypeLabSelect() {
+  var sel = document.getElementById('fAtLab');
+  if (!sel) return;
+  var html = '<option value="">— بدون مخبر —</option>';
+  for (var i = 0; i < _apptTypesLabs.length; i++) {
+    var lab = _apptTypesLabs[i];
+    var safeName = String(lab.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + lab.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
 // Renders the list of saved templates. Each row has edit + delete buttons.
 // HTML-escapes the name so a user-supplied "<script>" can't break out.
 function renderApptTypesList() {
@@ -690,10 +768,18 @@ function renderApptTypesList() {
     el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">لا توجد قوالب بعد. أنشئ أول قالب لتسريع حجز المواعيد.</div>';
     return;
   }
-  // Build a quick lookup for treatment names
+  // Build quick lookups for related entity names (treatment, provider, lab)
   var trMap = {};
   for (var i = 0; i < _apptTypesTreatments.length; i++) {
     trMap[_apptTypesTreatments[i].id] = _apptTypesTreatments[i];
+  }
+  var docMap = {};
+  for (var di = 0; di < _apptTypesProviders.length; di++) {
+    docMap[_apptTypesProviders[di].id] = _apptTypesProviders[di];
+  }
+  var labMap = {};
+  for (var li = 0; li < _apptTypesLabs.length; li++) {
+    labMap[_apptTypesLabs[li].id] = _apptTypesLabs[li];
   }
   el.innerHTML = _apptTypes.map(function(t) {
     var safeName = String(t.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -703,11 +789,33 @@ function renderApptTypesList() {
     var trColor = t.default_treatment_id && trMap[t.default_treatment_id]
       ? (trMap[t.default_treatment_id].color || '#8da0bd')
       : '#8da0bd';
+    // Gap 8.2: Build the optional provider + lab line. We only render this
+    // second line if at least one of the two is set — keeps cards compact
+    // when the doctor hasn't filled them in. Display a "deleted" hint when
+    // the FK still has a UUID but the lookup misses (rare: linked entity
+    // was deleted after the template was saved).
+    var extras = [];
+    if (t.default_provider_id) {
+      var docName = docMap[t.default_provider_id]
+        ? String(docMap[t.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        : '<طبيب محذوف>';
+      extras.push('👨‍⚕️ ' + docName);
+    }
+    if (t.default_lab_id) {
+      var labName = labMap[t.default_lab_id]
+        ? String(labMap[t.default_lab_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        : '<مخبر محذوف>';
+      extras.push('🧪 ' + labName);
+    }
+    var extrasLine = extras.length
+      ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + extras.join(' · ') + '</div>'
+      : '';
     return '<div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">'
          +   '<div style="width:10px;height:10px;border-radius:50%;background:' + trColor + ';flex-shrink:0;"></div>'
          +   '<div style="flex:1;min-width:0;">'
          +     '<div style="font-weight:700;font-size:14px;color:var(--text);">' + safeName + '</div>'
          +     '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + (t.default_duration_min || 30) + ' د — ' + trName + '</div>'
+         +     extrasLine
          +   '</div>'
          +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="editApptType(\'' + t.id + '\')">✏️ تعديل</button>'
          +   '<button type="button" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="deleteApptType(\'' + t.id + '\')">🗑️ حذف</button>'
@@ -727,6 +835,11 @@ function openApptTypeModal() {
   document.getElementById('fAtDuration').value = '30';
   populateApptTypeTreatmentSelect();
   document.getElementById('fAtTreatment').value = '';
+  // Gap 8.2: reset optional provider + lab pickers
+  populateApptTypeProviderSelect();
+  document.getElementById('fAtProvider').value = '';
+  populateApptTypeLabSelect();
+  document.getElementById('fAtLab').value = '';
   document.getElementById('apptTypeModal').classList.add('open');
   setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
 }
@@ -741,6 +854,11 @@ function editApptType(id) {
   document.getElementById('fAtDuration').value = String(t.default_duration_min || 30);
   populateApptTypeTreatmentSelect();
   document.getElementById('fAtTreatment').value = t.default_treatment_id || '';
+  // Gap 8.2: pre-fill provider + lab from the stored template
+  populateApptTypeProviderSelect();
+  document.getElementById('fAtProvider').value = t.default_provider_id || '';
+  populateApptTypeLabSelect();
+  document.getElementById('fAtLab').value = t.default_lab_id || '';
   document.getElementById('apptTypeModal').classList.add('open');
   setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
 }
@@ -756,6 +874,9 @@ async function saveApptType() {
   var durationRaw = document.getElementById('fAtDuration').value;
   var duration = parseInt(durationRaw, 10);
   var treatmentId = document.getElementById('fAtTreatment').value || null;
+  // Gap 8.2: capture optional provider + lab ids (empty string → null)
+  var providerId = document.getElementById('fAtProvider').value || null;
+  var labId = document.getElementById('fAtLab').value || null;
 
   if (!name) {
     showToast('⚠️ اسم القالب مطلوب', true);
@@ -773,32 +894,69 @@ async function saveApptType() {
   var btn = document.getElementById('btnSaveApptType');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
+  // Helper for Gap 8.2 graceful fallback: detects rejection of the new
+  // columns (42703 = undefined_column, or the column name in the error
+  // text). Lets us retry without provider/lab on pre-Gap-8.2 installations.
+  function _isGap82ColumnMissing(err) {
+    if (!err) return false;
+    var msg = (err.message || '') + ' ' + (err.code || '');
+    return /42703|default_provider_id|default_lab_id/i.test(msg);
+  }
+
   try {
     var res;
     if (_editingApptTypeId) {
-      // UPDATE existing
+      // UPDATE existing — include provider + lab in the payload
+      var updatePayload = {
+        name: name,
+        default_duration_min: duration,
+        default_treatment_id: treatmentId,
+        default_provider_id: providerId,
+        default_lab_id: labId
+      };
       res = await window.sb.from('appointment_types')
-        .update({
-          name: name,
-          default_duration_min: duration,
-          default_treatment_id: treatmentId
-        })
+        .update(updatePayload)
         .eq('id', _editingApptTypeId)
         .eq('doctor_id', currentUser.id);
+      // Gap 8.2 retry: strip the new columns and try again
+      if (res.error && _isGap82ColumnMissing(res.error)) {
+        _gap82ColumnsMissing = true;
+        console.warn('Gap 8.2: provider/lab columns missing on UPDATE — retrying without them. Run the Gap 8.2 migration.');
+        var legacy = { name: name, default_duration_min: duration, default_treatment_id: treatmentId };
+        res = await window.sb.from('appointment_types')
+          .update(legacy)
+          .eq('id', _editingApptTypeId)
+          .eq('doctor_id', currentUser.id);
+      }
     } else {
       // INSERT new
       var maxSort = 0;
       for (var i = 0; i < _apptTypes.length; i++) {
         if ((_apptTypes[i].sort_order || 0) > maxSort) maxSort = _apptTypes[i].sort_order;
       }
-      res = await window.sb.from('appointment_types')
-        .insert({
+      var insertPayload = {
+        doctor_id: currentUser.id,
+        name: name,
+        default_duration_min: duration,
+        default_treatment_id: treatmentId,
+        default_provider_id: providerId,
+        default_lab_id: labId,
+        sort_order: maxSort + 1
+      };
+      res = await window.sb.from('appointment_types').insert(insertPayload);
+      // Gap 8.2 retry: strip the new columns and try again
+      if (res.error && _isGap82ColumnMissing(res.error)) {
+        _gap82ColumnsMissing = true;
+        console.warn('Gap 8.2: provider/lab columns missing on INSERT — retrying without them. Run the Gap 8.2 migration.');
+        var legacyIns = {
           doctor_id: currentUser.id,
           name: name,
           default_duration_min: duration,
           default_treatment_id: treatmentId,
           sort_order: maxSort + 1
-        });
+        };
+        res = await window.sb.from('appointment_types').insert(legacyIns);
+      }
     }
 
     btn.disabled = false; btn.textContent = '💾 حفظ';

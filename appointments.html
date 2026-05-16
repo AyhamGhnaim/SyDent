@@ -1795,8 +1795,13 @@ function _gap8IsTableMissing(err) {
 async function loadAppointmentTypes() {
   if (!currentUser) return;
   try {
+    // Gap 8.2: select default_provider_id + default_lab_id alongside the
+    // original fields. If the columns don't exist yet (42703), retry with
+    // the old projection so the picker still works.
+    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, is_active, sort_order';
+    var legacyCols = 'id, name, default_duration_min, default_treatment_id, is_active, sort_order';
     var res = await window.sb.from('appointment_types')
-      .select('id, name, default_duration_min, default_treatment_id, is_active, sort_order')
+      .select(fullCols)
       .eq('doctor_id', currentUser.id)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
@@ -1807,8 +1812,21 @@ async function loadAppointmentTypes() {
         console.warn('Gap 8: appointment_types table missing — template picker disabled.');
         return;
       }
-      console.warn('Gap 8 load error:', res.error);
-      return;
+      // Gap 8.2 fallback: retry with legacy projection
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (/42703|default_provider_id|default_lab_id/i.test(msg)) {
+        console.warn('Gap 8.2: provider/lab columns missing on SELECT — falling back to legacy columns.');
+        res = await window.sb.from('appointment_types')
+          .select(legacyCols)
+          .eq('doctor_id', currentUser.id)
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true });
+        if (res.error) { console.warn('Gap 8 retry failed:', res.error); return; }
+      } else {
+        console.warn('Gap 8 load error:', res.error);
+        return;
+      }
     }
     _appointmentTypes = res.data || [];
   } catch (e) {
@@ -1887,6 +1905,28 @@ function onApptTypePicked() {
       }
     }
   }
+
+  // Gap 8.2: Pre-fill the provider picker from the template's default_provider_id.
+  // The picker is the existing #fProvider, populated by populateApptProviderPicker
+  // (which uses the OpenDental 3-tier default). We set its value to the template's
+  // provider — if that doctor was deleted, the picker silently keeps its current
+  // default (no crash). The doctor can always change it after.
+  if (t.default_provider_id) {
+    var provPicker = document.getElementById('fProvider');
+    if (provPicker) {
+      // Verify the option exists before setting (deleted doctor → no option)
+      var optExists = false;
+      for (var k = 0; k < provPicker.options.length; k++) {
+        if (provPicker.options[k].value === t.default_provider_id) { optExists = true; break; }
+      }
+      if (optExists) provPicker.value = t.default_provider_id;
+    }
+  }
+
+  // Gap 8.2: default_lab_id is intentionally NOT applied to the appointment
+  // form here (per the user's design choice — option A). It stays cached on
+  // the template and will be used later when creating a lab_order from this
+  // appointment, where it can suggest the lab automatically.
 }
 
 // ─── Render ──────────────────────────────────────────
