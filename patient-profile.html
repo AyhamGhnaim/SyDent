@@ -3361,6 +3361,16 @@ function renderSessions() {
   // Show provider badge whenever any doctors are defined
   var showProviderCol = CLINIC_DOCTORS && CLINIC_DOCTORS.length >= 1;
   sessions.forEach(function(s) {
+    // Color the treatment-type badge with the treatment's actual fill/stroke,
+    // matching how the tooth chart, calendar, and treatment picker display it.
+    // Match by name (s.type stores the display name) since legacy sessions may not
+    // have a treatment_key. Fall back to the legacy blue if no match (e.g. "أخرى"
+    // or a deleted custom treatment).
+    var typeMatch = (Array.isArray(TREATMENTS) ? TREATMENTS : [])
+      .find(function(t){ return t.name === s.type; });
+    var typeFill   = typeMatch ? typeMatch.fill   : '#63b3ed';   // var(--blue) fallback
+    var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
+    var typeBadge = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth_num + '</span>' : '';
     var st = s.status || 'completed';
     var stLbl = STATUS_LABELS[st] || st;
@@ -3400,7 +3410,7 @@ function renderSessions() {
     var costStyle = 'text-align:left;color:' + costColor + ';font-weight:700;';
     rows += '<tr>'
       + '<td' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</td>'
-      + '<td><span class="tag tag-blue">' + (s.type||'—') + '</span>' + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
+      + '<td>' + typeBadge + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td style="' + costStyle + '">' + fmt(s.cost) + ' ل.س</td>'
@@ -3480,6 +3490,12 @@ function renderRecentSessions() {
   var top5 = sessions.slice(0, 5);
   var html = '';
   top5.forEach(function(s) {
+    // Same color logic as renderSessions: badge uses the treatment's fill/stroke.
+    var typeMatch = (Array.isArray(TREATMENTS) ? TREATMENTS : [])
+      .find(function(t){ return t.name === s.type; });
+    var typeFill   = typeMatch ? typeMatch.fill   : '#63b3ed';
+    var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
+    var typeBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;">سن ' + s.tooth_num + '</span>' : '';
     // Match renderSessions: color cost by payment status when splits exist
     var sessPaid = computeSessionPaid(s.id);
@@ -3497,7 +3513,7 @@ function renderRecentSessions() {
     }
     html += '<div class="irow" style="flex-direction:column;align-items:stretch;gap:4px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-        + '<span style="font-weight:700;color:var(--text);font-size:13px;">' + (s.type||'—') + toothBadge + '</span>'
+        + '<span style="font-weight:700;color:var(--text);font-size:13px;">' + typeBadge + toothBadge + '</span>'
         + '<span style="color:' + costColor + ';font-weight:700;font-size:13px;white-space:nowrap;"' + (costTitle ? ' title="' + costTitle + '"' : '') + '>' + fmt(s.cost) + ' ل.س</span>'
       + '</div>'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
