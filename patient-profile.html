@@ -249,8 +249,22 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .planned-pp-actions .btn-delete-pp:hover{border-color:var(--red);color:var(--red);}
 
 /* Toggle inside the appointment modal — same visual language as appointments.html */
-.planned-toggle-pp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:9px;cursor:pointer;}
-.planned-toggle-pp input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:#63b3ed;}
+.planned-toggle-pp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:9px;cursor:pointer;transition:all .15s;}
+.planned-toggle-pp:hover{background:rgba(99,179,237,0.12);border-color:rgba(99,179,237,0.4);}
+/* Custom checkbox — see appointments.html for full rationale. accent-color is
+   unreliable on dark themes / Safari; we paint our own ✓ for reliable visual
+   feedback when checked. */
+.planned-toggle-pp input[type=checkbox]{
+  -webkit-appearance:none;-moz-appearance:none;appearance:none;
+  width:20px;height:20px;border:2px solid #63b3ed;border-radius:5px;
+  background:transparent;cursor:pointer;position:relative;flex-shrink:0;margin:0;transition:all .15s;
+}
+.planned-toggle-pp input[type=checkbox]:hover{background:rgba(99,179,237,0.12);}
+.planned-toggle-pp input[type=checkbox]:checked{background:#63b3ed;border-color:#63b3ed;}
+.planned-toggle-pp input[type=checkbox]:checked::after{
+  content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-55%);
+  color:#0a1628;font-size:14px;font-weight:900;line-height:1;
+}
 .planned-toggle-pp .ptpp-text{flex:1;}
 .planned-toggle-pp .ptpp-title{font-size:12px;font-weight:700;color:#63b3ed;}
 .planned-toggle-pp .ptpp-hint{font-size:10px;color:var(--text2);margin-top:1px;}
