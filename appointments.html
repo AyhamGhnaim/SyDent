@@ -741,6 +741,13 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
 
       <div class="form-grid">
+        <!-- Gap 8: Template picker (hidden in edit mode) -->
+        <div class="form-group full" id="apptTypePickerWrap" style="display:none;">
+          <label>⚡ قالب جاهز (اختياري) — لتعبئة المدة والعلاج تلقائياً</label>
+          <select id="fApptTypePicker" onchange="onApptTypePicked()">
+            <option value="">— بدون قالب —</option>
+          </select>
+        </div>
         <div class="form-group full">
           <label>اسم المريض *</label>
           <input type="text" id="fPatient" placeholder="ابحث أو اكتب الاسم…" list="patientsList" required>
@@ -1767,6 +1774,118 @@ async function overrideApptTime(apptId, fieldKey) {
   render();
 }
 
+// ─── Gap 8: Appointment Type templates (loader + picker handler) ─────────────
+// Loaded once at page init, cached per page session. The picker is shown only
+// when creating a new appointment (hidden in edit mode — see openModal /
+// editAppt). Selecting a template pre-fills duration + treatment type;
+// color stays derived from the treatment (single source of truth).
+//
+// Fault-tolerant: if the appointment_types table is missing (pre-migration),
+// the picker simply stays empty and hidden — no crash, no toast spam.
+
+var _appointmentTypes = [];   // cached templates for this session
+var _gap8TableMissing = false;
+
+function _gap8IsTableMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42P01|PGRST205|relation .* does not exist|appointment_types/i.test(msg);
+}
+
+async function loadAppointmentTypes() {
+  if (!currentUser) return;
+  try {
+    var res = await window.sb.from('appointment_types')
+      .select('id, name, default_duration_min, default_treatment_id, is_active, sort_order')
+      .eq('doctor_id', currentUser.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (res.error) {
+      if (_gap8IsTableMissing(res.error)) {
+        _gap8TableMissing = true;
+        console.warn('Gap 8: appointment_types table missing — template picker disabled.');
+        return;
+      }
+      console.warn('Gap 8 load error:', res.error);
+      return;
+    }
+    _appointmentTypes = res.data || [];
+  } catch (e) {
+    console.warn('Gap 8 load exception:', e);
+  }
+}
+
+// Populates the <select> inside the modal. Idempotent — safe to call every
+// time the modal opens (cheap with a small list, and keeps the dropdown
+// fresh if the user added templates in another tab).
+function populateApptTypePicker() {
+  var sel = document.getElementById('fApptTypePicker');
+  if (!sel) return;
+  var html = '<option value="">— بدون قالب —</option>';
+  for (var i = 0; i < _appointmentTypes.length; i++) {
+    var t = _appointmentTypes[i];
+    var safeName = String(t.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + t.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+  sel.value = '';
+}
+
+// Called from the picker's onchange. Pre-fills duration + treatment.
+// We do NOT touch the color directly — it's driven by the treatment, and
+// updateColorPreview() (called below) recomputes it from the selected
+// treatment's own color. Single source of truth preserved.
+function onApptTypePicked() {
+  var sel = document.getElementById('fApptTypePicker');
+  if (!sel) return;
+  var id = sel.value;
+  if (!id) return; // user picked "— بدون قالب —"
+  var t = _appointmentTypes.find(function(x){ return x.id === id; });
+  if (!t) return;
+
+  // Duration: only pre-fill if it matches one of the existing <option> values
+  // in #fDuration. If the template specifies e.g. 45 and the select has
+  // 30/45/60/90/120, pick 45. Otherwise leave the current value alone.
+  if (t.default_duration_min) {
+    var durSel = document.getElementById('fDuration');
+    if (durSel) {
+      var target = String(t.default_duration_min);
+      var found = false;
+      for (var i = 0; i < durSel.options.length; i++) {
+        if (durSel.options[i].value === target) { found = true; break; }
+      }
+      if (found) {
+        durSel.value = target;
+      } else {
+        // Add a one-off option so the template's exact duration is honored.
+        var opt = document.createElement('option');
+        opt.value = target;
+        opt.textContent = target + ' دقيقة';
+        durSel.appendChild(opt);
+        durSel.value = target;
+      }
+    }
+  }
+
+  // Treatment: only pre-fill if it still exists in TREATMENTS (FK may have
+  // been NULLed if the treatment was deleted after the template was created).
+  if (t.default_treatment_id) {
+    var typeSel = document.getElementById('fType');
+    if (typeSel) {
+      var match = null;
+      for (var j = 0; j < TREATMENTS.length; j++) {
+        if (TREATMENTS[j].id === t.default_treatment_id) { match = TREATMENTS[j]; break; }
+      }
+      if (match) {
+        typeSel.value = match.id;
+        // Trigger the existing color preview update so color tracks the treatment.
+        if (typeof updateColorPreview === 'function') updateColorPreview();
+      }
+    }
+  }
+}
+
 // ─── Render ──────────────────────────────────────────
 function render() {
   if (view==='month') renderMonth();
@@ -1987,6 +2106,17 @@ async function openModal(prefillDate) {
   // Hide schedule-now button (only meaningful when editing existing planned)
   var schedNowBtn = document.getElementById('scheduleNowBtn');
   if (schedNowBtn) schedNowBtn.style.display = 'none';
+  // Gap 8: show + populate template picker (only available on NEW appts).
+  // If pre-migration or zero templates, just hide it — keeps the form clean.
+  var atPickerWrap = document.getElementById('apptTypePickerWrap');
+  if (atPickerWrap) {
+    if (_gap8TableMissing || _appointmentTypes.length === 0) {
+      atPickerWrap.style.display = 'none';
+    } else {
+      populateApptTypePicker();
+      atPickerWrap.style.display = '';
+    }
+  }
   onPlannedToggle();  // sync visibility of date/time/reason/note
   updateColorPreview();
 
@@ -2021,6 +2151,10 @@ async function editAppt(id) {
   var reasonInp = document.getElementById('fReason');
   if (reasonInp) reasonInp.value = (isPlanned ? (a.notes || '') : '');
   onPlannedToggle();
+  // Gap 8: template picker is for new appointments only — hide it in edit mode
+  // so we don't accidentally overwrite the existing appointment's settings.
+  var atPickerWrap = document.getElementById('apptTypePickerWrap');
+  if (atPickerWrap) atPickerWrap.style.display = 'none';
   // أظهر المودال أولاً
   document.getElementById('deleteApptBtn').style.display = 'inline-block';
   // Gap 7: show "Schedule now" button only when editing a planned appt
@@ -2651,6 +2785,15 @@ async function submitAppt(e) {
     is_planned:   isPlannedNow
   };
 
+  // Gap 8: capture the template id that was used (new appointments only).
+  // The picker is hidden in edit mode so we never overwrite an existing
+  // appointment's appointment_type_id by accident.
+  if (!editingId) {
+    var atPicker = document.getElementById('fApptTypePicker');
+    var pickedId = atPicker ? (atPicker.value || null) : null;
+    if (pickedId) apptData.appointment_type_id = pickedId;
+  }
+
   // ── Gap 6: Auto-fill timestamps based on status ─────────────────────────
   // Keep status semantics in sync with the time-tracking journey:
   //   • status='confirmed' (live appt, not planned) and confirmed_at is empty
@@ -2925,6 +3068,29 @@ async function submitAppt(e) {
       if (migrationMissing) strippedIns.status = 'confirmed';
       ins = await window.sb.from('appointments').insert(strippedIns).select().single();
     }
+    // Gap 8 retry: if the appointments.appointment_type_id column is missing
+    // (Gap 8 migration not yet applied — unlikely but possible if the user
+    // updated the table mid-flow), strip that field and retry. The
+    // appointment still saves; we just lose the template-traceability link.
+    if (ins.error && apptData.appointment_type_id &&
+        /42703|appointment_type_id/i.test((ins.error.message || '') + ' ' + (ins.error.code || ''))) {
+      console.warn('Gap 8: appointment_type_id rejected on INSERT — retrying without it. Run the Gap 8 migration to enable template traceability.');
+      var strippedAt = Object.assign({}, apptData);
+      delete strippedAt.appointment_type_id;
+      // Preserve all earlier fallbacks (Gap 1, 6, 7) so we don't regress.
+      if (plannedMigrationMissing) {
+        delete strippedAt.is_planned;
+        if (strippedAt.date === null) strippedAt.date = dateStr(new Date());
+        if (strippedAt.time === null) strippedAt.time = '12:00';
+      }
+      if (migrationMissing) strippedAt.status = 'confirmed';
+      if (_g6HasAutoFill) {
+        delete strippedAt.confirmed_at;
+        delete strippedAt.dismissed_at;
+        delete strippedAt.confirmation_status;
+      }
+      ins = await window.sb.from('appointments').insert(strippedAt).select().single();
+    }
     if (ins.error) {
       showToast('❌ خطأ في الإضافة: ' + ins.error.message);
     } else {
@@ -2988,6 +3154,7 @@ function showToast(msg) {
   if (!data || !data.user) { window.location.href = 'auth.html'; return; }
   currentUser = data.user;
   await loadClinicDoctors();
+  await loadAppointmentTypes();  // Gap 8: cache templates for the modal picker
   await loadAppointments();
 })();
 

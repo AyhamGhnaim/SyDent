@@ -235,6 +235,14 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
       </form>
     </div>
 
+    <!-- 1.6 قوالب المواعيد — Gap 8 -->
+    <div class="section">
+      <div class="section-title">🎨 قوالب المواعيد</div>
+      <div class="section-sub">قوالب جاهزة لتسريع حجز المواعيد الشائعة (تنظيف، علاج عصب، إلخ). كل قالب يحدد المدة الافتراضية والعلاج المرتبط.</div>
+      <button type="button" class="btn btn-primary" onclick="openApptTypeModal()" id="btnNewApptType">+ إضافة قالب جديد</button>
+      <div id="apptTypesList" style="margin-top:18px;"></div>
+    </div>
+
     <!-- 2. تغيير البريد -->
     <div class="section">
       <div class="section-title">📧 تغيير البريد الإلكتروني</div>
@@ -277,6 +285,32 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
     </div>
 
    </div>
+  </div>
+</div>
+
+<!-- Gap 8: Modal إضافة/تعديل قالب موعد -->
+<div class="modal-overlay" id="apptTypeModal" onclick="if(event.target===this) closeApptTypeModal()">
+  <div class="modal">
+    <div class="modal-title" id="apptTypeModalTitle">إضافة قالب جديد</div>
+    <div class="form-group">
+      <label>اسم القالب</label>
+      <input type="text" id="fAtName" placeholder="مثال: تنظيف أسنان" maxlength="80" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>المدة (دقيقة)</label>
+      <input type="number" id="fAtDuration" min="1" max="480" step="5" placeholder="30">
+    </div>
+    <div class="form-group">
+      <label>العلاج الافتراضي</label>
+      <select id="fAtTreatment">
+        <option value="">— بدون علاج افتراضي —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يستخدم لتحديد اللون والسعر تلقائياً</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeApptTypeModal()">إلغاء</button>
+      <button type="button" class="btn btn-primary" id="btnSaveApptType" onclick="saveApptType()">💾 حفظ</button>
+    </div>
   </div>
 </div>
 
@@ -337,6 +371,8 @@ function showToast(msg, isError = false) {
 
   // Gap 5: load appointment settings from clinic_settings (fault-tolerant)
   await loadAppointmentSettings();
+  // Gap 8: load appointment-type templates + treatments dropdown
+  await loadAppointmentTypes();
 })();
 
 // ─── Gap 5: Appointment settings (no-show fee) ───
@@ -550,6 +586,260 @@ async function confirmDelete() {
   await window.sb.auth.signOut();
   showToast('✅ تم حذف الحساب بالكامل');
   setTimeout(() => { window.location.href = 'auth.html'; }, 1500);
+}
+
+// ─── Gap 8: Appointment Type Templates (CRUD) ───────────────────────────────
+// Lets the doctor create reusable templates that pre-fill the appointment
+// modal (name, duration, default treatment). Color is intentionally NOT
+// stored on the template — it always derives from the linked treatment so
+// there's a single source of truth for visual identity.
+//
+// Storage: appointment_types table (Migration 8). RLS isolates per-doctor.
+// Fault-tolerant: if the table or column doesn't exist yet (pre-migration),
+// the section degrades gracefully — list shows a hint, modal save warns once.
+
+var _apptTypes = [];            // cached templates for the list
+var _apptTypesTreatments = [];  // cached treatments for the dropdown
+var _editingApptTypeId = null;  // id of the template currently being edited
+var _gap8TableMissing = false;  // true once we detect pre-migration state
+
+// Detects pre-migration state. PostgREST returns 42P01/PGRST205 for missing
+// relations; we treat any "appointment_types does not exist" mention the same.
+function isApptTypesTableMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42P01|PGRST205|relation .* does not exist|appointment_types/i.test(msg);
+}
+
+// Loads templates + treatments in parallel. Renders the list when done.
+// Treatments come from a separate query so the dropdown stays populated
+// even if the user has zero templates yet.
+async function loadAppointmentTypes() {
+  var listEl = document.getElementById('apptTypesList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">جارٍ التحميل…</div>';
+
+  // 1. Treatments (for the dropdown). Best-effort: empty list still works.
+  try {
+    var trRes = await window.sb.from('treatments')
+      .select('id, name, color')
+      .eq('doctor_id', currentUser.id)
+      .order('name', { ascending: true });
+    _apptTypesTreatments = (trRes && trRes.data) ? trRes.data : [];
+  } catch (e) {
+    console.warn('Gap 8: treatments load failed (continuing):', e);
+    _apptTypesTreatments = [];
+  }
+  populateApptTypeTreatmentSelect();
+
+  // 2. Templates
+  try {
+    var res = await window.sb.from('appointment_types')
+      .select('*')
+      .eq('doctor_id', currentUser.id)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (res.error) {
+      if (isApptTypesTableMissing(res.error)) {
+        _gap8TableMissing = true;
+        listEl.innerHTML = '<div style="color:var(--yellow);font-size:13px;padding:12px;background:rgba(245,200,66,0.08);border-radius:8px;border:1px solid rgba(245,200,66,0.2);">⚠️ يلزم ترقية قاعدة البيانات لتفعيل القوالب — راجع console.</div>';
+        console.warn('Gap 8 migration required:\nCREATE TABLE appointment_types ...');
+        var btn = document.getElementById('btnNewApptType');
+        if (btn) btn.disabled = true;
+        return;
+      }
+      console.error('Gap 8 load error:', res.error);
+      listEl.innerHTML = '<div style="color:var(--red);font-size:13px;">فشل تحميل القوالب</div>';
+      return;
+    }
+    _apptTypes = res.data || [];
+    renderApptTypesList();
+  } catch (e) {
+    console.error('Gap 8 load exception:', e);
+    listEl.innerHTML = '<div style="color:var(--red);font-size:13px;">فشل تحميل القوالب</div>';
+  }
+}
+
+// Populates the treatment <select> inside the modal. Keeps the "no treatment"
+// option at the top so the user can clear an existing link by re-selecting it.
+function populateApptTypeTreatmentSelect() {
+  var sel = document.getElementById('fAtTreatment');
+  if (!sel) return;
+  var html = '<option value="">— بدون علاج افتراضي —</option>';
+  for (var i = 0; i < _apptTypesTreatments.length; i++) {
+    var t = _apptTypesTreatments[i];
+    var safeName = String(t.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + t.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+// Renders the list of saved templates. Each row has edit + delete buttons.
+// HTML-escapes the name so a user-supplied "<script>" can't break out.
+function renderApptTypesList() {
+  var el = document.getElementById('apptTypesList');
+  if (!el) return;
+  if (!_apptTypes.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:13px;">لا توجد قوالب بعد. أنشئ أول قالب لتسريع حجز المواعيد.</div>';
+    return;
+  }
+  // Build a quick lookup for treatment names
+  var trMap = {};
+  for (var i = 0; i < _apptTypesTreatments.length; i++) {
+    trMap[_apptTypesTreatments[i].id] = _apptTypesTreatments[i];
+  }
+  el.innerHTML = _apptTypes.map(function(t) {
+    var safeName = String(t.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var trName = t.default_treatment_id && trMap[t.default_treatment_id]
+      ? String(trMap[t.default_treatment_id].name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      : '— بدون علاج —';
+    var trColor = t.default_treatment_id && trMap[t.default_treatment_id]
+      ? (trMap[t.default_treatment_id].color || '#8da0bd')
+      : '#8da0bd';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">'
+         +   '<div style="width:10px;height:10px;border-radius:50%;background:' + trColor + ';flex-shrink:0;"></div>'
+         +   '<div style="flex:1;min-width:0;">'
+         +     '<div style="font-weight:700;font-size:14px;color:var(--text);">' + safeName + '</div>'
+         +     '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + (t.default_duration_min || 30) + ' د — ' + trName + '</div>'
+         +   '</div>'
+         +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="editApptType(\'' + t.id + '\')">✏️ تعديل</button>'
+         +   '<button type="button" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="deleteApptType(\'' + t.id + '\')">🗑️ حذف</button>'
+         + '</div>';
+  }).join('');
+}
+
+// Opens the modal in CREATE mode. Resets form to defaults.
+function openApptTypeModal() {
+  if (_gap8TableMissing) {
+    showToast('⚠️ يلزم ترقية قاعدة البيانات أولاً', true);
+    return;
+  }
+  _editingApptTypeId = null;
+  document.getElementById('apptTypeModalTitle').textContent = 'إضافة قالب جديد';
+  document.getElementById('fAtName').value = '';
+  document.getElementById('fAtDuration').value = '30';
+  populateApptTypeTreatmentSelect();
+  document.getElementById('fAtTreatment').value = '';
+  document.getElementById('apptTypeModal').classList.add('open');
+  setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
+}
+
+// Opens the modal in EDIT mode. Looks up the template by id from the cache.
+function editApptType(id) {
+  var t = _apptTypes.find(function(x){ return x.id === id; });
+  if (!t) { showToast('لم يتم العثور على القالب', true); return; }
+  _editingApptTypeId = id;
+  document.getElementById('apptTypeModalTitle').textContent = 'تعديل قالب';
+  document.getElementById('fAtName').value = t.name || '';
+  document.getElementById('fAtDuration').value = String(t.default_duration_min || 30);
+  populateApptTypeTreatmentSelect();
+  document.getElementById('fAtTreatment').value = t.default_treatment_id || '';
+  document.getElementById('apptTypeModal').classList.add('open');
+  setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
+}
+
+function closeApptTypeModal() {
+  document.getElementById('apptTypeModal').classList.remove('open');
+  _editingApptTypeId = null;
+}
+
+// Save = INSERT (create mode) or UPDATE (edit mode). Validates inputs first.
+async function saveApptType() {
+  var name = (document.getElementById('fAtName').value || '').trim();
+  var durationRaw = document.getElementById('fAtDuration').value;
+  var duration = parseInt(durationRaw, 10);
+  var treatmentId = document.getElementById('fAtTreatment').value || null;
+
+  if (!name) {
+    showToast('⚠️ اسم القالب مطلوب', true);
+    return;
+  }
+  if (name.length > 80) {
+    showToast('⚠️ اسم القالب طويل جداً (80 حرف كحد أقصى)', true);
+    return;
+  }
+  if (isNaN(duration) || duration < 1 || duration > 480) {
+    showToast('⚠️ المدة يجب أن تكون بين 1 و 480 دقيقة', true);
+    return;
+  }
+
+  var btn = document.getElementById('btnSaveApptType');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+
+  try {
+    var res;
+    if (_editingApptTypeId) {
+      // UPDATE existing
+      res = await window.sb.from('appointment_types')
+        .update({
+          name: name,
+          default_duration_min: duration,
+          default_treatment_id: treatmentId
+        })
+        .eq('id', _editingApptTypeId)
+        .eq('doctor_id', currentUser.id);
+    } else {
+      // INSERT new
+      var maxSort = 0;
+      for (var i = 0; i < _apptTypes.length; i++) {
+        if ((_apptTypes[i].sort_order || 0) > maxSort) maxSort = _apptTypes[i].sort_order;
+      }
+      res = await window.sb.from('appointment_types')
+        .insert({
+          doctor_id: currentUser.id,
+          name: name,
+          default_duration_min: duration,
+          default_treatment_id: treatmentId,
+          sort_order: maxSort + 1
+        });
+    }
+
+    btn.disabled = false; btn.textContent = '💾 حفظ';
+
+    if (res.error) {
+      if (isApptTypesTableMissing(res.error)) {
+        _gap8TableMissing = true;
+        showToast('⚠️ يلزم ترقية قاعدة البيانات', true);
+      } else {
+        showToast('❌ ' + (res.error.message || 'فشل الحفظ'), true);
+      }
+      return;
+    }
+
+    showToast(_editingApptTypeId ? '✅ تم تعديل القالب' : '✅ تم إضافة القالب');
+    closeApptTypeModal();
+    await loadAppointmentTypes();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '💾 حفظ';
+    console.error('saveApptType exception:', e);
+    showToast('❌ خطأ غير متوقع', true);
+  }
+}
+
+// Delete with a simple native confirm — full custom modal would be overkill
+// here. The FK on appointments.appointment_type_id is SET NULL on delete,
+// so old appointments stay intact (just lose the template link).
+async function deleteApptType(id) {
+  var t = _apptTypes.find(function(x){ return x.id === id; });
+  if (!t) return;
+  var ok = confirm('حذف القالب "' + (t.name || '') + '"؟\n\nالمواعيد القديمة التي استخدمت هذا القالب ستبقى كما هي.');
+  if (!ok) return;
+
+  try {
+    var res = await window.sb.from('appointment_types')
+      .delete()
+      .eq('id', id)
+      .eq('doctor_id', currentUser.id);
+    if (res.error) {
+      showToast('❌ ' + (res.error.message || 'فشل الحذف'), true);
+      return;
+    }
+    showToast('✅ تم حذف القالب');
+    await loadAppointmentTypes();
+  } catch (e) {
+    console.error('deleteApptType exception:', e);
+    showToast('❌ خطأ غير متوقع', true);
+  }
 }
 
 initSidebar('settings');
