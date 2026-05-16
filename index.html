@@ -201,6 +201,31 @@
     flex-shrink: 0;
   }
 
+  /* ─── Gap 6: Inline next-action button in today's appointments ─── */
+  .dash-time-btn {
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s ease;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+  .dash-time-btn:hover { filter: brightness(1.15); }
+  .dash-time-btn:disabled { opacity: 0.5; cursor: wait; }
+  .dash-time-stamp {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.04);
+    margin-top: 2px;
+    display: inline-block;
+    margin-right: 4px;
+  }
+
   .finance-row {
     display: flex; justify-content: space-between; align-items: center;
     padding: 10px 0;
@@ -517,26 +542,16 @@ async function loadDashboard() {
   const { data: appts } = await window.sb.from('appointments').select('*')
     .eq('doctor_id', uid).eq('date', today).order('time', { ascending: true });
   const apptsToday = appts || [];
+  // Cache locally so Gap 6 button clicks can re-render this card without a
+  // full dashboard reload. Mutated in-place by recordDashApptTime().
+  _dashApptsToday = apptsToday;
+  _dashUid = uid;
   document.getElementById('statApptToday').textContent = apptsToday.length;
   const nowTime = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const upcoming = apptsToday.filter(a => (a.time||'') >= nowTime).length;
   document.getElementById('statApptUpcoming').textContent = upcoming ? upcoming + ' متبقية' : '';
 
-  const apptsEl = document.getElementById('todayAppts');
-  if (apptsToday.length === 0) {
-    apptsEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد مواعيد اليوم</div>';
-  } else {
-    apptsEl.innerHTML = apptsToday.map(a => `
-      <div class="appt-item">
-        <div class="appt-time">${(a.time||'').slice(0,5) || '—'}</div>
-        <div style="flex:1;min-width:0">
-          <div class="appt-name">${a.patient_name||'—'}</div>
-          <div class="appt-type">${a.type||'—'}</div>
-        </div>
-        <div class="appt-dot" style="background:${a.color||'#2ee89e'}"></div>
-      </div>
-    `).join('');
-  }
+  renderTodayApptsCard();
 
   // ── دخل الشهر ──
   const { start, end } = thisMonthRange();
@@ -631,6 +646,158 @@ async function loadLabOrdersCard(uid, patientsList) {
       +   '<span class="lab-status ' + st.cls + '">' + st.ar + '</span>'
       + '</a>';
   }).join('');
+}
+
+// ─── Gap 6: Inline action buttons in "Today's Appointments" ─────────────────
+// Lets the secretary advance the patient journey (🚪 وصل → 🪑 جلس → ✅ خرج)
+// directly from the dashboard without navigating to appointments.html.
+//
+// We keep a module-level cache of today's appointments so a single click
+// can re-render the card without a full dashboard reload. Mutations are
+// applied locally first, then synced to Supabase.
+//
+// Design choice: 📞 تأكيد is NOT shown here. Gap 6 auto-fill ensures
+// appointments saved as 'confirmed' already have confirmed_at, and if
+// status='pending' the secretary uses the full edit modal in appointments.html.
+// This keeps the dashboard a one-button-per-row "happy path" surface.
+
+var _dashApptsToday = [];
+var _dashUid = null;
+
+// Stage definitions for the dashboard. Excludes 'confirmed_at' on purpose —
+// see comment above. Mirrors the keys/labels/colors used in appointments.html
+// so the visual language stays consistent across pages.
+var DASH_TIME_STAGES = [
+  { key: 'arrived_at',   label: '🚪 وصل', color: '#f5c842' },
+  { key: 'seated_at',    label: '🪑 جلس', color: '#fb923c' },
+  { key: 'dismissed_at', label: '✅ خرج', color: '#2ee89e' }
+];
+
+// Statuses that disable the action button — appointment is logically done.
+function _dashIsFinished(s) {
+  return s === 'completed' || s === 'cancelled' || s === 'broken' || s === 'no_show';
+}
+
+// Returns the next-step button stage for a dashboard row, or null.
+// Skips 'confirmed_at' (handled at save time) so the first button visible
+// here is always 🚪 وصل for a confirmed appointment.
+function getDashNextAction(appt) {
+  if (!appt) return null;
+  if (_dashIsFinished(appt.status)) return null;
+  // Confirmation is implicit on the dashboard. If the appointment isn't
+  // confirmed yet, we don't expose buttons here (avoids confusing flows).
+  if (!appt.confirmed_at && appt.status !== 'confirmed') return null;
+  for (var i = 0; i < DASH_TIME_STAGES.length; i++) {
+    if (!appt[DASH_TIME_STAGES[i].key]) return DASH_TIME_STAGES[i];
+  }
+  return null;
+}
+
+// Build the compact action button HTML, or '' if no action.
+function renderDashActionBtn(appt) {
+  var act = getDashNextAction(appt);
+  if (!act) return '';
+  return '<button class="dash-time-btn" '
+       + 'style="background:' + act.color + '22;color:' + act.color
+       + ';border:1px solid ' + act.color + '55" '
+       + 'onclick="recordDashApptTime(\'' + appt.id + '\',\'' + act.key + '\',this)">'
+       + act.label + '</button>';
+}
+
+// Builds the compact stamp strip (smaller than the appointments-page one —
+// dashboard rows are tight). Only shows the journey stamps, not confirmation.
+function renderDashStrip(appt) {
+  if (!appt) return '';
+  var parts = [];
+  DASH_TIME_STAGES.forEach(function(st) {
+    if (appt[st.key]) {
+      var d = new Date(appt[st.key]);
+      if (isNaN(d.getTime())) return;
+      var t = d.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+      parts.push(
+        '<span class="dash-time-stamp" style="color:' + st.color + '">'
+        + st.label.split(' ')[0] + ' ' + t + '</span>'
+      );
+    }
+  });
+  return parts.join('');
+}
+
+// Renders the entire "today's appointments" card from _dashApptsToday.
+// Called once on load, then again after every successful click.
+function renderTodayApptsCard() {
+  var el = document.getElementById('todayAppts');
+  if (!el) return;
+  if (!_dashApptsToday.length) {
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:13px">لا توجد مواعيد اليوم</div>';
+    return;
+  }
+  el.innerHTML = _dashApptsToday.map(function(a) {
+    var stamps = renderDashStrip(a);
+    var btn = renderDashActionBtn(a);
+    var safeName = (a.patient_name || '—');
+    var safeType = (a.type || '—');
+    var safeTime = (a.time || '').slice(0, 5) || '—';
+    return '<div class="appt-item">'
+         +   '<div class="appt-time">' + safeTime + '</div>'
+         +   '<div style="flex:1;min-width:0">'
+         +     '<div class="appt-name">' + safeName + '</div>'
+         +     '<div class="appt-type">' + safeType + '</div>'
+         +     (stamps ? '<div style="margin-top:3px">' + stamps + '</div>' : '')
+         +   '</div>'
+         +   btn
+         +   '<div class="appt-dot" style="background:' + (a.color || '#2ee89e') + ';margin-right:0"></div>'
+         + '</div>';
+  }).join('');
+}
+
+// Detects pre-migration rejections (column missing or constraint violated).
+// Mirrors the same patterns used in appointments.html for consistency.
+function _dashIsAutoFillRejection(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42703|23514|confirmed_at|arrived_at|seated_at|dismissed_at|confirmation_valid/i.test(msg);
+}
+
+var _dashGap6WarnedOnce = false;
+function _dashWarnGap6MigrationOnce() {
+  if (_dashGap6WarnedOnce) return;
+  _dashGap6WarnedOnce = true;
+  console.warn('Gap 6 migration required for dashboard actions. See appointments.html for the migration SQL.');
+}
+
+// Records a timestamp for a today-card appointment, then re-renders both this
+// card and the Waiting Room so the change is visible immediately.
+async function recordDashApptTime(apptId, fieldKey, btnEl) {
+  if (!apptId || !fieldKey) return;
+  var allowed = ['arrived_at', 'seated_at', 'dismissed_at'];
+  if (allowed.indexOf(fieldKey) === -1) {
+    console.error('recordDashApptTime: invalid key', fieldKey);
+    return;
+  }
+  if (btnEl) btnEl.disabled = true;
+
+  var nowIso = new Date().toISOString();
+  var patch = {}; patch[fieldKey] = nowIso;
+
+  try {
+    var res = await window.sb.from('appointments').update(patch).eq('id', apptId);
+    if (res.error) {
+      if (_dashIsAutoFillRejection(res.error)) _dashWarnGap6MigrationOnce();
+      else console.error('recordDashApptTime failed:', res.error);
+      if (btnEl) btnEl.disabled = false;
+      return;
+    }
+    // Mutate the cached row so the next render reflects the new state.
+    var row = _dashApptsToday.find(function(a){ return a.id === apptId; });
+    if (row) row[fieldKey] = nowIso;
+    renderTodayApptsCard();
+    // Sync the Waiting Room widget so the patient appears/disappears live.
+    if (_dashUid) loadWaitingRoom(_dashUid);
+  } catch (e) {
+    console.error('recordDashApptTime exception:', e);
+    if (btnEl) btnEl.disabled = false;
+  }
 }
 
 // ─── Gap 6: Waiting Room Widget ─────────────────────────────────────────────
