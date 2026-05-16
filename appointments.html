@@ -613,6 +613,10 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div id="apptLabList" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
+
+      <!-- 💸 No-show fee button (visible only when editing + status='no_show' + fee enabled + not yet applied) -->
+      <button type="button" id="noShowFeeBtn" onclick="applyNoShowFeeFromModal()" style="display:none;margin-top:12px;width:100%;padding:10px;background:#ef5350;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">💸 تطبيق رسم لم يحضر</button>
+
       <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
         <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">🗑️ حذف</button>
@@ -1374,6 +1378,9 @@ async function openModal(prefillDate) {
   document.getElementById('apptProcSection').style.display = 'none';
   // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
   document.getElementById('apptLabSection').style.display = 'none';
+  // إخفاء زر "تطبيق رسم لم يحضر" (يظهر فقط في التعديل عند الحاجة)
+  var noShowBtn = document.getElementById('noShowFeeBtn');
+  if (noShowBtn) noShowBtn.style.display = 'none';
   updateColorPreview();
 
   // Populate provider picker (uses OpenDental 3-tier default)
@@ -1421,6 +1428,10 @@ async function editAppt(id) {
 
   // Show lab orders section (if any orders are linked to this appointment)
   renderApptLabOrders(a);
+
+  // Show/hide the no-show fee button based on current state (Gap 5).
+  // Fire-and-forget — fetches settings + checks for existing fee in DB.
+  updateNoShowFeeBtnVisibility(a);
 }
 
 /* Build the provider <select>. Visible only if >= 1 clinic doctor exists. */
@@ -1773,6 +1784,104 @@ async function completeApptWithProcedures() {
     document.getElementById('fStatus').value = appt.status;
   }
   if (btn) { btn.disabled = false; btn.textContent = '✅ إكمال الموعد + كل العلاجات المخطّطة'; }
+}
+
+// ─── Gap 5: explicit "Apply No-Show Fee" button handler ──────────────────────
+// Surfaces the no-show fee prompt as a dedicated button so the doctor can
+// trigger it any time the appointment is already saved as no_show — not only
+// during the status-change transition inside saveAppt.
+// Same flow as the auto-prompt in saveAppt:
+//   step 1: confirm to apply (or skip)
+//   step 2: optional reason text
+// On success the fee is inserted and the button hides itself.
+async function applyNoShowFeeFromModal() {
+  if (!editingId) return;
+  var appt = appointments.find(function(a){ return a.id === editingId; });
+  if (!appt) { showToast('⚠️ تعذّر العثور على الموعد'); return; }
+
+  // Guard: must be no_show. The button only renders in this case but a stale
+  // DOM could theoretically still fire — keep the check.
+  if (appt.status !== 'no_show') {
+    showToast('⚠️ هذا الإجراء متاح فقط لمواعيد "لم يحضر"');
+    return;
+  }
+  if (!appt.patient_id) {
+    showToast('⚠️ لا يمكن تطبيق الرسم — الموعد بلا مريض مسجّل');
+    return;
+  }
+
+  // Re-check everything against DB (settings + already-applied) since the
+  // user might have changed things in another tab since the modal opened.
+  var feeCfg = await getNoShowFeeConfig();
+  if (!feeCfg.enabled || feeCfg.amount <= 0) {
+    showToast('⚠️ رسم "لم يحضر" غير مفعّل في الإعدادات');
+    return;
+  }
+  var alreadyApplied = await noShowFeeAlreadyApplied(editingId);
+  if (alreadyApplied) {
+    showToast('ℹ️ الرسم مُطبَّق على هذا الموعد مسبقاً');
+    var bn = document.getElementById('noShowFeeBtn');
+    if (bn) bn.style.display = 'none';
+    return;
+  }
+
+  var msg = '🚫 تطبيق رسم لم يحضر؟\n\n'
+          + 'المريض: ' + (appt.patient_name || '—') + '\n'
+          + 'المبلغ: ' + feeCfg.amount.toLocaleString('en-US') + ' ل.س\n\n'
+          + '• موافق → تطبيق الرسم\n'
+          + '• إلغاء → عدم التطبيق';
+  if (!confirm(msg)) return;
+  var reason = prompt('سبب عدم الحضور (اختياري):', '') || '';
+
+  var btn = document.getElementById('noShowFeeBtn');
+  var originalText = '';
+  if (btn) {
+    originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'جارٍ تطبيق الرسم…';
+  }
+
+  var ok = await applyNoShowFee({
+    patientId:  appt.patient_id,
+    providerId: appt.provider_id || null,
+    amount:     feeCfg.amount,
+    reason:     reason,
+    apptId:     editingId,
+    apptDate:   appt.date
+  });
+
+  if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  if (ok) {
+    showToast('✅ تم تطبيق رسم لم يحضر');
+    if (btn) btn.style.display = 'none';  // hide so the doctor can't double-apply
+  }
+  // On failure applyNoShowFee already showed an error toast; leave the
+  // button visible so the user can retry.
+}
+
+// Show/hide the no-show fee button based on the currently-loaded appointment.
+// Called from editAppt() right after the modal fields are populated.
+// Conditions (all must be true to show):
+//   1. appt.status === 'no_show'
+//   2. appt has a patient_id
+//   3. clinic settings: no-show fee enabled with amount > 0
+//   4. no existing no-show fee session linked to this appointment
+async function updateNoShowFeeBtnVisibility(appt) {
+  var btn = document.getElementById('noShowFeeBtn');
+  if (!btn) return;
+  btn.style.display = 'none';  // safe default
+  if (!appt || appt.status !== 'no_show' || !appt.patient_id) return;
+  try {
+    var feeCfg = await getNoShowFeeConfig();
+    if (!feeCfg.enabled || feeCfg.amount <= 0) return;
+    var alreadyApplied = await noShowFeeAlreadyApplied(appt.id);
+    if (alreadyApplied) return;
+    // Update label with the amount so the doctor sees the cost up-front
+    btn.textContent = '💸 تطبيق رسم لم يحضر (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
+    btn.style.display = 'block';
+  } catch (e) {
+    console.warn('updateNoShowFeeBtnVisibility:', e);
+  }
 }
 
 // حذف الموعد من داخل المودال
