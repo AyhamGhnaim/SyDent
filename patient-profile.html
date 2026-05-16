@@ -2671,6 +2671,21 @@ function renderTeeth() {
 /* Add a small color dot on each tooth indicating its dominant treatment status.
    Skips teeth with no treatments. */
 function addStatusBadges() {
+  // Clean slate: restore each cell's title to its base (saved on first run)
+  // and clear any opacity left over from a previous status. Without this,
+  // a tooth that lost its badge (e.g. status changed to 'completed' or
+  // its treatment was removed) would still show its old hover tooltip and
+  // faded shape from the prior render.
+  document.querySelectorAll('.tooth-cell').forEach(function(c){
+    // Save the original title on first encounter so we can restore it later.
+    if (!c.hasAttribute('data-base-title')) {
+      c.setAttribute('data-base-title', c.title || '');
+    }
+    // Reset to base each render — we'll append the status label below if needed.
+    c.title = c.getAttribute('data-base-title') || '';
+    var sh = c.querySelector('.tooth-shape');
+    if (sh && sh.style.opacity) sh.style.opacity = '';
+  });
   var allTeeth = UPPER_T.concat(LOWER_T);
   for (var i=0; i<allTeeth.length; i++) {
     var num = allTeeth[i];
@@ -2693,7 +2708,11 @@ function addStatusBadges() {
     cell.appendChild(badge);
     // Native browser tooltip on the cell — appears under the cursor automatically,
     // never gets clipped at screen edges (the browser handles positioning).
-    cell.title = STATUS_LABELS[status] || status;
+    // Combine the base title (e.g. "السن 13") with the status label so the user
+    // sees both pieces of info on hover, e.g. "السن 13 — من عيادتنا".
+    var statusLbl = STATUS_LABELS[status] || status;
+    var baseTitle = cell.getAttribute('data-base-title') || '';
+    cell.title = baseTitle ? (baseTitle + ' — ' + statusLbl) : statusLbl;
     // Apply visual treatment to the tooth shape
     var shape = cell.querySelector('.tooth-shape');
     if (shape) {
