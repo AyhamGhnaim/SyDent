@@ -1051,11 +1051,29 @@ async function reallocatePatientFunds() {
     // payment to one session would have the leftover 70k frozen as "credit",
     // and a new 25k completed session wouldn't get auto-paid. That's a UX bug.
     //
+    // Identify manual payment IDs, but DETECT CORRUPTED state: manual_allocation=true
+    // with zero splits is theoretically impossible via the app (saveManualSplits
+    // always creates splits BEFORE setting the flag). It can only come from DB
+    // corruption / manual SQL. In that case, we ignore the flag and treat the
+    // payment as regular FIFO.
+    //
     // The manual_allocation column may not exist on pre-Migration-8 DBs;
     // truthy check handles undefined gracefully.
+    var splitsCountByPayment = {};
+    for (var pci = 0; pci < paymentSplits.length; pci++) {
+      splitsCountByPayment[paymentSplits[pci].payment_id] = (splitsCountByPayment[paymentSplits[pci].payment_id] || 0) + 1;
+    }
     var manualPaymentIds = [];
+    var corruptedManualPaymentIds = [];   // manual=true but no splits → clear flag
     for (var mi = 0; mi < payments.length; mi++) {
-      if (payments[mi].manual_allocation === true) manualPaymentIds.push(payments[mi].id);
+      if (payments[mi].manual_allocation === true) {
+        if (splitsCountByPayment[payments[mi].id]) {
+          manualPaymentIds.push(payments[mi].id);
+        } else {
+          // No splits → corrupted manual flag. Will be cleared after rebuild.
+          corruptedManualPaymentIds.push(payments[mi].id);
+        }
+      }
     }
 
     // Split current splits into two groups:
@@ -1187,6 +1205,27 @@ async function reallocatePatientFunds() {
       }
       // Append new splits to memory.
       for (var k2 = 0; k2 < (insRes.data || []).length; k2++) paymentSplits.push(insRes.data[k2]);
+    }
+
+    // Clear the manual_allocation flag for any payments we detected as corrupted
+    // (manual=true with no splits). After the FIFO rebuild above they now have
+    // proper splits and should be flagged as regular FIFO. Best-effort —
+    // failure here is non-fatal because splits are already saved correctly.
+    if (corruptedManualPaymentIds.length) {
+      try {
+        await window.sb.from('ledger_payments')
+          .update({ manual_allocation: false })
+          .in('id', corruptedManualPaymentIds)
+          .eq('doctor_id', currentUser.id);
+        // Sync local payment objects so the UI reflects cleared flags immediately.
+        for (var ci = 0; ci < payments.length; ci++) {
+          if (corruptedManualPaymentIds.indexOf(payments[ci].id) !== -1) {
+            payments[ci].manual_allocation = false;
+          }
+        }
+      } catch (e) {
+        console.warn('reallocate: failed to clear corrupted manual flag', e);
+      }
     }
     return true;
   } catch(e) {

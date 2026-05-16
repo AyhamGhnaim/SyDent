@@ -1254,13 +1254,13 @@ async function scanOrphanedPayments() {
     var splitPayIds = {};
     (spRes.data || []).forEach(function(sp){ splitPayIds[sp.payment_id] = true; });
 
-    // 3. Filter to payments WITHOUT any splits AND not flagged as manual_allocation.
-    // (Manual payments with zero splits is theoretically valid: 100% unearned that
-    //  the user explicitly cleared. We don't touch those.)
+    // 3. Filter to payments WITHOUT any splits. Any payment in this state is an
+    // orphan that needs FIFO redistribution — regardless of manual_allocation flag.
+    // (manual_allocation=true with zero splits is theoretically impossible via the
+    //  app, since saveManualSplits always creates splits BEFORE setting the flag.
+    //  But DB corruption / manual SQL can produce this state, so we still rebuild.)
     var orphans = allPayments.filter(function(p){
-      if (splitPayIds[p.id]) return false;
-      if (p.manual_allocation === true) return false;
-      return true;
+      return !splitPayIds[p.id];
     });
 
     // Group by patient.
@@ -1391,13 +1391,27 @@ async function _backfillOnePatient(patientId) {
 
     if (!payments.length) return true;   // nothing to do
 
-    // Identify manual payment IDs. Their ALLOCATED splits (is_unearned=false)
-    // are preserved verbatim; their UNEARNED splits (is_unearned=true) are
-    // re-distributed by FIFO into new sessions just like normal payments.
-    // See patient-profile.html's reallocatePatientFunds() for the same logic.
+    // Identify manual payment IDs, but DETECT CORRUPTED state: manual_allocation=true
+    // with zero splits is theoretically impossible via the app (saveManualSplits
+    // always creates splits BEFORE setting the flag). It can only come from DB
+    // corruption / manual SQL. In that case, we ignore the flag and treat the
+    // payment as regular FIFO.
+    var splitsCountByPayment = {};
+    for (var pci = 0; pci < splits.length; pci++) {
+      splitsCountByPayment[splits[pci].payment_id] = (splitsCountByPayment[splits[pci].payment_id] || 0) + 1;
+    }
     var manualPayIds = {};
+    var corruptedManualPayIds = [];   // manual=true but no splits → clear the flag later
     for (var mi = 0; mi < payments.length; mi++) {
-      if (payments[mi].manual_allocation === true) manualPayIds[payments[mi].id] = true;
+      if (payments[mi].manual_allocation === true) {
+        if (splitsCountByPayment[payments[mi].id]) {
+          // Has splits → genuinely manual, preserve as designed.
+          manualPayIds[payments[mi].id] = true;
+        } else {
+          // No splits → corrupted manual flag. Clear it and treat as FIFO.
+          corruptedManualPayIds.push(payments[mi].id);
+        }
+      }
     }
 
     // Partition existing splits.
@@ -1474,6 +1488,21 @@ async function _backfillOnePatient(patientId) {
     if (insRes.error) {
       console.warn('backfill ' + patientId + ': insert failed', insRes.error);
       return false;
+    }
+
+    // Clear the manual_allocation flag for any payments we detected as corrupted
+    // (manual=true with no splits). After the FIFO rebuild above they now have
+    // proper splits and should be flagged as regular FIFO. Best-effort — failure
+    // here is non-fatal because the splits are already saved correctly.
+    if (corruptedManualPayIds.length) {
+      try {
+        await window.sb.from('ledger_payments')
+          .update({ manual_allocation: false })
+          .in('id', corruptedManualPayIds)
+          .eq('doctor_id', currentUser.id);
+      } catch (e) {
+        console.warn('backfill: failed to clear corrupted manual flag', e);
+      }
     }
     return true;
   } catch (e) {
