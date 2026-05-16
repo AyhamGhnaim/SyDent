@@ -620,12 +620,19 @@ async function loadAppointmentTypes() {
   listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">جارٍ التحميل…</div>';
 
   // 1. Treatments (for the dropdown). Best-effort: empty list still works.
+  // NOTE: treatments table uses owner_id (not doctor_id) and is gated by RLS,
+  // so we don't need an explicit .eq() filter — RLS does it.
+  // We store the UUID 'id' (not treatment_key) because appointment_types
+  // has a real FK to treatments(id). Display uses 'name', color uses 'fill'.
   try {
     var trRes = await window.sb.from('treatments')
-      .select('id, name, color')
-      .eq('doctor_id', currentUser.id)
-      .order('name', { ascending: true });
-    _apptTypesTreatments = (trRes && trRes.data) ? trRes.data : [];
+      .select('id, name, fill')
+      .order('sort_order', { ascending: true });
+    _apptTypesTreatments = (trRes && trRes.data)
+      ? trRes.data.map(function(t){
+          return { id: t.id, name: t.name, color: t.fill };
+        })
+      : [];
   } catch (e) {
     console.warn('Gap 8: treatments load failed (continuing):', e);
     _apptTypesTreatments = [];

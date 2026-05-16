@@ -1868,14 +1868,17 @@ function onApptTypePicked() {
     }
   }
 
-  // Treatment: only pre-fill if it still exists in TREATMENTS (FK may have
-  // been NULLed if the treatment was deleted after the template was created).
+  // Treatment: the template stores treatments.id (UUID), but TREATMENTS[].id
+  // in this page is treatment_key for backward-compat. Match via dbId (the
+  // UUID is exposed as 'dbId' in loadTreatmentsFromSupabase). If the linked
+  // treatment was deleted after the template was created, the FK has been
+  // NULLed, so we silently skip — duration alone still pre-fills.
   if (t.default_treatment_id) {
     var typeSel = document.getElementById('fType');
     if (typeSel) {
       var match = null;
       for (var j = 0; j < TREATMENTS.length; j++) {
-        if (TREATMENTS[j].id === t.default_treatment_id) { match = TREATMENTS[j]; break; }
+        if (TREATMENTS[j].dbId === t.default_treatment_id) { match = TREATMENTS[j]; break; }
       }
       if (match) {
         typeSel.value = match.id;
