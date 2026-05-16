@@ -214,7 +214,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tooth-status-badge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:5;}
 .status-planned{background:#ef4444;}
 .status-completed{background:#3b82f6;}
-.status-existing{background:#9ca3af;opacity:.7;}
+.status-existing_current{background:#10b981;opacity:.75;}  /* EC — done in our clinic */
+.status-existing_other{background:#9ca3af;opacity:.55;}    /* EO — done elsewhere */
+.status-existing{background:#9ca3af;opacity:.7;}           /* legacy fallback (pre-migration) */
 .status-referred{background:#f59e0b;}
 .topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
@@ -547,8 +549,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <button type="button" class="status-opt" data-status="planned" onclick="pickStatus('planned')">
               <span class="status-dot" style="background:#ef4444;"></span>مخطط
             </button>
-            <button type="button" class="status-opt" data-status="existing" onclick="pickStatus('existing')">
-              <span class="status-dot" style="background:#9ca3af;"></span>موجود مسبقاً
+            <button type="button" class="status-opt" data-status="existing_current" onclick="pickStatus('existing_current')">
+              <span class="status-dot" style="background:#10b981;"></span>موجود — من عيادتنا
+            </button>
+            <button type="button" class="status-opt" data-status="existing_other" onclick="pickStatus('existing_other')">
+              <span class="status-dot" style="background:#9ca3af;"></span>موجود — من عيادة أخرى
             </button>
             <button type="button" class="status-opt" data-status="referred" onclick="pickStatus('referred')">
               <span class="status-dot" style="background:#f59e0b;"></span>محوّل
@@ -2046,7 +2051,8 @@ function isExtractionKey(key) {
 }
 
 /* Get the treatment status for a surface of a tooth.
-   Returns: 'planned' / 'completed' / 'existing' / 'referred' (default 'completed' for legacy) */
+   Returns: 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'existing' (legacy) / 'referred'
+   Default 'completed' for legacy data without a stored status. */
 function getStatus(num, surface) {
   var sm = teethMap[String(num)] || {};
   if (sm.__status && sm.__status[surface]) return sm.__status[surface];
@@ -2054,7 +2060,9 @@ function getStatus(num, surface) {
 }
 
 /* Get the dominant status for a tooth (used for badge/indicator at tooth level).
-   Priority: planned > completed > existing > referred. */
+   Priority: planned > completed > existing_current > existing_other > existing (legacy) > referred.
+   EC outranks EO because it represents your own historical work (more clinically relevant).
+   Legacy 'existing' falls between EO and referred so pre-migration data still surfaces. */
 function getDominantStatus(num) {
   var sm = teethMap[String(num)] || {};
   if (!sm.__status) return 'completed';
@@ -2066,6 +2074,8 @@ function getDominantStatus(num) {
   }
   if (statuses.indexOf('planned') >= 0) return 'planned';
   if (statuses.indexOf('completed') >= 0) return 'completed';
+  if (statuses.indexOf('existing_current') >= 0) return 'existing_current';
+  if (statuses.indexOf('existing_other') >= 0) return 'existing_other';
   if (statuses.indexOf('existing') >= 0) return 'existing';
   if (statuses.indexOf('referred') >= 0) return 'referred';
   return 'completed';
@@ -2685,7 +2695,9 @@ function addStatusBadges() {
     var shape = cell.querySelector('.tooth-shape');
     if (shape) {
       if (status === 'planned') shape.style.opacity = '0.55';
-      else if (status === 'existing') shape.style.opacity = '0.65';
+      else if (status === 'existing_current') shape.style.opacity = '0.75';
+      else if (status === 'existing_other') shape.style.opacity = '0.55';
+      else if (status === 'existing') shape.style.opacity = '0.65';  // legacy
       else if (status === 'referred') shape.style.opacity = '0.50';
     }
   }
@@ -2737,23 +2749,83 @@ var currentTooth = null;
 var currentSurface = null;
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
-var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing' / 'referred'
+var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'referred'
 var pendingProviderId = null;  // Selected clinic doctor for this treatment
 var CLINIC_DOCTORS = [];
 var BUNDLE_ITEMS = [];
 
 var STATUS_LABELS = {
-  planned:   'مخطط',
-  completed: 'منجز',
-  existing:  'موجود مسبقاً',
-  referred:  'محوّل'
+  planned:          'مخطط',
+  completed:        'منجز',
+  existing_current: 'موجود — من عيادتنا',
+  existing_other:   'موجود — من عيادة أخرى',
+  existing:         'موجود مسبقاً',           // legacy: pre-migration rows
+  referred:         'محوّل'
 };
 var STATUS_COLORS = {
-  planned:   '#ef4444',
-  completed: '#3b82f6',
-  existing:  '#9ca3af',
-  referred:  '#f59e0b'
+  planned:          '#ef4444',
+  completed:        '#3b82f6',
+  existing_current: '#10b981',                 // green-teal: our practice's historical work
+  existing_other:   '#9ca3af',                 // grey: external clinic's work
+  existing:         '#9ca3af',                 // legacy: pre-migration rows
+  referred:         '#f59e0b'
 };
+
+/* Detect "check constraint" errors on teeth_status.status / ledger_sessions.status
+   so we can gracefully fall back to legacy 'existing' when the EC/EO migration
+   hasn't been applied to the DB yet. Same pattern used for appointments_status_check
+   in appointments.html (Gaps 1+5). */
+function isStatusConstraintError(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /check constraint|23514|teeth_status_status_check|ledger_sessions_status_check/i.test(msg);
+}
+
+/* Map new EC/EO statuses to legacy 'existing' for pre-migration DBs.
+   Anything else passes through unchanged. */
+function downgradeStatusForLegacy(s) {
+  if (s === 'existing_current' || s === 'existing_other') return 'existing';
+  return s;
+}
+
+/* Tracks whether we've already warned the user about the missing EC/EO migration,
+   so the toast fires only once per page session. */
+var ecEoMigrationWarned = false;
+function warnEcEoMigrationOnce() {
+  if (ecEoMigrationWarned) return;
+  ecEoMigrationWarned = true;
+  showToast('⚠️ تم الحفظ كـ "موجود مسبقاً" — يلزم ترقية قاعدة البيانات لتمييز EC/EO');
+  console.warn(
+    "Status 'existing_current'/'existing_other' rejected by DB constraint — falling back to legacy 'existing'. " +
+    "Run migration:\n" +
+    "ALTER TABLE teeth_status DROP CONSTRAINT IF EXISTS teeth_status_status_check;\n" +
+    "ALTER TABLE teeth_status ADD CONSTRAINT teeth_status_status_check\n" +
+    "  CHECK (status IN ('planned','completed','existing_current','existing_other','referred','condition'));\n" +
+    "ALTER TABLE ledger_sessions DROP CONSTRAINT IF EXISTS ledger_sessions_status_check;\n" +
+    "ALTER TABLE ledger_sessions ADD CONSTRAINT ledger_sessions_status_check\n" +
+    "  CHECK (status IN ('planned','completed','existing_current','existing_other','referred','condition'));\n" +
+    "UPDATE teeth_status SET status='existing_other' WHERE status='existing';\n" +
+    "UPDATE ledger_sessions SET status='existing_other' WHERE status='existing';"
+  );
+}
+
+/* Upsert a teeth_status row with automatic legacy fallback.
+   If the DB rejects 'existing_current'/'existing_other' because the migration
+   isn't applied yet, retry once with 'existing'. Returns the supabase result.
+   Note: ledger_sessions inserts don't need a similar wrapper because their callers
+   already guard with `if (pendingTreatStatus === 'completed' || 'planned')`, so
+   existing_* statuses never reach the ledger insert path. */
+async function upsertTeethStatusWithFallback(row, opts) {
+  var first = await window.sb.from('teeth_status').upsert(row, opts);
+  if (first.error && isStatusConstraintError(first.error)
+      && (row.status === 'existing_current' || row.status === 'existing_other')) {
+    var legacyRow = Object.assign({}, row, { status: 'existing' });
+    var retry = await window.sb.from('teeth_status').upsert(legacyRow, opts);
+    if (!retry.error) warnEcEoMigrationOnce();
+    return retry;
+  }
+  return first;
+}
 
 function pickStatus(s) {
   pendingTreatStatus = s;
@@ -3150,7 +3222,7 @@ async function saveToothTreatment() {
       var un = String(unit[u]);
       var isAbut = (unit[u] === abuts.mesial || unit[u] === abuts.distal);
       if (isAbut) {
-        var rA = await window.sb.from('teeth_status').upsert({
+        var rA = await upsertTeethStatusWithFallback({
           doctor_id: currentUser.id, patient_id: patientId,
           tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
@@ -3164,7 +3236,7 @@ async function saveToothTreatment() {
         teethMap[un].__status.WHOLE = pendingTreatStatus;
       } else {
         // Pontic: save at PONTIC surface (DB constraint accepts it)
-        var rP = await window.sb.from('teeth_status').upsert({
+        var rP = await upsertTeethStatusWithFallback({
           doctor_id: currentUser.id, patient_id: patientId,
           tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
         }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
@@ -3192,7 +3264,7 @@ async function saveToothTreatment() {
       teethMap[String(currentTooth)] = {};
     }
     // Normal save — DB constraint now accepts all valid surface values
-    var rN = await window.sb.from('teeth_status').upsert({
+    var rN = await upsertTeethStatusWithFallback({
       doctor_id: currentUser.id, patient_id: patientId,
       tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
@@ -3226,7 +3298,8 @@ async function saveToothTreatment() {
   // so we save the true surface key for accurate per-surface reporting.
   var dbSurface = currentSurface;
   // Only create a ledger entry for completed and planned treatments (financial records).
-  // 'existing' (pre-existing) and 'referred' (sent away) are clinical notes, not billable.
+  // 'existing_current'/'existing_other' (pre-existing work, whether ours or external) and
+  // 'referred' (sent away) are clinical notes only — they don't represent current chargeable production.
   var newSess = null;
   if (pendingTreatStatus === 'completed' || pendingTreatStatus === 'planned') {
     var rL = await window.sb.from('ledger_sessions').insert({
@@ -4410,7 +4483,7 @@ async function saveToothAndOpenLab() {
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
   // 1. Save tooth status (surface + treatment_key + clinical status + treating provider)
-  var rTs = await window.sb.from('teeth_status').upsert({
+  var rTs = await upsertTeethStatusWithFallback({
     doctor_id: currentUser.id, patient_id: patientId,
     tooth_num: String(currentTooth), surface: currentSurface,
     treatment_key: pendingToothStatus,
@@ -4434,7 +4507,8 @@ async function saveToothAndOpenLab() {
   else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
   else areaForLabDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
 
-  // 2. Insert ledger session — only for planned/completed (existing/referred are clinical notes, not billable).
+  // 2. Insert ledger session — only for planned/completed.
+  // existing_current/existing_other/referred are clinical notes, not billable.
   // CRITICAL: pass status + provider_id so the user's choices are preserved.
   // Without these, DB defaults (status='completed', provider_id=NULL) silently overwrite them.
   var newSess = null;
