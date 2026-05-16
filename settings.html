@@ -216,6 +216,25 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
       </form>
     </div>
 
+    <!-- 1.5 إعدادات المواعيد — Gap 5 -->
+    <div class="section">
+      <div class="section-title">🗓️ إعدادات المواعيد</div>
+      <div class="section-sub">رسم اختياري يُطبَّق على المرضى الذين لم يحضروا موعدهم بدون إخطار مسبق</div>
+      <form onsubmit="saveAppointmentSettings(event)">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);">
+            <input type="checkbox" id="fNoShowFeeEnabled" style="width:auto;margin:0;">
+            تفعيل رسم "لم يحضر"
+          </label>
+        </div>
+        <div class="form-group">
+          <label>المبلغ (ل.س)</label>
+          <input type="number" id="fNoShowFeeAmount" min="0" step="1000" placeholder="5000">
+        </div>
+        <button type="submit" class="btn btn-primary" id="btnSaveApptSettings">حفظ التغييرات</button>
+      </form>
+    </div>
+
     <!-- 2. تغيير البريد -->
     <div class="section">
       <div class="section-title">📧 تغيير البريد الإلكتروني</div>
@@ -315,7 +334,74 @@ function showToast(msg, isError = false) {
   document.getElementById('fName').value         = meta.full_name || meta.name || '';
   document.getElementById('fRole').value         = meta.role || 'طبيب أسنان';
   document.getElementById('fEmailCurrent').value = currentUser.email || '';
+
+  // Gap 5: load appointment settings from clinic_settings (fault-tolerant)
+  await loadAppointmentSettings();
 })();
+
+// ─── Gap 5: Appointment settings (no-show fee) ───
+// Stored in clinic_settings as two keys: no_show_fee_enabled, no_show_fee_amount.
+// loadAppointmentSettings is fault-tolerant: if the table isn't migrated yet,
+// we keep the form fields at their defaults (disabled, blank amount) instead
+// of breaking the whole settings page.
+async function loadAppointmentSettings() {
+  try {
+    const res = await window.sb.from('clinic_settings')
+      .select('key, value')
+      .eq('doctor_id', currentUser.id)
+      .in('key', ['no_show_fee_enabled', 'no_show_fee_amount']);
+    if (res.error) {
+      // Table missing → silently use defaults. Any other error → log it but
+      // still let the user open the section.
+      const msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('clinic_settings read warn:', res.error);
+      }
+      return;
+    }
+    const byKey = {};
+    (res.data || []).forEach(r => { byKey[r.key] = r.value; });
+    document.getElementById('fNoShowFeeEnabled').checked = (byKey['no_show_fee_enabled'] === 'true');
+    const amt = parseInt(byKey['no_show_fee_amount'] || '0', 10) || 0;
+    if (amt > 0) document.getElementById('fNoShowFeeAmount').value = amt;
+  } catch (e) {
+    console.warn('loadAppointmentSettings fallback:', e);
+  }
+}
+
+async function saveAppointmentSettings(e) {
+  e.preventDefault();
+  const enabled = document.getElementById('fNoShowFeeEnabled').checked;
+  const amountRaw = document.getElementById('fNoShowFeeAmount').value;
+  const amount = parseInt(amountRaw, 10);
+  if (enabled && (isNaN(amount) || amount <= 0)) {
+    showToast('⚠️ أدخل مبلغاً صالحاً أكبر من صفر', true);
+    return;
+  }
+  const btn = document.getElementById('btnSaveApptSettings');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+
+  // Upsert both keys in one round-trip — the unique(doctor_id, key) constraint
+  // means we can rely on onConflict to replace existing rows cleanly.
+  const rows = [
+    { doctor_id: currentUser.id, key: 'no_show_fee_enabled', value: enabled ? 'true' : 'false', updated_at: new Date().toISOString() },
+    { doctor_id: currentUser.id, key: 'no_show_fee_amount',  value: String(isNaN(amount) ? 0 : amount), updated_at: new Date().toISOString() }
+  ];
+  const { error } = await window.sb.from('clinic_settings')
+    .upsert(rows, { onConflict: 'doctor_id,key' });
+
+  btn.disabled = false; btn.textContent = 'حفظ التغييرات';
+  if (error) {
+    const msg = (error.message || '') + ' ' + (error.code || '');
+    if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+      showToast('⚠️ يلزم ترقية قاعدة البيانات (clinic_settings)', true);
+    } else {
+      showToast('❌ ' + (error.message || 'فشل الحفظ'), true);
+    }
+    return;
+  }
+  showToast('✅ تم حفظ إعدادات المواعيد');
+}
 
 // ─── حفظ المعلومات الشخصية ───
 async function saveProfile(e) {

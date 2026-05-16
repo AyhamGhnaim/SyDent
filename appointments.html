@@ -577,6 +577,7 @@ textarea { resize: vertical; min-height: 72px; }
             <option value="confirmed">مؤكد</option>
             <option value="pending">معلّق</option>
             <option value="completed">مكتمل</option>
+            <option value="no_show">لم يحضر</option>
             <option value="cancelled">ملغى</option>
           </select>
         </div>
@@ -1054,6 +1055,123 @@ function statusClass(s) {
 // Statuses considered "finished" — used to hide from upcoming-list view.
 function isFinishedStatus(s) {
   return s === 'completed' || s === 'cancelled' || s === 'broken' || s === 'no_show';
+}
+
+// ─── Gap 5: No-Show fee helpers ──────────────────────────────────────────────
+// Settings live in the generic clinic_settings table (key/value store) so we
+// don't need a fresh migration every time we add a preference. Two keys here:
+//   - 'no_show_fee_enabled' : 'true' | 'false'
+//   - 'no_show_fee_amount'  : integer string (Syrian Pounds)
+// Both reads are fault-tolerant: if the table doesn't exist yet (pre-migration),
+// we treat the feature as disabled instead of breaking the user's workflow.
+
+// Detect the "table missing" error so the rest of the app keeps working
+// when Migration 5 (clinic_settings) hasn't been applied yet. PostgreSQL
+// returns 42P01 for "relation does not exist"; PostgREST may map this to
+// PGRST205 with a textual hint. We accept either form.
+function isClinicSettingsTableMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42P01|PGRST205|clinic_settings.*does not exist/i.test(msg);
+}
+
+// Returns the current no-show fee config:
+//   { enabled: boolean, amount: integer }
+// On any failure, returns { enabled: false, amount: 0 } so the prompt simply
+// doesn't fire — the user can still mark appointments as no-show normally.
+async function getNoShowFeeConfig() {
+  try {
+    var res = await window.sb.from('clinic_settings')
+      .select('key, value')
+      .eq('doctor_id', currentUser.id)
+      .in('key', ['no_show_fee_enabled', 'no_show_fee_amount']);
+    if (res.error) {
+      if (!isClinicSettingsTableMissing(res.error)) {
+        console.warn('clinic_settings read warn:', res.error);
+      }
+      return { enabled: false, amount: 0 };
+    }
+    var rows = res.data || [];
+    var byKey = {};
+    rows.forEach(function(r){ byKey[r.key] = r.value; });
+    var enabled = (byKey['no_show_fee_enabled'] === 'true');
+    var amount  = parseInt(byKey['no_show_fee_amount'] || '0', 10) || 0;
+    return { enabled: enabled, amount: amount };
+  } catch (e) {
+    console.warn('getNoShowFeeConfig fallback:', e);
+    return { enabled: false, amount: 0 };
+  }
+}
+
+// Returns true if a no-show fee session has already been recorded for this
+// appointment, so we don't double-charge if the user flips the status back
+// and forth. We look for any session linked to the appointment whose type
+// matches our canonical fee label.
+async function noShowFeeAlreadyApplied(apptId) {
+  if (!apptId) return false;
+  try {
+    var res = await window.sb.from('ledger_sessions')
+      .select('id, type')
+      .eq('doctor_id', currentUser.id)
+      .eq('appointment_id', apptId)
+      .eq('type', NO_SHOW_FEE_TYPE_LABEL)
+      .limit(1);
+    if (res.error) return false; // fail open — better to warn user than block
+    return Array.isArray(res.data) && res.data.length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Canonical label for the auto-inserted fee session. Searched by exact match
+// in noShowFeeAlreadyApplied(), so don't change without a data migration.
+var NO_SHOW_FEE_TYPE_LABEL = 'رسم موعد لم يحضر';
+
+// Apply the no-show fee: INSERT a ledger_sessions row for the patient at the
+// appointment's provider. Returns true on success.
+// Note: this only inserts the fee — the patient's unearned-credit reallocation
+// (FIFO) runs in patient-profile.html on demand. If the patient has unearned
+// credit, it will auto-flow to this new fee the next time their profile is
+// opened (saveSession path triggers reallocatePatientFunds there).
+async function applyNoShowFee(opts) {
+  // opts: { patientId, providerId, amount, reason, apptId, apptDate }
+  try {
+    var feeDate = opts.apptDate || dateStr(new Date());
+    var noteParts = ['موعد ' + feeDate + ' — لم يحضر المريض'];
+    if (opts.reason && opts.reason.trim()) noteParts.push('السبب: ' + opts.reason.trim());
+    var baseRow = {
+      doctor_id: currentUser.id,
+      patient_id: opts.patientId,
+      type: NO_SHOW_FEE_TYPE_LABEL,
+      description: 'رسم لم يحضر',
+      cost: opts.amount,
+      date: feeDate,
+      status: 'completed',
+      provider_id: opts.providerId || null,
+      notes: noteParts.join('\n')
+    };
+    // First attempt with appointment_id (Migration 2). If that column is
+    // missing in some legacy DB, retry without it so the fee is still saved.
+    var row = Object.assign({ appointment_id: opts.apptId || null }, baseRow);
+    var sessRes = await window.sb.from('ledger_sessions').insert(row);
+    if (sessRes.error) {
+      var errMsg = (sessRes.error.message || '') + ' ' + (sessRes.error.code || '');
+      var apptIdMissing = /column .*appointment_id.* does not exist|42703/i.test(errMsg);
+      if (apptIdMissing) {
+        console.warn('appointment_id column missing — saving fee without link.');
+        sessRes = await window.sb.from('ledger_sessions').insert(baseRow);
+      }
+    }
+    if (sessRes.error) {
+      console.warn('no-show fee insert error:', sessRes.error);
+      showToast('⚠️ تعذّر تسجيل الرسم: ' + (sessRes.error.message || 'سبب غير معروف'));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('applyNoShowFee fallback:', e);
+    return false;
+  }
 }
 
 // ─── Render ──────────────────────────────────────────
@@ -1732,6 +1850,52 @@ async function submitAppt(e) {
     provider_id:  providerId
   };
 
+  // ── Gap 5: No-show fee workflow ─────────────────────────────────────────
+  // Trigger conditions (all must be true):
+  //   1. new status is 'no_show'
+  //   2. previous status was NOT 'no_show' (i.e. we're transitioning into it)
+  //   3. patient is identified (no point charging an unknown name)
+  //   4. clinic has enabled the fee with a positive amount
+  //   5. no existing fee row is linked to this appointment (no double-charge)
+  // If all met, show a confirm prompt + optional reason field.
+  // Fee is OPTIONAL: the user can choose "without fee" and still mark no-show.
+  var pendingNoShowFee = null;  // {amount, reason} if user opted in, else null
+  if (apptData.status === 'no_show') {
+    var previousStatus = null;
+    if (editingId) {
+      var prevAppt = appointments.find(function(a){ return a.id === editingId; });
+      if (prevAppt) previousStatus = prevAppt.status;
+    }
+    var isTransition = (previousStatus !== 'no_show');
+    if (isTransition && patientId) {
+      var feeCfg = await getNoShowFeeConfig();
+      if (feeCfg.enabled && feeCfg.amount > 0) {
+        var alreadyApplied = editingId ? await noShowFeeAlreadyApplied(editingId) : false;
+        if (!alreadyApplied) {
+          // Two-step prompt — simpler than building a custom modal for MVP:
+          //   step 1: ask whether to apply the fee at all (yes/no/cancel)
+          //   step 2: only if yes, ask for optional reason
+          var msg = '🚫 المريض لم يحضر للموعد\n\n'
+                  + 'هل تريد تطبيق رسم لم يحضر على ' + patientName + '؟\n\n'
+                  + 'المبلغ: ' + feeCfg.amount.toLocaleString('en-US') + ' ل.س\n\n'
+                  + '• موافق  → تطبيق الرسم\n'
+                  + '• إلغاء → حفظ الموعد بدون رسم';
+          if (confirm(msg)) {
+            var reason = prompt('سبب عدم الحضور (اختياري):', '') || '';
+            pendingNoShowFee = { amount: feeCfg.amount, reason: reason };
+          }
+          // If user cancelled the first prompt, pendingNoShowFee stays null
+          // and we proceed to save the appointment as no_show WITHOUT a fee.
+          // This is the "fee is optional" behavior the user asked for.
+        }
+      }
+    } else if (isTransition && !patientId) {
+      // Edge: appt has no patient linked → can't charge. Save status anyway,
+      // but notify so the user knows why no fee was applied.
+      console.info('No-show fee skipped: appointment has no linked patient.');
+    }
+  }
+
   // Helper: detect "status not in check constraint" errors so we can fall back
   // to 'confirmed' when the appointments_status_check migration isn't applied
   // yet. Same logic used in completeApptWithProcedures — keeps the two write
@@ -1758,8 +1922,23 @@ async function submitAppt(e) {
     if (upd.error) {
       showToast('❌ خطأ في التعديل: ' + upd.error.message);
     } else {
+      // ── Apply the no-show fee AFTER the appt save succeeded, never before.
+      // If the fee insert fails, the appt itself is already saved correctly —
+      // applyNoShowFee shows its own error toast and we don't roll back.
+      if (pendingNoShowFee) {
+        await applyNoShowFee({
+          patientId:  patientId,
+          providerId: providerId,
+          amount:     pendingNoShowFee.amount,
+          reason:     pendingNoShowFee.reason,
+          apptId:     editingId,
+          apptDate:   apptData.date
+        });
+      }
       if (migrationMissing) {
         showToast('⚠️ تم الحفظ كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
+      } else if (pendingNoShowFee) {
+        showToast('✅ تم الحفظ + تطبيق رسم لم يحضر');
       } else {
         showToast('✅ تم تعديل الموعد');
       }
@@ -1769,18 +1948,32 @@ async function submitAppt(e) {
       await loadAppointments();
     }
   } else {
-    var ins = await window.sb.from('appointments').insert(apptData);
+    var ins = await window.sb.from('appointments').insert(apptData).select().single();
     if (ins.error && isStatusConstraintError(ins.error) && newStatuses.indexOf(apptData.status) !== -1) {
       migrationMissing = true;
       console.warn("appointments.status='" + apptData.status + "' rejected on INSERT — falling back to 'confirmed'.");
       var fallbackIns = Object.assign({}, apptData, { status: 'confirmed' });
-      ins = await window.sb.from('appointments').insert(fallbackIns);
+      ins = await window.sb.from('appointments').insert(fallbackIns).select().single();
     }
     if (ins.error) {
       showToast('❌ خطأ في الإضافة: ' + ins.error.message);
     } else {
+      // New appointment created as no_show with a pending fee — rare flow,
+      // but supported. We need the freshly-inserted id to link the fee row.
+      if (pendingNoShowFee && ins.data && ins.data.id) {
+        await applyNoShowFee({
+          patientId:  patientId,
+          providerId: providerId,
+          amount:     pendingNoShowFee.amount,
+          reason:     pendingNoShowFee.reason,
+          apptId:     ins.data.id,
+          apptDate:   apptData.date
+        });
+      }
       if (migrationMissing) {
         showToast('⚠️ تمت الإضافة كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
+      } else if (pendingNoShowFee) {
+        showToast('✅ تمت الإضافة + تطبيق رسم لم يحضر');
       } else {
         showToast('✅ تمت إضافة الموعد');
       }
