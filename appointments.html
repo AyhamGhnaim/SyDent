@@ -265,6 +265,35 @@ body {
 .status-broken    { background: rgba(251,146,60,0.22);  color: #fb923c; }
 .status-noshow    { background: rgba(239,83,80,0.32);   color: var(--red); }
 
+/* ─── Gap 6: Time Tracking ─── */
+.time-track-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+.time-track-btn:hover { filter: brightness(1.15); }
+.time-track-btn:disabled { opacity: 0.5; cursor: wait; }
+.time-track-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.time-track-stamp {
+  cursor: pointer;
+  user-select: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+}
+.time-track-stamp:hover { background: rgba(255,255,255,0.10); }
+
 /* ─── List View ─── */
 .list-group { margin-bottom: 24px; }
 .list-date-header {
@@ -1521,6 +1550,223 @@ async function applyNoShowFee(opts) {
   }
 }
 
+// ─── Gap 6: Time Tracking helpers ────────────────────────────────────────────
+// Tracks the patient journey:
+//   confirmed_at  (📞 تم التأكيد)
+//   arrived_at    (🚪 وصل العيادة)        ← appears in Waiting Room widget
+//   seated_at     (🪑 جلس على الكرسي)     ← removed from Waiting Room widget
+//   dismissed_at  (✅ خرج من العيادة)
+//
+// Workflow mirrors OpenDental: ONE button visible at a time (the next step).
+// Once a timestamp is set, a colored badge appears under the patient name and
+// the next button takes its place.
+
+// Stage definitions — single source of truth for labels, colors, order.
+var TIME_STAGES = [
+  { key: 'confirmed_at', label: '📞 تأكيد', icon: '📞', color: '#63b3ed' },
+  { key: 'arrived_at',   label: '🚪 وصل',   icon: '🚪', color: '#f5c842' },
+  { key: 'seated_at',    label: '🪑 جلس',   icon: '🪑', color: '#fb923c' },
+  { key: 'dismissed_at', label: '✅ خرج',   icon: '✅', color: '#2ee89e' }
+];
+
+// Returns the next action button for an appointment, or null if no action is
+// applicable (e.g. appointment is cancelled/broken or already dismissed).
+function getNextTimeAction(appt) {
+  if (!appt) return null;
+  if (isFinishedStatus(appt.status) && appt.status !== 'completed') return null;
+  for (var i = 0; i < TIME_STAGES.length; i++) {
+    var st = TIME_STAGES[i];
+    if (!appt[st.key]) return st;
+  }
+  return null; // all 4 stamps recorded
+}
+
+// Formats an ISO timestamp as HH:MM in 24h, browser-local time. Returns '' on
+// nullish input so callers can use it directly inside template strings.
+function fmtApptTime(iso) {
+  if (!iso) return '';
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+  } catch (e) { return ''; }
+}
+
+// Builds the inline "stamp strip" shown under the patient name listing each
+// recorded stage in chronological order. Renders nothing if no stamps exist.
+function renderTimeStrip(appt) {
+  if (!appt) return '';
+  var parts = [];
+  TIME_STAGES.forEach(function(st) {
+    if (appt[st.key]) {
+      var t = fmtApptTime(appt[st.key]);
+      parts.push(
+        '<span class="time-track-stamp" style="color:' + st.color +
+        '" title="انقر مرتين لتعديل وقت ' + st.label.replace(/^[^\s]+\s/, '') + '" ' +
+        'ondblclick="event.stopPropagation();overrideApptTime(\'' + appt.id + '\',\'' + st.key + '\')">' +
+        st.icon + ' ' + t + '</span>'
+      );
+    }
+  });
+  if (!parts.length) return '';
+  return '<div class="time-track-strip">' + parts.join('') + '</div>';
+}
+
+// Builds the inline action button HTML for a given appointment. Returns '' if
+// no next action is available (so callers can splice into template strings).
+function renderTimeActionBtn(appt) {
+  var act = getNextTimeAction(appt);
+  if (!act) return '';
+  var bg = act.color + '22';
+  var bd = act.color + '55';
+  return '<button class="time-track-btn" ' +
+         'style="background:' + bg + ';color:' + act.color + ';border:1px solid ' + bd + '" ' +
+         'onclick="event.stopPropagation();recordApptTime(\'' + appt.id + '\',\'' + act.key + '\',this)">' +
+         act.label + '</button>';
+}
+
+// Detects PostgreSQL CHECK-constraint violations for confirmation_status —
+// fires when Gap 6 migration has not been applied yet. We then retry the
+// update without the status field so the timestamp still gets saved.
+function isConfirmationConstraintError(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /check constraint|23514|confirmation_valid/i.test(msg);
+}
+
+// One-shot user warning for missing Gap 6 migration. Logged details give the
+// admin everything needed to fix it without spamming the UI on every click.
+var _gap6WarnedOnce = false;
+function warnTimeTrackingMigrationOnce() {
+  if (_gap6WarnedOnce) return;
+  _gap6WarnedOnce = true;
+  console.warn(
+    'Gap 6 migration needed. Run in Supabase SQL editor:\n' +
+    'ALTER TABLE appointments\n' +
+    "  ADD COLUMN IF NOT EXISTS confirmation_status TEXT DEFAULT 'pending',\n" +
+    '  ADD COLUMN IF NOT EXISTS confirmed_at  TIMESTAMPTZ,\n' +
+    '  ADD COLUMN IF NOT EXISTS arrived_at    TIMESTAMPTZ,\n' +
+    '  ADD COLUMN IF NOT EXISTS seated_at     TIMESTAMPTZ,\n' +
+    '  ADD COLUMN IF NOT EXISTS dismissed_at  TIMESTAMPTZ;'
+  );
+  try {
+    if (typeof showToast === 'function') {
+      showToast('يلزم ترقية قاعدة البيانات لميزة تتبع الوقت — راجع console', 'warning');
+    } else {
+      alert('يلزم ترقية قاعدة البيانات لتفعيل تتبع الوقت بالكامل (راجع console للتفاصيل).');
+    }
+  } catch (e) {}
+}
+
+// Detects "column does not exist" (42703) — fires when none of the timestamp
+// columns are present at all. In that case we can't proceed; just warn.
+function isMissingTimeColumnError(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42703|column .* does not exist|confirmed_at|arrived_at|seated_at|dismissed_at/i.test(msg);
+}
+
+// Records a single timestamp on an appointment. Auto-sets confirmation_status
+// when stamping confirmed_at. Falls back gracefully if the migration is
+// missing. Returns true on success, false otherwise.
+async function recordApptTime(apptId, fieldKey, btnEl) {
+  if (!apptId || !fieldKey) return false;
+  // Validate fieldKey against whitelist to prevent injection via crafted DOM
+  var allowedKeys = ['confirmed_at','arrived_at','seated_at','dismissed_at'];
+  if (allowedKeys.indexOf(fieldKey) === -1) {
+    console.error('recordApptTime: invalid field key', fieldKey);
+    return false;
+  }
+  // Disable the button while the update is in flight to prevent double-clicks.
+  if (btnEl) { btnEl.disabled = true; }
+
+  var patch = {};
+  patch[fieldKey] = new Date().toISOString();
+  if (fieldKey === 'confirmed_at') patch.confirmation_status = 'confirmed';
+
+  try {
+    var res = await window.sb.from('appointments').update(patch).eq('id', apptId);
+    if (res.error) {
+      // Pre-migration: confirmation_valid constraint may not exist OR the
+      // column itself may be absent. Retry without confirmation_status.
+      if (isConfirmationConstraintError(res.error) && fieldKey === 'confirmed_at') {
+        var retryPatch = {}; retryPatch[fieldKey] = patch[fieldKey];
+        var retry = await window.sb.from('appointments').update(retryPatch).eq('id', apptId);
+        if (retry.error) {
+          if (isMissingTimeColumnError(retry.error)) warnTimeTrackingMigrationOnce();
+          else console.error('recordApptTime retry failed:', retry.error);
+          if (btnEl) btnEl.disabled = false;
+          return false;
+        }
+        warnTimeTrackingMigrationOnce();
+      } else if (isMissingTimeColumnError(res.error)) {
+        warnTimeTrackingMigrationOnce();
+        if (btnEl) btnEl.disabled = false;
+        return false;
+      } else {
+        console.error('recordApptTime failed:', res.error);
+        if (btnEl) btnEl.disabled = false;
+        return false;
+      }
+    }
+    // Reflect locally so we don't wait a full network round-trip to re-render.
+    var local = appointments.find(function(a){ return a.id === apptId; });
+    if (local) {
+      local[fieldKey] = patch[fieldKey];
+      if (fieldKey === 'confirmed_at') local.confirmation_status = 'confirmed';
+    }
+    render();
+    return true;
+  } catch (e) {
+    console.error('recordApptTime exception:', e);
+    if (btnEl) btnEl.disabled = false;
+    return false;
+  }
+}
+
+// Manual override of a timestamp via double-click on its stamp. Accepts
+// HH:MM input (24h). Empty input clears the timestamp (allows undo).
+// Date portion is preserved from the existing value or defaults to appt.date.
+async function overrideApptTime(apptId, fieldKey) {
+  var allowedKeys = ['confirmed_at','arrived_at','seated_at','dismissed_at'];
+  if (allowedKeys.indexOf(fieldKey) === -1) return;
+  var appt = appointments.find(function(a){ return a.id === apptId; });
+  if (!appt) return;
+
+  var stage = TIME_STAGES.find(function(s){ return s.key === fieldKey; });
+  var stageName = stage ? stage.label.replace(/^[^\s]+\s/, '') : 'الوقت';
+  var currentDisplay = fmtApptTime(appt[fieldKey]);
+  var input = prompt('وقت "' + stageName + '" (HH:MM، 24 ساعة)\nاتركها فارغة للحذف:', currentDisplay);
+  if (input === null) return; // user cancelled
+
+  var newIso = null;
+  if (input.trim() !== '') {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(input.trim());
+    if (!m) { alert('صيغة غير صحيحة. استخدم HH:MM'); return; }
+    var hh = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+    if (hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+      alert('الساعة خارج النطاق المسموح'); return;
+    }
+    // Anchor to existing date portion if any, else the appointment's own date.
+    var baseDate = appt[fieldKey]
+      ? new Date(appt[fieldKey])
+      : (appt.date ? new Date(appt.date + 'T00:00:00') : new Date());
+    if (isNaN(baseDate.getTime())) baseDate = new Date();
+    baseDate.setHours(hh, mm, 0, 0);
+    newIso = baseDate.toISOString();
+  }
+
+  var patch = {}; patch[fieldKey] = newIso;
+  var res = await window.sb.from('appointments').update(patch).eq('id', apptId);
+  if (res.error) {
+    if (isMissingTimeColumnError(res.error)) warnTimeTrackingMigrationOnce();
+    else console.error('overrideApptTime failed:', res.error);
+    return;
+  }
+  appt[fieldKey] = newIso;
+  render();
+}
+
 // ─── Render ──────────────────────────────────────────
 function render() {
   if (view==='month') renderMonth();
@@ -1628,7 +1874,11 @@ function renderDay() {
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
               <div class="appt-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
               <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
-              <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
+              ${renderTimeStrip(e)}
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+                <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
+                <span onclick="event.stopPropagation()">${renderTimeActionBtn(e)}</span>
+              </div>
             </div>
           </div>
         </div>`;
@@ -1687,9 +1937,11 @@ function renderList() {
           <div class="list-info">
             <div class="list-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
             <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
+            ${renderTimeStrip(e)}
           </div>
           <span class="list-badge ${statusClass(e.status)}">${statusLabel(e.status)}</span>
           <div class="list-actions" onclick="event.stopPropagation()">
+            ${renderTimeActionBtn(e)}
             <button class="list-action-btn" onclick="editAppt('${e.id}')">✏️</button>
             <button class="list-action-btn danger" onclick="deleteAppt('${e.id}')">🗑️</button>
           </div>

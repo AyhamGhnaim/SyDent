@@ -415,6 +415,18 @@
     </div>
   </div>
 
+  <!-- 🚪 Gap 6: Waiting Room Widget -->
+  <div class="card" style="margin-top:20px;" id="waitingRoomCard">
+    <div class="card-header">
+      <div class="card-title">
+        🚪 في غرفة الانتظار
+        <span class="today-badge" id="waitingRoomCount" style="margin-right:6px;">0</span>
+      </div>
+      <a class="card-action" href="appointments.html">إدارة المواعيد ←</a>
+    </div>
+    <div id="waitingRoomList"></div>
+  </div>
+
   <div class="card" style="margin-top:20px;">
     <div class="card-header">
       <div class="card-title">🧪 طلبات المخابر <span id="labsOverdueBadge" style="display:none;background:rgba(239,83,80,0.18);color:#ef5350;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;">0 متأخر</span></div>
@@ -539,6 +551,10 @@ async function loadDashboard() {
 
   // ── طلبات المخابر العاجلة ──
   await loadLabOrdersCard(uid, list);
+
+  // ── 🚪 Gap 6: غرفة الانتظار (مرضى وصلوا ولم يجلسوا على الكرسي بعد) ──
+  await loadWaitingRoom(uid);
+  startWaitingRoomAutoRefresh(uid);
 }
 
 const LAB_DASH_STATUSES = {
@@ -615,6 +631,108 @@ async function loadLabOrdersCard(uid, patientsList) {
       +   '<span class="lab-status ' + st.cls + '">' + st.ar + '</span>'
       + '</a>';
   }).join('');
+}
+
+// ─── Gap 6: Waiting Room Widget ─────────────────────────────────────────────
+// Shows today's patients who have arrived but not yet been seated.
+// Mirrors OpenDental's "Waiting Room" pane: a list filtered by
+//   arrived_at IS NOT NULL AND seated_at IS NULL
+// Wait time uses local browser clock minus arrived_at, color-coded:
+//   • <15 min → grey
+//   • 15–24 min → yellow
+//   • ≥25 min → red
+// Auto-refreshes every 30s, but only when the tab is visible (battery-friendly).
+
+// Detects pre-migration state (column doesn't exist yet). Returns true so
+// callers can quietly hide the widget instead of showing an error.
+function isWaitingRoomPreMigration(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42703|column .* does not exist|arrived_at|seated_at/i.test(msg);
+}
+
+async function loadWaitingRoom(uid) {
+  var listEl = document.getElementById('waitingRoomList');
+  var countEl = document.getElementById('waitingRoomCount');
+  var cardEl = document.getElementById('waitingRoomCard');
+  if (!listEl || !countEl || !cardEl) return;
+
+  var today = todayStr();
+  var rows = [];
+  try {
+    var res = await window.sb.from('appointments')
+      .select('id, patient_name, type, time, arrived_at, color')
+      .eq('doctor_id', uid)
+      .eq('date', today)
+      .not('arrived_at', 'is', null)
+      .is('seated_at', null)
+      .order('arrived_at', { ascending: true });
+    if (res.error) {
+      // Pre-migration: hide widget entirely instead of showing an empty card.
+      if (isWaitingRoomPreMigration(res.error)) {
+        cardEl.style.display = 'none';
+        return;
+      }
+      console.warn('waiting room load error:', res.error);
+      return;
+    }
+    rows = res.data || [];
+  } catch (e) {
+    console.warn('waiting room exception:', e);
+    return;
+  }
+
+  cardEl.style.display = ''; // ensure visible if previously hidden
+  countEl.textContent = rows.length;
+
+  if (rows.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">'
+                     + '🟢 لا أحد ينتظر حالياً</div>';
+    return;
+  }
+
+  var now = new Date();
+  listEl.innerHTML = rows.map(function(a) {
+    var arrived = new Date(a.arrived_at);
+    if (isNaN(arrived.getTime())) arrived = now;
+    var waitMin = Math.max(0, Math.floor((now - arrived) / 60000));
+    var color, emoji;
+    if (waitMin >= 25) { color = '#ef5350'; emoji = '🔴'; }
+    else if (waitMin >= 15) { color = '#f5c842'; emoji = '🟡'; }
+    else { color = '#8da0bd'; emoji = '⚪'; }
+    var arrivedStr = arrived.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+    var safeName = (a.patient_name || '—');
+    var safeType = (a.type || '—');
+    return '<a class="appt-item" href="appointments.html" style="text-decoration:none;color:inherit">'
+         +   '<div class="appt-time">' + arrivedStr + '</div>'
+         +   '<div style="flex:1;min-width:0">'
+         +     '<div class="appt-name">' + safeName + '</div>'
+         +     '<div class="appt-type">' + safeType + '</div>'
+         +   '</div>'
+         +   '<div style="color:' + color + ';font-weight:700;font-size:13px;white-space:nowrap;padding-right:8px">'
+         +     emoji + ' ' + waitMin + ' د'
+         +   '</div>'
+         + '</a>';
+  }).join('');
+}
+
+// Auto-refresh: re-query the waiting room every 30 seconds, but ONLY when the
+// tab is visible. This keeps wait-time numbers accurate without burning CPU
+// in the background. We keep a module-level handle so we can clear it cleanly
+// if the dashboard ever gets re-initialized.
+var _waitingRoomTimer = null;
+var _waitingRoomUid = null;
+function startWaitingRoomAutoRefresh(uid) {
+  _waitingRoomUid = uid;
+  if (_waitingRoomTimer) clearInterval(_waitingRoomTimer);
+  _waitingRoomTimer = setInterval(function() {
+    if (!document.hidden && _waitingRoomUid) loadWaitingRoom(_waitingRoomUid);
+  }, 30000);
+  // Also refresh immediately when the tab becomes visible again (e.g. user
+  // switched away for 5 min and comes back — wait times need a fresh paint).
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden && _waitingRoomUid) loadWaitingRoom(_waitingRoomUid);
+  });
 }
 
 loadDashboard();
