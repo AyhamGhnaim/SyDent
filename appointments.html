@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SyDent">
 <meta name="theme-color" content="#0a1628">
+<!-- Cache-bust: gap5-btn-v3 -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="manifest" href="manifest.json">
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1878,24 +1882,47 @@ async function applyNoShowFeeFromModal() {
 // have closed this modal and opened another appointment. We compare appt.id
 // to editingId before touching the DOM so a slow DB call can't leak the
 // button into a different appointment's modal.
+// Show/hide the no-show fee button based on the currently-loaded appointment.
+// Called from editAppt() right after the modal fields are populated.
+// Conditions (all must be true to show):
+//   1. appt.status === 'no_show'
+//   2. appt has a patient_id
+//   3. clinic settings: no-show fee enabled with amount > 0
+//   4. no existing no-show fee session linked to this appointment
+// Stale-update guard: by the time the async checks finish, the user might
+// have closed this modal and opened another appointment. We compare appt.id
+// to editingId before touching the DOM so a slow DB call can't leak the
+// button into a different appointment's modal.
 async function updateNoShowFeeBtnVisibility(appt) {
   var btn = document.getElementById('noShowFeeBtn');
   if (!btn) return;
   btn.style.display = 'none';  // safe default
-  if (!appt || appt.status !== 'no_show' || !appt.patient_id) return;
+
+  // Diagnostic logging — helps the doctor (and us in support) understand
+  // exactly why the button is hidden in any given case. Visible in DevTools
+  // console (F12 → Console).
+  var diag = { apptId: appt && appt.id, status: appt && appt.status, patient_id: appt && appt.patient_id };
+  if (!appt) { console.info('[no-show-btn] hidden: no appt object'); return; }
+  if (appt.status !== 'no_show') { console.info('[no-show-btn] hidden: status is "' + appt.status + '" (need "no_show")', diag); return; }
+  if (!appt.patient_id) { console.info('[no-show-btn] hidden: appointment has no patient_id', diag); return; }
+
   try {
     var feeCfg = await getNoShowFeeConfig();
+    console.info('[no-show-btn] feeCfg:', feeCfg);
     // Guard: editingId may have changed while we awaited the DB.
-    if (editingId !== appt.id) return;
-    if (!feeCfg.enabled || feeCfg.amount <= 0) return;
+    if (editingId !== appt.id) { console.info('[no-show-btn] hidden: editingId changed'); return; }
+    if (!feeCfg.enabled) { console.info('[no-show-btn] hidden: fee disabled in settings'); return; }
+    if (feeCfg.amount <= 0) { console.info('[no-show-btn] hidden: fee amount is 0'); return; }
     var alreadyApplied = await noShowFeeAlreadyApplied(appt.id);
+    console.info('[no-show-btn] alreadyApplied:', alreadyApplied);
     if (editingId !== appt.id) return;  // re-check after second await
-    if (alreadyApplied) return;
+    if (alreadyApplied) { console.info('[no-show-btn] hidden: fee already applied'); return; }
     // Update label with the amount so the doctor sees the cost up-front
     btn.textContent = '💸 تطبيق رسم لم يحضر (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
     btn.style.display = 'block';
+    console.info('[no-show-btn] shown ✓');
   } catch (e) {
-    console.warn('updateNoShowFeeBtnVisibility:', e);
+    console.warn('[no-show-btn] error:', e);
   }
 }
 
