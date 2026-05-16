@@ -193,6 +193,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;}
 .modal-body{padding:20px;max-height:75vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
 .modal-body::-webkit-scrollbar{display:none;width:0;height:0;}
+.no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
 .form-group{margin-bottom:15px;}
 .form-group label{display:block;font-size:12px;color:var(--text2);font-weight:600;margin-bottom:5px;}
 .form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 13px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;outline:none;transition:border-color .2s;direction:rtl;}
@@ -3876,7 +3877,7 @@ function renderLabOrders() {
       + '<td style="white-space:nowrap;">' + actions + '</td>'
       + '</tr>';
   });
-  el.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+  el.innerHTML = '<div style="overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;" class="no-scrollbar"><table class="data-table">'
     + '<thead><tr><th>تاريخ الإرسال</th><th>السن</th><th>نوع العمل</th><th>المخبر</th><th>اللون</th><th style="text-align:left;">التكلفة</th><th>الحالة</th><th></th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table></div>';
   updateLabsBadge();

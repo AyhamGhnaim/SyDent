@@ -43,7 +43,8 @@ const css = `
   .sb-logo-name { font-size: 18px; font-weight: 900; color: var(--text); font-family: 'Cairo', sans-serif; }
   .sb-logo-sub  { font-size: 10px; color: var(--text2); font-family: 'Cairo', sans-serif; }
 
-  .sb-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .sb-nav { flex: 1; padding: 12px 0; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .sb-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .sb-section {
     padding: 14px 20px 6px;
     font-size: 10px; font-weight: 700;
