@@ -2060,10 +2060,25 @@ async function submitAppt(e) {
   var migrationMissing = false;
 
   if (editingId) {
-    console.info('[save-appt] UPDATE attempting:', { id: editingId, status: apptData.status });
+    console.info('[save-appt] UPDATE attempting:', { id: editingId, status: apptData.status, doctor_id: currentUser.id });
+    // .select() forces PostgREST to return the rows that were actually
+    // updated. If RLS blocks the row, or the WHERE matches nothing, data
+    // will be an empty array — exposing silent no-op updates.
     var upd = await window.sb.from('appointments').update(apptData)
-      .eq('id', editingId).eq('doctor_id', currentUser.id);
-    console.info('[save-appt] UPDATE result:', upd.error ? ('ERROR: ' + upd.error.message) : 'OK');
+      .eq('id', editingId).eq('doctor_id', currentUser.id)
+      .select();
+    console.info('[save-appt] UPDATE result:',
+      upd.error ? ('ERROR: ' + upd.error.message) : 'OK',
+      '| rows affected:', upd.data ? upd.data.length : 0,
+      upd.data && upd.data.length > 0 ? '| new status: ' + upd.data[0].status : ''
+    );
+    // Critical: zero rows affected = silent no-op. Surface it loudly.
+    if (!upd.error && (!upd.data || upd.data.length === 0)) {
+      console.error('[save-appt] ⚠️ UPDATE succeeded but 0 rows changed. RLS mismatch or WHERE filter excluded the row.');
+      showToast('⚠️ التحديث فشل بصمت — راجع Console');
+      btn.disabled = false; btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ الموعد';
+      return;
+    }
     // Retry with 'confirmed' if the DB rejects a new lifecycle status.
     if (upd.error && isStatusConstraintError(upd.error) && newStatuses.indexOf(apptData.status) !== -1) {
       migrationMissing = true;
