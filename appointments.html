@@ -1732,15 +1732,63 @@ async function submitAppt(e) {
     provider_id:  providerId
   };
 
+  // Helper: detect "status not in check constraint" errors so we can fall back
+  // to 'confirmed' when the appointments_status_check migration isn't applied
+  // yet. Same logic used in completeApptWithProcedures — keeps the two write
+  // paths consistent so a not-yet-migrated DB never blocks the user.
+  function isStatusConstraintError(err) {
+    if (!err) return false;
+    var msg = (err.message || '') + ' ' + (err.code || '');
+    return /check constraint|23514|appointments_status_check/i.test(msg);
+  }
+  var newStatuses = ['completed','scheduled','broken','no_show'];
+  var migrationMissing = false;
+
   if (editingId) {
-    const { error } = await window.sb.from('appointments').update(apptData)
+    var upd = await window.sb.from('appointments').update(apptData)
       .eq('id', editingId).eq('doctor_id', currentUser.id);
-    if (error) { showToast('❌ خطأ في التعديل: ' + error.message); }
-    else { showToast('✅ تم تعديل الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
+    // Retry with 'confirmed' if the DB rejects a new lifecycle status.
+    if (upd.error && isStatusConstraintError(upd.error) && newStatuses.indexOf(apptData.status) !== -1) {
+      migrationMissing = true;
+      console.warn("appointments.status='" + apptData.status + "' rejected on UPDATE — falling back to 'confirmed'. Run: ALTER TABLE appointments DROP CONSTRAINT appointments_status_check; ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','pending','completed','cancelled','broken','no_show'));");
+      var fallback = Object.assign({}, apptData, { status: 'confirmed' });
+      upd = await window.sb.from('appointments').update(fallback)
+        .eq('id', editingId).eq('doctor_id', currentUser.id);
+    }
+    if (upd.error) {
+      showToast('❌ خطأ في التعديل: ' + upd.error.message);
+    } else {
+      if (migrationMissing) {
+        showToast('⚠️ تم الحفظ كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
+      } else {
+        showToast('✅ تم تعديل الموعد');
+      }
+      selectedDate = new Date(apptData.date + 'T12:00:00');
+      currentDate  = new Date(apptData.date + 'T12:00:00');
+      closeModal();
+      await loadAppointments();
+    }
   } else {
-    const { error } = await window.sb.from('appointments').insert(apptData);
-    if (error) { showToast('❌ خطأ في الإضافة: ' + error.message); }
-    else { showToast('✅ تمت إضافة الموعد'); selectedDate = new Date(apptData.date + 'T12:00:00'); currentDate = new Date(apptData.date + 'T12:00:00'); closeModal(); await loadAppointments(); }
+    var ins = await window.sb.from('appointments').insert(apptData);
+    if (ins.error && isStatusConstraintError(ins.error) && newStatuses.indexOf(apptData.status) !== -1) {
+      migrationMissing = true;
+      console.warn("appointments.status='" + apptData.status + "' rejected on INSERT — falling back to 'confirmed'.");
+      var fallbackIns = Object.assign({}, apptData, { status: 'confirmed' });
+      ins = await window.sb.from('appointments').insert(fallbackIns);
+    }
+    if (ins.error) {
+      showToast('❌ خطأ في الإضافة: ' + ins.error.message);
+    } else {
+      if (migrationMissing) {
+        showToast('⚠️ تمت الإضافة كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
+      } else {
+        showToast('✅ تمت إضافة الموعد');
+      }
+      selectedDate = new Date(apptData.date + 'T12:00:00');
+      currentDate  = new Date(apptData.date + 'T12:00:00');
+      closeModal();
+      await loadAppointments();
+    }
   }
 
   btn.disabled = false; btn.textContent = editingId ? 'حفظ التعديلات' : 'حفظ الموعد';
