@@ -183,6 +183,37 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .del-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;transition:all .15s;}
 .del-btn:hover{color:var(--red);background:rgba(239,83,80,.1);}
 
+/* ── Bug #3: Payment Split Editor (manual allocation override) ── */
+.split-edit-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:2px;}
+.split-edit-btn:hover{color:var(--blue);background:rgba(99,179,237,.1);}
+.split-editor-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;padding-left:4px;scrollbar-width:thin;}
+.split-editor-list::-webkit-scrollbar{width:6px;}
+.split-editor-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.split-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;transition:border-color .15s;}
+.split-row:hover{border-color:var(--green);}
+.split-row.is-full{opacity:.65;}
+.split-info{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.split-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.split-meta{font-size:11px;color:var(--text2);}
+.split-meta .remain{color:var(--yellow);font-weight:700;}
+.split-meta .paid-full{color:var(--green);font-weight:700;}
+.split-amount-input{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;text-align:left;direction:ltr;outline:none;transition:border-color .15s;width:100%;}
+.split-amount-input:focus{border-color:var(--green);}
+.split-amount-input.over{border-color:var(--red);color:var(--red);}
+.split-summary{margin-top:14px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:6px;font-size:13px;}
+.split-summary-row{display:flex;justify-content:space-between;align-items:center;}
+.split-summary-row .lbl{color:var(--text2);font-weight:600;}
+.split-summary-row .val{font-weight:700;}
+.split-summary-row .val.green{color:var(--green);}
+.split-summary-row .val.blue{color:var(--blue);}
+.split-summary-row .val.red{color:var(--red);}
+.split-summary-row .val.muted{color:var(--text2);}
+.split-warn{margin-top:8px;padding:9px 12px;background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.3);border-radius:8px;color:var(--red);font-size:12px;display:none;}
+.split-warn.show{display:block;}
+.btn-revert-fifo{padding:8px 14px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin-right:auto;}
+.btn-revert-fifo:hover{background:rgba(245,200,66,.1);border-color:var(--yellow);color:var(--yellow);}
+.manual-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.3);margin-right:4px;}
+
 /* ── Modal ── */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:20px;}
 .modal-overlay.open{display:flex;}
@@ -759,6 +790,34 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- Bug #3: Manual Paysplit Override Modal (Dentrix Ascend pattern) -->
+<div class="modal-overlay" id="splitEditModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head">
+      <h3>✏️ توزيع الدفعة على الجلسات</h3>
+      <button class="modal-close" onclick="closeModal('splitEditModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="splitEditorHeader" style="margin-bottom:14px;padding:10px 13px;background:var(--bg3);border-radius:9px;border:1px solid var(--border);">
+        <!-- filled by openSplitEditor() -->
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">📋 وزّع المبلغ على الجلسات:</div>
+      <div class="split-editor-list" id="splitEditorList">
+        <!-- filled by openSplitEditor() -->
+      </div>
+      <div class="split-summary" id="splitEditorSummary">
+        <!-- filled live by recalcSplitTotals() -->
+      </div>
+      <div class="split-warn" id="splitEditorWarn"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-revert-fifo" id="splitRevertBtn" onclick="revertToFifo()" title="حذف التوزيع اليدوي وإعادة التوزيع تلقائياً بنظام FIFO">🔄 رجوع لـ FIFO تلقائي</button>
+      <button class="btn-cancel-m" onclick="closeModal('splitEditModal')">إلغاء</button>
+      <button class="btn-save-m" id="splitSaveBtn" onclick="saveManualSplits()">💾 حفظ التوزيع</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -940,11 +999,15 @@ async function persistPaymentSplits(splitRows) {
    always correct regardless of the order events were entered.
 
    How it works:
-     1. DELETE all existing splits for the patient.
-     2. Walk payments oldest-first by date.
+     1. DELETE all existing splits for the patient (except manually-allocated payments).
+     2. Walk non-manual payments oldest-first by date.
      3. For each payment, run buildFifoSplits against current sessions + splits
         already built for earlier payments (chronological correctness).
+        Manual splits are treated as existing capacity (already consumed).
      4. INSERT the freshly-computed splits in one bulk call.
+
+   Bug #3: Payments with manual_allocation=true are SKIPPED entirely — their splits
+   are preserved in DB and consume session capacity for FIFO calculations.
 
    Returns: true on success (or legacy no-op), false on a real failure.
    Concurrency-safe: a re-entry guard prevents two parallel rebuilds from
@@ -979,9 +1042,23 @@ async function reallocatePatientFunds() {
       return true;
     }
 
-    // 1. Delete all existing splits for this patient.
-    var delRes = await window.sb.from('payment_splits').delete()
+    // Bug #3: Identify manually-allocated payments — their splits are preserved.
+    // The manual_allocation column may not exist on pre-Migration-8 DBs;
+    // truthy check handles undefined gracefully.
+    var manualPaymentIds = [];
+    for (var mi = 0; mi < payments.length; mi++) {
+      if (payments[mi].manual_allocation === true) manualPaymentIds.push(payments[mi].id);
+    }
+
+    // 1. Delete existing splits for this patient — but NOT the manual ones.
+    // PostgREST: use .not('payment_id', 'in', '(...)') to exclude manual splits.
+    var delQuery = window.sb.from('payment_splits').delete()
       .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
+    if (manualPaymentIds.length) {
+      // PostgREST in/not.in syntax: comma-separated list of UUIDs wrapped in parentheses.
+      delQuery = delQuery.not('payment_id', 'in', '(' + manualPaymentIds.join(',') + ')');
+    }
+    var delRes = await delQuery;
     if (delRes.error) {
       if (_isPaymentSplitsTableMissing(delRes.error)) {
         // Pre-Migration-3 DB: silently skip. The app still works in legacy mode.
@@ -990,12 +1067,23 @@ async function reallocatePatientFunds() {
       console.warn('reallocate: delete splits failed:', delRes.error);
       return false;
     }
-    paymentSplits = [];
 
-    // 2. Sort payments oldest-first (by date, then created_at as tiebreaker).
+    // Sync memory: drop non-manual splits, keep manual ones.
+    if (manualPaymentIds.length) {
+      paymentSplits = paymentSplits.filter(function(sp){
+        return manualPaymentIds.indexOf(sp.payment_id) !== -1;
+      });
+    } else {
+      paymentSplits = [];
+    }
+
+    // 2. Sort NON-manual payments oldest-first (by date, then created_at as tiebreaker).
     // Same-date payments are ordered by their actual creation timestamp
     // (matches OpenDental DateTStamp behavior — deterministic FIFO).
-    var sortedPayments = payments.slice().sort(function(a, b){
+    var nonManualPayments = payments.filter(function(p){
+      return p.manual_allocation !== true;
+    });
+    var sortedPayments = nonManualPayments.slice().sort(function(a, b){
       var ad = String(a.date || '9999-12-31');
       var bd = String(b.date || '9999-12-31');
       if (ad < bd) return -1;
@@ -1016,7 +1104,8 @@ async function reallocatePatientFunds() {
     // 3. Walk payments and build splits chronologically.
     // Each iteration uses the accumulated splits as "existing" so later
     // payments only see capacity that's actually left on each session.
-    var accumulated = [];
+    // Bug #3: Pre-seed with manual splits so their capacity is already counted.
+    var accumulated = paymentSplits.slice();   // manual splits as initial capacity
     for (var i = 0; i < sortedPayments.length; i++) {
       var splits = buildFifoSplits(sortedPayments[i], sessions, accumulated);
       if (splits.length) {
@@ -1024,18 +1113,24 @@ async function reallocatePatientFunds() {
       }
     }
 
+    // Compute the splits to INSERT — only the new (non-manual) ones.
+    // accumulated may include manual splits at the start; skip those.
+    var newSplitsToInsert = accumulated.filter(function(sp){
+      return manualPaymentIds.indexOf(sp.payment_id) === -1;
+    });
+
     // 4. Bulk-insert the new splits. One retry on failure because DELETE has
     // already committed — leaving DB empty would corrupt the balance display.
-    if (accumulated.length) {
+    if (newSplitsToInsert.length) {
       var insRes = await window.sb.from('payment_splits')
-        .insert(accumulated).select();
+        .insert(newSplitsToInsert).select();
       if (insRes.error) {
         if (_isPaymentSplitsTableMissing(insRes.error)) return true;
         console.warn('reallocate: insert failed, retrying once:', insRes.error);
         // One retry — transient network errors clear up on second try.
         await new Promise(function(r){ setTimeout(r, 200); });
         var retry = await window.sb.from('payment_splits')
-          .insert(accumulated).select();
+          .insert(newSplitsToInsert).select();
         if (retry.error) {
           console.warn('reallocate: retry also failed:', retry.error);
           if (typeof showToast === 'function') {
@@ -1043,10 +1138,12 @@ async function reallocatePatientFunds() {
           }
           return false;
         }
-        paymentSplits = retry.data || [];
+        // Append new splits to memory (manual splits already preserved above).
+        for (var k = 0; k < (retry.data || []).length; k++) paymentSplits.push(retry.data[k]);
         return true;
       }
-      paymentSplits = insRes.data || [];
+      // Append new splits to memory (manual splits already preserved above).
+      for (var k2 = 0; k2 < (insRes.data || []).length; k2++) paymentSplits.push(insRes.data[k2]);
     }
     return true;
   } catch(e) {
@@ -3650,12 +3747,19 @@ function renderPayments() {
   }
   var rows = '';
   payments.forEach(function(p) {
+    // Bug #3: show ✏️ split-editor button for every payment (works in legacy mode too).
+    // manual_allocation flag adds a small "يدوي" badge so the user can tell which
+    // payments are manually-allocated vs FIFO-driven.
+    var manualBadge = (p.manual_allocation === true)
+      ? '<span class="manual-badge" title="هذه الدفعة موزّعة يدوياً — FIFO لا يعيد توزيعها">يدوي</span>'
+      : '';
+    var splitBtn = '<button class="split-edit-btn" onclick="openSplitEditor(\'' + p.id + '\')" title="توزيع هذه الدفعة على الجلسات">✏️</button>';
     rows += '<tr>'
       + '<td' + dtHoverAttrs(p.created_at) + '>' + fmtD(p.date) + '</td>'
-      + '<td><span class="tag tag-green">' + (p.method||'—') + '</span></td>'
+      + '<td>' + manualBadge + '<span class="tag tag-green">' + (p.method||'—') + '</span></td>'
       + '<td style="color:var(--text2)">' + (p.notes||'—') + '</td>'
       + '<td class="amount-green" style="text-align:left;">' + fmt(p.amount) + ' ل.س</td>'
-      + '<td><button class="del-btn" onclick="delPayment(\'' + p.id + '\')">🗑</button></td>'
+      + '<td style="white-space:nowrap;">' + splitBtn + '<button class="del-btn" onclick="delPayment(\'' + p.id + '\')">🗑</button></td>'
       + '</tr>';
   });
   el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>طريقة الدفع</th><th>ملاحظات</th><th style="text-align:left;">المبلغ</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -3818,6 +3922,421 @@ async function delPayment(id) {
   await syncPaymentStatus();
   renderStats(); renderPayments();
   showToast('🗑️ تم حذف الدفعة');
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Bug #3: Manual Paysplit Override (Dentrix Ascend pattern)
+   ─────────────────────────────────────────────────────────────────────────
+   Lets the user manually override FIFO allocation for a specific payment.
+   Modal shows a row per session with an "applied amount" input. Sum-1 hour:
+   the remaining (payment.amount - sum-of-applied) becomes a single unearned
+   split automatically (no separate "unearned" input — keeps UI simple).
+
+   Compare with OpenDental's Income Transfer Manager (negative+positive paysplits,
+   must sum to 0): far too complex for the Syrian market. Dentrix Ascend's
+   "Applied per procedure" pattern is the cleanest and most professional.
+
+   Persistence: on save, the payment is marked manual_allocation=true so future
+   reallocatePatientFunds() calls skip it. Revert button clears the flag and
+   regenerates splits via the normal FIFO path.
+
+   Graceful fallback: if manual_allocation column doesn't exist (pre-Migration-8),
+   splits are still saved but the flag isn't persisted — meaning a later session
+   add/delete will trigger reallocate and overwrite them. A toast warns the user. */
+
+var _splitEditing = {
+  paymentId: null,
+  payment: null,
+  paymentAmt: 0,
+  rows: [],   // [{ sessionId, sessionCost, alreadyPaidByOtherSplits, originalApplied, currentInput }]
+};
+var _manualAllocColumnMissing = false;   // sticky once detected
+var _manualAllocWarned = false;          // toast-once flag
+
+function _isManualAllocColMissing(err) {
+  if (!err) return false;
+  // Postgres 42703 = undefined_column; PGRST204 = column not in schema cache.
+  if (err.code === '42703' || err.code === 'PGRST204') return true;
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('manual_allocation') !== -1
+      && (m.indexOf('column') !== -1 || m.indexOf('does not exist') !== -1 || m.indexOf('schema cache') !== -1);
+}
+
+function _warnManualAllocMigrationOnce() {
+  if (_manualAllocWarned) return;
+  _manualAllocWarned = true;
+  if (typeof showToast === 'function') {
+    showToast('ℹ️ التوزيع اليدوي يحتاج ترقية قاعدة البيانات (Migration 8)');
+  }
+  console.warn(
+    'Bug #3: manual_allocation column missing. Splits are saved but the\n' +
+    'manual flag is not — meaning a later session add/delete may trigger\n' +
+    'reallocatePatientFunds() and overwrite these splits.\n\n' +
+    'Run this migration:\n' +
+    'ALTER TABLE ledger_payments\n' +
+    '  ADD COLUMN IF NOT EXISTS manual_allocation BOOLEAN NOT NULL DEFAULT FALSE;\n'
+  );
+}
+
+/* Open the split editor for a specific payment. Builds the row list from
+   current sessions and prefills each input with the existing split amount. */
+function openSplitEditor(paymentId) {
+  var p = (payments || []).find(function(x){ return x.id === paymentId; });
+  if (!p) { showToast('⚠️ الدفعة غير موجودة'); return; }
+
+  // Snapshot for live calculations.
+  _splitEditing.paymentId  = paymentId;
+  _splitEditing.payment    = p;
+  _splitEditing.paymentAmt = Math.round(parseFloat(p.amount) || 0);
+  _splitEditing.rows       = [];
+
+  // Build the session list. Same sort order as buildFifoSplits so the user
+  // sees the familiar "completed first, then planned, oldest first" layout.
+  var eligible = (sessions || []).slice().filter(function(s){
+    return s && s.id && (parseFloat(s.cost) || 0) > 0;
+  });
+  eligible.sort(function(a, b){
+    var aDone = a.status === 'completed' ? 0 : 1;
+    var bDone = b.status === 'completed' ? 0 : 1;
+    if (aDone !== bDone) return aDone - bDone;
+    var ad = String(a.date || '9999-12-31');
+    var bd = String(b.date || '9999-12-31');
+    if (ad < bd) return -1;
+    if (ad > bd) return 1;
+    var ac = String(a.created_at || '');
+    var bc = String(b.created_at || '');
+    if (ac < bc) return -1;
+    if (ac > bc) return 1;
+    return 0;
+  });
+
+  // For each session, compute:
+  //  - alreadyPaidByOthers: sum of splits from OTHER payments to this session
+  //  - originalApplied:     sum of splits from THIS payment to this session
+  // We display "remaining" = sessCost - alreadyPaidByOthers
+  // (because re-allocating THIS payment shouldn't subtract its own previous splits)
+  for (var i = 0; i < eligible.length; i++) {
+    var sess = eligible[i];
+    var alreadyPaidByOthers = 0;
+    var originalApplied = 0;
+    for (var j = 0; j < (paymentSplits || []).length; j++) {
+      var sp = paymentSplits[j];
+      if (sp.session_id !== sess.id) continue;
+      if (sp.payment_id === paymentId) {
+        originalApplied += parseInt(sp.amount, 10) || 0;
+      } else {
+        alreadyPaidByOthers += parseInt(sp.amount, 10) || 0;
+      }
+    }
+    _splitEditing.rows.push({
+      sessionId: sess.id,
+      sessionCost: Math.round(parseFloat(sess.cost) || 0),
+      sessionStatus: sess.status,
+      sessionType: sess.type,
+      sessionDate: sess.date,
+      sessionTooth: sess.tooth_num,
+      sessionSurface: sess.surface,
+      alreadyPaidByOthers: alreadyPaidByOthers,
+      originalApplied: originalApplied,
+      currentInput: originalApplied   // start with the existing allocation
+    });
+  }
+
+  // Render header
+  var hdr = document.getElementById('splitEditorHeader');
+  if (hdr) {
+    hdr.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'
+      +   '<div>'
+      +     '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:3px;">💵 إجمالي الدفعة</div>'
+      +     '<div style="font-size:18px;font-weight:700;color:var(--green);">' + fmt(_splitEditing.paymentAmt) + ' ل.س</div>'
+      +   '</div>'
+      +   '<div style="text-align:left;">'
+      +     '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:3px;">📅 التاريخ</div>'
+      +     '<div style="font-size:13px;color:var(--text);font-weight:700;">' + fmtD(p.date) + '</div>'
+      +   '</div>'
+      + '</div>';
+  }
+
+  // Render rows
+  renderSplitRows();
+  recalcSplitTotals();
+
+  // Hide revert button if not currently manual (nothing to revert).
+  var revertBtn = document.getElementById('splitRevertBtn');
+  if (revertBtn) {
+    revertBtn.style.display = (p.manual_allocation === true) ? 'inline-block' : 'none';
+  }
+
+  openModal('splitEditModal');
+}
+
+/* Renders the per-session input rows. Each row's input gets an oninput handler
+   that updates _splitEditing.rows[i].currentInput and triggers recalcSplitTotals. */
+function renderSplitRows() {
+  var list = document.getElementById('splitEditorList');
+  if (!list) return;
+  if (!_splitEditing.rows.length) {
+    list.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد جلسات لتوزيع الدفعة عليها</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < _splitEditing.rows.length; i++) {
+    var r = _splitEditing.rows[i];
+    var remainingForOthers = r.sessionCost - r.alreadyPaidByOthers;
+    if (remainingForOthers < 0) remainingForOthers = 0;
+    var isFull = (remainingForOthers === 0);
+    var statusLbl = (r.sessionStatus === 'completed') ? '✅' : (r.sessionStatus === 'planned' ? '📋' : '•');
+    var toothLbl = r.sessionTooth ? ' • سن ' + r.sessionTooth : '';
+    var surfaceLbl = r.sessionSurface ? ' (' + r.sessionSurface + ')' : '';
+    var remHtml = isFull
+      ? '<span class="paid-full">✓ مسددة بالكامل من دفعات أخرى</span>'
+      : ('متبقي على الجلسة: <span class="remain">' + fmt(remainingForOthers) + ' ل.س</span>');
+    html += '<div class="split-row' + (isFull ? ' is-full' : '') + '">'
+      +   '<div class="split-info">'
+      +     '<div class="split-title">' + statusLbl + ' ' + escapeHtml(r.sessionType || '—') + toothLbl + escapeHtml(surfaceLbl) + ' <span style="color:var(--text2);font-weight:600;font-size:11px;">— ' + fmt(r.sessionCost) + ' ل.س</span></div>'
+      +     '<div class="split-meta">' + fmtD(r.sessionDate) + ' • ' + remHtml + '</div>'
+      +   '</div>'
+      +   '<input type="number" class="split-amount-input" id="splitInput_' + i + '" min="0" inputmode="numeric" placeholder="0" value="' + (r.currentInput || 0) + '" oninput="onSplitInputChange(' + i + ', this.value)">'
+      + '</div>';
+  }
+  list.innerHTML = html;
+}
+
+/* Update the model when an input changes, then recompute totals. */
+function onSplitInputChange(rowIdx, valStr) {
+  var n = parseInt(valStr, 10);
+  if (!isFinite(n) || n < 0) n = 0;
+  if (_splitEditing.rows[rowIdx]) {
+    _splitEditing.rows[rowIdx].currentInput = n;
+  }
+  recalcSplitTotals();
+}
+
+/* Recompute summary footer + enable/disable save button. */
+function recalcSplitTotals() {
+  var total = _splitEditing.paymentAmt;
+  var allocated = 0;
+  var hasOverpayPerSession = false;
+  for (var i = 0; i < _splitEditing.rows.length; i++) {
+    var r = _splitEditing.rows[i];
+    var v = r.currentInput || 0;
+    allocated += v;
+    // Highlight rows where the user exceeded what makes sense
+    // (more than session cost minus other-payments paid).
+    var remainingForOthers = r.sessionCost - r.alreadyPaidByOthers;
+    if (remainingForOthers < 0) remainingForOthers = 0;
+    var inp = document.getElementById('splitInput_' + i);
+    if (inp) {
+      if (v > remainingForOthers) {
+        inp.classList.add('over');
+        hasOverpayPerSession = true;
+      } else {
+        inp.classList.remove('over');
+      }
+    }
+  }
+  var remaining = total - allocated;   // positive → unearned, negative → over
+  var summaryEl = document.getElementById('splitEditorSummary');
+  if (summaryEl) {
+    var leftover = remaining > 0 ? remaining : 0;
+    var over = remaining < 0 ? -remaining : 0;
+    summaryEl.innerHTML =
+        '<div class="split-summary-row"><span class="lbl">📊 الإجمالي الموزّع:</span><span class="val green">' + fmt(allocated) + ' ل.س</span></div>'
+      + (leftover > 0
+          ? '<div class="split-summary-row"><span class="lbl">💳 سيُحفظ كرصيد مقدّم:</span><span class="val blue">' + fmt(leftover) + ' ل.س</span></div>'
+          : '')
+      + (over > 0
+          ? '<div class="split-summary-row"><span class="lbl">⚠️ تجاوز قيمة الدفعة:</span><span class="val red">' + fmt(over) + ' ل.س</span></div>'
+          : '')
+      + '<div class="split-summary-row" style="border-top:1px dashed var(--border);padding-top:6px;margin-top:2px;"><span class="lbl">💵 المجموع الكلي:</span><span class="val muted">' + fmt(allocated + leftover) + ' من ' + fmt(total) + ' ل.س</span></div>';
+  }
+  // Warning + save-disable logic.
+  var warnEl = document.getElementById('splitEditorWarn');
+  var saveBtn = document.getElementById('splitSaveBtn');
+  var blockSave = false;
+  var warnMsg = '';
+  if (remaining < 0) {
+    blockSave = true;
+    warnMsg = '⚠️ مجموع التوزيع يتجاوز قيمة الدفعة بـ ' + fmt(-remaining) + ' ل.س. قلّل أحد المبالغ لإتمام الحفظ.';
+  } else if (hasOverpayPerSession) {
+    // Non-blocking — user may intentionally overpay a session.
+    warnMsg = 'ℹ️ بعض الجلسات وصلتها مبالغ أكبر من المتبقي عليها — سيُسجَّل التوزيع كما هو.';
+  }
+  if (warnEl) {
+    if (warnMsg) { warnEl.textContent = warnMsg; warnEl.classList.add('show'); }
+    else         { warnEl.textContent = ''; warnEl.classList.remove('show'); }
+  }
+  if (saveBtn) saveBtn.disabled = blockSave;
+}
+
+/* Save the manual allocation. Steps:
+     1. Delete existing splits for this payment.
+     2. Insert new splits (skip 0-amount rows).
+     3. Insert one unearned split if there's leftover.
+     4. Mark payment.manual_allocation = true (graceful: skip if column missing).
+     5. Reload + re-render. */
+async function saveManualSplits() {
+  var saveBtn = document.getElementById('splitSaveBtn');
+  if (saveBtn && saveBtn.disabled) return;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جارٍ الحفظ…'; }
+
+  try {
+    var paymentId = _splitEditing.paymentId;
+    var p = _splitEditing.payment;
+    if (!paymentId || !p || !currentUser) {
+      showToast('⚠️ بيانات الدفعة غير متاحة');
+      return;
+    }
+
+    var total = _splitEditing.paymentAmt;
+    var allocated = 0;
+    var newSplits = [];
+
+    // Build the new split rows from the inputs.
+    for (var i = 0; i < _splitEditing.rows.length; i++) {
+      var r = _splitEditing.rows[i];
+      var amt = r.currentInput || 0;
+      if (amt <= 0) continue;
+      allocated += amt;
+      // Pull provider_id from the session if known.
+      var sess = sessions.find(function(s){ return s.id === r.sessionId; });
+      newSplits.push({
+        doctor_id:    p.doctor_id,
+        payment_id:   paymentId,
+        patient_id:   p.patient_id,
+        session_id:   r.sessionId,
+        provider_id:  (sess && sess.provider_id) ? sess.provider_id : null,
+        amount:       amt,
+        is_unearned:  false,
+        payment_date: p.date || null
+      });
+    }
+
+    // Leftover → one unearned split.
+    var leftover = total - allocated;
+    if (leftover > 0) {
+      newSplits.push({
+        doctor_id:    p.doctor_id,
+        payment_id:   paymentId,
+        patient_id:   p.patient_id,
+        session_id:   null,
+        provider_id:  null,
+        amount:       leftover,
+        is_unearned:  true,
+        payment_date: p.date || null
+      });
+    }
+
+    // Guard: should never happen because recalcSplitTotals disables save on overage,
+    // but defensive check protects against race conditions.
+    if (allocated > total) {
+      showToast('⚠️ مجموع التوزيع يتجاوز قيمة الدفعة');
+      return;
+    }
+
+    // 1. Delete existing splits for this payment.
+    var delRes = await window.sb.from('payment_splits').delete()
+      .eq('payment_id', paymentId).eq('doctor_id', currentUser.id);
+    if (delRes.error) {
+      if (_isPaymentSplitsTableMissing(delRes.error)) {
+        showToast('⚠️ ميزة التوزيع تحتاج ترقية قاعدة البيانات (Migration 3)');
+        return;
+      }
+      console.warn('saveManualSplits: delete failed:', delRes.error);
+      showToast('⚠️ فشل حذف التوزيع القديم');
+      return;
+    }
+    // Drop local in-memory splits for this payment.
+    paymentSplits = paymentSplits.filter(function(sp){ return sp.payment_id !== paymentId; });
+
+    // 2. Insert the new splits (if any).
+    if (newSplits.length) {
+      var insRes = await window.sb.from('payment_splits').insert(newSplits).select();
+      if (insRes.error) {
+        console.warn('saveManualSplits: insert failed:', insRes.error);
+        showToast('⚠️ فشل حفظ التوزيع');
+        return;
+      }
+      var added = insRes.data || [];
+      for (var k = 0; k < added.length; k++) paymentSplits.push(added[k]);
+    }
+
+    // 3. Mark the payment as manually allocated (graceful: skip on pre-Migration-8 DBs).
+    // We don't UPDATE on each save because the column might not exist; we try once
+    // and remember the result for the session.
+    if (!_manualAllocColumnMissing) {
+      var updRes = await window.sb.from('ledger_payments')
+        .update({ manual_allocation: true })
+        .eq('id', paymentId)
+        .eq('doctor_id', currentUser.id);
+      if (updRes.error) {
+        if (_isManualAllocColMissing(updRes.error)) {
+          _manualAllocColumnMissing = true;
+          _warnManualAllocMigrationOnce();
+        } else {
+          console.warn('saveManualSplits: mark manual failed:', updRes.error);
+          // Non-fatal — the splits are already saved.
+        }
+      } else {
+        // Sync local payment object so the UI reflects the new flag immediately.
+        p.manual_allocation = true;
+      }
+    } else {
+      _warnManualAllocMigrationOnce();
+    }
+
+    // 4. Re-render the UI to reflect the new allocation.
+    await syncPaymentStatus();
+    renderStats(); renderPayments(); renderSessions(); renderRecentSessions();
+    closeModal('splitEditModal');
+    showToast('✅ تم حفظ التوزيع');
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 حفظ التوزيع'; }
+  }
+}
+
+/* Clear the manual_allocation flag and regenerate splits via the normal FIFO path. */
+async function revertToFifo() {
+  var paymentId = _splitEditing.paymentId;
+  var p = _splitEditing.payment;
+  if (!paymentId || !p || !currentUser) return;
+  if (!confirm('إعادة التوزيع تلقائياً بنظام FIFO؟\n\nهذا سيحذف التوزيع اليدوي الحالي.')) return;
+
+  var revertBtn = document.getElementById('splitRevertBtn');
+  if (revertBtn) { revertBtn.disabled = true; }
+
+  try {
+    // Clear the manual flag (graceful on pre-Migration-8 DBs).
+    if (!_manualAllocColumnMissing) {
+      var updRes = await window.sb.from('ledger_payments')
+        .update({ manual_allocation: false })
+        .eq('id', paymentId)
+        .eq('doctor_id', currentUser.id);
+      if (updRes.error && _isManualAllocColMissing(updRes.error)) {
+        _manualAllocColumnMissing = true;
+        _warnManualAllocMigrationOnce();
+      }
+    }
+    // Sync local state.
+    p.manual_allocation = false;
+
+    // Trigger full FIFO rebuild (drops all non-manual splits and rebuilds chronologically).
+    // After flipping the flag to false above, this payment is now "non-manual" and
+    // will be re-allocated by FIFO along with any others.
+    var ok = await reallocatePatientFunds();
+    if (!ok) {
+      showToast('⚠️ فشلت إعادة التوزيع — حاول مرة أخرى');
+      return;
+    }
+
+    await syncPaymentStatus();
+    renderStats(); renderPayments(); renderSessions(); renderRecentSessions();
+    closeModal('splitEditModal');
+    showToast('🔄 تم الرجوع إلى FIFO التلقائي');
+  } finally {
+    if (revertBtn) { revertBtn.disabled = false; }
+  }
 }
 
 /* ── Save Payment ── */
