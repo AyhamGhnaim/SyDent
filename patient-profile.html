@@ -5841,15 +5841,18 @@ async function deletePlannedFromProfile(id) {
   allAppointmentsForTl = (allAppointmentsForTl || []).filter(function(a){ return a.id !== id; });
   // Phase 2B-B: lab_orders.appointment_id has ON DELETE SET NULL at the DB
   // level — the FK already nulled any references to this appointment on
-  // the server. Mirror that in the local cache so the labs tab and the
-  // timeline don't keep showing the "📅 موعد مرتبط" badge until next
-  // reload. Safe no-op when no lab order pointed at this appointment.
-  var labsSynced = 0;
+  // the server. Mirror that in the local cache so any future timeline
+  // pass that exposes the appt link (and the labs.html tab opened in
+  // another window after a return-to-profile) sees consistent data.
+  //
+  // Note: the patient-profile labs tab itself doesn't currently render
+  // appointment_id, so we don't re-call renderLabOrders() here — that
+  // would be a no-op. Timeline re-render below handles the visible
+  // surfaces that might consume the field in future.
   (labOrders || []).forEach(function(lo){
-    if (lo.appointment_id === id) { lo.appointment_id = null; labsSynced++; }
+    if (lo.appointment_id === id) { lo.appointment_id = null; }
   });
   renderPlannedAppts();
-  if (labsSynced > 0 && typeof renderLabOrders === 'function') renderLabOrders();
   renderTimeline();
   showToast('🗑️ تم حذف الموعد المخطّط');
 }

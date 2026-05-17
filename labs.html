@@ -287,9 +287,23 @@ td.patient-link a:hover { text-decoration: underline; }
 .order-card.at-risk { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.04); }
 
 /* Clickable appointment badge — visually identical to non-clickable
-   variant but with hover affordance for the now-actionable element. */
-a.appt-badge { text-decoration: none; cursor: pointer; }
+   variant but with hover affordance for the now-actionable element.
+   On mobile (cards), min-height ensures a comfortable tap target. */
+a.appt-badge {
+  text-decoration: none;
+  cursor: pointer;
+  /* Inline-flex centers the 📅 emoji vertically and lets min-height
+     enforce a tap-friendly target without bloating the desktop row.
+     33px is just under the iOS 44pt guideline but reasonable for a
+     secondary navigation element next to the primary patient link. */
+  min-height: 22px;
+  line-height: 1.2;
+}
 a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
+/* On mobile cards specifically, allow a slightly larger badge for thumbs. */
+@media (max-width: 720px) {
+  a.appt-badge { min-height: 28px; padding: 5px 9px !important; }
+}
 
 /* Mobile cards (hidden on desktop) */
 .cards-list { display: none; padding: 12px; gap: 10px; flex-direction: column; }
@@ -1060,9 +1074,9 @@ function renderTable() {
       var apptLabel  = linkedAppt ? fmtApptOption(linkedAppt) : 'موعد مرتبط';
       var badgeStyle = 'display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.4);padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;';
       if (linkedAppt) {
-        apptBadge = '<a href="appointments.html?editAppt=' + encodeURIComponent(lo.appointment_id) + '" class="appt-badge" title="' + escapeHtml(apptLabel) + ' — اضغط لفتح الموعد" style="' + badgeStyle + '">📅</a>';
+        apptBadge = '<a href="appointments.html?editAppt=' + encodeURIComponent(lo.appointment_id) + '" class="appt-badge" title="' + escapeHtml(apptLabel) + ' — اضغط لفتح الموعد" aria-label="افتح الموعد المرتبط — ' + escapeHtml(apptLabel) + '" style="' + badgeStyle + '">📅</a>';
       } else {
-        apptBadge = '<span class="appt-badge" title="' + escapeHtml(apptLabel) + '" style="' + badgeStyle + '">📅</span>';
+        apptBadge = '<span class="appt-badge" title="' + escapeHtml(apptLabel) + '" aria-label="موعد مرتبط: ' + escapeHtml(apptLabel) + '" style="' + badgeStyle + '">📅</span>';
       }
     }
 

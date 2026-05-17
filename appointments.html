@@ -3632,10 +3632,12 @@ function showToast(msg) {
         if (typeof setView === 'function') setView('list');
         setTimeout(function(){ editAppt(editApptId); }, 200);
       } else {
-        // Appointment wasn't in the loaded window — most commonly because
-        // it falls outside the current month filter. Surface a clear hint
-        // rather than silently doing nothing.
-        showToast('⚠️ الموعد المرتبط خارج النطاق الحالي — جرّب تغيير الشهر');
+        // loadAppointments() above pulls ALL appointments for this doctor
+        // (no date filter), so a missing id means the appointment has been
+        // deleted (or never existed). The DB FK SET NULL would normally
+        // null the lab order's appointment_id, but the user may have
+        // clicked an old labs.html tab whose cache predates the deletion.
+        showToast('⚠️ الموعد المرتبط لم يعد موجوداً — قد يكون محذوفاً');
       }
       var url2 = new URL(window.location.href);
       url2.searchParams.delete('editAppt');
