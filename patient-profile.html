@@ -1262,20 +1262,12 @@ async function ppLoadReminderLogs() {
       .order('sent_at', { ascending: false });
     if (res.error) {
       var msg = (res.error.message || '') + ' ' + (res.error.code || '');
-      // Stay silent only for the truly migration-missing case so other
-      // bugs (RLS, columns) surface in console for debugging.
       if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
-        console.warn('reminder_logs load failed:', res.error);
+        console.warn('reminder_logs load:', res.error);
       }
       return;
     }
-    // Phase 2B-A diagnostic: log how many reminders we loaded so the user
-    // can verify in console if reminders aren't appearing in the timeline.
-    var rows = res.data || [];
-    if (rows.length > 0) {
-      console.log('[SyDent] Loaded ' + rows.length + ' reminder log(s) for patient ' + patientId);
-    }
-    rows.forEach(function(log){
+    (res.data || []).forEach(function(log){
       // Keep only the newest log per appointment (already sorted DESC).
       if (!lastReminderLogByAppt[log.appointment_id]) {
         lastReminderLogByAppt[log.appointment_id] = log;
@@ -1373,33 +1365,13 @@ async function ppSendWaReminder() {
     }).select().single();
     if (ins.error) {
       console.warn('reminder_logs insert:', ins.error);
-      // Phase 2B-A fix: surface the actual reason to the user instead of a
-      // generic 'تعذّر حفظ السجل'. This was hiding RLS / missing-table /
-      // missing-column failures and leaving the user thinking the reminder
-      // was logged when it wasn't.
-      var errCode = ins.error.code || '';
-      var errMsg = (ins.error.message || '').toLowerCase();
-      var reason = 'سبب غير معروف';
-      if (errCode === '42P01' || /relation .* does not exist/i.test(errMsg)) {
-        reason = 'جدول reminder_logs غير موجود — شغّل Migration 5';
-      } else if (errCode === '42703' || /column .* does not exist/i.test(errMsg)) {
-        reason = 'عمود مفقود في reminder_logs — راجع Migration 5';
-      } else if (errCode === '42501' || /row-level security|rls/i.test(errMsg)) {
-        reason = 'RLS تمنع الكتابة — راجع policies على reminder_logs';
-      } else if (errCode === '23502' || /not.null/i.test(errMsg)) {
-        reason = 'حقل مطلوب فارغ: ' + (ins.error.message || '');
-      } else if (errCode === '23503' || /foreign key/i.test(errMsg)) {
-        reason = 'مرجع غير صالح (appointment_id أو patient_id)';
-      } else if (ins.error.message) {
-        reason = ins.error.message;
-      }
-      showToast('⚠️ تم فتح WhatsApp لكن لم يُحفظ السجل: ' + reason);
+      showToast('⚠️ تم فتح WhatsApp (تعذّر حفظ السجل)');
     } else {
       showToast('✅ تم إرسال التذكير');
-      // Phase 2B-A fix: merge the freshly-saved row into the in-memory
-      // map immediately, then also re-fetch for safety. This ensures the
-      // timeline + button checkmark update even if ppLoadReminderLogs hits
-      // a stale-cache or RLS-read issue.
+      // Phase 2B-A: merge the freshly-saved row into the in-memory map
+      // immediately, then also re-fetch for safety. This ensures the
+      // timeline + button checkmark update without waiting on a stale
+      // schema cache.
       if (ins.data) {
         lastReminderLogByAppt[ins.data.appointment_id] = ins.data;
       }
@@ -1408,10 +1380,7 @@ async function ppSendWaReminder() {
       // Phase 2B-A: the new reminder log appears in the timeline immediately.
       try { renderTimeline(); } catch(_) {}
     }
-  } catch(e) {
-    console.warn('ppSendWaReminder:', e);
-    showToast('⚠️ خطأ غير متوقّع في حفظ التذكير: ' + (e && e.message ? e.message : ''));
-  }
+  } catch(e) { console.warn('ppSendWaReminder:', e); }
 
   closeModal('ppWaModal');
 }
