@@ -429,6 +429,152 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .wa-send-btn:hover { opacity: .9; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Phase 2B-A: Patient Timeline (unified Progress Notes) ── */
+.tl-filters{
+  display:flex; flex-direction:column; gap:10px;
+  background:rgba(0,0,0,0.15);
+  border:1px solid var(--border);
+  border-radius:11px;
+  padding:12px 14px;
+  margin-bottom:14px;
+}
+.tl-filters-row{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+}
+.tl-filter-label{
+  font-size:11px; color:var(--text2); font-weight:600;
+  margin-left:6px; white-space:nowrap;
+}
+.tl-chip{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 10px;
+  font-size:11px; font-weight:700;
+  border-radius:14px;
+  background:rgba(255,255,255,0.04);
+  color:var(--text2);
+  border:1px solid var(--border);
+  cursor:pointer;
+  transition:all .15s;
+  user-select:none;
+}
+.tl-chip:hover{ background:rgba(255,255,255,0.07); color:var(--text); }
+.tl-chip.active{
+  background:rgba(46,232,158,0.15);
+  color:var(--green);
+  border-color:rgba(46,232,158,0.4);
+}
+.tl-search-input{
+  flex:1; min-width:180px;
+  padding:7px 12px;
+  font-size:12px; font-family:inherit;
+  background:rgba(0,0,0,0.25);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  outline:none;
+}
+.tl-search-input:focus{ border-color:var(--green); }
+.tl-date-select{
+  padding:6px 10px;
+  font-size:11px; font-weight:600; font-family:inherit;
+  background:rgba(0,0,0,0.25);
+  border:1px solid var(--border);
+  border-radius:8px;
+  color:var(--text);
+  cursor:pointer;
+  outline:none;
+}
+.tl-date-select:focus{ border-color:var(--green); }
+
+.tl-list{ display:flex; flex-direction:column; gap:8px; }
+.tl-empty{
+  text-align:center; padding:60px 20px;
+  color:var(--text2); font-size:13px;
+}
+.tl-empty-icon{ font-size:44px; margin-bottom:12px; opacity:.6; }
+
+.tl-row{
+  display:flex; gap:12px;
+  padding:11px 13px;
+  background:rgba(0,0,0,0.18);
+  border:1px solid var(--border);
+  border-right:3px solid var(--blue);
+  border-radius:9px;
+  transition:background .15s;
+}
+.tl-row:hover{ background:rgba(255,255,255,0.025); }
+.tl-row-icon{
+  flex-shrink:0;
+  width:36px; height:36px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+  background:rgba(255,255,255,0.04);
+  border-radius:50%;
+}
+.tl-row-body{ flex:1; min-width:0; }
+.tl-row-head{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  margin-bottom:4px;
+}
+.tl-row-title{
+  font-weight:700; font-size:13px; color:var(--text);
+}
+.tl-row-time{
+  font-size:10px; color:var(--text2);
+  margin-right:auto;
+  white-space:nowrap;
+}
+.tl-row-meta{
+  font-size:11px; color:var(--text2);
+  display:flex; flex-wrap:wrap; gap:10px;
+  margin-top:3px;
+}
+.tl-row-meta b{ color:var(--text); font-weight:600; }
+.tl-row-notes{
+  margin-top:6px;
+  font-size:11px; color:var(--text2);
+  font-style:italic;
+  padding:5px 8px;
+  background:rgba(0,0,0,0.18);
+  border-radius:6px;
+  border-right:2px solid rgba(255,255,255,0.06);
+  white-space:pre-wrap; word-wrap:break-word;
+}
+.tl-badge{
+  display:inline-block;
+  font-size:9px; font-weight:700;
+  padding:1px 6px;
+  border-radius:8px;
+  border:1px solid;
+  white-space:nowrap;
+}
+.tl-row.tl-session  { border-right-color:var(--green); }
+.tl-row.tl-payment  { border-right-color:var(--yellow); }
+.tl-row.tl-appt     { border-right-color:var(--blue); }
+.tl-row.tl-lab      { border-right-color:#c084fc; }
+.tl-row.tl-unearned { border-right-color:#7dd3fc; }
+.tl-row.tl-reminder { border-right-color:#fb923c; }
+
+.tl-pagination{
+  display:flex; justify-content:center; padding:12px;
+}
+.tl-load-more{
+  padding:8px 18px;
+  font-size:12px; font-weight:600; font-family:inherit;
+  background:rgba(46,232,158,0.1);
+  color:var(--green);
+  border:1px solid rgba(46,232,158,0.3);
+  border-radius:9px;
+  cursor:pointer;
+  transition:background .15s;
+}
+.tl-load-more:hover{ background:rgba(46,232,158,0.18); }
+.tl-count{
+  text-align:center;
+  font-size:11px; color:var(--text2);
+  padding:6px;
+}
 </style>
 </head>
 <body>
@@ -473,6 +619,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
   <div class="tabs">
     <button class="tab active" onclick="switchTab('file',this)">📋 الملف</button>
+    <button class="tab" onclick="switchTab('timeline',this)">🕐 السجل الكامل</button>
     <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
     <button class="tab" onclick="switchTab('labs',this)">🧪 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
@@ -537,6 +684,45 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button class="btn btn-primary btn-sm" onclick="openSessionModal()">＋ إضافة جلسة</button>
       </div>
       <div id="sessionsContent"></div>
+    </div>
+  </div>
+
+  <!-- Tab: السجل الكامل (Timeline) -->
+  <div class="panel" id="tab-timeline">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">🕐 السجل الكامل للمريض</span>
+        <span style="font-size:11px;color:var(--text2);">كل الأحداث مرتّبة من الأحدث للأقدم</span>
+      </div>
+      <div class="tl-filters">
+        <div class="tl-filters-row">
+          <span class="tl-filter-label">النوع:</span>
+          <span class="tl-chip" data-tl-type="all" onclick="onTlTypeChip('all')">الكل</span>
+          <span class="tl-chip active" data-tl-type="session" onclick="onTlTypeChip('session')">🦷 جلسات</span>
+          <span class="tl-chip active" data-tl-type="payment" onclick="onTlTypeChip('payment')">💰 دفعات</span>
+          <span class="tl-chip active" data-tl-type="appointment" onclick="onTlTypeChip('appointment')">📅 مواعيد</span>
+          <span class="tl-chip active" data-tl-type="lab" onclick="onTlTypeChip('lab')">🧪 مخابر</span>
+          <span class="tl-chip active" data-tl-type="unearned" onclick="onTlTypeChip('unearned')">💵 رصيد مقدّم</span>
+          <span class="tl-chip active" data-tl-type="reminder" onclick="onTlTypeChip('reminder')">📱 تذكيرات</span>
+        </div>
+        <div class="tl-filters-row">
+          <span class="tl-filter-label">التاريخ:</span>
+          <select class="tl-date-select" id="tlDateRange" onchange="onTlDateRangeChange(this.value)">
+            <option value="all">الكل</option>
+            <option value="7d">آخر 7 أيام</option>
+            <option value="30d">آخر 30 يوم</option>
+            <option value="90d">آخر 90 يوم</option>
+            <option value="year">هذه السنة</option>
+            <option value="lastyear">السنة الماضية</option>
+          </select>
+          <input type="text" class="tl-search-input" id="tlSearch" placeholder="بحث في الملاحظات، الطبيب، نوع العلاج..." oninput="onTlSearchInput(this.value)">
+        </div>
+      </div>
+      <div id="tlCount" class="tl-count"></div>
+      <div id="tlContent" class="tl-list"></div>
+      <div id="tlPagination" class="tl-pagination" style="display:none;">
+        <button class="tl-load-more" onclick="onTlLoadMore()">تحميل المزيد ↓</button>
+      </div>
     </div>
   </div>
 
@@ -937,6 +1123,31 @@ var editingApptId = null; // Gap 7: id of appointment currently being edited in 
 var currentUser = null;
 
 // ═══════════════════════════════════════════════════════════════
+// Phase 2B-A — Patient Timeline (unified Progress Notes view)
+// All helpers prefixed with tl* to avoid global collisions. Data is
+// aggregated client-side from already-loaded sources (sessions,
+// payments, paymentSplits, labOrders, lastReminderLogByAppt) plus
+// one extra fetch for ALL appointments (loadAll only loads upcoming).
+// ═══════════════════════════════════════════════════════════════
+var allAppointmentsForTl = [];  // every appointment for this patient (any date, any status)
+var timelineFilters = {
+  // type chips: all 6 enabled by default → user sees everything
+  types: {
+    session:     true,
+    payment:     true,
+    appointment: true,
+    lab:         true,
+    unearned:    true,
+    reminder:    true
+  },
+  dateRange: 'all',  // 'all' | '7d' | '30d' | '90d' | 'year' | 'lastyear'
+  search:    ''
+};
+var TL_PAGE_SIZE = 50;
+var timelineShownCount = TL_PAGE_SIZE;
+var _tlSearchDebounce = null;
+
+// ═══════════════════════════════════════════════════════════════
 // Phase 2A — WhatsApp Reminders (patient-profile quick action)
 // All helpers prefixed with pp* to avoid global collisions with the
 // appointments.html copies. The button targets the *nearest upcoming*
@@ -1151,6 +1362,8 @@ async function ppSendWaReminder() {
       showToast('✅ تم إرسال التذكير');
       await ppLoadReminderLogs();
       ppUpdateWaButtonVisibility();
+      // Phase 2B-A: the new reminder log appears in the timeline immediately.
+      try { renderTimeline(); } catch(_) {}
     }
   } catch(e) { console.warn('ppSendWaReminder:', e); }
 
@@ -1721,6 +1934,450 @@ function getTreatment(id) {
   return null;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Phase 2B-A — Patient Timeline functions
+   Aggregates events from sessions, payments, appointments, lab
+   orders, unearned splits, and reminder logs into one sortable list.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Fetch ALL appointments (loadAll only fetches upcoming for linking).
+   Failures are non-fatal — we just degrade to whatever's already loaded. */
+async function loadAllAppointmentsForTimeline() {
+  allAppointmentsForTl = [];
+  if (!currentUser || !patientId) return;
+  try {
+    var res = await window.sb.from('appointments')
+      .select('id, date, time, type, status, provider_id, notes, created_at, is_planned, duration')
+      .eq('patient_id', patientId)
+      .eq('doctor_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    if (res.error) {
+      // Some legacy DBs may not have is_planned column — retry without it.
+      var m = (res.error.message || '').toLowerCase();
+      if (m.indexOf('is_planned') !== -1 || res.error.code === '42703') {
+        var res2 = await window.sb.from('appointments')
+          .select('id, date, time, type, status, provider_id, notes, created_at, duration')
+          .eq('patient_id', patientId)
+          .eq('doctor_id', currentUser.id)
+          .order('created_at', { ascending: false });
+        if (!res2.error) allAppointmentsForTl = res2.data || [];
+        else console.warn('timeline appts load (retry):', res2.error);
+      } else {
+        console.warn('timeline appts load:', res.error);
+      }
+    } else {
+      allAppointmentsForTl = res.data || [];
+    }
+  } catch(e) {
+    console.warn('timeline appts fetch failed:', e);
+  }
+}
+
+/* Parse any timestamp-ish value (ISO string, Date) → epoch ms.
+   Falls back to 0 (oldest) so unknown timestamps sink to bottom. */
+function tlTs(val) {
+  if (!val) return 0;
+  try {
+    var t = new Date(val).getTime();
+    return isNaN(t) ? 0 : t;
+  } catch(_) { return 0; }
+}
+
+/* For sessions/payments with both `date` (day) and `created_at` (datetime),
+   prefer the datetime if same day, else use the date at noon (avoids TZ flips). */
+function tlBestTs(dateStr, createdAt) {
+  var dt = tlTs(createdAt);
+  if (!dateStr) return dt;
+  var dayPart = String(dateStr).slice(0, 10);
+  var createdDay = createdAt ? new Date(createdAt).toISOString().slice(0, 10) : null;
+  if (createdDay && createdDay === dayPart) return dt;
+  // Use noon UTC so the row sorts to mid-day, regardless of local TZ.
+  return tlTs(dayPart + 'T12:00:00Z');
+}
+
+/* Build unified event list. Returns array sorted DESC by timestamp. */
+function buildTimelineEvents() {
+  var events = [];
+
+  // ── 1. Sessions ──
+  (sessions || []).forEach(function(s) {
+    var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === s.provider_id; });
+    var typeMatch = (Array.isArray(TREATMENTS) ? TREATMENTS : [])
+      .find(function(t){ return t.name === s.type; });
+    var st = s.status || 'completed';
+    events.push({
+      type: 'session',
+      icon: '🦷',
+      ts: tlBestTs(s.date, s.created_at),
+      data: s,
+      providerName: prov ? prov.name : '',
+      providerColor: prov ? (prov.color || '#2ee89e') : null,
+      typeFill: typeMatch ? typeMatch.fill : '#63b3ed',
+      statusKey: st,
+      statusLabel: STATUS_LABELS[st] || st,
+      statusColor: STATUS_COLORS[st] || '#3b82f6',
+      searchHay: [
+        s.type, s.tooth_num, s.description, s.notes, s.surface,
+        prov ? prov.name : '', STATUS_LABELS[st] || ''
+      ].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // ── 2. Payments (with manual-allocation badge) ──
+  (payments || []).forEach(function(p) {
+    events.push({
+      type: 'payment',
+      icon: '💰',
+      ts: tlBestTs(p.date, p.created_at),
+      data: p,
+      isManual: p.manual_allocation === true,
+      searchHay: [p.method, p.notes, p.amount].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // ── 3. Appointments (all of them — past, future, planned, cancelled) ──
+  (allAppointmentsForTl || []).forEach(function(a) {
+    var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === a.provider_id; });
+    // Composite timestamp: date+time if both present, else date, else created_at.
+    var ts;
+    if (a.date && a.time) {
+      // Some DBs return time as 'HH:MM:SS', others 'HH:MM' — normalize to 5 chars.
+      var t = String(a.time).slice(0, 5);
+      ts = tlTs(a.date + 'T' + t + ':00');
+      if (!ts) ts = tlBestTs(a.date, a.created_at);
+    } else if (a.date) {
+      ts = tlBestTs(a.date, a.created_at);
+    } else {
+      ts = tlTs(a.created_at);
+    }
+    // Localized status label. patient-profile.html doesn't have APPT_STATUS_LABELS
+    // (that's an appointments.html constant), so we map the common ones inline.
+    var APPT_STATUS_AR = {
+      scheduled: 'مجدول', confirmed: 'مؤكّد', arrived: 'وصل المريض',
+      in_chair: 'على الكرسي', completed: 'مكتمل', cancelled: 'ملغي',
+      broken: 'متغيّب', no_show: 'لم يحضر'
+    };
+    var statusLabel = APPT_STATUS_AR[a.status] || a.status || '—';
+    events.push({
+      type: 'appointment',
+      icon: '📅',
+      ts: ts,
+      data: a,
+      providerName: prov ? prov.name : '',
+      providerColor: prov ? (prov.color || '#2ee89e') : null,
+      statusKey: a.status,
+      statusLabel: statusLabel,
+      isPlanned: a.is_planned === true,
+      searchHay: [
+        a.type, a.notes, statusLabel,
+        prov ? prov.name : '', a.date, a.time
+      ].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // ── 4. Lab orders ──
+  (labOrders || []).forEach(function(lo) {
+    var st = LAB_STATUSES[lo.status] || LAB_STATUSES['sent'];
+    var labDisplay = lo.lab_name || '';
+    if (lo.lab_id) {
+      var lObj = (allLabs || []).find(function(x){ return x.id === lo.lab_id; });
+      if (lObj) labDisplay = lObj.name;
+    }
+    events.push({
+      type: 'lab',
+      icon: '🧪',
+      ts: tlBestTs(lo.date_sent, lo.created_at),
+      data: lo,
+      labName: labDisplay,
+      statusLabel: st ? st.ar : (lo.status || ''),
+      statusColor: st ? st.color : '#a3a3a3',
+      searchHay: [
+        lo.work_type, lo.tooth_num, labDisplay, lo.shade, lo.notes,
+        st ? st.ar : ''
+      ].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // ── 5. Unearned credits (only the unearned splits — one event per split row) ──
+  (paymentSplits || []).filter(function(sp){ return sp.is_unearned === true; }).forEach(function(sp) {
+    // Pair to its payment for date display
+    var pay = (payments || []).find(function(pp){ return pp.id === sp.payment_id; });
+    var dateForTs = (pay && pay.date) || sp.payment_date || sp.created_at;
+    events.push({
+      type: 'unearned',
+      icon: '💵',
+      ts: tlBestTs(dateForTs, sp.created_at),
+      data: sp,
+      payment: pay || null,
+      searchHay: ['رصيد مقدّم', 'unearned', sp.amount, sp.notes].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // ── 6. WhatsApp reminders (use lastReminderLogByAppt populated by ppLoadReminderLogs) ──
+  Object.keys(lastReminderLogByAppt || {}).forEach(function(apptId) {
+    var log = lastReminderLogByAppt[apptId];
+    if (!log) return;
+    var appt = (allAppointmentsForTl || []).find(function(a){ return a.id === apptId; });
+    events.push({
+      type: 'reminder',
+      icon: '📱',
+      ts: tlTs(log.sent_at || log.created_at),
+      data: log,
+      relatedAppt: appt || null,
+      searchHay: ['تذكير', 'whatsapp', log.status, log.message_text, log.recipient_phone].filter(Boolean).join(' ').toLowerCase()
+    });
+  });
+
+  // Sort newest first; stable tie-break by type then id so same-second events
+  // don't reshuffle on re-render.
+  events.sort(function(a, b) {
+    if (b.ts !== a.ts) return b.ts - a.ts;
+    if (a.type !== b.type) return a.type < b.type ? -1 : 1;
+    var aid = (a.data && a.data.id) || '';
+    var bid = (b.data && b.data.id) || '';
+    return aid < bid ? -1 : (aid > bid ? 1 : 0);
+  });
+
+  return events;
+}
+
+/* Apply current filter state. Pure function — returns filtered array. */
+function applyTimelineFilters(events) {
+  var f = timelineFilters;
+  // Compute date cutoff (epoch ms) once per call.
+  var cutoffStart = null, cutoffEnd = null;
+  var now = new Date();
+  var todayY = now.getFullYear();
+  if (f.dateRange === '7d') {
+    cutoffStart = Date.now() - 7 * 86400000;
+  } else if (f.dateRange === '30d') {
+    cutoffStart = Date.now() - 30 * 86400000;
+  } else if (f.dateRange === '90d') {
+    cutoffStart = Date.now() - 90 * 86400000;
+  } else if (f.dateRange === 'year') {
+    cutoffStart = new Date(todayY, 0, 1).getTime();
+  } else if (f.dateRange === 'lastyear') {
+    cutoffStart = new Date(todayY - 1, 0, 1).getTime();
+    cutoffEnd   = new Date(todayY, 0, 1).getTime();
+  }
+  var q = (f.search || '').trim().toLowerCase();
+
+  return events.filter(function(e) {
+    if (!f.types[e.type]) return false;
+    if (cutoffStart !== null && e.ts < cutoffStart) return false;
+    if (cutoffEnd   !== null && e.ts >= cutoffEnd) return false;
+    if (q && (e.searchHay || '').indexOf(q) === -1) return false;
+    return true;
+  });
+}
+
+/* Format ts → "15 مايو 2026 — 14:30" (Arabic). */
+function tlFormatDateTime(ts) {
+  if (!ts) return '—';
+  try {
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return '—';
+    var day = d.getDate();
+    var mon = PP_MONTHS_AR[d.getMonth()];
+    var yr  = d.getFullYear();
+    var hh  = String(d.getHours()).padStart(2, '0');
+    var mm  = String(d.getMinutes()).padStart(2, '0');
+    return day + ' ' + mon + ' ' + yr + ' — ' + hh + ':' + mm;
+  } catch(_) { return '—'; }
+}
+
+/* Render one event row. Returns HTML string. All user-controlled text passes
+   through escapeHtml(). */
+function renderTimelineRow(e) {
+  var cls = 'tl-row tl-' + (e.type === 'appointment' ? 'appt' : e.type);
+  var timeStr = tlFormatDateTime(e.ts);
+  var title = '', meta = '', notes = '';
+
+  if (e.type === 'session') {
+    var s = e.data;
+    // Show surface only when it's a specific surface (not WHOLE = full tooth).
+    var surfaceShown = (s.surface && s.surface !== 'WHOLE') ? s.surface : null;
+    var toothPart = s.tooth_num
+      ? ' — السن ' + escapeHtml(String(s.tooth_num)) + (surfaceShown ? ' (' + escapeHtml(String(surfaceShown)) + ')' : '')
+      : '';
+    title = escapeHtml(s.type || 'جلسة') + toothPart;
+    var statusBadge = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
+    var costPart = (parseFloat(s.cost) || 0) > 0
+      ? '<span>التكلفة: <b>' + fmt(s.cost) + ' ل.س</b></span>'
+      : '';
+    var provPart = e.providerName
+      ? '<span>👨‍⚕️ <b style="color:' + e.providerColor + ';">' + escapeHtml(e.providerName) + '</b></span>'
+      : '';
+    meta = statusBadge + costPart + provPart;
+    if (s.description) notes += escapeHtml(s.description);
+    if (s.notes) notes += (notes ? '\n' : '') + escapeHtml(s.notes);
+  }
+  else if (e.type === 'payment') {
+    var p = e.data;
+    title = 'دفعة: ' + fmt(p.amount) + ' ل.س';
+    var methodBadge = '<span class="tl-badge" style="background:rgba(46,232,158,0.15);color:var(--green);border-color:rgba(46,232,158,0.4);">' + escapeHtml(p.method || '—') + '</span>';
+    var manualBadge = e.isManual
+      ? '<span class="tl-badge" style="background:rgba(99,179,237,0.15);color:var(--blue);border-color:rgba(99,179,237,0.4);" title="موزّعة يدوياً">يدوي</span>'
+      : '';
+    meta = methodBadge + manualBadge;
+    if (p.notes) notes = escapeHtml(p.notes);
+  }
+  else if (e.type === 'appointment') {
+    var a = e.data;
+    var dateLabel = a.date
+      ? ('📅 ' + escapeHtml(String(a.date)) + (a.time ? ' الساعة ' + escapeHtml(String(a.time).slice(0,5)) : ''))
+      : '📋 موعد مخطّط (بلا تاريخ)';
+    title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
+    var stColor = '#63b3ed';
+    if (e.statusKey === 'completed') stColor = '#2ee89e';
+    else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show') stColor = '#a3a3a3';
+    else if (e.statusKey === 'broken') stColor = '#ef5350';
+    var statBadge2 = '<span class="tl-badge" style="background:' + stColor + '22;color:' + stColor + ';border-color:' + stColor + '55;">' + escapeHtml(e.statusLabel || '—') + '</span>';
+    var plannedBadge = e.isPlanned
+      ? '<span class="tl-badge" style="background:rgba(245,200,66,0.15);color:var(--yellow);border-color:rgba(245,200,66,0.4);">مخطّط</span>'
+      : '';
+    var provPart2 = e.providerName
+      ? '<span>👨‍⚕️ <b style="color:' + e.providerColor + ';">' + escapeHtml(e.providerName) + '</b></span>'
+      : '';
+    meta = statBadge2 + plannedBadge + provPart2;
+    if (a.notes) notes = escapeHtml(a.notes);
+  }
+  else if (e.type === 'lab') {
+    var lo = e.data;
+    var toothPart2 = lo.tooth_num ? ' — السن ' + escapeHtml(String(lo.tooth_num)) : '';
+    title = '🧪 ' + escapeHtml(lo.work_type || 'طلب مخبر') + toothPart2;
+    var statBadge3 = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
+    var labPart = e.labName
+      ? '<span>المخبر: <b>' + escapeHtml(e.labName) + '</b></span>'
+      : '';
+    var shadePart = lo.shade ? '<span>اللون: <b>' + escapeHtml(lo.shade) + '</b></span>' : '';
+    var costPart2 = (parseFloat(lo.cost) || 0) > 0
+      ? '<span>التكلفة: <b>' + fmt(lo.cost) + ' ل.س</b></span>'
+      : '';
+    meta = statBadge3 + labPart + shadePart + costPart2;
+    if (lo.notes) notes = escapeHtml(lo.notes);
+  }
+  else if (e.type === 'unearned') {
+    var sp = e.data;
+    title = '💵 رصيد مقدّم: ' + fmt(sp.amount) + ' ل.س';
+    var origPart = e.payment
+      ? '<span>من دفعة بتاريخ <b>' + escapeHtml(String(e.payment.date || '—')) + '</b></span>'
+      : '';
+    meta = '<span class="tl-badge" style="background:rgba(125,211,252,0.15);color:#7dd3fc;border-color:rgba(125,211,252,0.4);">غير موزّع</span>' + origPart;
+    if (sp.notes) notes = escapeHtml(sp.notes);
+  }
+  else if (e.type === 'reminder') {
+    var lg = e.data;
+    title = '📱 تذكير WhatsApp';
+    var stColor2 = '#fb923c';
+    var stLabel = 'تم الإرسال';
+    if (lg.status === 'failed')    { stColor2 = '#ef5350'; stLabel = 'فشل الإرسال'; }
+    else if (lg.status === 'pending') { stColor2 = '#f5c842'; stLabel = 'قيد الإرسال'; }
+    else if (lg.status === 'sent' || lg.status === 'delivered' || lg.status === 'read') {
+      stColor2 = '#2ee89e'; stLabel = 'تم الإرسال';
+    }
+    var stBadge4 = '<span class="tl-badge" style="background:' + stColor2 + '22;color:' + stColor2 + ';border-color:' + stColor2 + '55;">' + escapeHtml(stLabel) + '</span>';
+    var phonePart = lg.recipient_phone
+      ? '<span>الهاتف: <b>' + escapeHtml(String(lg.recipient_phone)) + '</b></span>'
+      : '';
+    var apptLink = '';
+    if (e.relatedAppt && e.relatedAppt.date) {
+      apptLink = '<span>موعد <b>' + escapeHtml(String(e.relatedAppt.date)) + '</b></span>';
+    }
+    meta = stBadge4 + phonePart + apptLink;
+    if (lg.message_text) notes = escapeHtml(lg.message_text);
+  }
+
+  return '<div class="' + cls + '">'
+    + '<div class="tl-row-icon">' + e.icon + '</div>'
+    + '<div class="tl-row-body">'
+      + '<div class="tl-row-head">'
+        + '<span class="tl-row-title">' + title + '</span>'
+        + '<span class="tl-row-time">' + timeStr + '</span>'
+      + '</div>'
+      + (meta ? '<div class="tl-row-meta">' + meta + '</div>' : '')
+      + (notes ? '<div class="tl-row-notes">' + notes + '</div>' : '')
+    + '</div>'
+  + '</div>';
+}
+
+/* Master render: builds events → filters → paginates → injects DOM. */
+function renderTimeline() {
+  var container = document.getElementById('tlContent');
+  var countEl = document.getElementById('tlCount');
+  var pagEl = document.getElementById('tlPagination');
+  if (!container) return;
+
+  var events = applyTimelineFilters(buildTimelineEvents());
+
+  if (events.length === 0) {
+    container.innerHTML = '<div class="tl-empty">'
+      + '<div class="tl-empty-icon">🗓️</div>'
+      + 'لا توجد أحداث تطابق الفلاتر المحدّدة'
+      + '</div>';
+    if (countEl) countEl.textContent = '';
+    if (pagEl) pagEl.style.display = 'none';
+    return;
+  }
+
+  // Clamp shown count to total (in case filters reduced the set).
+  if (timelineShownCount < TL_PAGE_SIZE) timelineShownCount = TL_PAGE_SIZE;
+  var sliced = events.slice(0, timelineShownCount);
+  container.innerHTML = sliced.map(renderTimelineRow).join('');
+
+  if (countEl) {
+    countEl.textContent = 'يعرض ' + sliced.length + ' من ' + events.length + ' حدث';
+  }
+  if (pagEl) {
+    pagEl.style.display = (events.length > sliced.length) ? 'flex' : 'none';
+  }
+}
+
+/* Toggle a type chip. 'all' acts as a master select-all/clear toggle. */
+function onTlTypeChip(typeKey) {
+  if (typeKey === 'all') {
+    // If any type is off, turn all ON. Otherwise turn all OFF.
+    var anyOff = Object.keys(timelineFilters.types).some(function(k){ return !timelineFilters.types[k]; });
+    Object.keys(timelineFilters.types).forEach(function(k){ timelineFilters.types[k] = anyOff; });
+  } else {
+    timelineFilters.types[typeKey] = !timelineFilters.types[typeKey];
+  }
+  // Refresh chip UI
+  document.querySelectorAll('.tl-chip[data-tl-type]').forEach(function(chip){
+    var key = chip.getAttribute('data-tl-type');
+    if (key === 'all') {
+      var allOn = Object.keys(timelineFilters.types).every(function(k){ return timelineFilters.types[k]; });
+      chip.classList.toggle('active', allOn);
+    } else {
+      chip.classList.toggle('active', !!timelineFilters.types[key]);
+    }
+  });
+  // Reset pagination so user sees freshly-filtered top items.
+  timelineShownCount = TL_PAGE_SIZE;
+  renderTimeline();
+}
+
+function onTlDateRangeChange(val) {
+  timelineFilters.dateRange = val || 'all';
+  timelineShownCount = TL_PAGE_SIZE;
+  renderTimeline();
+}
+
+/* Debounced search to avoid re-render on every keystroke. */
+function onTlSearchInput(val) {
+  if (_tlSearchDebounce) clearTimeout(_tlSearchDebounce);
+  _tlSearchDebounce = setTimeout(function(){
+    timelineFilters.search = val || '';
+    timelineShownCount = TL_PAGE_SIZE;
+    renderTimeline();
+  }, 220);
+}
+
+function onTlLoadMore() {
+  timelineShownCount += TL_PAGE_SIZE;
+  renderTimeline();
+}
+
 /* ── Load from Supabase ── */
 async function loadAll() {
   if (!currentUser || !patientId) return;
@@ -1844,6 +2501,11 @@ async function loadAll() {
     if (lbsErr) { console.warn('labs load error:', lbsErr); allLabs = []; }
     else allLabs = lbs || [];
   } catch(e) { console.warn('labs fetch failed:', e); allLabs = []; }
+
+  // Phase 2B-A: full appointment history for the unified timeline tab.
+  // Non-fatal — degrades to empty list if the table is unreachable.
+  try { await loadAllAppointmentsForTimeline(); }
+  catch(e) { console.warn('loadAllAppointmentsForTimeline:', e); allAppointmentsForTl = []; }
 
   init();
 }
@@ -3943,7 +4605,7 @@ async function saveToothTreatment() {
     Object.assign(patient, updates);
   }
 
-  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
   closeModal('toothModal');
   // Build area label that reflects the type
   var areaLabelToast;
@@ -4303,7 +4965,7 @@ async function delSession(id) {
     }
   }
   await syncPaymentStatus();
-  renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
+  renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
   showToast('🗑️ تم حذف الجلسة');
 }
 
@@ -4328,7 +4990,7 @@ async function delPayment(id) {
   // (e.g., a later payment may now cover a session that the deleted one had paid).
   await reallocatePatientFunds();
   await syncPaymentStatus();
-  renderStats(); renderPayments();
+  renderStats(); renderPayments(); renderTimeline();
   showToast('🗑️ تم حذف الدفعة');
 }
 
@@ -4696,7 +5358,7 @@ async function saveManualSplits() {
 
     // 4. Re-render the UI to reflect the new allocation.
     await syncPaymentStatus();
-    renderStats(); renderPayments(); renderSessions(); renderRecentSessions();
+    renderStats(); renderPayments(); renderSessions(); renderRecentSessions(); renderTimeline();
     closeModal('splitEditModal');
     showToast('✅ تم حفظ التوزيع');
   } finally {
@@ -4739,7 +5401,7 @@ async function revertToFifo() {
     }
 
     await syncPaymentStatus();
-    renderStats(); renderPayments(); renderSessions(); renderRecentSessions();
+    renderStats(); renderPayments(); renderSessions(); renderRecentSessions(); renderTimeline();
     closeModal('splitEditModal');
     showToast('🔄 تم الرجوع إلى FIFO التلقائي');
   } finally {
@@ -4777,7 +5439,7 @@ async function savePayment() {
     var realloc_ok = await reallocatePatientFunds();
     patient.payment_manual = false;
     await syncPaymentStatus();
-    renderStats(); renderInfo(); renderPayments();
+    renderStats(); renderInfo(); renderPayments(); renderTimeline();
     closeModal('payModal');
     document.getElementById('payAmount').value = '';
     document.getElementById('payNotes').value  = '';
@@ -4835,7 +5497,7 @@ async function saveSession() {
     Object.assign(patient, updates);
   }
   await syncPaymentStatus();
-  renderStats(); renderInfo(); renderSessions(); renderRecentSessions();
+  renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderTimeline();
   closeModal('sessionModal');
   document.getElementById('sType').value=''; document.getElementById('sCost').value='';
   document.getElementById('sDesc').value=''; document.getElementById('sNotes').value='';
@@ -4986,6 +5648,11 @@ async function saveAppt() {
 
   renderPlannedAppts();
 
+  // Phase 2B-A: timeline reflects the new/edited appointment.
+  // Reload from DB (cheaper than mirror-updating two arrays) and re-render.
+  try { await loadAllAppointmentsForTimeline(); renderTimeline(); }
+  catch(e) { console.warn('timeline refresh after saveAppt:', e); }
+
   if (migrationMissing) {
     showToast('⚠️ تم الحفظ كموعد عادي — يلزم ترقية قاعدة البيانات لميزة "مخطّط"');
   } else if (isPlannedNow) {
@@ -5127,7 +5794,10 @@ async function deletePlannedFromProfile(id) {
     .eq('id', id).eq('doctor_id', currentUser.id);
   if (res.error) { showToast('❌ خطأ في الحذف: ' + res.error.message); return; }
   plannedAppts = plannedAppts.filter(function(p){ return p.id !== id; });
+  // Phase 2B-A: keep timeline in sync with the deleted appointment.
+  allAppointmentsForTl = (allAppointmentsForTl || []).filter(function(a){ return a.id !== id; });
   renderPlannedAppts();
+  renderTimeline();
   showToast('🗑️ تم حذف الموعد المخطّط');
 }
 
@@ -5708,6 +6378,7 @@ async function _saveLabOrderInner() {
   }
 
   renderLabOrders();
+  renderTimeline();
   closeModal('labOrderModal');
 }
 
@@ -5762,6 +6433,7 @@ async function advanceLabOrder(id) {
     if (idx !== -1) labOrders[idx] = data;
   }
   renderLabOrders();
+  renderTimeline();
   showToast('✅ تم تحديث الحالة إلى: ' + LAB_STATUSES[nx.next].ar);
 }
 
@@ -5775,6 +6447,7 @@ async function rejectLabOrder(id) {
     if (idx !== -1) labOrders[idx] = data;
   }
   renderLabOrders();
+  renderTimeline();
   showToast('🔴 تم رفض الطلب');
 }
 
@@ -5785,6 +6458,7 @@ async function delLabOrder(id) {
   if (error) { showToast('⚠️ فشل الحذف'); return; }
   labOrders = labOrders.filter(function(x){ return x.id !== id; });
   renderLabOrders();
+  renderTimeline();
   showToast('🗑 تم حذف الطلب');
 }
 
@@ -5858,7 +6532,7 @@ async function saveToothAndOpenLab() {
     Object.assign(patient, updates);
   }
   await syncPaymentStatus();
-  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments();
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
 
   // Now close tooth modal and open lab modal with prefilled data
   var toothNum = currentTooth;
@@ -6013,6 +6687,9 @@ async function init() {
   safe(renderPlannedAppts,   'renderPlannedAppts');
   // Phase 2A: show/hide WhatsApp button based on settings + upcoming + phone
   safe(ppUpdateWaButtonVisibility, 'ppUpdateWaButtonVisibility');
+  // Phase 2B-A: render the unified timeline (file tab is default; timeline only
+  // visible when user clicks the tab, but we paint it now so it's ready instantly).
+  safe(renderTimeline,       'renderTimeline');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();
