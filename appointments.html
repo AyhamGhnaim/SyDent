@@ -1925,9 +1925,15 @@ async function getBrokenFeeConfig() {
 // fee type can be filtered/reported independently.
 var BROKEN_FEE_TYPE_LABEL = 'رسم موعد مكسور';
 
-// Idempotency check: returns true if a broken-fee session already exists
-// for this appointment. Prevents double-charging when the user toggles the
-// status broken → confirmed → broken or clicks the button twice quickly.
+// Idempotency check: returns true if EITHER a broken-fee OR no-show-fee
+// session already exists for this appointment. Cross-checking both fee
+// types here (rather than each function only checking its own label) is
+// deliberate: broken and no-show are semantic alternatives for the same
+// outcome (the patient didn't visit), so applying both to one appointment
+// is always a mistake. If the user wants to switch from one to the other,
+// they must first delete the wrong fee session from the patient profile,
+// then re-apply. Prevents double-charging via toggle: broken → no_show
+// or vice versa.
 async function brokenFeeAlreadyApplied(apptId) {
   if (!apptId) return false;
   try {
@@ -1935,7 +1941,7 @@ async function brokenFeeAlreadyApplied(apptId) {
       .select('id, type')
       .eq('doctor_id', currentUser.id)
       .eq('appointment_id', apptId)
-      .eq('type', BROKEN_FEE_TYPE_LABEL)
+      .in('type', [BROKEN_FEE_TYPE_LABEL, NO_SHOW_FEE_TYPE_LABEL])
       .limit(1);
     if (res.error) return false; // fail open — better to warn user than block
     return Array.isArray(res.data) && res.data.length > 0;
@@ -1991,10 +1997,12 @@ async function applyBrokenFee(opts) {
 // in noShowFeeAlreadyApplied(), so don't change without a data migration.
 var NO_SHOW_FEE_TYPE_LABEL = 'رسم موعد لم يحضر';
 
-// Returns true if a no-show fee session has already been recorded for this
-// appointment, so we don't double-charge if the user flips the status back
-// and forth. We look for any session linked to the appointment whose type
-// matches our canonical fee label.
+// Returns true if EITHER a no-show fee OR a broken fee session has already
+// been recorded for this appointment. Cross-checks both labels so the user
+// can't accidentally double-charge by flipping the status no_show → broken
+// (or vice versa) and clicking the second button. Symmetric to
+// brokenFeeAlreadyApplied above — keep the two functions in sync if the
+// label set changes.
 async function noShowFeeAlreadyApplied(apptId) {
   if (!apptId) return false;
   try {
@@ -2002,7 +2010,7 @@ async function noShowFeeAlreadyApplied(apptId) {
       .select('id, type')
       .eq('doctor_id', currentUser.id)
       .eq('appointment_id', apptId)
-      .eq('type', NO_SHOW_FEE_TYPE_LABEL)
+      .in('type', [NO_SHOW_FEE_TYPE_LABEL, BROKEN_FEE_TYPE_LABEL])
       .limit(1);
     if (res.error) return false; // fail open — better to warn user than block
     return Array.isArray(res.data) && res.data.length > 0;
@@ -2968,6 +2976,21 @@ async function completeApptWithProcedures() {
   var attached = sessionsByAppt[editingId] || [];
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
   if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
+
+  // Phase 2C guard: refuse to silently flip a broken/no_show/cancelled
+  // appointment to 'completed'. If the doctor reached this button on such
+  // an appointment, it's almost certainly a misclick — confirm explicitly
+  // before overriding. The fee buttons (💔 / 💸) are the intended workflow
+  // for those statuses; Set Complete is for visits that actually happened.
+  if (_curAppt && (_curAppt.status === 'broken' || _curAppt.status === 'no_show' || _curAppt.status === 'cancelled')) {
+    var statusLabelMap = { broken: 'مكسور', no_show: 'لم يحضر', cancelled: 'ملغى' };
+    var lbl = statusLabelMap[_curAppt.status] || _curAppt.status;
+    var overrideMsg = '⚠️ هذا الموعد محدّد حالياً كـ "' + lbl + '".\n\n'
+                    + 'هل تريد فعلاً تحويله إلى "مكتمل" وإكمال العلاجات المخطّطة؟\n\n'
+                    + '• موافق → تحويل الحالة + إكمال العلاجات\n'
+                    + '• إلغاء → إبقاء الموعد كما هو';
+    if (!confirm(overrideMsg)) return;
+  }
 
   // ── Gap 2: provider-mismatch check ────────────────────────────────────────
   // The appointment's provider is the source of truth. Only flag mismatches
