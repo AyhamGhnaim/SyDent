@@ -870,8 +870,7 @@ textarea { resize: vertical; min-height: 72px; }
             <option value="confirmed">مؤكد</option>
             <option value="pending">معلّق</option>
             <option value="completed">مكتمل</option>
-            <option value="no_show">لم يحضر</option>
-            <option value="broken">مكسور</option>
+            <option value="no_show">عدم حضور</option>
             <option value="cancelled">ملغى</option>
           </select>
         </div>
@@ -909,10 +908,7 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
 
       <!-- 💸 No-show fee button (visible only when editing + status='no_show' + fee enabled + not yet applied) -->
-      <button type="button" id="noShowFeeBtn" onclick="applyNoShowFeeFromModal()" style="display:none;margin-top:12px;width:100%;padding:10px;background:#ef5350;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">💸 تطبيق رسم لم يحضر</button>
-
-      <!-- 💔 Broken-appointment fee button (visible only when editing + status='broken' + fee configured + not yet applied) -->
-      <button type="button" id="brokenFeeBtn" onclick="applyBrokenFeeFromModal()" style="display:none;margin-top:8px;width:100%;padding:10px;background:#f97316;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">💔 تطبيق رسم موعد مكسور</button>
+      <button type="button" id="noShowFeeBtn" onclick="applyNoShowFeeFromModal()" style="display:none;margin-top:12px;width:100%;padding:10px;background:#ef5350;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">💸 تطبيق رسم عدم الحضور</button>
 
       <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
@@ -1822,8 +1818,8 @@ function statusLabel(s) {
   if (s === 'cancelled') return 'ملغى';
   if (s === 'completed') return 'مكتمل';
   if (s === 'scheduled') return 'مجدول';
-  if (s === 'broken')    return 'مكسور';   // booked for gap 5; safe label today
-  if (s === 'no_show')   return 'لم يحضر'; // booked for gap 5; safe label today
+  if (s === 'broken')    return 'عدم حضور';   // legacy data — UI no longer offers 'broken' (Phase 2C reverted)
+  if (s === 'no_show')   return 'عدم حضور';
   return s || '—';
 }
 function statusClass(s) {
@@ -1884,125 +1880,14 @@ async function getNoShowFeeConfig() {
   }
 }
 
-// ─── Phase 2C: Broken Appointment Fee (mirrors the no-show pattern) ──────────
-// Distinct from no-show fee per OpenDental convention:
-//   - 'broken'   = patient didn't show up without notice (or cancelled <24h)
-//   - 'no_show'  = same outcome but typically tracked separately for analytics
-// Two separate fee columns let clinics charge different amounts (e.g., broken
-// fee is often smaller because rescheduling is still possible). The UI keeps
-// both clearly labeled so the doctor picks the right one consciously.
-//
-// Note: broken_appointment_fee exists since Migration 5, but there's no
-// `_enabled` flag column. By design we use `amount > 0` as the implicit
-// "enabled" signal — keeps the schema unchanged (Rule #7: no migrations
-// unless absolutely necessary) and matches how most clinics actually
-// configure: either you charge a fee or you don't.
-async function getBrokenFeeConfig() {
-  try {
-    var res = await window.sb.from('clinic_settings')
-      .select('broken_appointment_fee')
-      .eq('owner_id', currentUser.id)
-      .maybeSingle();
-    if (res.error) {
-      if (!isClinicSettingsTableMissing(res.error)) {
-        console.warn('clinic_settings broken fee read warn:', res.error);
-      }
-      return { enabled: false, amount: 0 };
-    }
-    var row = res.data || {};
-    var amount = parseInt(row.broken_appointment_fee || 0, 10) || 0;
-    // amount > 0 IS the enable signal — no separate flag column.
-    return { enabled: amount > 0, amount: amount };
-  } catch (e) {
-    console.warn('getBrokenFeeConfig fallback:', e);
-    return { enabled: false, amount: 0 };
-  }
-}
-
-// Canonical label for the auto-inserted broken-fee session. Searched by
-// exact match in brokenFeeAlreadyApplied(), so don't change without a data
-// migration. Intentionally different from NO_SHOW_FEE_TYPE_LABEL so each
-// fee type can be filtered/reported independently.
-var BROKEN_FEE_TYPE_LABEL = 'رسم موعد مكسور';
-
-// Idempotency check: returns true if EITHER a broken-fee OR no-show-fee
-// session already exists for this appointment. Cross-checking both fee
-// types here (rather than each function only checking its own label) is
-// deliberate: broken and no-show are semantic alternatives for the same
-// outcome (the patient didn't visit), so applying both to one appointment
-// is always a mistake. If the user wants to switch from one to the other,
-// they must first delete the wrong fee session from the patient profile,
-// then re-apply. Prevents double-charging via toggle: broken → no_show
-// or vice versa.
-async function brokenFeeAlreadyApplied(apptId) {
-  if (!apptId) return false;
-  try {
-    var res = await window.sb.from('ledger_sessions')
-      .select('id, type')
-      .eq('doctor_id', currentUser.id)
-      .eq('appointment_id', apptId)
-      .in('type', [BROKEN_FEE_TYPE_LABEL, NO_SHOW_FEE_TYPE_LABEL])
-      .limit(1);
-    if (res.error) return false; // fail open — better to warn user than block
-    return Array.isArray(res.data) && res.data.length > 0;
-  } catch (e) {
-    return false;
-  }
-}
-
-// Apply the broken-appointment fee: INSERT a ledger_sessions row for the
-// patient at the appointment's provider. Returns true on success.
-// As with applyNoShowFee, the patient's unearned-credit reallocation runs
-// later in patient-profile.html — this function just records the charge.
-async function applyBrokenFee(opts) {
-  // opts: { patientId, providerId, amount, reason, apptId, apptDate }
-  try {
-    var feeDate = opts.apptDate || dateStr(new Date());
-    var noteParts = ['موعد ' + feeDate + ' — موعد مكسور (لم يحضر بدون إشعار)'];
-    if (opts.reason && opts.reason.trim()) noteParts.push('السبب: ' + opts.reason.trim());
-    var baseRow = {
-      doctor_id: currentUser.id,
-      patient_id: opts.patientId,
-      type: BROKEN_FEE_TYPE_LABEL,
-      description: 'رسم موعد مكسور',
-      cost: opts.amount,
-      date: feeDate,
-      status: 'completed',
-      provider_id: opts.providerId || null,
-      notes: noteParts.join('\n')
-    };
-    var row = Object.assign({ appointment_id: opts.apptId || null }, baseRow);
-    var sessRes = await window.sb.from('ledger_sessions').insert(row);
-    if (sessRes.error) {
-      var errMsg = (sessRes.error.message || '') + ' ' + (sessRes.error.code || '');
-      var apptIdMissing = /column .*appointment_id.* does not exist|42703/i.test(errMsg);
-      if (apptIdMissing) {
-        console.warn('appointment_id column missing — saving broken fee without link.');
-        sessRes = await window.sb.from('ledger_sessions').insert(baseRow);
-      }
-    }
-    if (sessRes.error) {
-      console.warn('broken fee insert error:', sessRes.error);
-      showToast('⚠️ تعذّر تسجيل الرسم: ' + (sessRes.error.message || 'سبب غير معروف'));
-      return false;
-    }
-    return true;
-  } catch (e) {
-    console.warn('applyBrokenFee fallback:', e);
-    return false;
-  }
-}
-
 // Canonical label for the auto-inserted fee session. Searched by exact match
 // in noShowFeeAlreadyApplied(), so don't change without a data migration.
 var NO_SHOW_FEE_TYPE_LABEL = 'رسم موعد لم يحضر';
 
-// Returns true if EITHER a no-show fee OR a broken fee session has already
-// been recorded for this appointment. Cross-checks both labels so the user
-// can't accidentally double-charge by flipping the status no_show → broken
-// (or vice versa) and clicking the second button. Symmetric to
-// brokenFeeAlreadyApplied above — keep the two functions in sync if the
-// label set changes.
+// Returns true if a no-show fee session has already been recorded for this
+// appointment, so we don't double-charge if the user flips the status back
+// and forth. We look for any session linked to the appointment whose type
+// matches our canonical fee label.
 async function noShowFeeAlreadyApplied(apptId) {
   if (!apptId) return false;
   try {
@@ -2010,7 +1895,7 @@ async function noShowFeeAlreadyApplied(apptId) {
       .select('id, type')
       .eq('doctor_id', currentUser.id)
       .eq('appointment_id', apptId)
-      .in('type', [NO_SHOW_FEE_TYPE_LABEL, BROKEN_FEE_TYPE_LABEL])
+      .eq('type', NO_SHOW_FEE_TYPE_LABEL)
       .limit(1);
     if (res.error) return false; // fail open — better to warn user than block
     return Array.isArray(res.data) && res.data.length > 0;
@@ -2029,13 +1914,13 @@ async function applyNoShowFee(opts) {
   // opts: { patientId, providerId, amount, reason, apptId, apptDate }
   try {
     var feeDate = opts.apptDate || dateStr(new Date());
-    var noteParts = ['موعد ' + feeDate + ' — لم يحضر المريض'];
+    var noteParts = ['موعد ' + feeDate + ' — عدم حضور المريض'];
     if (opts.reason && opts.reason.trim()) noteParts.push('السبب: ' + opts.reason.trim());
     var baseRow = {
       doctor_id: currentUser.id,
       patient_id: opts.patientId,
       type: NO_SHOW_FEE_TYPE_LABEL,
-      description: 'رسم لم يحضر',
+      description: 'رسم عدم الحضور',
       cost: opts.amount,
       date: feeDate,
       status: 'completed',
@@ -2647,12 +2532,9 @@ async function openModal(prefillDate) {
   document.getElementById('apptProcSection').style.display = 'none';
   // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
   document.getElementById('apptLabSection').style.display = 'none';
-  // إخفاء زر "تطبيق رسم لم يحضر" (يظهر فقط في التعديل عند الحاجة)
+  // إخفاء زر "تطبيق رسم عدم الحضور" (يظهر فقط في التعديل عند الحاجة)
   var noShowBtn = document.getElementById('noShowFeeBtn');
   if (noShowBtn) noShowBtn.style.display = 'none';
-  // إخفاء زر "تطبيق رسم موعد مكسور" (يظهر فقط في التعديل عند الحاجة) — Phase 2C
-  var brokenBtn = document.getElementById('brokenFeeBtn');
-  if (brokenBtn) brokenBtn.style.display = 'none';
   // Gap 7: planned-appointment fields — show toggle, reset state
   var plannedWrap = document.getElementById('plannedToggleWrap');
   if (plannedWrap) plannedWrap.style.display = 'flex';
@@ -2724,7 +2606,14 @@ async function editAppt(id) {
   for (var _i=0; _i<TREATMENTS.length; _i++) if (TREATMENTS[_i].name === a.type) { _foundT = TREATMENTS[_i]; break; }
   document.getElementById('fType').value = _foundT ? _foundT.id : '_other';
   updateColorPreview();
-  document.getElementById('fStatus').value = a.status;
+  // Map legacy 'broken' status to 'no_show' since the dropdown no longer
+  // offers 'broken' (Phase 2C reverted — broken and no_show were merged into
+  // a single "عدم حضور" concept). Without this remap, setting .value='broken'
+  // would silently fail and the getter would return "" on save, causing a
+  // DB check constraint violation. The migration is graceful: the user sees
+  // "عدم حضور" and the next save commits status='no_show' to the DB.
+  var _statusForUi = (a.status === 'broken') ? 'no_show' : a.status;
+  document.getElementById('fStatus').value = _statusForUi;
   // For planned: reason is the primary note; for scheduled: notes is the note.
   document.getElementById('fNotes').value  = isPlanned ? '' : (a.notes || '');
   // كذلك تعبئة قائمة المرضى للـ datalist
@@ -2753,16 +2642,11 @@ async function editAppt(id) {
   // Show/hide the no-show fee button based on current state (Gap 5).
   // Fire-and-forget — fetches settings + checks for existing fee in DB.
   // Gap 7: no-show fee doesn't apply to planned appointments (no chair time).
-  // Phase 2C: same applies to the broken fee — planned appts have no
-  // scheduled time so they can't be "broken" in the no-show sense.
   if (isPlanned) {
     var nsb = document.getElementById('noShowFeeBtn');
     if (nsb) nsb.style.display = 'none';
-    var bfb = document.getElementById('brokenFeeBtn');
-    if (bfb) bfb.style.display = 'none';
   } else {
     updateNoShowFeeBtnVisibility(a);
-    updateBrokenFeeBtnVisibility(a);
   }
 }
 
@@ -2977,13 +2861,15 @@ async function completeApptWithProcedures() {
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
   if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
 
-  // Phase 2C guard: refuse to silently flip a broken/no_show/cancelled
+  // Guard: refuse to silently flip a no_show / cancelled / (legacy) broken
   // appointment to 'completed'. If the doctor reached this button on such
   // an appointment, it's almost certainly a misclick — confirm explicitly
-  // before overriding. The fee buttons (💔 / 💸) are the intended workflow
-  // for those statuses; Set Complete is for visits that actually happened.
-  if (_curAppt && (_curAppt.status === 'broken' || _curAppt.status === 'no_show' || _curAppt.status === 'cancelled')) {
-    var statusLabelMap = { broken: 'مكسور', no_show: 'لم يحضر', cancelled: 'ملغى' };
+  // before overriding. The fee button (💸) is the intended workflow for
+  // no_show; Set Complete is for visits that actually happened.
+  // 'broken' is kept in the check for backward compatibility with any
+  // legacy appointments still marked that way (UI no longer offers it).
+  if (_curAppt && (_curAppt.status === 'no_show' || _curAppt.status === 'broken' || _curAppt.status === 'cancelled')) {
+    var statusLabelMap = { no_show: 'عدم حضور', broken: 'عدم حضور (قديم)', cancelled: 'ملغى' };
     var lbl = statusLabelMap[_curAppt.status] || _curAppt.status;
     var overrideMsg = '⚠️ هذا الموعد محدّد حالياً كـ "' + lbl + '".\n\n'
                     + 'هل تريد فعلاً تحويله إلى "مكتمل" وإكمال العلاجات المخطّطة؟\n\n'
@@ -3153,10 +3039,11 @@ async function applyNoShowFeeFromModal() {
   var appt = appointments.find(function(a){ return a.id === editingId; });
   if (!appt) { showToast('⚠️ تعذّر العثور على الموعد'); return; }
 
-  // Guard: must be no_show. The button only renders in this case but a stale
-  // DOM could theoretically still fire — keep the check.
-  if (appt.status !== 'no_show') {
-    showToast('⚠️ هذا الإجراء متاح فقط لمواعيد "لم يحضر"');
+  // Guard: must be no_show (or legacy 'broken' which we treat as equivalent).
+  // The button only renders in this case but a stale DOM could theoretically
+  // still fire — keep the check.
+  if (appt.status !== 'no_show' && appt.status !== 'broken') {
+    showToast('⚠️ هذا الإجراء متاح فقط لمواعيد "عدم حضور"');
     return;
   }
   if (!appt.patient_id) {
@@ -3168,7 +3055,7 @@ async function applyNoShowFeeFromModal() {
   // user might have changed things in another tab since the modal opened.
   var feeCfg = await getNoShowFeeConfig();
   if (!feeCfg.enabled || feeCfg.amount <= 0) {
-    showToast('⚠️ رسم "لم يحضر" غير مفعّل في الإعدادات');
+    showToast('⚠️ رسم "عدم الحضور" غير مفعّل في الإعدادات');
     return;
   }
   var alreadyApplied = await noShowFeeAlreadyApplied(editingId);
@@ -3179,7 +3066,7 @@ async function applyNoShowFeeFromModal() {
     return;
   }
 
-  var msg = '🚫 تطبيق رسم لم يحضر؟\n\n'
+  var msg = '🚫 تطبيق رسم عدم الحضور؟\n\n'
           + 'المريض: ' + (appt.patient_name || '—') + '\n'
           + 'المبلغ: ' + feeCfg.amount.toLocaleString('en-US') + ' ل.س\n\n'
           + '• موافق → تطبيق الرسم\n'
@@ -3214,7 +3101,7 @@ async function applyNoShowFeeFromModal() {
 
   if (btn) { btn.disabled = false; btn.textContent = originalText; }
   if (ok) {
-    showToast('✅ تم تطبيق رسم لم يحضر');
+    showToast('✅ تم تطبيق رسم عدم الحضور');
     if (btn) btn.style.display = 'none';  // hide so the doctor can't double-apply
   }
   // On failure applyNoShowFee already showed an error toast; leave the
@@ -3243,7 +3130,11 @@ async function updateNoShowFeeBtnVisibility(appt) {
   var btn = document.getElementById('noShowFeeBtn');
   if (!btn) return;
   btn.style.display = 'none';  // safe default
-  if (!appt || appt.status !== 'no_show' || !appt.patient_id) return;
+  // Treat legacy 'broken' as 'no_show' (Phase 2C reverted — both map to the
+  // same "عدم حضور" concept in the UI now).
+  var st = appt && appt.status;
+  var isAbsence = (st === 'no_show' || st === 'broken');
+  if (!appt || !isAbsence || !appt.patient_id) return;
   try {
     var feeCfg = await getNoShowFeeConfig();
     // Guard: editingId may have changed while we awaited the DB.
@@ -3253,110 +3144,10 @@ async function updateNoShowFeeBtnVisibility(appt) {
     if (editingId !== appt.id) return;  // re-check after second await
     if (alreadyApplied) return;
     // Update label with the amount so the doctor sees the cost up-front
-    btn.textContent = '💸 تطبيق رسم لم يحضر (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
+    btn.textContent = '💸 تطبيق رسم عدم الحضور (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
     btn.style.display = 'block';
   } catch (e) {
     console.warn('updateNoShowFeeBtnVisibility:', e);
-  }
-}
-
-// ─── Phase 2C: Broken-fee modal handlers (mirror of no-show handlers) ────────
-// Triggered from the orange 💔 button inside the appointment modal. Identical
-// safety guards to applyNoShowFeeFromModal: re-checks settings + idempotency
-// against the DB right before charging, re-validates editingId between every
-// await (user can close the modal mid-prompt), and hides the button on
-// success so the doctor can't double-apply.
-async function applyBrokenFeeFromModal() {
-  if (!editingId) return;
-  var appt = appointments.find(function(a){ return a.id === editingId; });
-  if (!appt) return;
-  if (appt.status !== 'broken') {
-    showToast('⚠️ هذا الإجراء متاح فقط للمواعيد ذات حالة "مكسور"');
-    return;
-  }
-  if (!appt.patient_id) {
-    showToast('⚠️ لا يمكن تطبيق الرسم — الموعد بلا مريض مسجّل');
-    return;
-  }
-
-  // Re-check against DB — the user may have edited settings in another tab.
-  var feeCfg = await getBrokenFeeConfig();
-  if (!feeCfg.enabled || feeCfg.amount <= 0) {
-    showToast('⚠️ رسم الموعد المكسور غير مفعّل في الإعدادات');
-    return;
-  }
-  var alreadyApplied = await brokenFeeAlreadyApplied(editingId);
-  if (alreadyApplied) {
-    showToast('ℹ️ الرسم مُطبَّق على هذا الموعد مسبقاً');
-    var bn = document.getElementById('brokenFeeBtn');
-    if (bn) bn.style.display = 'none';
-    return;
-  }
-
-  var msg = '💔 تطبيق رسم موعد مكسور؟\n\n'
-          + 'المريض: ' + (appt.patient_name || '—') + '\n'
-          + 'المبلغ: ' + feeCfg.amount.toLocaleString('en-US') + ' ل.س\n\n'
-          + '• موافق → تطبيق الرسم\n'
-          + '• إلغاء → عدم التطبيق';
-  if (!confirm(msg)) return;
-  var reason = prompt('سبب الكسر (اختياري):', '') || '';
-
-  // Guard: the user may have closed/switched the modal during prompts.
-  if (editingId !== appt.id) {
-    console.info('Broken fee canceled — modal switched during prompt.');
-    return;
-  }
-
-  var btn = document.getElementById('brokenFeeBtn');
-  var originalText = '';
-  if (btn) {
-    originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'جارٍ تطبيق الرسم…';
-  }
-
-  var ok = await applyBrokenFee({
-    patientId:  appt.patient_id,
-    providerId: appt.provider_id || null,
-    amount:     feeCfg.amount,
-    reason:     reason,
-    apptId:     editingId,
-    apptDate:   appt.date
-  });
-
-  if (btn) { btn.disabled = false; btn.textContent = originalText; }
-  if (ok) {
-    showToast('✅ تم تطبيق رسم الموعد المكسور');
-    if (btn) btn.style.display = 'none';
-  }
-  // On failure applyBrokenFee already showed an error toast; keep the button
-  // visible so the user can retry.
-}
-
-// Show/hide the broken-fee button. Conditions (all must be true to show):
-//   1. appt.status === 'broken'
-//   2. appt has a patient_id
-//   3. clinic settings: broken_appointment_fee > 0
-//   4. no existing broken-fee session linked to this appointment
-// Stale-update guard mirrors the no-show version: editingId is re-checked
-// after every await so a slow DB roundtrip can't paint the button into a
-// different appointment's modal.
-async function updateBrokenFeeBtnVisibility(appt) {
-  var btn = document.getElementById('brokenFeeBtn');
-  if (!btn) return;
-  btn.style.display = 'none';  // safe default
-  if (!appt || appt.status !== 'broken' || !appt.patient_id) return;
-  try {
-    var feeCfg = await getBrokenFeeConfig();
-    if (editingId !== appt.id) return;
-    if (!feeCfg.enabled || feeCfg.amount <= 0) return;
-    var alreadyApplied = await brokenFeeAlreadyApplied(appt.id);
-    if (editingId !== appt.id) return;
-    if (alreadyApplied) return;
-    btn.textContent = '💔 تطبيق رسم موعد مكسور (' + feeCfg.amount.toLocaleString('en-US') + ' ل.س)';
-    btn.style.display = 'block';
-  } catch (e) {
-    console.warn('updateBrokenFeeBtnVisibility:', e);
   }
 }
 
@@ -3551,8 +3342,8 @@ async function submitAppt(e) {
           // Two-step prompt — simpler than building a custom modal for MVP:
           //   step 1: ask whether to apply the fee at all (yes/no/cancel)
           //   step 2: only if yes, ask for optional reason
-          var msg = '🚫 المريض لم يحضر للموعد\n\n'
-                  + 'هل تريد تطبيق رسم لم يحضر على ' + patientName + '؟\n\n'
+          var msg = '🚫 تم تسجيل عدم الحضور\n\n'
+                  + 'هل تريد تطبيق رسم عدم الحضور على ' + patientName + '؟\n\n'
                   + 'المبلغ: ' + feeCfg.amount.toLocaleString('en-US') + ' ل.س\n\n'
                   + '• موافق  → تطبيق الرسم\n'
                   + '• إلغاء → حفظ الموعد بدون رسم';
@@ -3686,7 +3477,7 @@ async function submitAppt(e) {
       } else if (migrationMissing) {
         showToast('⚠️ تم الحفظ كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
       } else if (pendingNoShowFee) {
-        showToast('✅ تم الحفظ + تطبيق رسم لم يحضر');
+        showToast('✅ تم الحفظ + تطبيق رسم عدم الحضور');
       } else if (prevWasPlanned && !isPlannedNow) {
         showToast('✅ تم جدولة الموعد المخطّط');
       } else if (isPlannedNow) {
@@ -3788,7 +3579,7 @@ async function submitAppt(e) {
       } else if (migrationMissing) {
         showToast('⚠️ تمت الإضافة كـ "مؤكد" — يلزم ترقية قاعدة البيانات');
       } else if (pendingNoShowFee) {
-        showToast('✅ تمت الإضافة + تطبيق رسم لم يحضر');
+        showToast('✅ تمت الإضافة + تطبيق رسم عدم الحضور');
       } else if (isPlannedNow) {
         showToast('✅ تمت إضافة موعد مخطّط');
       } else {

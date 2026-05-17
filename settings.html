@@ -366,15 +366,15 @@ textarea::placeholder { color: var(--text2); }
       </form>
     </div>
 
-    <!-- 1.5 إعدادات المواعيد — Gap 5 + Phase 2C -->
+    <!-- 1.5 إعدادات المواعيد — Gap 5 -->
     <div class="section">
       <div class="section-title">🗓️ إعدادات المواعيد</div>
-      <div class="section-sub">رسوم اختيارية على المواعيد المفقودة. حسب OpenDental، الفرق بين الحالتين هو الإخطار المسبق: "لم يحضر" بلا تواصل، "مكسور" قد يشمل إلغاء متأخر — اختر السلوك المناسب لعيادتك.</div>
+      <div class="section-sub">رسم اختياري يُطبَّق على المريض الذي لا يحضر موعده (بدون تواصل أو بإلغاء متأخر).</div>
       <form onsubmit="saveAppointmentSettings(event)">
 
-        <!-- No-show fee -->
+        <!-- No-show fee — renamed to "رسم عدم الحضور" for clarity -->
         <div style="background:rgba(239,83,80,0.08);border:1px solid rgba(239,83,80,0.25);border-radius:10px;padding:14px;margin-bottom:14px;">
-          <div style="font-weight:700;color:#ef5350;margin-bottom:10px;font-size:14px;">💸 رسم "لم يحضر" (No-show)</div>
+          <div style="font-weight:700;color:#ef5350;margin-bottom:10px;font-size:14px;">💸 رسم عدم الحضور</div>
           <div class="form-group">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text);">
               <input type="checkbox" id="fNoShowFeeEnabled" style="width:auto;margin:0;">
@@ -384,15 +384,6 @@ textarea::placeholder { color: var(--text2); }
           <div class="form-group" style="margin-bottom:0;">
             <label>المبلغ (ل.س)</label>
             <input type="number" id="fNoShowFeeAmount" min="0" step="1000" placeholder="5000">
-          </div>
-        </div>
-
-        <!-- Broken-appointment fee (Phase 2C) -->
-        <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.25);border-radius:10px;padding:14px;margin-bottom:14px;">
-          <div style="font-weight:700;color:#f97316;margin-bottom:10px;font-size:14px;">💔 رسم الموعد المكسور (Broken)</div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label>المبلغ (ل.س) — اترك 0 لتعطيل هذا الرسم</label>
-            <input type="number" id="fBrokenFeeAmount" min="0" step="1000" placeholder="3000">
           </div>
         </div>
 
@@ -853,7 +844,7 @@ async function saveClinicSettings() {
 async function loadAppointmentSettings() {
   try {
     const res = await window.sb.from('clinic_settings')
-      .select('no_show_fee_enabled, no_show_fee_amount, broken_appointment_fee')
+      .select('no_show_fee_enabled, no_show_fee_amount')
       .eq('owner_id', currentUser.id)
       .maybeSingle();
     if (res.error) {
@@ -869,12 +860,6 @@ async function loadAppointmentSettings() {
     document.getElementById('fNoShowFeeEnabled').checked = !!row.no_show_fee_enabled;
     const amt = parseInt(row.no_show_fee_amount || 0, 10) || 0;
     if (amt > 0) document.getElementById('fNoShowFeeAmount').value = amt;
-    // Phase 2C: broken-fee column uses amount > 0 as the implicit enable
-    // signal. Blank field when 0 so the placeholder shows the suggested
-    // 3,000 ل.س rather than a literal "0" the user has to clear first.
-    const bAmt = parseInt(row.broken_appointment_fee || 0, 10) || 0;
-    const bField = document.getElementById('fBrokenFeeAmount');
-    if (bField && bAmt > 0) bField.value = bAmt;
   } catch (e) {
     console.warn('loadAppointmentSettings fallback:', e);
   }
@@ -889,12 +874,6 @@ async function saveAppointmentSettings(e) {
     showToast('⚠️ أدخل مبلغاً صالحاً أكبر من صفر', true);
     return;
   }
-  // Phase 2C: broken fee — single amount field, no separate enable flag.
-  // Blank or 0 means "disabled" (no fee charged). Negative values are
-  // clamped to 0 to keep DB constraint-safe.
-  const brokenRaw = (document.getElementById('fBrokenFeeAmount') || {}).value;
-  let brokenAmount = parseInt(brokenRaw, 10);
-  if (isNaN(brokenAmount) || brokenAmount < 0) brokenAmount = 0;
 
   const btn = document.getElementById('btnSaveApptSettings');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
@@ -906,7 +885,6 @@ async function saveAppointmentSettings(e) {
     owner_id: currentUser.id,
     no_show_fee_enabled: enabled,
     no_show_fee_amount: isNaN(amount) ? 0 : amount,
-    broken_appointment_fee: brokenAmount,
     updated_at: new Date().toISOString()
   };
   const { error } = await window.sb.from('clinic_settings')

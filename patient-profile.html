@@ -828,8 +828,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <option value="confirmed" selected>مؤكد</option>
             <option value="pending">معلّق</option>
             <option value="completed">مكتمل</option>
-            <option value="no_show">لم يحضر</option>
-            <option value="broken">مكسور</option>
+            <option value="no_show">عدم حضور</option>
             <option value="cancelled">ملغى</option>
           </select>
         </div>
@@ -2058,7 +2057,7 @@ function buildTimelineEvents() {
   var APPT_STATUS_AR = {
     scheduled: 'مجدول', confirmed: 'مؤكّد', pending: 'معلّق',
     arrived: 'وصل المريض', in_chair: 'على الكرسي', completed: 'مكتمل',
-    cancelled: 'ملغي', broken: 'مكسور', no_show: 'لم يحضر'
+    cancelled: 'ملغي', broken: 'عدم حضور', no_show: 'عدم حضور'
   };
   (allAppointmentsForTl || []).forEach(function(a) {
     var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === a.provider_id; });
@@ -2255,8 +2254,7 @@ function renderTimelineRow(e) {
     title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
     var stColor = '#63b3ed';
     if (e.statusKey === 'completed') stColor = '#2ee89e';
-    else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show') stColor = '#a3a3a3';
-    else if (e.statusKey === 'broken') stColor = '#f97316';  // orange — matches appointments.html .status-broken CSS + modal button
+    else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show' || e.statusKey === 'broken') stColor = '#a3a3a3';
     var statBadge2 = '<span class="tl-badge" style="background:' + stColor + '22;color:' + stColor + ';border-color:' + stColor + '55;">' + escapeHtml(e.statusLabel || '—') + '</span>';
     var plannedBadge = e.isPlanned
       ? '<span class="tl-badge" style="background:rgba(245,200,66,0.15);color:var(--yellow);border-color:rgba(245,200,66,0.4);">مخطّط</span>'
@@ -5875,7 +5873,9 @@ function editPlannedFromProfile(id) {
   document.getElementById('aDur').value = String(p.duration || 60);
   document.getElementById('aDate').value = toDay();   // hidden while planned
   document.getElementById('aTime').value = '09:00';
-  document.getElementById('aStatus').value = p.status || 'confirmed';
+  // Map legacy 'broken' to 'no_show' (Phase 2C reverted — dropdown no longer offers broken).
+  var _statusForUi1 = (p.status === 'broken') ? 'no_show' : (p.status || 'confirmed');
+  document.getElementById('aStatus').value = _statusForUi1;
   document.getElementById('aReason').value = p.notes || '';
   document.getElementById('aNotes').value  = '';
   var t = document.getElementById('apptModalTitle');
@@ -5902,7 +5902,9 @@ function quickSchedulePlannedFromProfile(id) {
   document.getElementById('aDur').value = String(p.duration || 60);
   document.getElementById('aDate').value = toDay();
   document.getElementById('aTime').value = '09:00';
-  document.getElementById('aStatus').value = p.status || 'confirmed';
+  // Map legacy 'broken' to 'no_show' (Phase 2C reverted).
+  var _statusForUi2 = (p.status === 'broken') ? 'no_show' : (p.status || 'confirmed');
+  document.getElementById('aStatus').value = _statusForUi2;
   document.getElementById('aReason').value = '';
   // Carry the planned reason forward into the regular notes field so it isn't lost.
   document.getElementById('aNotes').value = p.notes || '';
