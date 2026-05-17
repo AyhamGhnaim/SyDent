@@ -686,7 +686,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="tl-filters">
         <div class="tl-filters-row">
           <span class="tl-filter-label">النوع:</span>
-          <span class="tl-chip" data-tl-type="all" onclick="onTlTypeChip('all')">الكل</span>
+          <span class="tl-chip active" data-tl-type="all" onclick="onTlTypeChip('all')">الكل</span>
           <span class="tl-chip active" data-tl-type="session" onclick="onTlTypeChip('session')">🦷 جلسات</span>
           <span class="tl-chip active" data-tl-type="payment" onclick="onTlTypeChip('payment')">💰 دفعات</span>
           <span class="tl-chip active" data-tl-type="appointment" onclick="onTlTypeChip('appointment')">📅 مواعيد</span>
@@ -2198,7 +2198,15 @@ function renderTimelineRow(e) {
   if (e.type === 'session') {
     var s = e.data;
     // Show surface only when it's a specific surface (not WHOLE = full tooth).
-    var surfaceShown = (s.surface && s.surface !== 'WHOLE') ? s.surface : null;
+    // Translate raw surface codes (O, I, M, D, B, L, V, R1-R3) to Arabic
+    // labels for end-user readability. Falls back to the raw code if unknown
+    // (defensive: future surface keys would still display, just untranslated).
+    var rawSurface = s.surface;
+    var surfaceShown = (rawSurface && rawSurface !== 'WHOLE')
+      ? (typeof SURFACE_LABELS !== 'undefined' && SURFACE_LABELS[rawSurface]
+          ? SURFACE_LABELS[rawSurface]
+          : rawSurface)
+      : null;
     var toothPart = s.tooth_num
       ? ' — السن ' + escapeHtml(String(s.tooth_num)) + (surfaceShown ? ' (' + escapeHtml(String(surfaceShown)) + ')' : '')
       : '';
@@ -2310,13 +2318,29 @@ function renderTimeline() {
   var pagEl = document.getElementById('tlPagination');
   if (!container) return;
 
-  var events = applyTimelineFilters(buildTimelineEvents());
+  // Distinguish two empty states:
+  //   (a) The patient genuinely has no events yet — show a friendly "get started" hint.
+  //   (b) The patient has events, but the current filters hide all of them
+  //       — show a reset hint so the user understands it's a filter issue.
+  var allEvents = buildTimelineEvents();
+  var events = applyTimelineFilters(allEvents);
 
   if (events.length === 0) {
-    container.innerHTML = '<div class="tl-empty">'
-      + '<div class="tl-empty-icon">🗓️</div>'
-      + 'لا توجد أحداث تطابق الفلاتر المحدّدة'
-      + '</div>';
+    if (allEvents.length === 0) {
+      // Case (a): brand-new patient with nothing logged
+      container.innerHTML = '<div class="tl-empty">'
+        + '<div class="tl-empty-icon">📭</div>'
+        + 'لا توجد أحداث بعد لهذا المريض<br>'
+        + '<span style="font-size:11px;color:var(--text2);">ابدأ بتسجيل جلسة، موعد، أو دفعة من التبويبات الأخرى</span>'
+        + '</div>';
+    } else {
+      // Case (b): events exist but filters hide them all
+      container.innerHTML = '<div class="tl-empty">'
+        + '<div class="tl-empty-icon">🗓️</div>'
+        + 'لا توجد أحداث تطابق الفلاتر المحدّدة<br>'
+        + '<button class="tl-load-more" style="margin-top:14px;" onclick="resetTimelineFilters()">🔄 إعادة ضبط الفلاتر</button>'
+        + '</div>';
+    }
     if (countEl) countEl.textContent = '';
     if (pagEl) pagEl.style.display = 'none';
     return;
@@ -2333,6 +2357,23 @@ function renderTimeline() {
   if (pagEl) {
     pagEl.style.display = (events.length > sliced.length) ? 'flex' : 'none';
   }
+}
+
+/* Reset all timeline filters to their initial state (called from empty-state CTA). */
+function resetTimelineFilters() {
+  Object.keys(timelineFilters.types).forEach(function(k){ timelineFilters.types[k] = true; });
+  timelineFilters.dateRange = 'all';
+  timelineFilters.search = '';
+  // Sync UI controls
+  document.querySelectorAll('.tl-chip[data-tl-type]').forEach(function(chip){
+    chip.classList.add('active');
+  });
+  var dr = document.getElementById('tlDateRange');
+  if (dr) dr.value = 'all';
+  var sr = document.getElementById('tlSearch');
+  if (sr) sr.value = '';
+  timelineShownCount = TL_PAGE_SIZE;
+  renderTimeline();
 }
 
 /* Toggle a type chip. 'all' acts as a master select-all/clear toggle. */
