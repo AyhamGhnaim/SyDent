@@ -676,17 +676,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 
-  <!-- Tab: الجلسات -->
-  <div class="panel" id="tab-sessions">
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">🦷 سجل الجلسات والعلاجات</span>
-        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">＋ إضافة جلسة</button>
-      </div>
-      <div id="sessionsContent"></div>
-    </div>
-  </div>
-
   <!-- Tab: السجل الكامل (Timeline) -->
   <div class="panel" id="tab-timeline">
     <div class="card">
@@ -723,6 +712,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="tlPagination" class="tl-pagination" style="display:none;">
         <button class="tl-load-more" onclick="onTlLoadMore()">تحميل المزيد ↓</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Tab: الجلسات -->
+  <div class="panel" id="tab-sessions">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">🦷 سجل الجلسات والعلاجات</span>
+        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">＋ إضافة جلسة</button>
+      </div>
+      <div id="sessionsContent"></div>
     </div>
   </div>
 
@@ -2036,6 +2036,15 @@ function buildTimelineEvents() {
   });
 
   // ── 3. Appointments (all of them — past, future, planned, cancelled) ──
+  // Inline status label map — patient-profile.html doesn't import the
+  // APPT_STATUS_LABELS constant from appointments.html. Defined once outside
+  // the forEach loop to avoid per-iteration allocation. Includes 'pending'
+  // (legacy/transitional status used by appointments.html).
+  var APPT_STATUS_AR = {
+    scheduled: 'مجدول', confirmed: 'مؤكّد', pending: 'معلّق',
+    arrived: 'وصل المريض', in_chair: 'على الكرسي', completed: 'مكتمل',
+    cancelled: 'ملغي', broken: 'متغيّب', no_show: 'لم يحضر'
+  };
   (allAppointmentsForTl || []).forEach(function(a) {
     var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === a.provider_id; });
     // Composite timestamp: date+time if both present, else date, else created_at.
@@ -2050,13 +2059,6 @@ function buildTimelineEvents() {
     } else {
       ts = tlTs(a.created_at);
     }
-    // Localized status label. patient-profile.html doesn't have APPT_STATUS_LABELS
-    // (that's an appointments.html constant), so we map the common ones inline.
-    var APPT_STATUS_AR = {
-      scheduled: 'مجدول', confirmed: 'مؤكّد', arrived: 'وصل المريض',
-      in_chair: 'على الكرسي', completed: 'مكتمل', cancelled: 'ملغي',
-      broken: 'متغيّب', no_show: 'لم يحضر'
-    };
     var statusLabel = APPT_STATUS_AR[a.status] || a.status || '—';
     events.push({
       type: 'appointment',
@@ -6310,6 +6312,11 @@ async function _saveLabOrderInner() {
       upcomingAppts.sort(function(a, b){
         return (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''));
       });
+    }
+    // Phase 2B-A: keep timeline cache in sync as well, so the new appointment
+    // shows up in the unified timeline without requiring a page reload.
+    if (Array.isArray(allAppointmentsForTl)) {
+      allAppointmentsForTl.unshift(apptRes.data);
     }
     showToast('📅 تم إنشاء موعد التركيب');
   }
