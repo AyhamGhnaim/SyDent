@@ -3603,9 +3603,16 @@ function showToast(msg) {
   // Phase 2A — Deep-link handler: dashboard's ⚠️ "أرسل تذكير" badge sends the
   // user here with ?wa=<appointment_id>. Open the modal automatically so the
   // user doesn't have to hunt for the appointment in the list/day view.
+  //
+  // Phase 2B-B extension — labs.html "📅 اذهب للموعد" badge sends the user
+  // here with ?editAppt=<appointment_id>. Same pattern: switch to list view
+  // + open the appointment edit modal, then clean the URL. Only one of the
+  // two params is honored per visit (?wa wins if both are present, since
+  // it's the more time-sensitive workflow).
   try {
     var qp = new URLSearchParams(window.location.search);
     var waId = qp.get('wa');
+    var editApptId = qp.get('editAppt');
     if (waId) {
       var matched = appointments.find(function(a){ return a.id === waId; });
       if (matched) {
@@ -3616,9 +3623,25 @@ function showToast(msg) {
       // Clean the URL so a refresh doesn't re-open the modal
       var url = new URL(window.location.href);
       url.searchParams.delete('wa');
+      // Also drop editAppt if present — wa took priority, don't double-open
+      url.searchParams.delete('editAppt');
       window.history.replaceState({}, '', url.toString());
+    } else if (editApptId) {
+      var matchedEdit = appointments.find(function(a){ return a.id === editApptId; });
+      if (matchedEdit) {
+        if (typeof setView === 'function') setView('list');
+        setTimeout(function(){ editAppt(editApptId); }, 200);
+      } else {
+        // Appointment wasn't in the loaded window — most commonly because
+        // it falls outside the current month filter. Surface a clear hint
+        // rather than silently doing nothing.
+        showToast('⚠️ الموعد المرتبط خارج النطاق الحالي — جرّب تغيير الشهر');
+      }
+      var url2 = new URL(window.location.href);
+      url2.searchParams.delete('editAppt');
+      window.history.replaceState({}, '', url2.toString());
     }
-  } catch(e) { console.warn('wa deep-link:', e); }
+  } catch(e) { console.warn('deep-link:', e); }
 })();
 
 initSidebar('appointments');

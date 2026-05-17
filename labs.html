@@ -268,6 +268,29 @@ td.patient-link a:hover { text-decoration: underline; }
   margin-right: 4px;
 }
 
+/* At-risk: appointment is imminent but lab work hasn't arrived yet.
+   Visually softer than overdue (orange vs red) — overdue always wins
+   when both conditions apply (handled in JS: isOverdue takes priority). */
+.at-risk-tag {
+  display: inline-block;
+  background: rgba(245,158,11,0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,0.35);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-right: 4px;
+}
+.row-at-risk td { background: rgba(245,158,11,0.05) !important; }
+.row-at-risk:hover td { background: rgba(245,158,11,0.10) !important; }
+.order-card.at-risk { border-color: rgba(245,158,11,0.4); background: rgba(245,158,11,0.04); }
+
+/* Clickable appointment badge — visually identical to non-clickable
+   variant but with hover affordance for the now-actionable element. */
+a.appt-badge { text-decoration: none; cursor: pointer; }
+a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
+
 /* Mobile cards (hidden on desktop) */
 .cards-list { display: none; padding: 12px; gap: 10px; flex-direction: column; }
 .order-card {
@@ -773,9 +796,56 @@ function escapeHtml(s) {
   });
 }
 function isOverdue(lo) {
-  if (!lo.date_due) return false;
+  // Active statuses only — finished orders never "overdue".
   if (lo.status === 'delivered' || lo.status === 'checked' || lo.status === 'rejected') return false;
-  return new Date(lo.date_due) < new Date();
+  // Primary signal: explicit due date has passed.
+  if (lo.date_due && new Date(lo.date_due) < new Date()) return true;
+  // Secondary signal (Phase 2B-B, mirrors appointments.html's lab section):
+  // a linked appointment has already arrived (today or earlier) but the work
+  // is still at the external lab ('sent'). Without this branch, an order
+  // tied to a past appointment but lacking date_due would never surface as
+  // overdue — silently bad. 'received'/'checked' are excluded above; only
+  // 'sent' triggers this branch since the work is still off-site.
+  if (lo.status === 'sent' && lo.appointment_id) {
+    var appt = getAppointmentById(lo.appointment_id);
+    if (appt && appt.date && appt.status !== 'cancelled') {
+      var apptDate = String(appt.date).slice(0, 10);
+      var now = new Date();
+      var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+      if (apptDate <= todayStr) return true;
+    }
+  }
+  return false;
+}
+
+/* At-risk: lab work not yet physically arrived ('sent') AND a linked
+   appointment is within 2 days. Mirrors OpenDental's "monitor several
+   weeks out" UX and Dentrix Ascend's "Outstanding" warning — the goal
+   is to flag "patient is coming, lab isn't ready" BEFORE the visit.
+
+   Priority: isOverdue() takes precedence — never show both tags on the
+   same row (rendering code below enforces this). Returns false safely
+   for orphan appointment_ids (FK SET NULL race / pre-fetch state).
+
+   Note: 'received' means the work is physically at the clinic — no
+   point warning. Only 'sent' status (still at the external lab)
+   triggers the at-risk signal. */
+function isAtRisk(lo) {
+  if (lo.status !== 'sent') return false;
+  if (!lo.appointment_id) return false;
+  var appt = getAppointmentById(lo.appointment_id);
+  if (!appt || !appt.date) return false;
+  // Skip cancelled/finished appointments — they no longer represent
+  // a future visit the lab needs to be ready for.
+  if (appt.status === 'cancelled') return false;
+  var apptDate = String(appt.date).slice(0, 10);
+  var today = new Date();
+  var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  // Window: today, tomorrow, day-after. Past-appointment cases are
+  // typically already overdue via date_due, so this stays forward-looking.
+  var horizon = new Date(today.getTime() + 2 * 86400000);
+  var horizonStr = horizon.getFullYear() + '-' + String(horizon.getMonth()+1).padStart(2,'0') + '-' + String(horizon.getDate()).padStart(2,'0');
+  return apptDate >= todayStr && apptDate <= horizonStr;
 }
 
 var toastT;
@@ -972,15 +1042,28 @@ function renderTable() {
       ? '<a href="patient-profile.html?id=' + lo.patient_id + '">' + escapeHtml(pname) + '</a>'
       : escapeHtml(pname);
     var overdue = isOverdue(lo);
+    // At-risk only shows when NOT overdue — overdue is the louder signal
+    // (red beats orange) and stacking both tags is visual noise.
+    var atRisk = !overdue && isAtRisk(lo);
     var overdueTag = overdue ? '<span class="overdue-tag">متأخر</span>' : '';
-    var rowClass = overdue ? 'row-overdue' : '';
+    var atRiskTag  = atRisk  ? '<span class="at-risk-tag" title="موعد المريض خلال يومين والمخبر لم يستلم العمل بعد">⏰ قارب الموعد</span>' : '';
+    var rowClass = overdue ? 'row-overdue' : (atRisk ? 'row-at-risk' : '');
 
-    // Linked-appointment badge
+    // Linked-appointment badge — clickable when we can resolve the appt.
+    // Uses the same deep-link pattern documented in v17 (appointments.html
+    // already handles ?editAppt=<id> via openEditFromQuery). Falls back to
+    // a non-link span when the appt isn't in the loaded window (e.g. older
+    // archived appointments) — clicking would 404 the modal, so we don't.
     var apptBadge = '';
     if (lo.appointment_id) {
       var linkedAppt = getAppointmentById(lo.appointment_id);
       var apptLabel  = linkedAppt ? fmtApptOption(linkedAppt) : 'موعد مرتبط';
-      apptBadge = '<span class="appt-badge" title="' + escapeHtml(apptLabel) + '" style="display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.4);padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;">📅</span>';
+      var badgeStyle = 'display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.4);padding:2px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-right:4px;';
+      if (linkedAppt) {
+        apptBadge = '<a href="appointments.html?editAppt=' + encodeURIComponent(lo.appointment_id) + '" class="appt-badge" title="' + escapeHtml(apptLabel) + ' — اضغط لفتح الموعد" style="' + badgeStyle + '">📅</a>';
+      } else {
+        apptBadge = '<span class="appt-badge" title="' + escapeHtml(apptLabel) + '" style="' + badgeStyle + '">📅</span>';
+      }
     }
 
     rows += '<tr class="' + rowClass + '">'
@@ -990,13 +1073,13 @@ function renderTable() {
       + '<td style="color:var(--text2)">' + escapeHtml(labNm) + '</td>'
       + '<td style="color:var(--text2)">' + escapeHtml(lo.shade || '—') + '</td>'
       + '<td>' + fmtD(lo.date_sent) + '</td>'
-      + '<td>' + overdueTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</td>'
+      + '<td>' + overdueTag + atRiskTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</td>'
       + '<td style="text-align:left;color:var(--text2)">' + fmt(lo.cost) + ' ل.س</td>'
       + '<td>' + pill + '</td>'
       + '<td style="white-space:nowrap;">' + actions + '</td>'
       + '</tr>';
 
-    cardHtml += '<div class="order-card' + (overdue ? ' overdue' : '') + '">'
+    cardHtml += '<div class="order-card' + (overdue ? ' overdue' : (atRisk ? ' at-risk' : '')) + '">'
       + '<div class="oc-row">'
       +   '<div class="oc-patient">' + apptBadge + pLink + '</div>'
       +   pill
@@ -1007,7 +1090,7 @@ function renderTable() {
       +   '<div><span class="lbl">المخبر:</span><span class="val">' + escapeHtml(labNm) + '</span></div>'
       +   '<div><span class="lbl">اللون:</span><span class="val">' + escapeHtml(lo.shade || '—') + '</span></div>'
       +   '<div><span class="lbl">الإرسال:</span><span class="val">' + fmtD(lo.date_sent) + '</span></div>'
-      +   '<div><span class="lbl">الاستحقاق:</span><span class="val">' + overdueTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</span></div>'
+      +   '<div><span class="lbl">الاستحقاق:</span><span class="val">' + overdueTag + atRiskTag + (lo.date_due ? fmtD(lo.date_due) : '—') + '</span></div>'
       +   '<div style="grid-column:1/-1;"><span class="lbl">التكلفة:</span><span class="val">' + fmt(lo.cost) + ' ل.س</span></div>'
       + '</div>'
       + '<div class="oc-actions">' + actions + '</div>'
