@@ -1251,8 +1251,12 @@ async function ppLoadReminderLogs() {
   if (!currentUser || !patientId) return;
   lastReminderLogByAppt = {};
   try {
+    // Phase 2B-A: include message_text, recipient_phone, id, created_at — the
+    // timeline render and searchHay both rely on these fields. Without them
+    // a reminder row would still appear, but its detail pane would be empty
+    // and free-text search across reminder content wouldn't match anything.
     var res = await window.sb.from('reminder_logs')
-      .select('appointment_id, sent_at, status, channel')
+      .select('id, appointment_id, sent_at, created_at, status, channel, message_text, recipient_phone')
       .eq('owner_id', currentUser.id)
       .eq('patient_id', patientId)
       .order('sent_at', { ascending: false });
@@ -2337,10 +2341,56 @@ function renderTimeline() {
         + '<span style="font-size:11px;color:var(--text2);">ابدأ بتسجيل جلسة، موعد، أو دفعة من التبويبات الأخرى</span>'
         + '</div>';
     } else {
-      // Case (b): events exist but filters hide them all
+      // Case (b): events exist but filters hide them all. Tell the user
+      // WHY — which type/date filter is currently active — and which
+      // event types ARE available in the unfiltered data, so they can
+      // see what's reachable with one click.
+      var typeLabels = {
+        session: '🦷 جلسات', payment: '💰 دفعات', appointment: '📅 مواعيد',
+        lab: '🧪 مخابر', unearned: '💵 رصيد مقدّم', reminder: '📱 تذكيرات'
+      };
+      var activeTypeKeys = Object.keys(timelineFilters.types)
+        .filter(function(k){ return timelineFilters.types[k]; });
+      var dateRangeLabels = {
+        '7d': 'آخر 7 أيام', '30d': 'آخر 30 يوم', '90d': 'آخر 90 يوم',
+        'year': 'هذه السنة', 'lastyear': 'السنة الماضية'
+      };
+      // Which event types DO exist in the unfiltered set? Use to hint
+      // the user toward filters that would actually return results.
+      var availableTypes = {};
+      allEvents.forEach(function(ev){ availableTypes[ev.type] = true; });
+
+      var hintLines = [];
+      if (activeTypeKeys.length < 6) {
+        hintLines.push(
+          'النوع المحدّد: <b>' +
+          activeTypeKeys.map(function(k){ return typeLabels[k] || k; }).join('، ') +
+          '</b>'
+        );
+      }
+      if (timelineFilters.dateRange !== 'all' && dateRangeLabels[timelineFilters.dateRange]) {
+        hintLines.push('النطاق الزمني: <b>' + dateRangeLabels[timelineFilters.dateRange] + '</b>');
+      }
+      if (timelineFilters.search) {
+        hintLines.push('البحث: <b>"' + escapeHtml(timelineFilters.search) + '"</b>');
+      }
+      var availableHint = '';
+      var availableKeys = Object.keys(availableTypes);
+      if (availableKeys.length > 0 && availableKeys.length < 6) {
+        availableHint = '<div style="font-size:11px;color:var(--text2);margin-top:8px;">'
+          + 'المتاح لهذا المريض: '
+          + availableKeys.map(function(k){ return typeLabels[k] || k; }).join('، ')
+          + '</div>';
+      }
+
       container.innerHTML = '<div class="tl-empty">'
         + '<div class="tl-empty-icon">🗓️</div>'
-        + 'لا توجد أحداث تطابق الفلاتر المحدّدة<br>'
+        + 'لا توجد أحداث تطابق الفلاتر المحدّدة'
+        + (hintLines.length
+            ? '<div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.7;">'
+              + hintLines.join('<br>') + '</div>'
+            : '')
+        + availableHint
         + '<button class="tl-load-more" style="margin-top:14px;" onclick="resetTimelineFilters()">🔄 إعادة ضبط الفلاتر</button>'
         + '</div>';
     }
@@ -2379,25 +2429,52 @@ function resetTimelineFilters() {
   renderTimeline();
 }
 
-/* Toggle a type chip. 'all' acts as a master select-all/clear toggle. */
+/* Type-chip behavior (Gmail-style filter chips):
+ *   - "الكل"                 → enable every type
+ *   - any other chip         → switch to "this type only" (single-select)
+ *   - same chip clicked twice while it's the only active one → re-enable all
+ *
+ * Rationale: users expect filter chips to BEHAVE like filters
+ * (i.e. "show me only X"), not toggles. The previous toggle behavior
+ * made it easy to end up with surprising hidden subsets — and worst,
+ * empty timelines that look like the data is gone. This single-select
+ * mode matches how filter chips work in Gmail, Notion, Linear, etc.
+ *
+ * Compatibility: the underlying state (timelineFilters.types booleans)
+ * is unchanged, so applyTimelineFilters() needs no edits.
+ */
 function onTlTypeChip(typeKey) {
+  var types = timelineFilters.types;
+  var allKeys = Object.keys(types);
+
   if (typeKey === 'all') {
-    // If any type is off, turn all ON. Otherwise turn all OFF.
-    var anyOff = Object.keys(timelineFilters.types).some(function(k){ return !timelineFilters.types[k]; });
-    Object.keys(timelineFilters.types).forEach(function(k){ timelineFilters.types[k] = anyOff; });
+    // Master "all" chip: always enables every type.
+    allKeys.forEach(function(k){ types[k] = true; });
   } else {
-    timelineFilters.types[typeKey] = !timelineFilters.types[typeKey];
+    // Count how many types are currently active.
+    var activeKeys = allKeys.filter(function(k){ return types[k]; });
+    var isOnlyActive = activeKeys.length === 1 && activeKeys[0] === typeKey;
+
+    if (isOnlyActive) {
+      // Second click on the solo-active chip → expand back to all.
+      allKeys.forEach(function(k){ types[k] = true; });
+    } else {
+      // Switch to "show only this type" — turn everything off, then on.
+      allKeys.forEach(function(k){ types[k] = (k === typeKey); });
+    }
   }
-  // Refresh chip UI
+
+  // Refresh chip UI to mirror the new state.
   document.querySelectorAll('.tl-chip[data-tl-type]').forEach(function(chip){
     var key = chip.getAttribute('data-tl-type');
     if (key === 'all') {
-      var allOn = Object.keys(timelineFilters.types).every(function(k){ return timelineFilters.types[k]; });
+      var allOn = allKeys.every(function(k){ return types[k]; });
       chip.classList.toggle('active', allOn);
     } else {
-      chip.classList.toggle('active', !!timelineFilters.types[key]);
+      chip.classList.toggle('active', !!types[key]);
     }
   });
+
   // Reset pagination so user sees freshly-filtered top items.
   timelineShownCount = TL_PAGE_SIZE;
   renderTimeline();
