@@ -630,6 +630,12 @@ async function loadLabOrdersCard(uid, patientsList) {
   } catch(e) { console.warn('lab_orders dashboard:', e); }
 
   // عدد المتأخرات (لا يقتصر على أول 5 — نحسبها بشكل منفصل)
+  // NOTE: this counter uses the simple date_due-based definition of overdue
+  // (DB-side filter, fast). labs.html applies a richer definition that also
+  // flags 'sent' orders whose linked appointment has already arrived even
+  // without an explicit date_due. The two views can therefore disagree by
+  // a small amount; labs.html is the authoritative detailed view, this
+  // counter is a fast home-page awareness signal kept intentionally simple.
   let overdueCount = 0;
   try {
     const todayIso = todayStr();

@@ -935,12 +935,23 @@ async function loadAll() {
     else allOrders = lo || [];
   } catch(e) { console.warn(e); allOrders = []; }
 
-  // Load appointments (today onwards, plus a small look-back for in-progress jobs)
-  // used to populate the "link to appointment" dropdown.
+  // Load appointments — used for two purposes:
+  //   1. The "link to appointment" dropdown when creating/editing an order.
+  //   2. (Phase 2B-B) Resolving appointment_id on existing orders so that
+  //      isOverdue/isAtRisk can fire when a 'sent' order's linked appt has
+  //      already arrived or is imminent. This requires a wider window than
+  //      the dropdown alone — a job sent 5 weeks ago to a slow lab might
+  //      still be 'sent' with the appointment now in the past, and we MUST
+  //      surface that as overdue. 60 days covers virtually all active lab
+  //      cases in the Syrian market (typical turnaround: 1-3 weeks).
+  // editLabOrder() already fetches the appointment on-demand for orders
+  // whose linked appt falls outside this window, so the dropdown remains
+  // correct in edge cases — only the in-list overdue signal benefits from
+  // the wider load.
   // Use local-time date so the lookback window matches the user's clock (Syria UTC+3).
   try {
     var lookback = new Date();
-    lookback.setDate(lookback.getDate() - 7);
+    lookback.setDate(lookback.getDate() - 60);
     var fromDate = dateStrLocal(lookback);
     const { data: ap, error: apErr } = await window.sb.from('appointments')
       .select('id, patient_id, patient_name, date, time, type, status')
@@ -1201,14 +1212,35 @@ function populateLabSelect(selectedLabId) {
    Contract:
      - selectedApptId is preserved ONLY if it belongs to patientId.
      - Cross-patient mismatches are silently dropped (caller is expected to clear
-       the selection when switching patients via onLabOrderPatientChange). */
+       the selection when switching patients via onLabOrderPatientChange).
+     - The visible list is restricted to recent + future appointments (last
+       7 days onward) even though allAppointments now spans 60 days. The
+       wider cache exists for isOverdue/isAtRisk to resolve older linked
+       appointments — it should NOT pollute the picker UX with appointments
+       the user is unlikely to want to link to. selectedApptId is honored
+       even if it falls outside this 7-day window (e.g. editing an old
+       order) so we never silently drop a real selection. */
 function populateAppointmentSelect(selectedApptId, patientId) {
   var sel = document.getElementById('labOrderAppointment');
   if (!sel) return;
   sel.innerHTML = '<option value="">— غير مربوط بموعد —</option>';
   if (!patientId) return; // no patient → only placeholder
 
-  var list = allAppointments.filter(function(a){ return a.patient_id === patientId; });
+  // Cutoff for the "recent enough to show in dropdown" filter.
+  // 7 days back matches the legacy (pre-Phase-2B-B) load window so users
+  // see the same options they used to — only the under-the-hood resolution
+  // for isOverdue got wider.
+  var pickerCutoff = new Date();
+  pickerCutoff.setDate(pickerCutoff.getDate() - 7);
+  var pickerCutoffStr = dateStrLocal(pickerCutoff);
+
+  var list = allAppointments.filter(function(a){
+    if (a.patient_id !== patientId) return false;
+    // Always include the currently selected appointment (even if old).
+    if (selectedApptId && a.id === selectedApptId) return true;
+    if (!a.date) return false;
+    return String(a.date).slice(0, 10) >= pickerCutoffStr;
+  });
   list.forEach(function(a){
     var opt = document.createElement('option');
     opt.value = a.id;
