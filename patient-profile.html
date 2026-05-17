@@ -2043,7 +2043,7 @@ function buildTimelineEvents() {
   var APPT_STATUS_AR = {
     scheduled: 'مجدول', confirmed: 'مؤكّد', pending: 'معلّق',
     arrived: 'وصل المريض', in_chair: 'على الكرسي', completed: 'مكتمل',
-    cancelled: 'ملغي', broken: 'متغيّب', no_show: 'لم يحضر'
+    cancelled: 'ملغي', broken: 'مكسور', no_show: 'لم يحضر'
   };
   (allAppointmentsForTl || []).forEach(function(a) {
     var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === a.provider_id; });
@@ -2241,7 +2241,7 @@ function renderTimelineRow(e) {
     var stColor = '#63b3ed';
     if (e.statusKey === 'completed') stColor = '#2ee89e';
     else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show') stColor = '#a3a3a3';
-    else if (e.statusKey === 'broken') stColor = '#ef5350';
+    else if (e.statusKey === 'broken') stColor = '#f97316';  // orange — matches appointments.html .status-broken CSS + modal button
     var statBadge2 = '<span class="tl-badge" style="background:' + stColor + '22;color:' + stColor + ';border-color:' + stColor + '55;">' + escapeHtml(e.statusLabel || '—') + '</span>';
     var plannedBadge = e.isPlanned
       ? '<span class="tl-badge" style="background:rgba(245,200,66,0.15);color:var(--yellow);border-color:rgba(245,200,66,0.4);">مخطّط</span>'
