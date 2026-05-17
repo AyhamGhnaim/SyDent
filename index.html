@@ -317,6 +317,37 @@
     .appt-name { font-size: 13px; }
     .appt-type { font-size: 11px; }
   }
+
+  /* ─── Phase 2A: WhatsApp reminder badge on dashboard today-appts ─── */
+  .wa-badge-dash {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    margin-right: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s, filter .15s;
+    font-family: 'Cairo', sans-serif;
+    white-space: nowrap;
+  }
+  .wa-badge-dash:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .wa-badge-dash.sent {
+    background: rgba(46,232,158,0.14); color: var(--accent); border-color: rgba(46,232,158,0.35);
+  }
+  .wa-badge-dash.pending {
+    background: rgba(245,200,66,0.14); color: var(--yellow); border-color: rgba(245,200,66,0.35);
+  }
+  .wa-badge-dash.urgent {
+    background: rgba(239,83,80,0.14); color: var(--red); border-color: rgba(239,83,80,0.45);
+    animation: waPulseDash 2.2s ease-in-out infinite;
+  }
+  @keyframes waPulseDash {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,0.4); }
+    50%     { box-shadow: 0 0 0 4px rgba(239,83,80,0); }
+  }
 </style>
 <script src="sidebar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -553,6 +584,9 @@ async function loadDashboard() {
   const upcoming = apptsToday.filter(a => (a.time||'') >= nowTime).length;
   document.getElementById('statApptUpcoming').textContent = upcoming ? upcoming + ' متبقية' : '';
 
+  // Phase 2A: load WhatsApp settings + reminder logs for today's appts before
+  // rendering the card so badges appear on first paint (no flicker).
+  await loadDashWaState(uid);
   renderTodayApptsCard();
 
   // ── دخل الشهر ──
@@ -725,6 +759,77 @@ function renderDashStrip(appt) {
   return parts.join('');
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Phase 2A — WhatsApp Reminders (dashboard "today's appointments" card)
+// We don't open the modal from the dashboard — clicking the badge sends
+// the user to appointments.html to complete the send. Keeps the dashboard
+// focused on overview, not deep interaction.
+// ═══════════════════════════════════════════════════════════════
+var _dashCfgWa = null;        // cached clinic_settings (whatsapp_reminders_enabled + hours_before)
+var _dashReminderLogs = {};   // { appointment_id: latest_log } for today's appts
+
+async function loadDashWaState(uid) {
+  // Settings — silently fall through if table is missing (pre-Migration-5)
+  try {
+    var cs = await window.sb.from('clinic_settings')
+      .select('whatsapp_reminders_enabled, whatsapp_reminder_hours_before')
+      .eq('owner_id', uid).maybeSingle();
+    if (!cs.error && cs.data) _dashCfgWa = cs.data;
+  } catch(e) { /* ignore */ }
+
+  // Reminder logs — only need entries for today's appts so we don't pull the
+  // full history. Bail silently if reminder_logs table is missing.
+  _dashReminderLogs = {};
+  if (!Array.isArray(_dashApptsToday) || !_dashApptsToday.length) return;
+  var ids = _dashApptsToday.map(function(a){ return a.id; }).filter(Boolean);
+  if (!ids.length) return;
+  try {
+    var rl = await window.sb.from('reminder_logs')
+      .select('appointment_id, sent_at')
+      .eq('owner_id', uid)
+      .in('appointment_id', ids)
+      .order('sent_at', { ascending: false });
+    if (!rl.error && Array.isArray(rl.data)) {
+      rl.data.forEach(function(log){
+        if (!_dashReminderLogs[log.appointment_id]) {
+          _dashReminderLogs[log.appointment_id] = log;
+        }
+      });
+    }
+  } catch(e) { /* ignore */ }
+}
+
+// Mirrors isFinishedStatus from appointments.html — no badge for finished appts.
+function _dashIsFinishedForWa(s) {
+  return s === 'completed' || s === 'cancelled' || s === 'broken' || s === 'no_show';
+}
+
+// Returns badge HTML or '' — mirrors appointments.html classifyReminderForAppt
+// semantics but trimmed for dashboard density (short labels, no titles needed).
+function renderDashWaBadge(appt) {
+  if (!_dashCfgWa || !_dashCfgWa.whatsapp_reminders_enabled) return '';
+  if (!appt || !appt.id || _dashIsFinishedForWa(appt.status)) return '';
+
+  var log = _dashReminderLogs[appt.id];
+  // Today's appts: if no log → urgent (the day is already here)
+  if (log) {
+    return '<span class="wa-badge-dash sent" title="آخر تذكير: '
+      + new Date(log.sent_at).toLocaleString('ar').replace(/"/g,'&quot;')
+      + '" onclick="event.stopPropagation(); _dashGoToWaReminder(\'' + appt.id + '\')">✓ تم التذكير</span>';
+  }
+  return '<span class="wa-badge-dash urgent" title="موعد اليوم بدون تذكير" '
+    + 'onclick="event.stopPropagation(); _dashGoToWaReminder(\'' + appt.id + '\')">⚠️ أرسل تذكير</span>';
+}
+
+// Click handler: hand off to appointments.html with the appt selected.
+// We use a query param the appointments page can read on init to pre-open
+// the reminder modal. If the page doesn't support it (older deploy), the
+// user just lands on appointments and can click the badge there.
+function _dashGoToWaReminder(apptId) {
+  if (!apptId) return;
+  window.location.href = 'appointments.html?wa=' + encodeURIComponent(apptId);
+}
+
 // Renders the entire "today's appointments" card from _dashApptsToday.
 // Called once on load, then again after every successful click.
 function renderTodayApptsCard() {
@@ -740,10 +845,11 @@ function renderTodayApptsCard() {
     var safeName = (a.patient_name || '—');
     var safeType = (a.type || '—');
     var safeTime = (a.time || '').slice(0, 5) || '—';
+    var waBadge = renderDashWaBadge(a);
     return '<div class="appt-item">'
          +   '<div class="appt-time">' + safeTime + '</div>'
          +   '<div style="flex:1;min-width:0">'
-         +     '<div class="appt-name">' + safeName + '</div>'
+         +     '<div class="appt-name">' + safeName + ' ' + waBadge + '</div>'
          +     '<div class="appt-type">' + safeType + '</div>'
          +     (stamps ? '<div style="margin-top:3px">' + stamps + '</div>' : '')
          +   '</div>'

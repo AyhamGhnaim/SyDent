@@ -1224,7 +1224,9 @@ function resolvePatientPhoneForAppt(appt) {
 // appointment that has a phone-equipped patient, or null when no badge applies.
 function classifyReminderForAppt(appt) {
   if (!appt || !appt.id || !appt.date) return null;
-  if (appt.status === 'cancelled') return null;
+  // No reminder for finished appointments (completed/cancelled/broken/no_show).
+  // Uses the shared helper so Gap 1's status set stays the single source of truth.
+  if (isFinishedStatus(appt.status)) return null;
   const today = new Date(); today.setHours(0,0,0,0);
   const d = new Date(appt.date + 'T12:00:00');
   if (isNaN(d.getTime())) return null;
@@ -3597,11 +3599,39 @@ function showToast(msg) {
   await loadPatientPhones();
   await loadReminderLogs();
   await loadAppointments();
+
+  // Phase 2A — Deep-link handler: dashboard's ⚠️ "أرسل تذكير" badge sends the
+  // user here with ?wa=<appointment_id>. Open the modal automatically so the
+  // user doesn't have to hunt for the appointment in the list/day view.
+  try {
+    var qp = new URLSearchParams(window.location.search);
+    var waId = qp.get('wa');
+    if (waId) {
+      var matched = appointments.find(function(a){ return a.id === waId; });
+      if (matched) {
+        // Switch to list view so the appointment is visible behind the modal
+        if (typeof setView === 'function') setView('list');
+        setTimeout(function(){ openWaReminderModal(waId); }, 200);
+      }
+      // Clean the URL so a refresh doesn't re-open the modal
+      var url = new URL(window.location.href);
+      url.searchParams.delete('wa');
+      window.history.replaceState({}, '', url.toString());
+    }
+  } catch(e) { console.warn('wa deep-link:', e); }
 })();
 
 initSidebar('appointments');
 
-window.onPTRRefresh = function() { loadAppointments(); };
+window.onPTRRefresh = async function() {
+  // Phase 2A: reload WA state alongside appointments so badges reflect any
+  // reminders sent or settings changed from another tab/device, and any
+  // newly-added patient phones become resolvable.
+  try { await loadClinicSettingsWa(); } catch(e) {}
+  try { await loadPatientPhones(); }    catch(e) {}
+  try { await loadReminderLogs(); }     catch(e) {}
+  await loadAppointments();
+};
 
 document.addEventListener('DOMContentLoaded', function() {
   var btn = document.createElement('button');
