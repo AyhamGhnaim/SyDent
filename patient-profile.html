@@ -366,6 +366,69 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   opacity:1;
   transform:translateX(-50%) translateY(0);
 }
+
+/* ─── WhatsApp Reminder (patient profile) ─── */
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+  border: none;
+}
+.btn-whatsapp:hover { background: #1fb858; }
+.btn-whatsapp:disabled { opacity: .55; cursor: not-allowed; }
+
+.wa-modal-message {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif; font-size: 13.5px;
+  outline: none; transition: border-color .2s;
+  width: 100%;
+  min-height: 170px;
+  resize: vertical;
+  line-height: 1.7;
+}
+.wa-modal-message:focus { border-color: var(--green); }
+
+.wa-info-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.wa-info-row strong { color: var(--green); }
+.wa-info-row .wa-info-label { color: var(--text2); font-size: 12px; }
+
+.wa-warn-row {
+  background: rgba(245,200,66,0.10);
+  border: 1px solid rgba(245,200,66,0.35);
+  color: var(--yellow);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.wa-send-btn {
+  background: #25D366;
+  color: #fff;
+  padding: 9px 18px;
+  border-radius: 9px;
+  border: none;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.wa-send-btn:hover { opacity: .9; }
+.wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -388,6 +451,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="topbar-actions">
     <button class="btn btn-outline" onclick="openApptModal()">📅 موعد جديد</button>
     <button class="btn btn-outline" onclick="openSessionModal()">🦷 جلسة جديدة</button>
+    <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaReminderFromProfile()" style="display:none;">📱 تذكير WhatsApp</button>
     <button class="btn btn-primary" onclick="openPayModal()">💰 تسجيل دفعة</button>
   </div>
 </div>
@@ -818,6 +882,42 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- WhatsApp Reminder Modal -->
+<div class="modal-overlay" id="ppWaModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 style="color:#25D366;">📱 إرسال تذكير عبر WhatsApp</h3>
+      <button class="modal-close" onclick="closeModal('ppWaModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="wa-info-row">
+        <span class="wa-info-label">المريض:</span>
+        <strong id="ppWaPatient">—</strong>
+        <span style="margin-right:auto;"></span>
+        <span class="wa-info-label">الهاتف:</span>
+        <strong id="ppWaPhone">—</strong>
+      </div>
+      <div class="wa-info-row">
+        <span class="wa-info-label">الموعد:</span>
+        <strong id="ppWaDateTime">—</strong>
+      </div>
+      <div id="ppWaWarn" class="wa-warn-row" style="display:none;"></div>
+      <div style="margin-top:10px;">
+        <label style="font-size:13px; font-weight:600; color:var(--text2); margin-bottom:6px; display:block;">
+          نص الرسالة (يمكن تعديله قبل الإرسال)
+        </label>
+        <textarea id="ppWaMessage" class="wa-modal-message" placeholder="الرسالة..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('ppWaModal')">إلغاء</button>
+      <button type="button" class="wa-send-btn" id="ppWaSendBtn" onclick="ppSendWaReminder()">
+        <span>📱</span> <span>فتح WhatsApp وإرسال</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -835,6 +935,227 @@ var upcomingAppts = []; // patient's upcoming/today appointments (for session-ap
 var plannedAppts  = []; // Gap 7: patient's planned (no-date) appointments
 var editingApptId = null; // Gap 7: id of appointment currently being edited in modal (null = create)
 var currentUser = null;
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 2A — WhatsApp Reminders (patient-profile quick action)
+// All helpers prefixed with pp* to avoid global collisions with the
+// appointments.html copies. The button targets the *nearest upcoming*
+// appointment for this patient — multi-appointment patients still get
+// per-appointment buttons via the appointments page.
+// ═══════════════════════════════════════════════════════════════
+var CLINIC_SETTINGS_WA = null;
+var lastReminderLogByAppt = {}; // { appointment_id: last_log } for THIS patient only
+var _currentPpWaApptId = null;
+
+const PP_DEFAULT_WA_TEMPLATE =
+'مرحباً {patient_name} 👋\n\n' +
+'تذكير بموعدك في عيادة {clinic_name}:\n' +
+'📅 التاريخ: {date} ({day_of_week})\n' +
+'🕐 الساعة: {time}\n' +
+'👨‍⚕️ الطبيب: {doctor_name}\n\n' +
+'الرجاء تأكيد الحضور 🙏';
+
+const PP_DAYS_AR   = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const PP_MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+function ppNormalizePhone(raw) {
+  if (!raw) return null;
+  var p = String(raw).replace(/\D/g, '');
+  if (!p) return null;
+  if (p.indexOf('00') === 0) p = p.substring(2);
+  if (p.indexOf('0') === 0 && p.length >= 9) p = '963' + p.substring(1);
+  else if (p.indexOf('963') !== 0 && p.length === 9) p = '963' + p;
+  if (p.length < 10 || p.length > 15) return null;
+  return p;
+}
+
+function ppFormatArabicDate(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  return d.getDate() + ' ' + PP_MONTHS_AR[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function ppApplyPlaceholders(template, data) {
+  var out = template || '';
+  Object.keys(data || {}).forEach(function(k){
+    var re = new RegExp('\\{' + k + '\\}', 'g');
+    out = out.replace(re, data[k] == null ? '' : String(data[k]));
+  });
+  return out;
+}
+
+function ppBuildPlaceholderData(appt) {
+  var fullName = (patient && patient.name) ? patient.name.trim() : (appt.patient_name || '');
+  var firstName = fullName.split(' ')[0] || fullName || 'المريض';
+  var doctorName = '';
+  if (appt && appt.provider_id && Array.isArray(CLINIC_DOCTORS)) {
+    var doc = CLINIC_DOCTORS.find(function(d){ return d.id === appt.provider_id; });
+    if (doc) doctorName = doc.name || '';
+  }
+  if (!doctorName) {
+    var meta = (currentUser && currentUser.user_metadata) || {};
+    doctorName = meta.full_name || meta.name || '';
+  }
+  var d = new Date(((appt && appt.date) || '') + 'T12:00:00');
+  var dow = isNaN(d.getTime()) ? '' : PP_DAYS_AR[d.getDay()];
+
+  return {
+    patient_name: fullName || 'المريض',
+    patient_first_name: firstName,
+    date: ppFormatArabicDate(appt && appt.date),
+    day_of_week: dow,
+    time: ((appt && appt.time) || '').slice(0,5),
+    doctor_name: doctorName || '—',
+    clinic_name:  (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_name)  || 'عيادتنا',
+    clinic_phone: (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_phone) || ''
+  };
+}
+
+function ppBuildWaMessage(appt) {
+  var tpl = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminder_template) || PP_DEFAULT_WA_TEMPLATE;
+  return ppApplyPlaceholders(tpl, ppBuildPlaceholderData(appt));
+}
+
+async function ppLoadClinicSettings() {
+  if (!currentUser) return;
+  try {
+    var res = await window.sb.from('clinic_settings')
+      .select('*').eq('owner_id', currentUser.id).maybeSingle();
+    if (res.error && res.error.code !== 'PGRST116') {
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('clinic_settings load:', res.error);
+      }
+      return;
+    }
+    if (res.data) CLINIC_SETTINGS_WA = res.data;
+  } catch(e) { console.warn('clinic_settings:', e); }
+}
+
+async function ppLoadReminderLogs() {
+  if (!currentUser || !patientId) return;
+  lastReminderLogByAppt = {};
+  try {
+    var res = await window.sb.from('reminder_logs')
+      .select('appointment_id, sent_at, status, channel')
+      .eq('owner_id', currentUser.id)
+      .eq('patient_id', patientId)
+      .order('sent_at', { ascending: false });
+    if (res.error) {
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('reminder_logs load:', res.error);
+      }
+      return;
+    }
+    (res.data || []).forEach(function(log){
+      if (!lastReminderLogByAppt[log.appointment_id]) {
+        lastReminderLogByAppt[log.appointment_id] = log;
+      }
+    });
+  } catch(e) { console.warn('reminder_logs:', e); }
+}
+
+// Show/hide the topbar WhatsApp button based on:
+//   - feature enabled in clinic_settings
+//   - patient has at least one upcoming appointment
+//   - patient has a valid phone number
+// Also flips the button label to '✓ تم' when the nearest upcoming appt
+// already has a reminder log, mirroring the badge semantics on the
+// appointments page.
+function ppUpdateWaButtonVisibility() {
+  var btn = document.getElementById('ppWaBtn');
+  if (!btn) return;
+  var enabled = CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminders_enabled;
+  var hasUpcoming = Array.isArray(upcomingAppts) && upcomingAppts.length > 0;
+  var hasPhone = patient && patient.phone && ppNormalizePhone(patient.phone);
+  if (enabled && hasUpcoming && hasPhone) {
+    btn.style.display = '';
+    var nearest = upcomingAppts[0];
+    var hasLog = nearest && lastReminderLogByAppt[nearest.id];
+    btn.innerHTML = hasLog ? '📱 تذكير WhatsApp ✓' : '📱 تذكير WhatsApp';
+    btn.title = hasLog ? 'آخر تذكير: ' + new Date(lastReminderLogByAppt[nearest.id].sent_at).toLocaleString('ar') : 'إرسال تذكير لأقرب موعد قادم';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function openWaReminderFromProfile() {
+  if (!Array.isArray(upcomingAppts) || upcomingAppts.length === 0) {
+    showToast('⚠️ لا يوجد موعد قادم لهذا المريض');
+    return;
+  }
+  ppOpenWaModal(upcomingAppts[0]);
+}
+
+function ppOpenWaModal(appt) {
+  if (!appt) return;
+  _currentPpWaApptId = appt.id;
+  document.getElementById('ppWaPatient').textContent = (patient && patient.name) || appt.patient_name || '—';
+  var phone = patient ? patient.phone : null;
+  document.getElementById('ppWaPhone').textContent = phone || '⚠️ غير متوفر';
+  var d = new Date((appt.date || '') + 'T12:00:00');
+  var dStr = isNaN(d.getTime()) ? appt.date : (PP_DAYS_AR[d.getDay()] + ' ' + ppFormatArabicDate(appt.date));
+  document.getElementById('ppWaDateTime').textContent = dStr + ' — ' + ((appt.time || '').slice(0,5));
+
+  var warn = document.getElementById('ppWaWarn');
+  var warnHtml = '';
+  if (!phone || !ppNormalizePhone(phone)) {
+    warnHtml += '⚠️ لا يوجد رقم هاتف صالح. أضِف رقماً في معلومات المريض أولاً.<br>';
+  }
+  var prevLog = lastReminderLogByAppt[appt.id];
+  if (prevLog) {
+    warnHtml += 'ℹ️ تم إرسال تذكير سابقاً في ' + new Date(prevLog.sent_at).toLocaleString('ar') + '. هل تريد إرسال آخر؟';
+  }
+  if (warnHtml) { warn.innerHTML = warnHtml; warn.style.display = 'block'; }
+  else { warn.style.display = 'none'; warn.innerHTML = ''; }
+
+  document.getElementById('ppWaMessage').value = ppBuildWaMessage(appt);
+
+  var sendBtn = document.getElementById('ppWaSendBtn');
+  sendBtn.disabled = !(phone && ppNormalizePhone(phone));
+
+  openModal('ppWaModal');
+}
+
+async function ppSendWaReminder() {
+  if (!_currentPpWaApptId) return;
+  var appt = upcomingAppts.find(function(a){ return a.id === _currentPpWaApptId; });
+  if (!appt) { showToast('❌ لم يُعثر على الموعد'); return; }
+  var phone = ppNormalizePhone(patient && patient.phone);
+  if (!phone) { showToast('⚠️ رقم الهاتف غير صالح'); return; }
+  var msg = document.getElementById('ppWaMessage').value.trim();
+  if (!msg) { showToast('⚠️ الرسالة فارغة'); return; }
+
+  var sendBtn = document.getElementById('ppWaSendBtn');
+  sendBtn.disabled = true;
+
+  var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+
+  try {
+    var ins = await window.sb.from('reminder_logs').insert({
+      owner_id: currentUser.id,
+      appointment_id: appt.id,
+      patient_id: patientId,
+      channel: 'whatsapp_link',
+      status: 'sent',
+      message_text: msg,
+      recipient_phone: phone
+    });
+    if (ins.error) {
+      console.warn('reminder_logs insert:', ins.error);
+      showToast('✅ تم فتح WhatsApp (تعذّر حفظ السجل)');
+    } else {
+      showToast('✅ تم إرسال التذكير');
+      await ppLoadReminderLogs();
+      ppUpdateWaButtonVisibility();
+    }
+  } catch(e) { console.warn('ppSendWaReminder:', e); }
+
+  closeModal('ppWaModal');
+}
 
 /* ── Payment Splits (OpenDental-style FIFO allocation) ──
    Helper: how much has been paid towards a specific session, based on payment_splits.
@@ -1477,7 +1798,7 @@ async function loadAll() {
   try {
     var todayStr = toDay();
     const { data: ua, error: uaErr } = await window.sb.from('appointments')
-      .select('id, date, time, type, status')
+      .select('id, date, time, type, status, provider_id, patient_name')
       .eq('patient_id', patientId)
       .gte('date', todayStr)
       .not('status', 'in', '(cancelled,broken,no_show,completed)')
@@ -1487,6 +1808,11 @@ async function loadAll() {
     if (uaErr) { console.warn('upcoming appts load:', uaErr); upcomingAppts = []; }
     else upcomingAppts = ua || [];
   } catch(e) { console.warn('upcoming appts fetch failed:', e); upcomingAppts = []; }
+
+  // Phase 2A — WhatsApp Reminders: settings + per-patient last logs.
+  // Both reads are fault-tolerant (missing tables won't break the page).
+  try { await ppLoadClinicSettings(); } catch(e) { console.warn('ppLoadClinicSettings:', e); }
+  try { await ppLoadReminderLogs(); }   catch(e) { console.warn('ppLoadReminderLogs:', e); }
 
   // Gap 7: planned appointments for this patient (no date, awaiting scheduling).
   // Wrapped in try/catch + column-missing detection so pre-migration DBs
@@ -5685,6 +6011,8 @@ async function init() {
   safe(renderLabOrders,      'renderLabOrders');
   // Gap 7: render planned-appointments card (hides itself when list is empty)
   safe(renderPlannedAppts,   'renderPlannedAppts');
+  // Phase 2A: show/hide WhatsApp button based on settings + upcoming + phone
+  safe(ppUpdateWaButtonVisibility, 'ppUpdateWaButtonVisibility');
   document.getElementById('payDate').value = toDay();
   document.getElementById('sDate').value   = toDay();
   document.getElementById('aDate').value   = toDay();

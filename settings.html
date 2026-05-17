@@ -206,6 +206,135 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   .modal-footer { flex-direction: column-reverse; }
   .modal-footer button { width: 100%; }
 }
+
+/* ─── WhatsApp Reminders section ──────────────── */
+textarea {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 11px 14px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif; font-size: 14px;
+  outline: none; transition: border-color .2s;
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  line-height: 1.7;
+}
+textarea:focus { border-color: var(--green); }
+textarea::placeholder { color: var(--text2); }
+
+.wa-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+.wa-toggle-row .label-block { display: flex; flex-direction: column; gap: 2px; }
+.wa-toggle-row .label-block strong { font-size: 14px; font-weight: 700; color: var(--text); }
+.wa-toggle-row .label-block span { font-size: 12px; color: var(--text2); }
+
+.wa-switch {
+  position: relative;
+  width: 46px; height: 26px;
+  background: rgba(138,154,181,0.3);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background .25s;
+  flex-shrink: 0;
+}
+.wa-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; right: 3px;
+  width: 20px; height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .25s;
+}
+.wa-switch.on { background: var(--green); }
+.wa-switch.on::after { transform: translateX(-20px); }
+
+.wa-placeholders {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 6px 0 14px;
+}
+.wa-placeholder-pill {
+  background: rgba(46,232,158,0.12);
+  border: 1px solid rgba(46,232,158,0.3);
+  color: var(--green);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: 'Cairo', sans-serif;
+}
+.wa-placeholder-pill:hover {
+  background: rgba(46,232,158,0.22);
+  transform: translateY(-1px);
+}
+
+.wa-actions-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px;
+}
+.btn-secondary {
+  padding: 10px 18px; border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+}
+.btn-secondary:hover { border-color: var(--green); color: var(--green); }
+
+.wa-row-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 720px) {
+  .wa-row-2col { grid-template-columns: 1fr; }
+}
+
+/* Preview modal (reusing modal-overlay base but green-themed) */
+.modal-overlay .modal.wa-preview {
+  border-color: rgba(46,232,158,0.3);
+  max-width: 520px;
+}
+.modal-overlay .modal.wa-preview .modal-title {
+  color: var(--green);
+}
+.wa-preview-box {
+  background: #075E54;
+  background-image: linear-gradient(135deg, #075E54 0%, #128C7E 100%);
+  border-radius: 14px;
+  padding: 18px;
+  margin: 16px 0;
+}
+.wa-preview-bubble {
+  background: #DCF8C6;
+  color: #1a1a1a;
+  border-radius: 12px 12px 12px 4px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Cairo', sans-serif;
+  max-width: 90%;
+  box-shadow: 0 1px 1px rgba(0,0,0,0.13);
+}
+.wa-preview-meta {
+  font-size: 10.5px; color: rgba(0,0,0,0.5);
+  text-align: left; margin-top: 4px;
+}
 </style>
 <script src="sidebar.js"></script>
 </head>
@@ -262,6 +391,57 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
       <div class="section-sub">قوالب جاهزة لتسريع حجز المواعيد الشائعة (تنظيف، علاج عصب، إلخ). كل قالب يحدد المدة الافتراضية والعلاج المرتبط.</div>
       <button type="button" class="btn btn-primary" onclick="openApptTypeModal()" id="btnNewApptType">+ إضافة قالب جديد</button>
       <div id="apptTypesList" style="margin-top:18px;"></div>
+    </div>
+
+    <!-- Phase 2A: WhatsApp Reminders -->
+    <div class="section" style="border-color: rgba(46,232,158,0.25);">
+      <div class="section-title">🔔 تذكيرات WhatsApp للمواعيد</div>
+      <div class="section-sub">أرسل تذكيرات للمرضى عبر WhatsApp قبل مواعيدهم بنقرة واحدة. <strong style="color:var(--green)">مجاني تماماً</strong> — يفتح WhatsApp Web/Mobile مع الرسالة جاهزة.</div>
+
+      <div class="wa-toggle-row">
+        <div class="label-block">
+          <strong>تفعيل ميزة التذكيرات</strong>
+          <span>إذا عُطِّلت، لن تظهر أزرار التذكير في صفحة المواعيد</span>
+        </div>
+        <div class="wa-switch on" id="waSwitch" onclick="toggleWaEnabled()"></div>
+      </div>
+
+      <div class="wa-row-2col">
+        <div class="form-group">
+          <label>اسم العيادة</label>
+          <input type="text" id="fClinicName" placeholder="عيادة د. أيهم لطب الأسنان">
+        </div>
+        <div class="form-group">
+          <label>رقم العيادة (يظهر في الرسالة)</label>
+          <input type="text" id="fClinicPhone" placeholder="0944-123-456">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>عدد الساعات قبل الموعد لتذكير المريض</label>
+        <input type="number" id="fHoursBefore" min="1" max="168" value="24" style="max-width:200px;">
+      </div>
+
+      <div class="form-group">
+        <label>قالب رسالة التذكير</label>
+        <div class="wa-placeholders" id="waPlaceholdersList">
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{patient_name}')">{patient_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{patient_first_name}')">{patient_first_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{date}')">{date}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{day_of_week}')">{day_of_week}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{time}')">{time}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{doctor_name}')">{doctor_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{clinic_name}')">{clinic_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholder('{clinic_phone}')">{clinic_phone}</span>
+        </div>
+        <textarea id="fTemplate" placeholder="اكتب قالب الرسالة هنا..."></textarea>
+      </div>
+
+      <div class="wa-actions-row">
+        <button type="button" class="btn btn-primary" id="btnSaveWa" onclick="saveClinicSettings()">💾 حفظ الإعدادات</button>
+        <button type="button" class="btn-secondary" onclick="previewTemplate()">👁️ معاينة الرسالة</button>
+        <button type="button" class="btn-secondary" onclick="resetTemplate()">🔄 استعادة القالب الافتراضي</button>
+      </div>
     </div>
 
     <!-- Bug #2: Backfill orphaned payment splits -->
@@ -402,6 +582,21 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   </div>
 </div>
 
+<!-- Modal معاينة قالب WhatsApp -->
+<div class="modal-overlay" id="waPreviewModal" onclick="if(event.target===this) closeWaPreview()">
+  <div class="modal wa-preview">
+    <div class="modal-title">👁️ معاينة الرسالة</div>
+    <div style="font-size:13px; color:var(--text2); margin-bottom:6px;">هذه معاينة برسالة عيّنة (بيانات تجريبية)</div>
+    <div class="wa-preview-box">
+      <div class="wa-preview-bubble" id="waPreviewBubble"></div>
+      <div class="wa-preview-meta" id="waPreviewTime"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeWaPreview()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -432,34 +627,232 @@ function showToast(msg, isError = false) {
   await loadAppointmentSettings();
   // Gap 8: load appointment-type templates + treatments dropdown
   await loadAppointmentTypes();
+  // Phase 2A: load WhatsApp Reminders settings (fault-tolerant)
+  await loadClinicSettingsWa();
   // Bug #2: auto-scan for orphaned payment splits (fault-tolerant)
   await scanOrphanedPayments();
 })();
 
+// ═══════════════════════════════════════════════════════════════
+// Phase 2A — WhatsApp Reminders (Clinic Settings UI)
+// Shares the same clinic_settings wide-table row as Gap 5 (no-show fee).
+// All reads/writes target columns whatsapp_* and the clinic identity fields.
+// ═══════════════════════════════════════════════════════════════
+
+const DEFAULT_WA_TEMPLATE =
+'مرحباً {patient_name} 👋\n\n' +
+'تذكير بموعدك في عيادة {clinic_name}:\n' +
+'📅 التاريخ: {date} ({day_of_week})\n' +
+'🕐 الساعة: {time}\n' +
+'👨‍⚕️ الطبيب: {doctor_name}\n\n' +
+'الرجاء تأكيد الحضور 🙏';
+
+let CLINIC_SETTINGS_WA = null;
+
+// Load (or auto-create) the clinic_settings row for this owner. Auto-creation
+// happens on first visit so all subsequent saves can use UPDATE without
+// special-casing the "no row yet" path. Fault-tolerant: if the table is
+// missing (pre-Migration-5), we silently keep CLINIC_SETTINGS_WA null and
+// the section displays defaults.
+async function loadClinicSettingsWa() {
+  try {
+    const res = await window.sb.from('clinic_settings')
+      .select('*').eq('owner_id', currentUser.id).maybeSingle();
+
+    if (res.error && res.error.code !== 'PGRST116') {
+      const msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('loadClinicSettingsWa:', res.error);
+      }
+      // Apply hard defaults so the section is usable visually even on error
+      applyWaSettingsToForm(null);
+      return;
+    }
+
+    if (res.data) {
+      CLINIC_SETTINGS_WA = res.data;
+    } else {
+      // First visit — create a default row
+      const meta = currentUser.user_metadata || {};
+      const defaults = {
+        owner_id: currentUser.id,
+        whatsapp_reminders_enabled: true,
+        whatsapp_reminder_template: DEFAULT_WA_TEMPLATE,
+        whatsapp_reminder_hours_before: 24,
+        clinic_name: ((meta.full_name || meta.name) ? ('عيادة ' + (meta.full_name || meta.name)) : null),
+        clinic_phone: null
+      };
+      const ins = await window.sb.from('clinic_settings').insert(defaults).select().single();
+      if (ins.error) {
+        console.warn('clinic_settings auto-create:', ins.error);
+        applyWaSettingsToForm(defaults);
+        return;
+      }
+      CLINIC_SETTINGS_WA = ins.data;
+    }
+
+    applyWaSettingsToForm(CLINIC_SETTINGS_WA);
+  } catch (e) {
+    console.warn('loadClinicSettingsWa catch:', e);
+    applyWaSettingsToForm(null);
+  }
+}
+
+function applyWaSettingsToForm(s) {
+  const safe = s || {
+    whatsapp_reminders_enabled: true,
+    whatsapp_reminder_template: DEFAULT_WA_TEMPLATE,
+    whatsapp_reminder_hours_before: 24,
+    clinic_name: '',
+    clinic_phone: ''
+  };
+  document.getElementById('fClinicName').value  = safe.clinic_name  || '';
+  document.getElementById('fClinicPhone').value = safe.clinic_phone || '';
+  document.getElementById('fHoursBefore').value = safe.whatsapp_reminder_hours_before || 24;
+  document.getElementById('fTemplate').value    = safe.whatsapp_reminder_template || DEFAULT_WA_TEMPLATE;
+  const sw = document.getElementById('waSwitch');
+  if (safe.whatsapp_reminders_enabled) sw.classList.add('on');
+  else sw.classList.remove('on');
+}
+
+function toggleWaEnabled() {
+  document.getElementById('waSwitch').classList.toggle('on');
+}
+
+// Insert placeholder at cursor position in the template textarea.
+function insertPlaceholder(ph) {
+  const ta = document.getElementById('fTemplate');
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const before = ta.value.substring(0, start);
+  const after  = ta.value.substring(end);
+  ta.value = before + ph + after;
+  const pos = start + ph.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+}
+
+function resetTemplate() {
+  if (!confirm('استعادة القالب الافتراضي؟ ستفقد التعديلات الحالية على نص الرسالة.')) return;
+  document.getElementById('fTemplate').value = DEFAULT_WA_TEMPLATE;
+  showToast('🔄 تم استعادة القالب الافتراضي (لم يُحفظ بعد)');
+}
+
+// Build sample data for the live preview — mirrors the structure used by
+// appointments.html so the preview reflects real rendering.
+function buildSampleData() {
+  const clinicName = document.getElementById('fClinicName').value.trim() || 'عيادتي';
+  const meta = currentUser.user_metadata || {};
+  const doctorName = meta.full_name || meta.name || 'د. أيهم';
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return {
+    patient_name: 'أحمد محمد',
+    patient_first_name: 'أحمد',
+    date: t.getDate() + ' ' + months[t.getMonth()],
+    day_of_week: days[t.getDay()],
+    time: '10:30',
+    doctor_name: doctorName,
+    clinic_name: clinicName,
+    clinic_phone: (document.getElementById('fClinicPhone').value.trim() || '—')
+  };
+}
+
+function applyPlaceholders(template, data) {
+  let out = template;
+  Object.keys(data).forEach(function(k){
+    const re = new RegExp('\\{' + k + '\\}', 'g');
+    out = out.replace(re, data[k]);
+  });
+  return out;
+}
+
+function previewTemplate() {
+  const tpl = document.getElementById('fTemplate').value || DEFAULT_WA_TEMPLATE;
+  const sample = buildSampleData();
+  const rendered = applyPlaceholders(tpl, sample);
+  document.getElementById('waPreviewBubble').textContent = rendered;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('waPreviewTime').textContent = hh + ':' + mm + '  ✓✓';
+  document.getElementById('waPreviewModal').classList.add('open');
+}
+function closeWaPreview() {
+  document.getElementById('waPreviewModal').classList.remove('open');
+}
+
+// Save the WhatsApp-related fields. We use UPSERT on owner_id so this works
+// even when the auto-create above hit an error path and CLINIC_SETTINGS_WA
+// is still null. Other fields (no_show_fee_*) are NOT touched here.
+async function saveClinicSettings() {
+  const enabled    = document.getElementById('waSwitch').classList.contains('on');
+  const clinicName  = document.getElementById('fClinicName').value.trim() || null;
+  const clinicPhone = document.getElementById('fClinicPhone').value.trim() || null;
+  const hoursRaw    = parseInt(document.getElementById('fHoursBefore').value, 10);
+  const hours       = (isNaN(hoursRaw) || hoursRaw < 1) ? 24 : Math.min(hoursRaw, 168);
+  const template    = document.getElementById('fTemplate').value.trim() || DEFAULT_WA_TEMPLATE;
+
+  const btn = document.getElementById('btnSaveWa');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+
+  const payload = {
+    owner_id: currentUser.id,
+    whatsapp_reminders_enabled: enabled,
+    clinic_name: clinicName,
+    clinic_phone: clinicPhone,
+    whatsapp_reminder_hours_before: hours,
+    whatsapp_reminder_template: template,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await window.sb.from('clinic_settings')
+    .upsert(payload, { onConflict: 'owner_id' })
+    .select().single();
+
+  btn.disabled = false; btn.textContent = '💾 حفظ الإعدادات';
+
+  if (error) {
+    const msg = (error.message || '') + ' ' + (error.code || '');
+    if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+      showToast('⚠️ يلزم ترقية قاعدة البيانات (Migration 5)', true);
+    } else {
+      showToast('❌ ' + (error.message || 'فشل الحفظ'), true);
+    }
+    return;
+  }
+  CLINIC_SETTINGS_WA = data;
+  // Reflect any server-side clamping back into the form
+  document.getElementById('fHoursBefore').value = data.whatsapp_reminder_hours_before;
+  showToast('✅ تم حفظ إعدادات WhatsApp');
+}
+
 // ─── Gap 5: Appointment settings (no-show fee) ───
-// Stored in clinic_settings as two keys: no_show_fee_enabled, no_show_fee_amount.
+// Stored as columns no_show_fee_enabled / no_show_fee_amount on the single
+// clinic_settings row per owner (Migration 5b extended the wide-table schema
+// used by WhatsApp Reminders, so Gap 5 now shares that row instead of
+// using a separate key/value pattern).
 // loadAppointmentSettings is fault-tolerant: if the table isn't migrated yet,
 // we keep the form fields at their defaults (disabled, blank amount) instead
 // of breaking the whole settings page.
 async function loadAppointmentSettings() {
   try {
     const res = await window.sb.from('clinic_settings')
-      .select('key, value')
-      .eq('doctor_id', currentUser.id)
-      .in('key', ['no_show_fee_enabled', 'no_show_fee_amount']);
+      .select('no_show_fee_enabled, no_show_fee_amount')
+      .eq('owner_id', currentUser.id)
+      .maybeSingle();
     if (res.error) {
       // Table missing → silently use defaults. Any other error → log it but
       // still let the user open the section.
       const msg = (res.error.message || '') + ' ' + (res.error.code || '');
-      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+      if (!/relation .* does not exist|42P01|PGRST205|PGRST116/i.test(msg)) {
         console.warn('clinic_settings read warn:', res.error);
       }
       return;
     }
-    const byKey = {};
-    (res.data || []).forEach(r => { byKey[r.key] = r.value; });
-    document.getElementById('fNoShowFeeEnabled').checked = (byKey['no_show_fee_enabled'] === 'true');
-    const amt = parseInt(byKey['no_show_fee_amount'] || '0', 10) || 0;
+    const row = res.data || {};
+    document.getElementById('fNoShowFeeEnabled').checked = !!row.no_show_fee_enabled;
+    const amt = parseInt(row.no_show_fee_amount || 0, 10) || 0;
     if (amt > 0) document.getElementById('fNoShowFeeAmount').value = amt;
   } catch (e) {
     console.warn('loadAppointmentSettings fallback:', e);
@@ -478,14 +871,17 @@ async function saveAppointmentSettings(e) {
   const btn = document.getElementById('btnSaveApptSettings');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
-  // Upsert both keys in one round-trip — the unique(doctor_id, key) constraint
-  // means we can rely on onConflict to replace existing rows cleanly.
-  const rows = [
-    { doctor_id: currentUser.id, key: 'no_show_fee_enabled', value: enabled ? 'true' : 'false', updated_at: new Date().toISOString() },
-    { doctor_id: currentUser.id, key: 'no_show_fee_amount',  value: String(isNaN(amount) ? 0 : amount), updated_at: new Date().toISOString() }
-  ];
+  // Upsert into the single per-owner row. UNIQUE(owner_id) means onConflict
+  // cleanly replaces the existing row's no_show_fee_* fields without
+  // touching the WhatsApp settings stored alongside.
+  const payload = {
+    owner_id: currentUser.id,
+    no_show_fee_enabled: enabled,
+    no_show_fee_amount: isNaN(amount) ? 0 : amount,
+    updated_at: new Date().toISOString()
+  };
   const { error } = await window.sb.from('clinic_settings')
-    .upsert(rows, { onConflict: 'doctor_id,key' });
+    .upsert(payload, { onConflict: 'owner_id' });
 
   btn.disabled = false; btn.textContent = 'حفظ التغييرات';
   if (error) {

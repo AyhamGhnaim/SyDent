@@ -617,6 +617,91 @@ textarea { resize: vertical; min-height: 72px; }
   .cal-date { font-size: 12px; }
   .topbar-title { font-size: 16px; }
 }
+
+/* ─── WhatsApp Reminder badges & modal ──────────────── */
+.wa-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-right: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .15s, filter .15s;
+  font-family: 'Cairo', sans-serif;
+}
+.wa-badge:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.wa-badge.sent {
+  background: rgba(46,232,158,0.14); color: var(--green); border-color: rgba(46,232,158,0.35);
+}
+.wa-badge.pending {
+  background: rgba(245,200,66,0.14); color: var(--yellow); border-color: rgba(245,200,66,0.35);
+}
+.wa-badge.urgent {
+  background: rgba(239,83,80,0.14); color: var(--red); border-color: rgba(239,83,80,0.45);
+  animation: waPulse 2.2s ease-in-out infinite;
+}
+@keyframes waPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,0.4); }
+  50%     { box-shadow: 0 0 0 4px rgba(239,83,80,0); }
+}
+
+.wa-modal-message {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  font-family: 'Cairo', sans-serif;
+  color: var(--text);
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  outline: none;
+}
+.wa-modal-message:focus { border-color: var(--green); }
+
+.wa-info-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.wa-info-row strong { color: var(--green); }
+.wa-info-row .wa-info-label { color: var(--text2); font-size: 12px; }
+
+.wa-warn-row {
+  background: rgba(245,200,66,0.10);
+  border: 1px solid rgba(245,200,66,0.35);
+  color: var(--yellow);
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.wa-send-btn {
+  background: #25D366;
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 9px;
+  border: none;
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.wa-send-btn:hover { opacity: .9; }
+.wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js"></script>
@@ -837,6 +922,40 @@ textarea { resize: vertical; min-height: 72px; }
 </div>
 
 <!-- Toast -->
+<!-- WhatsApp Reminder Modal -->
+<div class="modal-overlay" id="waReminderModal" onclick="if(event.target===this) closeWaReminderModal()">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-header">
+      <h2 class="modal-title" style="color:#25D366;">📱 إرسال تذكير عبر WhatsApp</h2>
+      <button class="modal-close" type="button" onclick="closeWaReminderModal()">✕</button>
+    </div>
+    <div class="wa-info-row">
+      <span class="wa-info-label">المريض:</span>
+      <strong id="waModalPatient">—</strong>
+      <span style="margin-right:auto;"></span>
+      <span class="wa-info-label">الهاتف:</span>
+      <strong id="waModalPhone">—</strong>
+    </div>
+    <div class="wa-info-row">
+      <span class="wa-info-label">الموعد:</span>
+      <strong id="waModalDateTime">—</strong>
+    </div>
+    <div id="waModalWarn" class="wa-warn-row" style="display:none;"></div>
+    <div style="margin-top:12px;">
+      <label style="font-size:13px; font-weight:600; color:var(--text2); margin-bottom:6px; display:block;">
+        نص الرسالة (يمكن تعديله قبل الإرسال)
+      </label>
+      <textarea id="waModalMessage" class="wa-modal-message" placeholder="الرسالة..."></textarea>
+    </div>
+    <div class="modal-footer" style="gap:10px;">
+      <button type="button" class="btn-cancel" onclick="closeWaReminderModal()">إلغاء</button>
+      <button type="button" class="wa-send-btn" id="waSendBtn" onclick="sendWaReminder()">
+        <span>📱</span> <span>فتح WhatsApp وإرسال</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -949,6 +1068,282 @@ let sessionsByAppt = {};       // { appointment_id: [ledger_sessions] } — proc
 let plannedSessionsByPatient = {}; // { patient_id: [planned ledger_sessions with appointment_id IS NULL] }
 let CLINIC_DOCTORS = [];       // for provider picker
 let currentUser  = null;
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 2A — WhatsApp Reminders (click-to-chat via wa.me)
+// All helpers inlined per Phase 2A architecture decision (no shared file
+// given the no-build-tools constraint). Settings live in clinic_settings.
+// reminder_logs tracks dispatch attempts. Fault-tolerant throughout: if
+// the tables are missing we treat the feature as disabled rather than
+// breaking the page.
+// ═══════════════════════════════════════════════════════════════
+let CLINIC_SETTINGS_WA = null;
+let reminderLogsByAppt = {};   // { appointment_id: latest_log }
+let patientsCache = {};        // { patient_id: {name, phone}, '__name__'+name: {id,name,phone} }
+
+const DEFAULT_WA_TEMPLATE =
+'مرحباً {patient_name} 👋\n\n' +
+'تذكير بموعدك في عيادة {clinic_name}:\n' +
+'📅 التاريخ: {date} ({day_of_week})\n' +
+'🕐 الساعة: {time}\n' +
+'👨‍⚕️ الطبيب: {doctor_name}\n\n' +
+'الرجاء تأكيد الحضور 🙏';
+
+// Distinct names from MONTHS_AR/DAYS_AR above (which are scoped lower in the
+// file and used by the existing calendar renderer). Keeping these separate
+// avoids any temporal-dead-zone or naming-collision surprises.
+const DAYS_AR_FULL   = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+const MONTHS_AR_FULL = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+// Normalize Syrian phone numbers to wa.me digits-only format with country code.
+// Accepts: 0944xxx, +963xxx, 00963xxx, 963xxx, 944xxx — and tolerates spaces/dashes.
+function normalizePhone(raw) {
+  if (!raw) return null;
+  let p = String(raw).replace(/\D/g, '');
+  if (!p) return null;
+  if (p.startsWith('00')) p = p.substring(2);
+  if (p.startsWith('0') && p.length >= 9) p = '963' + p.substring(1);
+  else if (!p.startsWith('963') && p.length === 9) p = '963' + p;
+  if (p.length < 10 || p.length > 15) return null;
+  return p;
+}
+
+function formatArabicDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  if (isNaN(d.getTime())) return dateStr;
+  return d.getDate() + ' ' + MONTHS_AR_FULL[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function applyWaPlaceholders(template, data) {
+  let out = template || '';
+  Object.keys(data || {}).forEach(function(k){
+    const re = new RegExp('\\{' + k + '\\}', 'g');
+    out = out.replace(re, data[k] == null ? '' : String(data[k]));
+  });
+  return out;
+}
+
+function buildWaPlaceholderData(appt) {
+  const fullName = (appt.patient_name || '').trim();
+  const firstName = fullName.split(' ')[0] || fullName || 'المريض';
+  let doctorName = '';
+  if (appt.provider_id) {
+    const doc = (CLINIC_DOCTORS || []).find(function(d){ return d.id === appt.provider_id; });
+    if (doc) doctorName = doc.name || '';
+  }
+  if (!doctorName) {
+    const meta = (currentUser && currentUser.user_metadata) || {};
+    doctorName = meta.full_name || meta.name || '';
+  }
+  const d = new Date((appt.date || '') + 'T12:00:00');
+  const dow = isNaN(d.getTime()) ? '' : DAYS_AR_FULL[d.getDay()];
+
+  return {
+    patient_name: fullName || 'المريض',
+    patient_first_name: firstName,
+    date: formatArabicDate(appt.date),
+    day_of_week: dow,
+    time: (appt.time || '').slice(0,5),
+    doctor_name: doctorName || '—',
+    clinic_name:  (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_name)  || 'عيادتنا',
+    clinic_phone: (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_phone) || ''
+  };
+}
+
+function buildWaMessage(appt) {
+  const tpl = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminder_template) || DEFAULT_WA_TEMPLATE;
+  return applyWaPlaceholders(tpl, buildWaPlaceholderData(appt));
+}
+
+async function loadClinicSettingsWa() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await window.sb.from('clinic_settings')
+      .select('*').eq('owner_id', currentUser.id).maybeSingle();
+    if (error && error.code !== 'PGRST116') {
+      const msg = (error.message || '') + ' ' + (error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('clinic_settings load:', error);
+      }
+      return;
+    }
+    if (data) CLINIC_SETTINGS_WA = data;
+  } catch(e) { console.warn('clinic_settings:', e); }
+}
+
+async function loadReminderLogs() {
+  if (!currentUser) return;
+  reminderLogsByAppt = {};
+  try {
+    const { data, error } = await window.sb.from('reminder_logs')
+      .select('appointment_id, sent_at, status, channel')
+      .eq('owner_id', currentUser.id)
+      .order('sent_at', { ascending: false });
+    if (error) {
+      const msg = (error.message || '') + ' ' + (error.code || '');
+      if (!/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        console.warn('reminder_logs load:', error);
+      }
+      return;
+    }
+    (data || []).forEach(function(log){
+      // Latest log per appointment (data is DESC-sorted, first hit wins)
+      if (!reminderLogsByAppt[log.appointment_id]) {
+        reminderLogsByAppt[log.appointment_id] = log;
+      }
+    });
+  } catch(e) { console.warn('reminder_logs:', e); }
+}
+
+// Lightweight phone resolution cache — keyed by both id and name so the
+// resolver works for legacy appointments where patient_id is null.
+async function loadPatientPhones() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await window.sb.from('patients')
+      .select('id, name, phone').eq('doctor_id', currentUser.id);
+    if (error) { console.warn('patients phones load:', error); return; }
+    patientsCache = {};
+    (data || []).forEach(function(p){
+      patientsCache[p.id] = { name: p.name, phone: p.phone };
+      if (p.name) patientsCache['__name__' + p.name] = { id: p.id, name: p.name, phone: p.phone };
+    });
+  } catch(e) { console.warn('patients phones:', e); }
+}
+
+function resolvePatientPhoneForAppt(appt) {
+  if (appt.patient_id && patientsCache[appt.patient_id]) return patientsCache[appt.patient_id].phone || null;
+  if (appt.patient_name && patientsCache['__name__' + appt.patient_name]) {
+    return patientsCache['__name__' + appt.patient_name].phone || null;
+  }
+  return null;
+}
+
+// Returns { kind: 'sent'|'pending'|'urgent', label, title } for a future
+// appointment that has a phone-equipped patient, or null when no badge applies.
+function classifyReminderForAppt(appt) {
+  if (!appt || !appt.id || !appt.date) return null;
+  if (appt.status === 'cancelled') return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(appt.date + 'T12:00:00');
+  if (isNaN(d.getTime())) return null;
+  const diffMs = d.getTime() - today.getTime();
+  if (diffMs < 0) return null;
+
+  const log = reminderLogsByAppt[appt.id];
+  if (log) {
+    return { kind: 'sent', label: '✓ تم التذكير', title: 'آخر تذكير: ' + new Date(log.sent_at).toLocaleString('ar') };
+  }
+  const diffH = diffMs / 36e5;
+  const cfgHours = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminder_hours_before) || 24;
+  if (diffH <= 24) {
+    return { kind: 'urgent', label: '⚠️ موعد قريب — أرسل تذكير', title: 'الموعد خلال ' + Math.round(diffH) + ' ساعة بدون تذكير' };
+  }
+  if (diffH <= cfgHours + 24) {
+    return { kind: 'pending', label: '📱 أرسل تذكير', title: 'حان وقت إرسال التذكير' };
+  }
+  return null;
+}
+
+function getReminderBadgeHtml(appt) {
+  if (!CLINIC_SETTINGS_WA || !CLINIC_SETTINGS_WA.whatsapp_reminders_enabled) return '';
+  const c = classifyReminderForAppt(appt);
+  if (!c) return '';
+  return '<span class="wa-badge ' + c.kind + '" title="' + c.title.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation(); openWaReminderModal(\'' + appt.id + '\')">' + c.label + '</span>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WhatsApp Reminder Modal handlers
+// ═══════════════════════════════════════════════════════════════
+let _currentWaApptId = null;
+
+function openWaReminderModal(apptId) {
+  const appt = appointments.find(function(a){ return a.id === apptId; });
+  if (!appt) { showToast('❌ لم يُعثر على الموعد'); return; }
+  _currentWaApptId = apptId;
+
+  document.getElementById('waModalPatient').textContent = appt.patient_name || '—';
+  const phone = resolvePatientPhoneForAppt(appt);
+  document.getElementById('waModalPhone').textContent = phone || '⚠️ غير متوفر';
+  const d = new Date((appt.date || '') + 'T12:00:00');
+  const dStr = isNaN(d.getTime()) ? appt.date : (DAYS_AR_FULL[d.getDay()] + ' ' + formatArabicDate(appt.date));
+  document.getElementById('waModalDateTime').textContent = dStr + ' — ' + ((appt.time || '').slice(0,5));
+
+  const warn = document.getElementById('waModalWarn');
+  let warnHtml = '';
+  if (!phone) {
+    warnHtml += '⚠️ لا يوجد رقم هاتف مسجَّل لهذا المريض. أضِف رقم الهاتف في ملف المريض أولاً.<br>';
+  }
+  const prevLog = reminderLogsByAppt[apptId];
+  if (prevLog) {
+    warnHtml += 'ℹ️ تم إرسال تذكير سابقاً في ' + new Date(prevLog.sent_at).toLocaleString('ar') + '. هل تريد إرسال آخر؟';
+  }
+  if (warnHtml) { warn.innerHTML = warnHtml; warn.style.display = 'block'; }
+  else { warn.style.display = 'none'; warn.innerHTML = ''; }
+
+  document.getElementById('waModalMessage').value = buildWaMessage(appt);
+
+  const sendBtn = document.getElementById('waSendBtn');
+  sendBtn.disabled = !phone;
+
+  document.getElementById('waReminderModal').classList.add('open');
+}
+
+function closeWaReminderModal() {
+  document.getElementById('waReminderModal').classList.remove('open');
+  _currentWaApptId = null;
+}
+
+async function sendWaReminder() {
+  if (!_currentWaApptId) return;
+  const appt = appointments.find(function(a){ return a.id === _currentWaApptId; });
+  if (!appt) { showToast('❌ لم يُعثر على الموعد'); return; }
+  const rawPhone = resolvePatientPhoneForAppt(appt);
+  const phone = normalizePhone(rawPhone);
+  if (!phone) { showToast('⚠️ رقم الهاتف غير صالح'); return; }
+  const message = document.getElementById('waModalMessage').value.trim();
+  if (!message) { showToast('⚠️ الرسالة فارغة'); return; }
+
+  const sendBtn = document.getElementById('waSendBtn');
+  sendBtn.disabled = true;
+
+  // wa.me universal link — works on WhatsApp Web, mobile app, and desktop app
+  const url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(message);
+  window.open(url, '_blank');
+
+  // Audit log (best-effort) — patient_id is FK NOT NULL so we resolve it first.
+  try {
+    let pid = appt.patient_id;
+    if (!pid && appt.patient_name && patientsCache['__name__' + appt.patient_name]) {
+      pid = patientsCache['__name__' + appt.patient_name].id;
+    }
+    if (!pid) {
+      showToast('✅ تم فتح WhatsApp (لم يُسجَّل لوغ — مريض غير مرتبط)');
+      closeWaReminderModal();
+      return;
+    }
+    const { error } = await window.sb.from('reminder_logs').insert({
+      owner_id: currentUser.id,
+      appointment_id: appt.id,
+      patient_id: pid,
+      channel: 'whatsapp_link',
+      status: 'sent',
+      message_text: message,
+      recipient_phone: phone
+    });
+    if (error) {
+      console.warn('reminder_logs insert:', error);
+      showToast('✅ تم فتح WhatsApp (تعذّر حفظ السجل)');
+    } else {
+      showToast('✅ تم إرسال التذكير');
+      await loadReminderLogs();
+      render();
+    }
+  } catch(e) { console.warn('sendWaReminder:', e); }
+
+  closeWaReminderModal();
+}
 
 /* OpenDental 3-tier provider default resolver:
    1. user_id == currentUser.id  → linked doctor
@@ -1441,10 +1836,9 @@ function isFinishedStatus(s) {
 }
 
 // ─── Gap 5: No-Show fee helpers ──────────────────────────────────────────────
-// Settings live in the generic clinic_settings table (key/value store) so we
-// don't need a fresh migration every time we add a preference. Two keys here:
-//   - 'no_show_fee_enabled' : 'true' | 'false'
-//   - 'no_show_fee_amount'  : integer string (Syrian Pounds)
+// Settings live as columns on the single clinic_settings row per owner
+// (Migration 5b extended the wide-table schema used by WhatsApp Reminders,
+// so Gap 5 now shares that row instead of using a separate key/value pattern).
 // Both reads are fault-tolerant: if the table doesn't exist yet (pre-migration),
 // we treat the feature as disabled instead of breaking the user's workflow.
 
@@ -1465,20 +1859,18 @@ function isClinicSettingsTableMissing(err) {
 async function getNoShowFeeConfig() {
   try {
     var res = await window.sb.from('clinic_settings')
-      .select('key, value')
-      .eq('doctor_id', currentUser.id)
-      .in('key', ['no_show_fee_enabled', 'no_show_fee_amount']);
+      .select('no_show_fee_enabled, no_show_fee_amount')
+      .eq('owner_id', currentUser.id)
+      .maybeSingle();
     if (res.error) {
       if (!isClinicSettingsTableMissing(res.error)) {
         console.warn('clinic_settings read warn:', res.error);
       }
       return { enabled: false, amount: 0 };
     }
-    var rows = res.data || [];
-    var byKey = {};
-    rows.forEach(function(r){ byKey[r.key] = r.value; });
-    var enabled = (byKey['no_show_fee_enabled'] === 'true');
-    var amount  = parseInt(byKey['no_show_fee_amount'] || '0', 10) || 0;
+    var row = res.data || {};
+    var enabled = !!row.no_show_fee_enabled;
+    var amount  = parseInt(row.no_show_fee_amount || 0, 10) || 0;
     return { enabled: enabled, amount: amount };
   } catch (e) {
     console.warn('getNoShowFeeConfig fallback:', e);
@@ -2029,12 +2421,13 @@ function renderDay() {
       var psHtml = ps
         ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
         : '';
+      var waHtml = getReminderBadgeHtml(e);
       html += `
         <div class="time-slot">
           <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
+              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}${psHtml}${waHtml}</div>
               <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
               ${renderTimeStrip(e)}
               <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
@@ -2092,12 +2485,13 @@ function renderList() {
       var psHtml = ps
         ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
         : '';
+      var waHtml = getReminderBadgeHtml(e);
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${(e.time||'').slice(0,5)}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${initials(e.patient_name||'؟')}</div>
           <div class="list-info">
-            <div class="list-name">${e.patient_name||'—'} ${lbHtml}${psHtml}</div>
+            <div class="list-name">${e.patient_name||'—'} ${lbHtml}${psHtml}${waHtml}</div>
             <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
             ${renderTimeStrip(e)}
           </div>
@@ -3198,6 +3592,10 @@ function showToast(msg) {
   currentUser = data.user;
   await loadClinicDoctors();
   await loadAppointmentTypes();  // Gap 8: cache templates for the modal picker
+  // Phase 2A — WhatsApp Reminders state
+  await loadClinicSettingsWa();
+  await loadPatientPhones();
+  await loadReminderLogs();
   await loadAppointments();
 })();
 
