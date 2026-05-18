@@ -356,6 +356,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
 
+      <div class="form-group">
+        <label>الاسم المبسّط للمريض <span style="color:var(--text2);font-weight:400;font-size:12px;">— اختياري</span></label>
+        <input type="text" id="tLaymanName" placeholder="مثال: حشوة بيضاء صغيرة" maxlength="100" autocomplete="off">
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">يُعرض في طباعة دليل العلاجات والإيصالات للمريض. إن تُرك فارغاً، يُعرض الاسم التقني.</div>
+      </div>
+
       <!-- Hidden label input (auto-generated from name) -->
       <input type="hidden" id="tLabel" value="">
 
@@ -633,6 +639,7 @@ async function loadTreatments() {
       is_active: t.is_active !== false,  // default true if column doesn't exist
       category: t.category || 'other',
       default_note: t.default_note || '',
+      layman_name: t.layman_name || '',
       price_overrides: t.price_overrides || {},  // {doctor_id: price}
       is_bundle: !!t.is_bundle
     };
@@ -786,6 +793,9 @@ function render() {
     var inactiveBadge = isInactive ? '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(160,160,160,.2);color:#9ca3af;border:1px solid #6b7280;margin-right:4px;">⏸️ معطّل</span>' : '';
     var toggleBtnText = isInactive ? '▶️ تفعيل' : '⏸️ تعطيل';
     var toggleBtnClass = isInactive ? 'act-btn' : 'inact-btn';
+    var laymanRow = (t.layman_name && t.layman_name.trim())
+      ? '<div class="treat-key" style="color:#7dd3fc;" title="الاسم المبسّط للمريض (يظهر في الطباعة والإيصالات)">👤 ' + escapeHtml(t.layman_name) + '</div>'
+      : '';
     html += '<div class="treat-card" draggable="true" data-treat-id="' + t.id + '" style="' + inactiveStyle + '">'
       + '<div class="treat-color-bar" style="' + bar + '"></div>'
       + '<div class="drag-handle" title="اسحب لإعادة الترتيب">⋮⋮</div>'
@@ -795,6 +805,7 @@ function render() {
           + '<div>'
             + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + bundleTag + ' ' + customPricesTag + ' ' + inactiveBadge + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
+            + laymanRow
           + '</div>'
           + '<div class="treat-icon" style="' + iconBg + 'border:2px solid ' + fg + ';"></div>'
         + '</div>'
@@ -851,6 +862,7 @@ function openAddModal() {
   document.getElementById('tName').value  = '';
   document.getElementById('tPrice').value = '';
   document.getElementById('tLabel').value = '';
+  document.getElementById('tLaymanName').value = '';
   document.getElementById('tNeedsLab').checked = false;
   document.getElementById('tCategory').value = 'restorative';
   document.getElementById('tDefaultNote').value = '';
@@ -869,6 +881,7 @@ function editTreatment(id) {
   document.getElementById('tName').value  = t.name;
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label;
+  document.getElementById('tLaymanName').value = t.layman_name || '';
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
@@ -914,6 +927,7 @@ function duplicateTreatment(id) {
   document.getElementById('tName').value  = t.name + ' (نسخة)';
   document.getElementById('tPrice').value = t.price;
   document.getElementById('tLabel').value = t.label || '';
+  document.getElementById('tLaymanName').value = t.layman_name || '';
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
@@ -1199,8 +1213,10 @@ async function saveTreatment() {
   var needsLab = document.getElementById('tNeedsLab').checked;
   var category = document.getElementById('tCategory').value;
   var defaultNote = document.getElementById('tDefaultNote').value.trim();
+  var laymanName = document.getElementById('tLaymanName').value.trim();
   if (!name)                 { showToast('⚠️ الاسم مطلوب'); return; }
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
+  if (laymanName.length > 100) { showToast('⚠️ الاسم المبسّط طويل جداً (الحد 100 حرف)'); return; }
 
   if (editingId) {
     // Log price change to history (if price actually changed)
@@ -1219,34 +1235,61 @@ async function saveTreatment() {
       } catch(e) { /* history table may not exist yet — silently ignore */ }
     }
     // UPDATE existing
-    const { error } = await window.sb
+    var updatePayload = { name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, layman_name: laymanName || null, updated_at: new Date().toISOString() };
+    var updRes = await window.sb
       .from('treatments')
-      .update({ name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq('id', editingId);
-    if (error) { showToast('⚠️ ' + error.message); return; }
+    if (updRes.error && _isLaymanColMissing(updRes.error)) {
+      // Migration 7.1 not yet run — retry without layman_name
+      delete updatePayload.layman_name;
+      updRes = await window.sb
+        .from('treatments')
+        .update(updatePayload)
+        .eq('id', editingId);
+      if (!updRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
+    }
+    if (updRes.error) { showToast('⚠️ ' + updRes.error.message); return; }
   } else {
     // INSERT new
     const key = 'custom_' + Date.now();
     const maxOrder = treatments.length > 0 ? Math.max.apply(null, treatments.map(t=>t.sort_order||0)) : 0;
-    const { error } = await window.sb
+    var insertPayload = {
+      doctor_id: currentDoctor.id,
+      treatment_key: key,
+      name: name, price: price, label: label,
+      fill: pickedFill, stroke: pickedStroke,
+      needs_lab: needsLab,
+      target_part: pickedTarget,
+      category: category,
+      default_note: defaultNote,
+      layman_name: laymanName || null,
+      builtin: false,
+      sort_order: maxOrder + 1
+    };
+    var insRes = await window.sb
       .from('treatments')
-      .insert({
-        doctor_id: currentDoctor.id,
-        treatment_key: key,
-        name: name, price: price, label: label,
-        fill: pickedFill, stroke: pickedStroke,
-        needs_lab: needsLab,
-        target_part: pickedTarget,
-        category: category,
-        default_note: defaultNote,
-        builtin: false,
-        sort_order: maxOrder + 1
-      });
-    if (error) { showToast('⚠️ ' + error.message); return; }
+      .insert(insertPayload);
+    if (insRes.error && _isLaymanColMissing(insRes.error)) {
+      // Migration 7.1 not yet run — retry without layman_name
+      delete insertPayload.layman_name;
+      insRes = await window.sb
+        .from('treatments')
+        .insert(insertPayload);
+      if (!insRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
+    }
+    if (insRes.error) { showToast('⚠️ ' + insRes.error.message); return; }
   }
   closeModal();
   await loadTreatments();
   showToast(editingId ? '✅ تم التعديل' : '✅ تم إضافة العلاج');
+}
+
+// Detect "layman_name column doesn't exist" error (graceful fallback for pre-Migration 7.1 schema)
+function _isLaymanColMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /layman_name/i.test(msg) && /(does not exist|42703|PGRST204|PGRST205|schema cache)/i.test(msg);
 }
 
 function pickColor(fill, stroke) {
@@ -1639,9 +1682,12 @@ function printLegend() {
     html += '<div class="cat-title">' + catNames[cat] + '</div>';
     html += '<table class="tab"><thead><tr><th style="width:30px;">اللون</th><th>اسم العلاج</th><th style="width:90px;">الرمز</th><th style="width:120px;">السعر</th></tr></thead><tbody>';
     grouped[cat].forEach(function(t){
+      var laymanSub = (t.layman_name && t.layman_name.trim())
+        ? '<div style="font-size:11px;color:#666;font-weight:400;margin-top:2px;">👤 للمريض: ' + escapeHtml(t.layman_name) + '</div>'
+        : '';
       html += '<tr>';
       html += '<td><span class="color-dot" style="background:' + t.fill + ';"></span></td>';
-      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#a78bfa;font-size:11px;">🧪 مخبر</span>' : '') + '</td>';
+      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#a78bfa;font-size:11px;">🧪 مخبر</span>' : '') + laymanSub + '</td>';
       html += '<td>' + escapeHtml(t.label) + '</td>';
       html += '<td class="price-col">' + fmt(t.price) + ' ل.س</td>';
       html += '</tr>';

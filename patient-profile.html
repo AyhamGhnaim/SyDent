@@ -1881,6 +1881,22 @@ function safe(fn, label) {
 
 /* ── Treatment catalog ── */
 var TREATMENTS = JSON.parse(localStorage.getItem('sydent_treatments') || '[]');
+
+/**
+ * Returns the appropriate display name for a treatment.
+ * - forPatient=true: returns layman_name if set, else falls back to technical name.
+ * - forPatient=false (default): returns technical name (clinician-facing).
+ * Used for printable treatment plans, receipts, and future WhatsApp templates.
+ * Internal UI (legends, tooltips, dropdowns) keeps technical names for the practitioner.
+ */
+function getDisplayName(treatment, forPatient) {
+  if (!treatment) return '';
+  if (forPatient && treatment.layman_name && String(treatment.layman_name).trim()) {
+    return String(treatment.layman_name).trim();
+  }
+  return treatment.name || '';
+}
+
 async function loadTreatmentsFromSupabase() {
   if (!window.sb) return;
   try {
@@ -1896,6 +1912,7 @@ async function loadTreatmentsFromSupabase() {
                category: t.category || 'other',
                default_note: t.default_note || '',
                completion_note: t.completion_note || '',
+               layman_name: t.layman_name || '',
                price_overrides: t.price_overrides || {},
                is_bundle: !!t.is_bundle };
     });
