@@ -127,6 +127,8 @@
   .stat-change { font-size: 12px; margin-top: 6px; }
   .stat-change.up { color: var(--accent); }
   .stat-change.down { color: var(--red); }
+  .stat-link { display: inline-block; text-decoration: none; cursor: pointer; }
+  .stat-link:hover { text-decoration: underline; }
   .stat-icon { font-size: 24px; float: left; opacity: 0.6; }
 
   .grid-2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-bottom: 24px; }
@@ -445,12 +447,12 @@
       <div class="stat-value" id="statIncome">—</div>
       <div class="stat-change up">ل.س</div>
     </div>
-    <a class="stat-card" href="patients.html">
+    <div class="stat-card">
       <span class="stat-icon">⚠️</span>
       <div class="stat-label">مستحقات</div>
       <div class="stat-value" id="statPending">—</div>
-      <div class="stat-change down" id="statPendingCount"></div>
-    </a>
+      <a class="stat-change down stat-link" id="statPendingCount" href="patients.html?filter=pending"></a>
+    </div>
   </div>
 
   <div class="grid-2">
@@ -551,8 +553,55 @@ async function loadDashboard() {
   }).length;
   document.getElementById('statPatientsNew').textContent = newCount ? '↑ ' + newCount + ' هذا الشهر' : '';
   const pendingCount = list.filter(p => p.payment === 'متبقي').length;
-  document.getElementById('statPending').textContent = pendingCount || '0';
-  document.getElementById('statPendingCount').textContent = pendingCount ? pendingCount + ' مرضى' : 'لا توجد مستحقات';
+
+  // ── مجموع المستحقات ──
+  // Compute total outstanding amount across pending patients:
+  //   total_due = sum(sessions.cost) - sum(payments.amount), summed only for
+  //   patients with payment='متبقي' (kept in sync by syncPaymentStatus in
+  //   patient-profile.html). We use per-doctor scope; partial unallocated
+  //   prepayments stay netted out (legacy behavior, matches OpenDental Aging).
+  // If queries fail or return nothing, fall back to '—'.
+  let totalDue = 0;
+  try {
+    const pendingIds = list.filter(p => p.payment === 'متبقي').map(p => p.id);
+    if (pendingIds.length > 0) {
+      const [sessRes, payRes] = await Promise.all([
+        window.sb.from('ledger_sessions').select('patient_id,cost')
+          .eq('doctor_id', uid).in('patient_id', pendingIds),
+        window.sb.from('ledger_payments').select('patient_id,amount')
+          .eq('doctor_id', uid).in('patient_id', pendingIds)
+      ]);
+      const sessSum = (sessRes.data || []).reduce((s,r) => s + Number(r.cost||0), 0);
+      const paySum  = (payRes.data  || []).reduce((s,r) => s + Number(r.amount||0), 0);
+      // Cap at 0 to avoid negative totals from over-paid edge cases mixing in.
+      totalDue = Math.max(0, sessSum - paySum);
+    }
+  } catch (e) {
+    console.warn('totalDue computation failed:', e);
+    totalDue = 0;
+  }
+
+  // Format total: keep raw number if small, abbreviate to K/M for readability
+  function fmtDueAmount(n) {
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 10000)   return Math.round(n/1000) + 'K';
+    return String(Math.round(n));
+  }
+  if (pendingCount > 0) {
+    document.getElementById('statPending').textContent = fmtDueAmount(totalDue) + ' ل.س';
+  } else {
+    document.getElementById('statPending').textContent = '0';
+  }
+  var pcEl = document.getElementById('statPendingCount');
+  if (pendingCount) {
+    pcEl.textContent = pendingCount + ' مريض ←';
+    pcEl.style.pointerEvents = '';
+    pcEl.style.opacity = '';
+  } else {
+    pcEl.textContent = 'لا توجد مستحقات';
+    pcEl.style.pointerEvents = 'none';
+    pcEl.style.opacity = '0.7';
+  }
 
   // آخر 5 مرضى (الأحدث أولاً)
   const recent = list.slice().sort((a,b) => (b.created_at||'').localeCompare(a.created_at||'')).slice(0, 5);

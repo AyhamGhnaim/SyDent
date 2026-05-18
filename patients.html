@@ -896,7 +896,23 @@ function showToast(msg) {
   if (!data || !data.user) { window.location.href = 'auth.html'; return; }
   currentUser = data.user;
   await loadPatients();
+  // Apply URL filter param (deep-link from dashboard, e.g. ?filter=pending)
+  applyUrlFilter();
 })();
+
+// Reads ?filter=<key> from the URL and activates the matching filter button.
+// Allowed keys mirror setFilter(): all, active, pending, new.
+function applyUrlFilter() {
+  try {
+    var params = new URLSearchParams(window.location.search || '');
+    var f = (params.get('filter') || '').toLowerCase();
+    if (!f) return;
+    var allowed = { all: 1, active: 1, pending: 1, 'new': 1 };
+    if (!allowed[f]) return;
+    var btn = document.querySelector('.filter-btn[onclick*="\'' + f + '\'"]');
+    if (btn) setFilter(f, btn);
+  } catch(e) { /* malformed URL: ignore */ }
+}
 
 window.onPTRRefresh = function() { loadPatients(); };
 
