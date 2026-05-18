@@ -4395,10 +4395,16 @@ async function openToothModal(n, surface) {
       if (tpR !== 'quadrant' && tpR !== 'arch' && tpR !== 'mouth') continue;
       matchedR++;
       var textColorR = isLightColor(tR.fill) ? '#0a1628' : '#fff';
+      // Phase 3 Feature D: same patient-facing subtitle pattern for regional
+      // treatments (denture, full-mouth exam, quadrant cleaning, etc.).
+      var laymanLineR = (tR.layman_name && String(tR.layman_name).trim())
+        ? '<div style="font-size:11px;color:#7dd3fc;margin-top:2px;font-weight:500;">👤 ' + escapeHtml(tR.layman_name.trim()) + '</div>'
+        : '';
       htmlR += '<button class="topt" style="border-color:' + tR.fill + ';background:' + tR.fill + '22;" '
             + 'onclick="pickToothTreatment(\'' + tR.treatment_key + '\',\'' + escapeHtml(tR.name) + '\')">'
             + '<span class="topt-label" style="background:' + tR.fill + ';color:' + textColorR + ';">' + tR.label + '</span>'
             + '<span>' + escapeHtml(tR.name) + '</span>'
+            + laymanLineR
             + '</button>';
     }
     if (matchedR === 0) {
@@ -4476,10 +4482,19 @@ async function openToothModal(n, surface) {
     if (!isAllowed(t)) continue;
     matched++;
     var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
+    // Phase 3 Feature D: show the layman (patient-facing) name as a subtle
+    // subtitle when present. The clinician sees both — technical for clinical
+    // accuracy, patient-friendly for "what would I say to the patient if they
+    // ask what this is". Matches the styling used in treatments.html legend.
+    var laymanLine = (t.layman_name && String(t.layman_name).trim())
+      ? '<div style="font-size:11px;color:#7dd3fc;margin-top:2px;font-weight:500;">👤 ' + escapeHtml(t.layman_name.trim()) + '</div>'
+      : '';
     html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
          + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
          + '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:18px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
-         + t.name + '</button>';
+         + '<span>' + escapeHtml(t.name) + '</span>'
+         + laymanLine
+         + '</button>';
   }
 
   if (matched === 0) {
