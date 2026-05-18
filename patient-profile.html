@@ -3943,15 +3943,34 @@ function buildTooth(num, surfaceMap, isUpper) {
   svg += '</g></svg>';
 
   // ── Tooltip rows ──
+  // Phase 3 Feature F follow-up: surface tooltip now shows the status badge
+  // (مراقبة/مخطط/محوّل/...) inline after the treatment name. Previously the
+  // tooltip showed "وحشي: حشوة املغم" with no indication that the wحشي surface
+  // was actually marked as 'condition' or 'planned' etc. Without this, the
+  // doctor couldn't tell at a glance which surfaces have a real treatment vs
+  // a watch/plan/referral. (Bug surfaced by live testing of tooth 47 — the
+  // 'وحشي' surface was 'مراقبة' but tooltip showed just "حشوة املغم".)
+  function tipStatusBadge(sm, sk) {
+    if (!sm || !sm.__status) return '';
+    var st = sm.__status[sk];
+    if (!st || st === 'completed') return '';  // 'completed' is the default — no badge
+    var lbl = STATUS_LABELS[st] || st;
+    var col = STATUS_COLORS[st] || '#888';
+    return ' <span style="display:inline-block;padding:0 5px;border-radius:6px;'
+         + 'background:' + col + '33;color:' + col + ';'
+         + 'font-size:10px;font-weight:700;margin-right:4px;">' + lbl + '</span>';
+  }
   var tipRows = '';
   if (hasCrownFull) {
     var cft = getTreatment(crownFullT);
     var cfLabel = isBridgeAbutment ? 'دعامة جسر' : 'التاج كامل';
-    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>' + cfLabel + ':</b> ' + (cft ? cft.name : crownFullT) + '</div>';
+    var cfBadge = tipStatusBadge(sm, 'CROWN_FULL');
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>' + cfLabel + ':</b> ' + (cft ? cft.name : crownFullT) + cfBadge + '</div>';
   }
   if (hasWhole) {
     var wt = getTreatment(wholeT);
-    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + wholeColor + '"></span><b>السن كاملاً:</b> ' + (wt ? wt.name : wholeT) + '</div>';
+    var wBadge = tipStatusBadge(sm, 'WHOLE');
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + wholeColor + '"></span><b>السن كاملاً:</b> ' + (wt ? wt.name : wholeT) + wBadge + '</div>';
   } else {
     var crownKeys = surfacesFor(num);
     for (var ki = 0; ki < crownKeys.length; ki++) {
@@ -3961,7 +3980,8 @@ function buildTooth(num, surfaceMap, isUpper) {
         var tobj = getTreatment(tk);
         var tname = tobj ? tobj.name : tk;
         var tcolor = T_FILL[tk] || '#888';
-        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + SURFACE_LABELS[sk] + ':</b> ' + tname + '</div>';
+        var skBadge = tipStatusBadge(sm, sk);
+        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + SURFACE_LABELS[sk] + ':</b> ' + tname + skBadge + '</div>';
       }
     }
     for (var rj = 0; rj < anat.roots.length; rj++) {
@@ -3971,7 +3991,8 @@ function buildTooth(num, surfaceMap, isUpper) {
         var rtobj = getTreatment(rtk);
         var rtname = rtobj ? rtobj.name : rtk;
         var rtcolor = T_FILL[rtk] || '#888';
-        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + rtcolor + '"></span><b>' + SURFACE_LABELS[rk] + ':</b> ' + rtname + '</div>';
+        var rkBadge = tipStatusBadge(sm, rk);
+        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + rtcolor + '"></span><b>' + SURFACE_LABELS[rk] + ':</b> ' + rtname + rkBadge + '</div>';
       }
     }
   }
