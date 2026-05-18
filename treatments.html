@@ -257,6 +257,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="prosthodontics">🔗 تعويضي</option>
         <option value="implantology">🔩 زراعة</option>
         <option value="cosmetic">✨ تجميلي</option>
+        <option value="prosth_cosmetic">💎 تعويض تجميلي</option>
         <option value="orthodontics">⚓ تقويم</option>
         <option value="other">📋 أخرى</option>
       </select>
@@ -383,12 +384,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <select id="tCategory" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
           <option value="diagnostic">🔍 تشخيصي (أشعة، استشارة)</option>
           <option value="preventive">🛡️ وقائي (تنظيف، فلوريد)</option>
-          <option value="restorative" selected>🦷 ترميمي (حشوات، تلبيس)</option>
+          <option value="restorative" selected>🦷 ترميمي (حشوات فقط)</option>
           <option value="endodontics">🌱 لب وجذر (قناة جذر)</option>
           <option value="surgical">🔪 جراحي (قلع، جراحة)</option>
-          <option value="prosthodontics">🔗 تعويضي (جسر، طقم)</option>
+          <option value="prosthodontics">🔗 تعويضي (تاج، جسر، طقم)</option>
           <option value="implantology">🔩 زراعة</option>
-          <option value="cosmetic">✨ تجميلي (تبييض، فينير)</option>
+          <option value="cosmetic">✨ تجميلي (تبييض)</option>
+          <option value="prosth_cosmetic">💎 تعويض تجميلي (فينير، زركون)</option>
           <option value="orthodontics">⚓ تقويم</option>
           <option value="other">📋 أخرى</option>
         </select>
@@ -764,16 +766,17 @@ function render() {
       'both':       { text:'تاج وجذر',    color:'#fb923c' }
     };
     var catMap = {
-      'diagnostic':    '🔍 تشخيصي',
-      'preventive':    '🛡️ وقائي',
-      'restorative':   '🦷 ترميمي',
-      'endodontics':   '🌱 لب وجذر',
-      'surgical':      '🔪 جراحي',
-      'prosthodontics':'🔗 تعويضي',
-      'implantology':  '🔩 زراعة',
-      'cosmetic':      '✨ تجميلي',
-      'orthodontics':  '⚓ تقويم',
-      'other':         '📋 أخرى'
+      'diagnostic':      '🔍 تشخيصي',
+      'preventive':      '🛡️ وقائي',
+      'restorative':     '🦷 ترميمي',
+      'endodontics':     '🌱 لب وجذر',
+      'surgical':        '🔪 جراحي',
+      'prosthodontics':  '🔗 تعويضي',
+      'implantology':    '🔩 زراعة',
+      'cosmetic':        '✨ تجميلي',
+      'prosth_cosmetic': '💎 تعويض تجميلي',
+      'orthodontics':    '⚓ تقويم',
+      'other':           '📋 أخرى'
     };
     var tp = targetMap[t.target_part] || targetMap.crown;
     var targetTag = '<span class="treat-target-tag" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:' + tp.color + '22;color:' + tp.color + ';border:1px solid ' + tp.color + '55;margin-right:4px;">🦷 ' + tp.text + '</span>';
@@ -850,6 +853,45 @@ var editingId = null;
 var pickedFill = '#2ee89e', pickedStroke = '#1fba7e';
 var pickedTarget = 'crown';
 
+// ── Smart lab default by category (Phase 3 Feature E) ──
+// Some treatment categories almost always need a lab, so we auto-enable the
+// "needs_lab" toggle when the user picks them. This avoids the common
+// mistake of saving a crown/bridge/implant without flagging it for the lab.
+// We only apply the default for NEW treatments and only while the user hasn't
+// manually touched the toggle — once they do, we respect their choice.
+var LAB_DEFAULTS_BY_CATEGORY = {
+  'diagnostic':      false,
+  'preventive':      false,
+  'restorative':     false,  // حشوات فقط — لا تحتاج مخبر
+  'endodontics':     false,
+  'surgical':        false,
+  'prosthodontics':  true,   // ✅ تاج + جسر + طقم
+  'implantology':    true,   // ✅ زراعة
+  'cosmetic':        false,  // تبييض فقط
+  'prosth_cosmetic': true,   // ✅ فينير + زركون
+  'orthodontics':    false,  // تقويم ثابت (الأكثر شيوعاً)
+  'other':           false
+};
+
+// True once the user toggles the lab checkbox themselves; we then stop
+// overriding it on category change. Reset at every modal open.
+var userTouchedLabToggle = false;
+
+// Applied on every category change; gracefully no-ops when conditions don't fit.
+function applyCategoryLabDefault() {
+  if (userTouchedLabToggle) return;  // respect user's manual choice
+  if (editingId) return;             // never override on edit
+  var catEl = document.getElementById('tCategory');
+  var toggle = document.getElementById('tNeedsLab');
+  if (!catEl || !toggle) return;
+  var shouldNeedLab = !!LAB_DEFAULTS_BY_CATEGORY[catEl.value];
+  if (toggle.checked === shouldNeedLab) return;  // no change needed
+  toggle.checked = shouldNeedLab;
+  if (shouldNeedLab) {
+    showToast('🧪 تم تفعيل "يحتاج مخبر" تلقائياً');
+  }
+}
+
 function openAddModal() {
   editingId = null;
   // Reset implant name lock
@@ -866,6 +908,7 @@ function openAddModal() {
   document.getElementById('tNeedsLab').checked = false;
   document.getElementById('tCategory').value = 'restorative';
   document.getElementById('tDefaultNote').value = '';
+  userTouchedLabToggle = false;  // new treatment — allow smart category defaults
   pickColor('#2ee89e','#1fba7e');
   pickTarget('crown');
   updatePreview();
@@ -885,6 +928,7 @@ function editTreatment(id) {
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
+  userTouchedLabToggle = true;  // editing existing — preserve current lab value
   // Only the BUILT-IN extraction/implant/bridge have their names locked.
   // Custom variants (like "زراعة سويسرية" or "قلع جراحي") are fully editable.
   var nameInput = document.getElementById('tName');
@@ -931,6 +975,7 @@ function duplicateTreatment(id) {
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
+  userTouchedLabToggle = true;  // duplicate copies original's lab value — don't override
   // Reset readonly state (duplicate is a new treatment, name editable)
   var nameInputDup = document.getElementById('tName');
   nameInputDup.readOnly = false;
@@ -1180,7 +1225,7 @@ async function resetToDefaults() {
   const DEFAULTS = [
     { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
     { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
-    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', category:'restorative', sort_order:3 },
+    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', category:'prosthodontics', sort_order:3 },
     { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  category:'endodontics', sort_order:4 },
     { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'implant', category:'implantology', sort_order:5 },
     { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', category:'prosthodontics', sort_order:6 },
@@ -1326,6 +1371,12 @@ document.querySelectorAll('.target-opt').forEach(function(o){
 });
 
 document.getElementById('tName').addEventListener('input', updatePreview);
+
+// Phase 3 Feature E: smart lab default by category + track manual override
+document.getElementById('tCategory').addEventListener('change', applyCategoryLabDefault);
+document.getElementById('tNeedsLab').addEventListener('change', function() {
+  userTouchedLabToggle = true;
+});
 
 // Search input
 var searchInputEl = document.getElementById('treatSearch');
@@ -1638,18 +1689,19 @@ function printLegend() {
     grouped[cat].push(t);
   });
   var catNames = {
-    'diagnostic':    '🔍 تشخيصي',
-    'preventive':    '🛡️ وقائي',
-    'restorative':   '🦷 ترميمي',
-    'endodontics':   '🌱 لب وجذر',
-    'surgical':      '🔪 جراحي',
-    'prosthodontics':'🔗 تعويضي',
-    'implantology':  '🔩 زراعة',
-    'cosmetic':      '✨ تجميلي',
-    'orthodontics':  '⚓ تقويم',
-    'other':         '📋 أخرى'
+    'diagnostic':      '🔍 تشخيصي',
+    'preventive':      '🛡️ وقائي',
+    'restorative':     '🦷 ترميمي',
+    'endodontics':     '🌱 لب وجذر',
+    'surgical':        '🔪 جراحي',
+    'prosthodontics':  '🔗 تعويضي',
+    'implantology':    '🔩 زراعة',
+    'cosmetic':        '✨ تجميلي',
+    'prosth_cosmetic': '💎 تعويض تجميلي',
+    'orthodontics':    '⚓ تقويم',
+    'other':           '📋 أخرى'
   };
-  var order = ['diagnostic','preventive','restorative','endodontics','surgical','prosthodontics','implantology','cosmetic','orthodontics','other'];
+  var order = ['diagnostic','preventive','restorative','endodontics','surgical','prosthodontics','implantology','cosmetic','prosth_cosmetic','orthodontics','other'];
   var today = new Date().toLocaleDateString('ar-SY', { year:'numeric', month:'long', day:'numeric' });
 
   var html = '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>دليل العلاجات — SyDent</title>';
