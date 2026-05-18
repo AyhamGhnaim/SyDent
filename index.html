@@ -73,6 +73,8 @@
   .header-title { font-size: 24px; font-weight: 900; }
   .header-sub { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
   .header-actions { display: flex; gap: 12px; align-items: center; }
+  .header-title-row { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+  .header-title-row > div { min-width: 0; flex: 1; }
 
   .btn {
     padding: 10px 20px;
@@ -1061,8 +1063,22 @@ document.addEventListener('DOMContentLoaded', function() {
   btn.innerHTML = '<span></span><span></span><span></span>';
   btn.onclick = function() { window.sbToggle(); };
   window._sbBtn = btn;
+  // Put hamburger next to the title (first inner div), wrapping them in a row.
+  // This keeps the layout tidy on mobile where .header stacks vertically.
   var header = document.querySelector('.header');
-  if (header) header.insertBefore(btn, header.firstChild);
+  if (header) {
+    var titleBlock = header.firstElementChild;
+    if (titleBlock) {
+      var row = document.createElement('div');
+      row.className = 'header-title-row';
+      // Move titleBlock into row, prepend hamburger
+      header.insertBefore(row, titleBlock);
+      row.appendChild(btn);
+      row.appendChild(titleBlock);
+    } else {
+      header.insertBefore(btn, header.firstChild);
+    }
+  }
 });
 </script>
 </body>
