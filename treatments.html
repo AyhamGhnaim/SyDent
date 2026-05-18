@@ -271,6 +271,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="chip" data-filter="extraction">قلع</button>
       <button class="chip" data-filter="implant">زراعة</button>
       <button class="chip" data-filter="bridge">جسر</button>
+      <button class="chip" data-filter="quadrant">ربع</button>
+      <button class="chip" data-filter="arch">فك</button>
+      <button class="chip" data-filter="mouth">فم كامل</button>
       <button class="chip" data-filter="lab">🧪 مخبر</button>
       <button class="chip" data-filter="custom">مخصصة</button>
       <button class="chip" data-filter="inactive">⏸️ معطّلة</button>
@@ -474,6 +477,36 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             </svg>
             <div class="target-title">زراعة</div>
             <div class="target-sub">يستبدل السن بلولب معدني + تاج</div>
+          </div>
+          <!-- Phase 3 Feature G: regional treatment areas -->
+          <div class="target-opt" data-target="quadrant">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <!-- 4 quadrants — top-right highlighted -->
+              <rect x="32" y="4" width="28" height="28" rx="4" fill="rgba(132,204,22,0.45)"/>
+              <rect x="4" y="4" width="28" height="28" rx="4" opacity="0.3"/>
+              <rect x="4" y="32" width="28" height="28" rx="4" opacity="0.3"/>
+              <rect x="32" y="32" width="28" height="28" rx="4" opacity="0.3"/>
+            </svg>
+            <div class="target-title">ربع</div>
+            <div class="target-sub">تنظيف جير ربع</div>
+          </div>
+          <div class="target-opt" data-target="arch">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Upper arch highlighted, lower dimmed -->
+              <path d="M4 32 C4 18 18 4 32 4 C46 4 60 18 60 32 Z" fill="rgba(16,185,129,0.45)"/>
+              <path d="M4 32 C4 46 18 60 32 60 C46 60 60 46 60 32 Z" opacity="0.3"/>
+            </svg>
+            <div class="target-title">فك كامل</div>
+            <div class="target-sub">بليتة، طقم، تقويم متحرك</div>
+          </div>
+          <div class="target-opt" data-target="mouth">
+            <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Full circle = whole mouth -->
+              <circle cx="32" cy="32" r="28" fill="rgba(6,182,212,0.45)"/>
+              <path d="M14 32 L50 32" stroke-width="2" opacity="0.6"/>
+            </svg>
+            <div class="target-title">فم كامل</div>
+            <div class="target-sub">فحص شامل، تنظيف فم كامل</div>
           </div>
         </div>
       </div>
@@ -763,7 +796,11 @@ function render() {
       'bridge':     { text:'جسر',         color:'#dc2626' },
       'extraction': { text:'قلع',         color:'#ef5350' },
       'implant':    { text:'زراعة',       color:'#63b3ed' },
-      'both':       { text:'تاج وجذر',    color:'#fb923c' }
+      'both':       { text:'تاج وجذر',    color:'#fb923c' },
+      // Phase 3 Feature G: regional treatment areas (no specific tooth)
+      'quadrant':   { text:'ربع',         color:'#84cc16' },  // lime — broader than tooth
+      'arch':       { text:'فك',          color:'#10b981' },  // emerald — broader than quadrant
+      'mouth':      { text:'فم كامل',     color:'#06b6d4' }   // cyan — broadest
     };
     var catMap = {
       'diagnostic':      '🔍 تشخيصي',

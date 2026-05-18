@@ -667,6 +667,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="chart-card-head">
         <span class="chart-card-title">🦷 مخطط الأسنان</span>
         <span class="chart-hint">اضغط على المنطقة المحددة من السن لتسجيل العلاج</span>
+        <button id="addRegionalBtn" class="btn btn-outline" onclick="openRegionalTreatmentPicker()" style="margin-right:auto;font-size:12px;padding:6px 12px;" title="علاج جماعي يطبَّق على ربع/فك/فم كامل">
+          + علاج جماعي
+        </button>
       </div>
       <div class="jaw-wrap">
         <div class="jaw-row" id="upperJaw"></div>
@@ -866,6 +869,31 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label>تاريخ التسجيل</label><input type="date" id="eCreated"></div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('editModal')">إلغاء</button><button class="btn-save-m" onclick="saveEditedPatient()">حفظ التعديلات</button></div>
+  </div>
+</div>
+
+<!-- Phase 3 Feature G: Regional Treatment Area Picker (quadrant/arch dropdown) -->
+<div class="modal-overlay" id="regionalAreaModal">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-head">
+      <h3 id="regionalAreaTitle">اختر المنطقة</h3>
+      <button class="modal-close" onclick="closeModal('regionalAreaModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:12px;" id="regionalAreaHint">
+        اختر المنطقة المراد علاجها
+      </div>
+      <div class="form-group">
+        <label style="display:block;margin-bottom:6px;font-weight:600;">المنطقة</label>
+        <select id="regionalAreaSelect" style="width:100%;padding:10px 12px;border-radius:8px;background:var(--bg2);color:var(--text);border:1px solid var(--border);font-size:14px;font-family:'Cairo',sans-serif;">
+          <!-- populated dynamically based on target_part -->
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('regionalAreaModal')">إلغاء</button>
+      <button class="btn-save-m" onclick="confirmRegionalAreaPick()">متابعة</button>
+    </div>
   </div>
 </div>
 
@@ -2053,6 +2081,10 @@ function buildTimelineEvents() {
       statusColor: STATUS_COLORS[st] || '#3b82f6',
       searchHay: [
         s.type, s.tooth_num, s.description, s.notes, s.surface,
+        // Phase 3 Feature G: include regional metadata in search
+        s.quadrant, s.arch,
+        s.quadrant ? QUADRANT_LABELS[s.quadrant] : '',
+        s.arch ? ARCH_LABELS[s.arch] : '',
         prov ? prov.name : '', STATUS_LABELS[st] || ''
       ].filter(Boolean).join(' ').toLowerCase()
     });
@@ -2242,9 +2274,17 @@ function renderTimelineRow(e) {
           ? SURFACE_LABELS[rawSurface]
           : rawSurface)
       : null;
-    var toothPart = s.tooth_num
-      ? ' — السن ' + escapeHtml(String(s.tooth_num)) + (surfaceShown ? ' (' + escapeHtml(String(surfaceShown)) + ')' : '')
-      : '';
+    var toothPart;
+    if (s.tooth_num) {
+      toothPart = ' — السن ' + escapeHtml(String(s.tooth_num)) + (surfaceShown ? ' (' + escapeHtml(String(surfaceShown)) + ')' : '');
+    } else if (s.quadrant && QUADRANT_LABELS[s.quadrant]) {
+      // Phase 3 Feature G: regional session in timeline
+      toothPart = ' — ' + escapeHtml(QUADRANT_LABELS[s.quadrant]);
+    } else if (s.arch && ARCH_LABELS[s.arch]) {
+      toothPart = ' — ' + escapeHtml(ARCH_LABELS[s.arch]);
+    } else {
+      toothPart = '';  // 'mouth' or legacy session — description carries the scope
+    }
     title = escapeHtml(s.type || 'جلسة') + toothPart;
     var statusBadge = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
     var costPart = (parseFloat(s.cost) || 0) > 0
@@ -4336,6 +4376,43 @@ function pickStatus(s) {
 
 async function openToothModal(n, surface) {
   await loadTreatmentsFromSupabase();
+  // Phase 3 Feature G: 'regional mode' — opened via "+ علاج جماعي" button. No specific tooth.
+  // In this mode we filter the treatment list to ONLY regional treatments.
+  // Authoritative signal is `n === null` (the call-site contract). The window flag is
+  // a belt-and-suspenders companion in case some legacy path passes 0/undefined.
+  var isRegionalMode = (n === null || n === undefined) && (window.__regionalPickerMode === true);
+  if (isRegionalMode) {
+    currentTooth = null;
+    currentSurface = null;
+    document.getElementById('toothModalTitle').textContent = 'علاج جماعي (ربع / فك / فم)';
+    var containerR = document.getElementById('toothOptsContainer');
+    var htmlR = '';
+    var matchedR = 0;
+    for (var iR = 0; iR < TREATMENTS.length; iR++) {
+      var tR = TREATMENTS[iR];
+      if (tR.is_active === false) continue;
+      var tpR = tR.target_part || 'crown';
+      if (tpR !== 'quadrant' && tpR !== 'arch' && tpR !== 'mouth') continue;
+      matchedR++;
+      var textColorR = isLightColor(tR.fill) ? '#0a1628' : '#fff';
+      htmlR += '<button class="topt" style="border-color:' + tR.fill + ';background:' + tR.fill + '22;" '
+            + 'onclick="pickToothTreatment(\'' + tR.treatment_key + '\',\'' + escapeHtml(tR.name) + '\')">'
+            + '<span class="topt-label" style="background:' + tR.fill + ';color:' + textColorR + ';">' + tR.label + '</span>'
+            + '<span>' + escapeHtml(tR.name) + '</span>'
+            + '</button>';
+    }
+    if (matchedR === 0) {
+      htmlR = '<div style="text-align:center;color:var(--text2);padding:24px 12px;">'
+            + 'لا توجد علاجات جماعية مفعّلة. اذهب إلى صفحة العلاجات وأضف علاجاً بنطاق "ربع/فك/فم".'
+            + '</div>';
+    }
+    containerR.innerHTML = htmlR;
+    document.getElementById('toothStep1').style.display = 'block';
+    document.getElementById('toothStep2').style.display = 'none';
+    document.getElementById('toothFoot').style.display  = 'none';
+    document.getElementById('toothModal').classList.add('open');
+    return;
+  }
   currentTooth = n;
   currentSurface = surface || centerSurface(n);
   var sm = teethMap[String(n)] || {};
@@ -4601,6 +4678,169 @@ function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ============================================================
+// Phase 3 Feature G — Regional Treatment Area Helpers
+// ============================================================
+// FDI numbering scheme: tens digit is the quadrant (1=UR, 2=UL, 3=LL, 4=LR for permanent;
+// 5=UR, 6=UL, 7=LL, 8=LR for primary teeth). Units digit (1-8) is the tooth number.
+// Examples: 11-18 = UR, 21-28 = UL, 31-38 = LL, 41-48 = LR.
+function quadrantForTooth(toothNum) {
+  if (!toothNum) return null;
+  var n = parseInt(toothNum, 10);
+  if (isNaN(n)) return null;
+  var quadrantDigit = Math.floor(n / 10);
+  switch (quadrantDigit) {
+    case 1: case 5: return 'UR';  // upper right (incl. primary)
+    case 2: case 6: return 'UL';  // upper left
+    case 3: case 7: return 'LL';  // lower left
+    case 4: case 8: return 'LR';  // lower right
+    default: return null;
+  }
+}
+function archForTooth(toothNum) {
+  var q = quadrantForTooth(toothNum);
+  if (!q) return null;
+  return (q === 'UR' || q === 'UL') ? 'U' : 'L';
+}
+
+// Display labels for regional areas (Arabic) — single source of truth.
+var QUADRANT_LABELS = {
+  'UR': 'الربع العلوي الأيمن',
+  'UL': 'الربع العلوي الأيسر',
+  'LL': 'الربع السفلي الأيسر',
+  'LR': 'الربع السفلي الأيمن'
+};
+var ARCH_LABELS = {
+  'U': 'الفك العلوي',
+  'L': 'الفك السفلي'
+};
+
+// Pending state for regional treatment (parallel to currentSurface for tooth-based flow).
+var pendingRegionalType = null;     // 'quadrant' / 'arch' / 'mouth'
+var pendingRegionalQuadrant = null; // 'UR' / 'UL' / 'LR' / 'LL'
+var pendingRegionalArch = null;     // 'U' / 'L'
+
+// Open the regional area picker modal. For 'mouth' there's nothing to choose, so we
+// skip straight to the cost/notes step. For 'quadrant'/'arch' we show a dropdown
+// pre-selected to the auto-detected value (if the user clicked a tooth first).
+function openRegionalAreaPicker(status, label, treatPart, autoQuadrant, autoArch) {
+  pendingRegionalType = treatPart;
+  pendingRegionalQuadrant = null;
+  pendingRegionalArch = null;
+
+  // 'mouth' → no picker needed, jump straight to Step 2 with WHOLE-mouth marker
+  if (treatPart === 'mouth') {
+    closeModal('toothModal');  // close treatment-list modal if it was open
+    proceedToRegionalStep2(status, label);
+    return;
+  }
+
+  // Populate dropdown based on type
+  var sel = document.getElementById('regionalAreaSelect');
+  var titleEl = document.getElementById('regionalAreaTitle');
+  var hintEl = document.getElementById('regionalAreaHint');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (treatPart === 'quadrant') {
+    titleEl.textContent = 'اختر الربع — ' + label;
+    hintEl.textContent = autoQuadrant
+      ? 'تم اقتراح الربع تلقائياً من السن الذي اخترته. يمكنك تغييره.'
+      : 'اختر الربع المراد علاجه';
+    ['UR','UL','LL','LR'].forEach(function(q){
+      var opt = document.createElement('option');
+      opt.value = q;
+      opt.textContent = QUADRANT_LABELS[q] + ' (' + q + ')';
+      if (q === autoQuadrant) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } else if (treatPart === 'arch') {
+    titleEl.textContent = 'اختر الفك — ' + label;
+    hintEl.textContent = autoArch
+      ? 'تم اقتراح الفك تلقائياً من السن الذي اخترته. يمكنك تغييره.'
+      : 'اختر الفك المراد علاجه';
+    ['U','L'].forEach(function(a){
+      var opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = ARCH_LABELS[a] + ' (' + a + ')';
+      if (a === autoArch) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  // Close the treatment-list modal so it doesn't sit behind the area picker
+  closeModal('toothModal');
+  document.getElementById('regionalAreaModal').classList.add('open');
+}
+
+// User confirmed the area selection — proceed to Step 2 with the selected value.
+function confirmRegionalAreaPick() {
+  var sel = document.getElementById('regionalAreaSelect');
+  if (!sel || !sel.value) return;
+  if (pendingRegionalType === 'quadrant') pendingRegionalQuadrant = sel.value;
+  else if (pendingRegionalType === 'arch') pendingRegionalArch = sel.value;
+  closeModal('regionalAreaModal');
+  proceedToRegionalStep2(pendingToothStatus, pendingToothLabel);
+}
+
+// Open the cost/notes step for a regional treatment. Reuses the toothModal Step 2
+// structure but with currentTooth/currentSurface unset, and an area label that
+// describes the region instead of a specific surface.
+function proceedToRegionalStep2(status, label) {
+  // Reset tooth-specific state — this is a regional treatment, no tooth
+  currentTooth = null;
+  currentSurface = null;
+
+  // Show the toothModal in Step 2 mode (skip Step 1 treatment list)
+  document.getElementById('toothStep1').style.display = 'none';
+  document.getElementById('toothStep2').style.display = 'block';
+  document.getElementById('toothFoot').style.display  = 'flex';
+
+  // Title reflects the regional scope
+  var areaText;
+  if (pendingRegionalType === 'mouth') areaText = 'الفم كامل';
+  else if (pendingRegionalType === 'quadrant') areaText = QUADRANT_LABELS[pendingRegionalQuadrant] || pendingRegionalQuadrant;
+  else if (pendingRegionalType === 'arch') areaText = ARCH_LABELS[pendingRegionalArch] || pendingRegionalArch;
+  else areaText = '';
+  document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — ' + areaText;
+  document.getElementById('toothModalTitle').textContent = label;
+
+  // Reset notes, date, status picker (same as the tooth flow)
+  document.getElementById('toothNotes').value = '';
+  document.getElementById('toothDate').value  = toDay();
+  pendingTreatStatus = 'completed';
+  document.querySelectorAll('#toothStatusPicker .status-opt').forEach(function(b){
+    if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
+    else b.classList.remove('selected');
+  });
+  // Defensive cost field reset (mirrors Feature F's modal init logic)
+  var costEl = document.getElementById('toothCost');
+  if (costEl) {
+    costEl.readOnly = false;
+    costEl.style.opacity = '';
+    costEl.style.cursor = '';
+    costEl.title = '';
+  }
+  populateProviderPicker();
+  var tr = getTreatment(status);
+  var basePrice = tr ? Number(tr.price || 0) : 0;
+  document.getElementById('toothCost').value = basePrice;
+
+  // Reuse the toothModal to show Step 2 (since it has all the cost/notes/status UI)
+  document.getElementById('toothModal').classList.add('open');
+}
+
+// Entry point: user clicks the "+ علاج جماعي" button. Opens Step 1 of toothModal
+// filtered to show only regional treatments (target_part in quadrant/arch/mouth).
+function openRegionalTreatmentPicker() {
+  // Reset tooth context — user picked "regional" mode, no specific tooth in mind
+  currentTooth = null;
+  currentSurface = null;
+  // Reuse openToothModal's behavior, then flag it as regional-only via a global
+  window.__regionalPickerMode = true;
+  // Trigger the same modal open path as normal flow
+  openToothModal(null, null);  // tooth=null signals "regional mode"
+}
+
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
@@ -4608,6 +4848,39 @@ function pickToothTreatment(status, label) {
   // not where the user clicked. This way the list can stay unified.
   var tr = getTreatment(status);
   var tp = tr ? (tr.target_part || 'crown') : 'crown';
+  // Phase 3 Feature G: regional treatments (quadrant/arch/mouth) don't use a specific
+  // tooth/surface — they route to a dedicated area picker instead.
+  if (tp === 'quadrant' || tp === 'arch' || tp === 'mouth') {
+    // currentTooth may be set (user clicked a tooth then picked a regional treatment)
+    // OR null (user opened from "+ علاج جماعي" button). Both paths converge here.
+    // Auto-detect the quadrant/arch from the clicked tooth (FDI numbering) if available.
+    var autoQuadrant = null, autoArch = null;
+    if (currentTooth) {
+      autoQuadrant = quadrantForTooth(currentTooth);
+      autoArch = archForTooth(currentTooth);
+    }
+    // Done with the regional-picker entry flag — area picker is the next step
+    window.__regionalPickerMode = false;
+    openRegionalAreaPicker(status, label, tp, autoQuadrant, autoArch);
+    return;
+  }
+  // Defensive: if user entered via "regional mode" but the treatment list is empty
+  // for regional and they somehow picked a tooth-based treatment, fall back gracefully
+  // (this branch shouldn't be reachable from the UI because openToothModal filters
+  // the list to regional-only when __regionalPickerMode is true).
+  if (window.__regionalPickerMode === true) {
+    window.__regionalPickerMode = false;
+    showToast('⚠️ هذا العلاج يحتاج اختيار سن — استخدم المخطط مباشرة');
+    closeModal('toothModal');
+    return;
+  }
+  // Phase 3 Feature G — defensive: clear any stale regional state from a previous
+  // workflow that the user abandoned. Without this, a closed-then-reopened modal
+  // could carry pendingRegionalType='quadrant' into a tooth-based save and the
+  // saveToothTreatment's regional branch would incorrectly fire.
+  pendingRegionalType = null;
+  pendingRegionalQuadrant = null;
+  pendingRegionalArch = null;
   // Special treatments override:
   if (tp === 'implant' || tp === 'bridge') {
     currentSurface = 'WHOLE';
@@ -4683,6 +4956,80 @@ async function saveToothTreatment() {
   // The doctor can edit it later if needed (e.g. set a price on a planned treatment).
   var cost = (costRaw && costRaw > 0) ? costRaw : 0;
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+
+  // ============================================================
+  // Phase 3 Feature G: Regional treatments (quadrant/arch/mouth)
+  // ============================================================
+  // These don't write to teeth_status (no specific tooth). They create a single
+  // ledger_sessions row with quadrant/arch columns set, and tooth_num/surface = null.
+  // Following OpenDental's rule, regional procedures don't display on the tooth chart;
+  // they appear only in the sessions list and timeline.
+  if (pendingRegionalType === 'quadrant' || pendingRegionalType === 'arch' || pendingRegionalType === 'mouth') {
+    // Build description that describes the region (no tooth number)
+    var regAreaText, regDescription;
+    if (pendingRegionalType === 'mouth') {
+      regAreaText = 'الفم كامل';
+    } else if (pendingRegionalType === 'quadrant') {
+      regAreaText = QUADRANT_LABELS[pendingRegionalQuadrant] || pendingRegionalQuadrant;
+    } else {
+      regAreaText = ARCH_LABELS[pendingRegionalArch] || pendingRegionalArch;
+    }
+    regDescription = regAreaText;
+
+    var regNewSess = null;
+    if (pendingTreatStatus === 'completed' || pendingTreatStatus === 'planned') {
+      // Build the insert payload. Set quadrant/arch where applicable; everything else null.
+      var regPayload = {
+        doctor_id: currentUser.id, patient_id: patientId,
+        type: pendingToothLabel, description: regDescription,
+        cost: cost, date: date, notes: notes,
+        tooth_num: null, surface: null,
+        status: pendingTreatStatus,
+        provider_id: pendingProviderId
+      };
+      if (pendingRegionalType === 'quadrant') regPayload.quadrant = pendingRegionalQuadrant;
+      else if (pendingRegionalType === 'arch') regPayload.arch = pendingRegionalArch;
+      // For 'mouth' both quadrant and arch stay null — the type itself signals scope.
+
+      var rReg = await window.sb.from('ledger_sessions').insert(regPayload).select().single();
+      if (rReg.error) {
+        // Graceful fallback if Migration 7.3 hasn't been applied yet
+        if (rReg.error.code === '42703' || (rReg.error.message || '').indexOf('quadrant') >= 0 || (rReg.error.message || '').indexOf('arch') >= 0) {
+          showToast('⚠️ يلزم تشغيل Migration 7.3 لإضافة أعمدة quadrant/arch');
+        } else {
+          showToast('⚠️ تسجيل الجلسة فشل: ' + rReg.error.message);
+        }
+        console.error('regional ledger insert error:', rReg.error);
+      } else {
+        regNewSess = rReg.data;
+        if (regNewSess) { sessions.unshift(regNewSess); sortByDateDesc(sessions); }
+      }
+    }
+
+    // Reallocate funds if a session was created (handles unearned-credit flow)
+    if (regNewSess) await reallocatePatientFunds();
+
+    // Update patient last_visit + status (same as tooth flow)
+    var regUpdates = {};
+    if (!patient.last_visit || date > patient.last_visit) regUpdates.last_visit = date;
+    if (patient.status === 'جديد') regUpdates.status = 'تحت العلاج';
+    if (Object.keys(regUpdates).length) {
+      await window.sb.from('patients').update(regUpdates).eq('id', patientId).eq('doctor_id', currentUser.id);
+      Object.assign(patient, regUpdates);
+    }
+
+    renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
+    closeModal('toothModal');
+    // Reset regional state for next save
+    pendingRegionalType = null;
+    pendingRegionalQuadrant = null;
+    pendingRegionalArch = null;
+    showToast('✅ تم تسجيل ' + pendingToothLabel + ' لـ ' + regAreaText);
+    return;
+  }
+  // ============================================================
+  // End Feature G regional path — normal tooth-based flow below
+  // ============================================================
 
   // Special handling: bridge marks abutments + pontics as a single unit.
   // - Abutments (the existing teeth on each side): treatment_key='bridge' at surface='WHOLE'
@@ -4936,6 +5283,18 @@ function renderSessions() {
     var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
     var typeBadge = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth_num + '</span>' : '';
+    // Phase 3 Feature G: regional badges (quadrant/arch/mouth)
+    // Display priority: tooth_num wins (specific). If tooth_num is null and quadrant/arch is set, show the region.
+    // If neither tooth nor quadrant/arch but session.description suggests mouth-wide, no badge needed (description carries it).
+    var regionalBadge = '';
+    if (!s.tooth_num) {
+      if (s.quadrant && QUADRANT_LABELS[s.quadrant]) {
+        regionalBadge = ' <span style="background:rgba(132,204,22,0.18);color:#84cc16;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + QUADRANT_LABELS[s.quadrant] + '">🔲 ' + QUADRANT_LABELS[s.quadrant] + '</span>';
+      } else if (s.arch && ARCH_LABELS[s.arch]) {
+        regionalBadge = ' <span style="background:rgba(16,185,129,0.18);color:#10b981;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + ARCH_LABELS[s.arch] + '">🦷 ' + ARCH_LABELS[s.arch] + '</span>';
+      }
+      // For 'mouth' the description already says "الفم كامل" — no extra badge needed.
+    }
     var st = s.status || 'completed';
     var stLbl = STATUS_LABELS[st] || st;
     var stColor = STATUS_COLORS[st] || '#3b82f6';
@@ -4974,7 +5333,7 @@ function renderSessions() {
     var costStyle = 'text-align:left;color:' + costColor + ';font-weight:700;';
     rows += '<tr>'
       + '<td' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</td>'
-      + '<td>' + typeBadge + toothBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
+      + '<td>' + typeBadge + toothBadge + regionalBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td style="' + costStyle + '">' + fmt(s.cost) + ' ل.س</td>'
@@ -5068,6 +5427,15 @@ function renderRecentSessions() {
     var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
     var typeBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;">سن ' + s.tooth_num + '</span>' : '';
+    // Phase 3 Feature G: regional badge for recent sessions list
+    var regionalBadge = '';
+    if (!s.tooth_num) {
+      if (s.quadrant && QUADRANT_LABELS[s.quadrant]) {
+        regionalBadge = ' <span style="background:rgba(132,204,22,0.18);color:#84cc16;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;" title="' + QUADRANT_LABELS[s.quadrant] + '">🔲 ' + QUADRANT_LABELS[s.quadrant] + '</span>';
+      } else if (s.arch && ARCH_LABELS[s.arch]) {
+        regionalBadge = ' <span style="background:rgba(16,185,129,0.18);color:#10b981;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;" title="' + ARCH_LABELS[s.arch] + '">🦷 ' + ARCH_LABELS[s.arch] + '</span>';
+      }
+    }
     // Match renderSessions: color cost by payment status when splits exist
     var sessPaid = computeSessionPaid(s.id);
     var sessCost = parseFloat(s.cost) || 0;
@@ -5084,7 +5452,7 @@ function renderRecentSessions() {
     }
     html += '<div class="irow" style="flex-direction:column;align-items:stretch;gap:4px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-        + '<span style="font-weight:700;color:var(--text);font-size:13px;">' + typeBadge + toothBadge + '</span>'
+        + '<span style="font-weight:700;color:var(--text);font-size:13px;">' + typeBadge + toothBadge + regionalBadge + '</span>'
         + '<span style="color:' + costColor + ';font-weight:700;font-size:13px;white-space:nowrap;"' + (costTitle ? ' title="' + costTitle + '"' : '') + '>' + fmt(s.cost) + ' ل.س</span>'
       + '</div>'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
