@@ -825,6 +825,13 @@ function formatSharePctDisplay(provider) {
 // ─── Render ───
 function render() {
   var providerFilter = document.getElementById('providerFilter').value;
+  // Phase 4: Defense-in-depth — in Doctor mode, force the filter to the
+  // logged doctor's id regardless of what the dropdown says. Prevents any
+  // race / edge case from leaking other providers' data.
+  if (window.SyDentLock && window.SyDentLock.isDoctor()) {
+    var lockedDid = window.SyDentLock.getDoctorId();
+    if (lockedDid) providerFilter = lockedDid;
+  }
   var inactiveMode = document.getElementById('inactiveFilter').value; // 'hide' | 'show'
   var visibleDoctors = doctors.filter(function(d){
     // Hide inactive unless explicitly showing them OR they're specifically picked
@@ -1345,6 +1352,19 @@ function applyDoctorModeFilter() {
   if (!sel) return;
   var did = window.SyDentLock.getDoctorId();
   if (!did) return;
+
+  // Also lock the inactive filter — in Doctor mode, viewing only your own
+  // data means the inactive-doctors toggle is irrelevant + could trigger
+  // rebuilds that drop your locked id from the options.
+  var inactiveSel = document.getElementById('inactiveFilter');
+  if (inactiveSel && !inactiveSel.disabled) {
+    inactiveSel.value = 'show'; // always include the doctor's own id in dropdown
+    inactiveSel.disabled = true;
+    inactiveSel.style.opacity = '0.7';
+    inactiveSel.style.cursor = 'not-allowed';
+    inactiveSel.title = 'مقفول في وضع الطبيب';
+  }
+
   // Ensure the option exists (in case the filter dropdown was repopulated)
   var hasOpt = false;
   for (var i = 0; i < sel.options.length; i++) {
@@ -1358,8 +1378,31 @@ function applyDoctorModeFilter() {
     sel.title = 'الفلتر مقفول على إنتاجك في وضع الطبيب';
     onFilterChange();
   } else {
-    // Doctor id not found in clinic_doctors — show a clear message
-    console.warn('[SyDentLock] Doctor mode: doctor id not in clinic_doctors list');
+    // Doctor id not found in clinic_doctors list (deactivated or deleted).
+    // CRITICAL: don't let the doctor see other providers' data. Inject a
+    // hidden invalid option so render() finds nothing.
+    console.warn('[SyDentLock] Doctor mode: doctor id not in clinic_doctors list — forcing empty state');
+    var opt = document.createElement('option');
+    opt.value = did;
+    opt.textContent = 'حسابك معطّل — لا تظهر بيانات';
+    sel.appendChild(opt);
+    sel.value = did;
+    sel.disabled = true;
+    sel.style.opacity = '0.7';
+    sel.style.cursor = 'not-allowed';
+    sel.title = 'حسابك غير نشط — تواصل مع المالك';
+    // Show a banner to inform the user
+    var banner = document.getElementById('docInactiveBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'docInactiveBanner';
+      banner.style.cssText = 'background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.45);color:#ef5350;padding:12px 16px;border-radius:10px;margin:14px 0;font-weight:700;text-align:center;';
+      banner.textContent = '⚠ حسابك غير نشط حالياً. لن تظهر أي بيانات إنتاج. الرجاء التواصل مع المالك.';
+      var content = document.querySelector('.content') || document.body;
+      if (content.firstChild) content.insertBefore(banner, content.firstChild);
+      else content.appendChild(banner);
+    }
+    onFilterChange();
   }
 }
 

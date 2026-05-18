@@ -567,51 +567,76 @@
       });
     });
 
-    ov.querySelector('#sdBtnCancel').addEventListener('click', function(){ ov.remove(); });
-    ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
-
-    ov.querySelector('#sdBtnConfirm').addEventListener('click', async function(){
-      var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
-      var targetDocId = null;
-      if (targetRole === 'doctor') {
-        var sel = ov.querySelector('#sdDoctorSel');
-        if (!sel || !sel.value) {
-          var m = ov.querySelector('#sdMsg');
-          m.textContent = 'اختر طبيباً أولاً.';
-          return;
-        }
-        targetDocId = sel.value;
-      }
-
-      // No-op? Just close.
-      if (targetRole === getRole() && (targetRole !== 'doctor' || targetDocId === getDoctorId())) {
+    // Esc key closes the modal (declared early so all close handlers can clean up)
+    var escHandler = function(e){
+      if (e.key === 'Escape' || e.keyCode === 27) {
         ov.remove();
-        return;
+        document.removeEventListener('keydown', escHandler);
       }
+    };
+    document.addEventListener('keydown', escHandler);
 
-      var need = requirePin(targetRole, targetDocId);
-      if (need) {
-        var pin = (ov.querySelector('#sdPinInput').value || '').trim();
-        var ver = await verifyPin(pin);
-        if (!ver.ok) {
-          var pm = ov.querySelector('#sdPinMsg');
-          if (ver.reason === 'cooldown') {
-            pm.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية.';
-          } else if (ver.reason === 'no_pin_set') {
-            pm.textContent = '⚠ لم يتم تعيين PIN بعد.';
-          } else if (ver.reason === 'invalid_format') {
-            pm.textContent = 'PIN يجب أن يكون 4-6 أرقام.';
-          } else if (ver.reason === 'wrong') {
-            pm.textContent = '❌ PIN خاطئ. متبقّي ' + (ver.failsLeft || 0) + ' محاولات.';
+    function closeModal() {
+      document.removeEventListener('keydown', escHandler);
+      ov.remove();
+    }
+
+    ov.querySelector('#sdBtnCancel').addEventListener('click', closeModal);
+    ov.addEventListener('click', function(e){ if (e.target === ov) closeModal(); });
+
+    var _switchInFlight = false;  // prevent spam-clicking confirm during async verify
+    ov.querySelector('#sdBtnConfirm').addEventListener('click', async function(){
+      if (_switchInFlight) return;
+      _switchInFlight = true;
+      var confirmBtn = ov.querySelector('#sdBtnConfirm');
+      confirmBtn.disabled = true;
+      try {
+        var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
+        var targetDocId = null;
+        if (targetRole === 'doctor') {
+          var sel = ov.querySelector('#sdDoctorSel');
+          if (!sel || !sel.value) {
+            var m = ov.querySelector('#sdMsg');
+            m.textContent = 'اختر طبيباً أولاً.';
+            return;
           }
+          targetDocId = sel.value;
+        }
+
+        // No-op? Just close.
+        if (targetRole === getRole() && (targetRole !== 'doctor' || targetDocId === getDoctorId())) {
+          closeModal();
           return;
         }
-      }
 
-      applyRole(targetRole, targetDocId);
-      ov.remove();
-      // Reload to apply guards page-wide
-      window.location.reload();
+        var need = requirePin(targetRole, targetDocId);
+        if (need) {
+          var pin = (ov.querySelector('#sdPinInput').value || '').trim();
+          var ver = await verifyPin(pin);
+          if (!ver.ok) {
+            var pm = ov.querySelector('#sdPinMsg');
+            if (ver.reason === 'cooldown') {
+              pm.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية.';
+            } else if (ver.reason === 'no_pin_set') {
+              pm.textContent = '⚠ لم يتم تعيين PIN بعد.';
+            } else if (ver.reason === 'invalid_format') {
+              pm.textContent = 'PIN يجب أن يكون 4-6 أرقام.';
+            } else if (ver.reason === 'wrong') {
+              pm.textContent = '❌ PIN خاطئ. متبقّي ' + (ver.failsLeft || 0) + ' محاولات.';
+            }
+            return;
+          }
+        }
+
+        applyRole(targetRole, targetDocId);
+        closeModal();
+        // Reload to apply guards page-wide
+        window.location.reload();
+      } finally {
+        // If we didn't redirect, re-enable the button
+        _switchInFlight = false;
+        if (confirmBtn && document.body.contains(confirmBtn)) confirmBtn.disabled = false;
+      }
     });
 
     updateActive();

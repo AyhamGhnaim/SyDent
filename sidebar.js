@@ -162,7 +162,42 @@ const navItems = [
 ];
 
 function buildHTML(activeId) {
-  const navHTML = navItems.map(item => {
+  // Phase 4: filter nav items by current device role.
+  // Owner sees everything; Doctor hides Owner-only pages; Secretary hides
+  // both Owner-only pages and provider-reports. We compute this at render
+  // time so SyDentLock (attached synchronously by supabase-init.js) is ready.
+  var role = (window.SyDentLock && window.SyDentLock.getRole) ? window.SyDentLock.getRole() : 'owner';
+  var BLOCKED = {
+    owner:     [],
+    doctor:    ['treatments', 'doctors', 'settings'],
+    secretary: ['treatments', 'doctors', 'settings', 'provider-reports']
+  };
+  var blocked = BLOCKED[role] || [];
+
+  // Drop blocked items + drop adjacent section headers that would become orphans.
+  var filtered = navItems.filter(function(item){
+    if (item.section) return true; // keep sections for now, prune below
+    return blocked.indexOf(item.id) < 0;
+  });
+  // Prune sections that have no items following them before the next section
+  var pruned = [];
+  for (var i = 0; i < filtered.length; i++) {
+    var it = filtered[i];
+    if (it.section) {
+      // Look ahead — is there at least one non-section item before the next section/end?
+      var hasItems = false;
+      for (var j = i + 1; j < filtered.length; j++) {
+        if (filtered[j].section) break;
+        hasItems = true;
+        break;
+      }
+      if (hasItems) pruned.push(it);
+    } else {
+      pruned.push(it);
+    }
+  }
+
+  const navHTML = pruned.map(item => {
     if (item.section) {
       return `<div class="sb-section">${item.section}</div>`;
     }

@@ -906,7 +906,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="toothStep1">
         <div style="font-size:13px;color:var(--text2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
           <span>اختر نوع العلاج:</span>
-          <a href="treatments.html" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
+          <a href="treatments.html" data-role-block="doctor secretary" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
         </div>
         <div class="tooth-opts" id="toothOptsContainer"></div>
       </div>
@@ -4498,7 +4498,12 @@ async function openToothModal(n, surface) {
   }
 
   if (matched === 0) {
-    html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a></div>' + html;
+    // Phase 4: only show "add treatment" link to Owner (others would hit blocked page)
+    var addLink = '';
+    if (!window.SyDentLock || window.SyDentLock.isOwner()) {
+      addLink = '<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a>';
+    }
+    html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.' + addLink + '</div>' + html;
   }
 
   if (isAlreadyImplant) {
