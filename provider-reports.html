@@ -433,6 +433,17 @@ function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Phase 3 Feature G: format the "tooth" column for both tooth-based and regional sessions.
+// Tooth-based: show the FDI number. Regional: show a compact Arabic label.
+var __QLBL_PR = {'UR':'علوي يمين','UL':'علوي يسار','LL':'سفلي يسار','LR':'سفلي يمين'};
+var __ALBL_PR = {'U':'الفك العلوي','L':'الفك السفلي'};
+function formatSessionToothCell(s) {
+  if (s.tooth_num) return escapeHtml(String(s.tooth_num));
+  if (s.quadrant && __QLBL_PR[s.quadrant]) return '<span style="font-size:11px;color:var(--text-muted,#8da0bd);">ربع ' + __QLBL_PR[s.quadrant] + '</span>';
+  if (s.arch && __ALBL_PR[s.arch]) return '<span style="font-size:11px;color:var(--text-muted,#8da0bd);">' + __ALBL_PR[s.arch] + '</span>';
+  return '—';
+}
+
 function fmt(n) {
   n = Number(n) || 0;
   return n.toLocaleString('en-US');
@@ -1020,7 +1031,7 @@ function showDetails(provId) {
     return '<tr>'
       + '<td>' + escapeHtml(s.date || '—') + '</td>'
       + '<td>' + escapeHtml(s.type || '—') + ' ' + statusBadge + '</td>'
-      + '<td>' + (s.tooth_num ? escapeHtml(String(s.tooth_num)) : '—') + '</td>'
+      + '<td>' + formatSessionToothCell(s) + '</td>'
       + '<td class="num">' + fmtSY(s.cost) + '</td>'
       + '<td class="num" style="color:var(--orange);">' + (sLabCost > 0 ? fmtSY(sLabCost) : '—') + '</td>'
       + '<td class="num">' + (basis === 'collection' ? '—' : fmtSY(sessionShare)) + '</td>'
@@ -1062,7 +1073,7 @@ function printSlip(provId) {
     return '<tr>'
       + '<td>' + escapeHtml(s.date || '—') + '</td>'
       + '<td>' + escapeHtml(s.type || '—') + '</td>'
-      + '<td style="text-align:center;">' + (s.tooth_num || '—') + '</td>'
+      + '<td style="text-align:center;">' + formatSessionToothCell(s) + '</td>'
       + '<td style="text-align:left;">' + fmtSY(s.cost) + '</td>'
       + '<td style="text-align:left;color:#fb923c;">' + (sLabCost > 0 ? fmtSY(sLabCost) : '—') + '</td>'
     + '</tr>';

@@ -4820,6 +4820,13 @@ function proceedToRegionalStep2(status, label) {
     costEl.style.cursor = '';
     costEl.title = '';
   }
+  // Phase 3 Feature G: hide the "🧪 حفظ + إرسال لمخبر" button for regional sessions.
+  // saveToothAndOpenLab() uses currentTooth/currentSurface to write to teeth_status,
+  // but in regional mode both are null, so the lab-attached save would fail with an
+  // invalid teeth_status row. If a regional treatment (e.g. arch denture) needs a
+  // lab order, the user can create it from the لا labs tab afterwards.
+  var labBtn = document.getElementById('toothLabBtn');
+  if (labBtn) labBtn.style.display = 'none';
   populateProviderPicker();
   var tr = getTreatment(status);
   var basePrice = tr ? Number(tr.price || 0) : 0;
@@ -5020,11 +5027,23 @@ async function saveToothTreatment() {
 
     renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
     closeModal('toothModal');
+    // Phase 3 Feature G: distinct toast for the two outcomes:
+    //   - billable status (completed/planned): session created → confirm save
+    //   - non-billable status (condition/existing_*/referred): no session created → tell the user
+    //     why (regional clinical notes don't make much sense — we save nothing, so the
+    //     user shouldn't think a record exists). This is consistent with the tooth-based
+    //     flow where these statuses write only to teeth_status; for regional we have no
+    //     teeth_status either, so the operation is effectively a no-op.
+    if (regNewSess) {
+      showToast('✅ تم تسجيل ' + pendingToothLabel + ' لـ ' + regAreaText);
+    } else if (pendingTreatStatus === 'condition' || pendingTreatStatus === 'existing_current'
+            || pendingTreatStatus === 'existing_other' || pendingTreatStatus === 'referred') {
+      showToast('ℹ️ حالة "' + (STATUS_LABELS[pendingTreatStatus] || pendingTreatStatus) + '" لا تُسجَّل لعلاج جماعي');
+    }
     // Reset regional state for next save
     pendingRegionalType = null;
     pendingRegionalQuadrant = null;
     pendingRegionalArch = null;
-    showToast('✅ تم تسجيل ' + pendingToothLabel + ' لـ ' + regAreaText);
     return;
   }
   // ============================================================

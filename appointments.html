@@ -2752,7 +2752,20 @@ function renderApptProcedures(appt) {
   placeholder.textContent = '— اختر علاجاً مخطّطاً —';
   selEl.appendChild(placeholder);
   planned.forEach(function(s){
-    var toothPart = s.tooth_num ? ' (سن ' + s.tooth_num + ')' : '';
+    // Phase 3 Feature G: dropdown for attaching planned procedures to an appointment
+    // — show region info instead of tooth number for regional sessions
+    var toothPart;
+    if (s.tooth_num) {
+      toothPart = ' (سن ' + s.tooth_num + ')';
+    } else if (s.quadrant) {
+      var QLBL2 = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+      toothPart = ' (' + (QLBL2[s.quadrant] || s.quadrant) + ')';
+    } else if (s.arch) {
+      var ALBL2 = {'U':'الفك العلوي','L':'الفك السفلي'};
+      toothPart = ' (' + (ALBL2[s.arch] || s.arch) + ')';
+    } else {
+      toothPart = '';
+    }
     var opt = document.createElement('option');
     opt.value = s.id;
     opt.textContent = (s.type || s.description || 'علاج') + toothPart + ' — ' + fmtCost(s.cost) + ' ل.س';
