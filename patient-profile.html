@@ -249,6 +249,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-existing_other{background:#9ca3af;opacity:.65;}    /* EO — done elsewhere */
 .status-existing{background:#9ca3af;opacity:.7;}           /* legacy fallback (pre-migration) */
 .status-referred{background:#f59e0b;}
+.status-condition{background:#6b7280;opacity:.70;}         /* Cn — clinical watch only, no charge */
 .topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
 
@@ -901,6 +902,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             </button>
             <button type="button" class="status-opt" data-status="referred" onclick="pickStatus('referred')">
               <span class="status-dot" style="background:#f59e0b;"></span>محوّل
+            </button>
+            <button type="button" class="status-opt" data-status="condition" onclick="pickStatus('condition')">
+              <span class="status-dot" style="background:#6b7280;"></span>مراقبة
             </button>
           </div>
         </div>
@@ -3477,6 +3481,7 @@ function getDominantStatus(num) {
   if (statuses.indexOf('existing_other') >= 0) return 'existing_other';
   if (statuses.indexOf('existing') >= 0) return 'existing';
   if (statuses.indexOf('referred') >= 0) return 'referred';
+  if (statuses.indexOf('condition') >= 0) return 'condition';  // Phase 3 Feature F: weakest — actual treatments win
   return 'completed';
 }
 
@@ -4120,6 +4125,7 @@ function addStatusBadges() {
       else if (status === 'existing_other') shape.style.opacity = '0.55';
       else if (status === 'existing') shape.style.opacity = '0.65';  // legacy
       else if (status === 'referred') shape.style.opacity = '0.50';
+      else if (status === 'condition') shape.style.opacity = '0.45';  // grey watch — most faded
     }
   }
 }
@@ -4170,7 +4176,7 @@ var currentTooth = null;
 var currentSurface = null;
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
-var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'referred'
+var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'referred' / 'condition'
 var pendingProviderId = null;  // Selected clinic doctor for this treatment
 var CLINIC_DOCTORS = [];
 var BUNDLE_ITEMS = [];
@@ -4181,7 +4187,8 @@ var STATUS_LABELS = {
   existing_current: 'من عيادتنا',
   existing_other:   'من عيادة أخرى',
   existing:         'موجود مسبقاً',           // legacy: pre-migration rows
-  referred:         'محوّل'
+  referred:         'محوّل',
+  condition:        'مراقبة'                  // Phase 3 Feature F: clinical watch only, no charge
 };
 var STATUS_COLORS = {
   planned:          '#ef4444',
@@ -4189,7 +4196,8 @@ var STATUS_COLORS = {
   existing_current: '#10b981',                 // green-teal: our practice's historical work
   existing_other:   '#9ca3af',                 // grey: external clinic's work
   existing:         '#9ca3af',                 // legacy: pre-migration rows
-  referred:         '#f59e0b'
+  referred:         '#f59e0b',
+  condition:        '#6b7280'                  // Phase 3 Feature F: darker grey to differentiate from existing_other
 };
 
 /* Detect "check constraint" errors on teeth_status.status / ledger_sessions.status
@@ -4245,6 +4253,20 @@ async function upsertTeethStatusWithFallback(row, opts) {
     if (!retry.error) warnEcEoMigrationOnce();
     return retry;
   }
+  // Phase 3 Feature F: if 'condition' is rejected (DB pre-dates Gap 4 migration),
+  // surface a clear migration warning to the user. We don't auto-rewrite to another
+  // status because 'condition' has distinct clinical semantics — silently downgrading
+  // to 'existing' would misrepresent the data.
+  if (first.error && isStatusConstraintError(first.error) && row.status === 'condition') {
+    showToast('⚠️ حالة "مراقبة" غير مدعومة بعد — يلزم تشغيل migration الـ EC/EO أولاً');
+    console.warn(
+      "Status 'condition' rejected by DB constraint. " +
+      "Run migration:\n" +
+      "ALTER TABLE teeth_status DROP CONSTRAINT IF EXISTS teeth_status_status_check;\n" +
+      "ALTER TABLE teeth_status ADD CONSTRAINT teeth_status_status_check\n" +
+      "  CHECK (status IN ('planned','completed','existing_current','existing_other','referred','condition'));"
+    );
+  }
   return first;
 }
 
@@ -4256,8 +4278,24 @@ function pickStatus(s) {
     else b.classList.remove('selected');
   });
   // Cost field is always visible — doctor can leave it 0 if not billable.
-  // Don't change the cost value here; user can edit it manually if they wish.
-  // (The validation in saveToothTreatment makes cost OPTIONAL regardless of status.)
+  // Phase 3 Feature F: for 'condition' (clinical watch), force cost to 0 and lock the field
+  // so the doctor can't accidentally type a charge for something we don't bill for.
+  // Restore editability when switching back to any other status.
+  var costEl = document.getElementById('toothCost');
+  if (costEl) {
+    if (s === 'condition') {
+      costEl.value = '0';
+      costEl.readOnly = true;
+      costEl.style.opacity = '0.55';
+      costEl.style.cursor = 'not-allowed';
+      costEl.title = 'حالة "مراقبة" — لا تكلفة';
+    } else {
+      costEl.readOnly = false;
+      costEl.style.opacity = '';
+      costEl.style.cursor = '';
+      costEl.title = '';
+    }
+  }
   // Auto-fill the notes textarea from the treatment's default/completion note
   var tr = getTreatment(pendingToothStatus);
   if (tr) {
@@ -4586,6 +4624,15 @@ function pickToothTreatment(status, label) {
     if (b.getAttribute('data-status') === 'completed') b.classList.add('selected');
     else b.classList.remove('selected');
   });
+  // Phase 3 Feature F: defensively reset cost field's readonly state in case the
+  // previous modal session set it to readonly (e.g. user picked 'مراقبة' last time).
+  var costEl2 = document.getElementById('toothCost');
+  if (costEl2) {
+    costEl2.readOnly = false;
+    costEl2.style.opacity = '';
+    costEl2.style.cursor = '';
+    costEl2.title = '';
+  }
   // Populate provider picker if there are multiple clinic doctors
   populateProviderPicker();
   // Set price based on selected provider (uses override if available)
