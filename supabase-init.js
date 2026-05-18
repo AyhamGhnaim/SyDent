@@ -112,11 +112,28 @@
   function isDoctor()    { return getRole() === 'doctor'; }
   function isSecretary() { return getRole() === 'secretary'; }
 
+  // Sync check: is a PIN configured in the DB?
+  // Returns false if cache hasn't loaded yet OR if no PIN is set.
+  // This is safe-by-default — if we can't confirm a PIN exists, we treat
+  // the lock as unconfigured (which means no PIN-required transitions).
+  // The cache is preloaded by autoInit() so this returns the correct value
+  // by the time the user clicks the lock button.
+  function isPinSet() {
+    return !!(_pinHashLoaded && _pinHashCache);
+  }
+
   // ── Hierarchy: Owner=3 > Doctor=2 = Secretary=2 ───────────────
   // الفلسفة: Owner → أي شي بدون PIN (تخفيض). أي ترقية → PIN.
   // التبديل الأفقي (Doctor → Secretary أو العكس) → PIN.
   // التبديل بين أطباء (Doctor:A → Doctor:B) → PIN.
+  // ✱ Important: if NO PIN is configured in the DB, the lock is effectively
+  //   disabled — any transition is free (otherwise Doctor/Secretary devices
+  //   could lock themselves out before setup completes).
   function requirePin(targetRole, targetDoctorId) {
+    // Lock not configured → no PIN required ever (prevents lockout if user
+    // switches modes before setting up a PIN)
+    if (!isPinSet()) return false;
+
     var curRole = getRole();
     var curDoctorId = getDoctorId();
 
@@ -512,26 +529,28 @@
         var checked = opt.querySelector('input').checked;
         opt.classList.toggle('sd-active', checked);
       });
-      // PIN visibility
+      // PIN visibility — based on the *current* requirePin decision
+      // (which itself respects whether a PIN is set in DB)
       var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
       var targetDocId = (targetRole === 'doctor') ? ov.querySelector('#sdDoctorSel') && ov.querySelector('#sdDoctorSel').value : null;
       var need = requirePin(targetRole, targetDocId);
       var pinRow = ov.querySelector('#sdPinRow');
       pinRow.style.display = need ? 'block' : 'none';
 
-      // Warn if need PIN but none set
       var msg = ov.querySelector('#sdMsg');
-      if (need && !hasPinSet) {
-        msg.textContent = '⚠ لم يتم تعيين PIN بعد. اذهب للإعدادات لتعيينه أولاً.';
-        msg.className = 'sd-msg';
-        ov.querySelector('#sdBtnConfirm').disabled = true;
-      } else if (isInCooldown()) {
+      var confirmBtn = ov.querySelector('#sdBtnConfirm');
+      if (isInCooldown()) {
         msg.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + cooldownSecondsLeft() + ' ثانية.';
         msg.className = 'sd-msg';
-        ov.querySelector('#sdBtnConfirm').disabled = true;
+        confirmBtn.disabled = true;
+      } else if (!hasPinSet) {
+        // Lock not yet configured — show informational hint (not an error)
+        msg.textContent = 'ℹ️ القفل غير مفعّل (لا يوجد PIN). يمكن التبديل بحرية. لتفعيل القفل، عيّن PIN من الإعدادات.';
+        msg.className = 'sd-msg sd-ok';
+        confirmBtn.disabled = false;
       } else {
         msg.textContent = '';
-        ov.querySelector('#sdBtnConfirm').disabled = false;
+        confirmBtn.disabled = false;
       }
     }
     radios.forEach(function(r){ r.addEventListener('change', updateActive); });
@@ -637,6 +656,7 @@
     loadPinHash: loadPinHash,
     savePinHash: savePinHash,
     invalidatePinCache: invalidatePinCache,
+    isPinSet: isPinSet,
     // hierarchy
     requirePin: requirePin,
     // rate limit
