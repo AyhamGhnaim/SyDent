@@ -274,7 +274,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="chip" data-filter="quadrant">ربع</button>
       <button class="chip" data-filter="arch">فك</button>
       <button class="chip" data-filter="mouth">فم كامل</button>
-      <button class="chip" data-filter="lab">🧪 مخبر</button>
+      <button class="chip" data-filter="lab"><span class="silver-tooth">🦷</span> مخبر</button>
       <button class="chip" data-filter="custom">مخصصة</button>
       <button class="chip" data-filter="inactive">⏸️ معطّلة</button>
     </div>
@@ -372,7 +372,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group">
         <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;margin-bottom:0;">
           <span style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--text);font-size:14px;">
-            <span style="font-size:18px;">🧪</span>
+            <span style="font-size:18px;">🦷</span>
             هذا العلاج يحتاج إرسال للمخبر
           </span>
           <label class="lab-toggle-switch" style="position:relative;display:inline-block;width:46px;height:24px;flex-shrink:0;">
@@ -789,7 +789,7 @@ function render() {
     var bar = 'background:' + bg + ';';
     var textColor = isLightColor(bg) ? '#0a1628' : '#fff';
     var builtinTag = '';
-    var labTag = t.needs_lab ? '<span class="treat-lab-tag">🧪 مخبر</span>' : '';
+    var labTag = t.needs_lab ? '<span class="treat-lab-tag">🦷 مخبر</span>' : '';
     var targetMap = {
       'crown':      { text:'سطح تاج',     color:'#f5c842' },
       'root':       { text:'جذر السن',    color:'#a78bfa' },
@@ -927,7 +927,7 @@ function applyCategoryLabDefault() {
   if (toggle.checked === shouldNeedLab) return;  // no change needed
   toggle.checked = shouldNeedLab;
   if (shouldNeedLab) {
-    showToast('🧪 تم تفعيل "يحتاج مخبر" تلقائياً');
+    showToast('🦷 تم تفعيل "يحتاج مخبر" تلقائياً');
   }
 }
 
@@ -1778,7 +1778,7 @@ function printLegend() {
         : '';
       html += '<tr>';
       html += '<td><span class="color-dot" style="background:' + t.fill + ';"></span></td>';
-      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#a78bfa;font-size:11px;">🧪 مخبر</span>' : '') + laymanSub + '</td>';
+      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#a78bfa;font-size:11px;">🦷 مخبر</span>' : '') + laymanSub + '</td>';
       html += '<td>' + escapeHtml(t.label) + '</td>';
       html += '<td class="price-col">' + fmt(t.price) + ' ل.س</td>';
       html += '</tr>';

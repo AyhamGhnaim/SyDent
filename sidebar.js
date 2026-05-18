@@ -71,6 +71,14 @@ const css = `
     border-right-color: var(--green);
   }
   .sb-icon { font-size: 16px; width: 20px; text-align: center; }
+  /* Silver-tooth visual treatment for lab-related icons.
+     Applied via <span class="silver-tooth">🦷</span> wrappers.
+     Uses CSS filters that work on emoji glyphs in WebKit/Blink. */
+  .silver-tooth {
+    filter: grayscale(1) brightness(1.1) contrast(0.9);
+    -webkit-filter: grayscale(1) brightness(1.1) contrast(0.9);
+    display: inline-block;
+  }
   .sb-badge {
     margin-right: auto;
     background: var(--green);
@@ -148,10 +156,10 @@ const navItems = [
   { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
   { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
   { section: 'الإدارة' },
-  { icon: '💊', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
+  { icon: '💉', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
   { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
-  { icon: '🧪', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
+  { icon: '🦷', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },
   { icon: '📊', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
   { icon: '📈', label: 'التقارير',    href: '#',             id: 'reports'   },
@@ -204,9 +212,12 @@ function buildHTML(activeId) {
     const isActive = item.id === activeId ? 'active' : '';
     const badge = item.badge ? `<span class="sb-badge">${item.badge}</span>` : '';
     const clickAttr = item.onClick ? `onclick="event.preventDefault();window.${item.onClick}();"` : '';
+    // Apply silver-tooth filter to the labs item only — gives the 🦷 emoji
+    // a metallic/silver tint that distinguishes it from other tooth icons.
+    const iconCls = item.id === 'labs' ? 'sb-icon silver-tooth' : 'sb-icon';
     return `
       <a class="sb-item ${isActive}" href="${item.href}" ${clickAttr}>
-        <span class="sb-icon">${item.icon}</span>
+        <span class="${iconCls}">${item.icon}</span>
         ${item.label}
         ${badge}
       </a>`;

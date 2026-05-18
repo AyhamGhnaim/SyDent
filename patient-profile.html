@@ -623,7 +623,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab" onclick="switchTab('timeline',this)">🕐 السجل الكامل</button>
     <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
-    <button class="tab" onclick="switchTab('labs',this)">🧪 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('labs',this)"><span class="silver-tooth">🦷</span> المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
   </div>
 
   <!-- Tab: الملف -->
@@ -694,7 +694,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <span class="tl-chip active" data-tl-type="session" onclick="onTlTypeChip('session')">🦷 جلسات</span>
           <span class="tl-chip active" data-tl-type="payment" onclick="onTlTypeChip('payment')">💰 دفعات</span>
           <span class="tl-chip active" data-tl-type="appointment" onclick="onTlTypeChip('appointment')">📅 مواعيد</span>
-          <span class="tl-chip active" data-tl-type="lab" onclick="onTlTypeChip('lab')">🧪 مخابر</span>
+          <span class="tl-chip active" data-tl-type="lab" onclick="onTlTypeChip('lab')"><span class="silver-tooth">🦷</span> مخابر</span>
           <span class="tl-chip active" data-tl-type="unearned" onclick="onTlTypeChip('unearned')">💵 رصيد مقدّم</span>
           <span class="tl-chip active" data-tl-type="reminder" onclick="onTlTypeChip('reminder')">📱 تذكيرات</span>
         </div>
@@ -746,7 +746,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-labs">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">🧪 طلبات المخابر</span>
+        <span class="card-title"><span class="silver-tooth">🦷</span> طلبات المخابر</span>
         <button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ طلب جديد</button>
       </div>
       <div id="labOrdersContent"></div>
@@ -956,7 +956,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot" id="toothFoot" style="display:none;">
       <button class="btn-cancel-m" onclick="backToStep1()">رجوع</button>
-      <button class="btn-lab" id="toothLabBtn" onclick="saveToothAndOpenLab()" style="display:none;">🧪 حفظ + إرسال لمخبر</button>
+      <button class="btn-lab" id="toothLabBtn" onclick="saveToothAndOpenLab()" style="display:none;"><span class="silver-tooth">🦷</span> حفظ + إرسال لمخبر</button>
       <button class="btn-save-m" onclick="saveToothTreatment()">حفظ كجلسة</button>
     </div>
   </div>
@@ -966,7 +966,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="labOrderModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3 id="labOrderTitle">🧪 طلب مخبر جديد</h3>
+      <h3 id="labOrderTitle"><span class="silver-tooth">🦷</span> طلب مخبر جديد</h3>
       <button class="modal-close" onclick="closeModal('labOrderModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -2154,7 +2154,7 @@ function buildTimelineEvents() {
     }
     events.push({
       type: 'lab',
-      icon: '🧪',
+      icon: '🦷',
       ts: tlBestTs(lo.date_sent, lo.created_at),
       data: lo,
       labName: labDisplay,
@@ -2329,7 +2329,7 @@ function renderTimelineRow(e) {
   else if (e.type === 'lab') {
     var lo = e.data;
     var toothPart2 = lo.tooth_num ? ' — السن ' + escapeHtml(String(lo.tooth_num)) : '';
-    title = '🧪 ' + escapeHtml(lo.work_type || 'طلب مخبر') + toothPart2;
+    title = '🦷 ' + escapeHtml(lo.work_type || 'طلب مخبر') + toothPart2;
     var statBadge3 = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
     var labPart = e.labName
       ? '<span>المخبر: <b>' + escapeHtml(e.labName) + '</b></span>'
@@ -2414,7 +2414,7 @@ function renderTimeline() {
       // see what's reachable with one click.
       var typeLabels = {
         session: '🦷 جلسات', payment: '💰 دفعات', appointment: '📅 مواعيد',
-        lab: '🧪 مخابر', unearned: '💵 رصيد مقدّم', reminder: '📱 تذكيرات'
+        lab: '🦷 مخابر', unearned: '💵 رصيد مقدّم', reminder: '📱 تذكيرات'
       };
       var activeTypeKeys = Object.keys(timelineFilters.types)
         .filter(function(k){ return timelineFilters.types[k]; });
@@ -4840,7 +4840,7 @@ function proceedToRegionalStep2(status, label) {
     costEl.style.cursor = '';
     costEl.title = '';
   }
-  // Phase 3 Feature G: hide the "🧪 حفظ + إرسال لمخبر" button for regional sessions.
+  // Phase 3 Feature G: hide the "🦷 حفظ + إرسال لمخبر" button for regional sessions.
   // saveToothAndOpenLab() uses currentTooth/currentSurface to write to teeth_status,
   // but in regional mode both are null, so the lab-attached save would fail with an
   // invalid teeth_status row. If a regional treatment (e.g. arch denture) needs a
@@ -6541,7 +6541,7 @@ function renderLabOrders() {
   var el = document.getElementById('labOrdersContent');
   if (!el) return;
   if (!labOrders.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">🧪</div>لا توجد طلبات مخابر مسجّلة بعد<br><br><button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ إضافة أول طلب</button></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🦷</div>لا توجد طلبات مخابر مسجّلة بعد<br><br><button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ إضافة أول طلب</button></div>';
     updateLabsBadge();
     return;
   }
@@ -6745,7 +6745,7 @@ function onLabApptChange() {
 async function openLabOrderModal(prefill) {
   await loadTreatmentsFromSupabase();
   prefill = prefill || {};
-  document.getElementById('labOrderTitle').textContent = '🧪 طلب مخبر جديد';
+  document.getElementById('labOrderTitle').textContent = '🦷 طلب مخبر جديد';
   document.getElementById('labOrderId').value = '';
   document.getElementById('labOrderTreatmentKey').value = prefill.treatment_key || '';
   populateLabWorkTypes(prefill.treatment_key);
@@ -6792,7 +6792,7 @@ async function editLabOrder(id) {
     }
   }
 
-  document.getElementById('labOrderTitle').textContent = '🧪 تعديل طلب المخبر';
+  document.getElementById('labOrderTitle').textContent = '🦷 تعديل طلب المخبر';
   document.getElementById('labOrderId').value = lo.id;
   document.getElementById('labOrderTreatmentKey').value = lo.treatment_key || '';
   populateLabWorkTypes(lo.treatment_key);

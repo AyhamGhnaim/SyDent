@@ -898,10 +898,10 @@ textarea { resize: vertical; min-height: 72px; }
         <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
 
-      <!-- 🧪 Lab orders section (visible only when editing + lab orders exist) -->
+      <!-- 🦷 Lab orders section (visible only when editing + lab orders exist) -->
       <div id="apptLabSection" style="display:none;margin-top:12px;padding:14px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:700;color:var(--text);">🧪 المخبر — مرتبط بهذا الموعد</div>
+          <div style="font-weight:700;color:var(--text);"><span class="silver-tooth">🦷</span> المخبر — مرتبط بهذا الموعد</div>
           <a href="labs.html" style="font-size:12px;color:#63b3ed;text-decoration:none;">إدارة المخابر ←</a>
         </div>
         <div id="apptLabList" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -1613,7 +1613,7 @@ function getApptLabBadge(appt) {
   }
   if (hasReady) {
     return {
-      icon: '🧪',
+      icon: '🦷',
       color: '#2ee89e',
       title: hasDirect
         ? 'شغل المخبر جاهز للتركيب في هذا الموعد'
@@ -1627,7 +1627,7 @@ function getApptLabBadge(appt) {
     var diffDays = Math.floor((apptT - nowT) / 86400000);
     if (diffDays >= 0 && diffDays <= 3) {
       return {
-        icon: '🧪',
+        icon: '🦷',
         color: '#63b3ed',
         title: hasDirect
           ? 'طلب مخبر مرتبط بهذا الموعد'

@@ -590,7 +590,7 @@ textarea::placeholder { color: var(--text2); }
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار القالب</div>
     </div>
     <div class="form-group" id="fAtLabWrap">
-      <label>🧪 المخبر الافتراضي</label>
+      <label><span class="silver-tooth">🦷</span> المخبر الافتراضي</label>
       <select id="fAtLab">
         <option value="">— بدون مخبر —</option>
       </select>
@@ -1361,7 +1361,7 @@ function renderApptTypesList() {
       var labName = labMap[t.default_lab_id]
         ? String(labMap[t.default_lab_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
         : '[مخبر محذوف]';
-      extras.push('🧪 ' + labName);
+      extras.push('🦷 ' + labName);
     }
     var extrasLine = extras.length
       ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + extras.join(' · ') + '</div>'
