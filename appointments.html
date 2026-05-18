@@ -1061,6 +1061,23 @@ function hexA(hex, a) {
   return 'rgba('+r+','+g+','+b+','+a+')';
 }
 
+// H2 fix: escape user-controlled fields before injecting into template literals.
+// Patient names, appointment types, and notes flow from raw user input through DB
+// to the rendered HTML below. While the current owner-only RLS model means a
+// malicious payload would only attack the same owner who entered it (XSS-against-
+// self, low risk), once multi-user is introduced (a secretary entering a patient
+// name) the same payload would attack the dentist. We escape now to prevent the
+// regression vector.
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 let appointments = [];
 let labOrdersByPatient = {};   // { patient_id: [lab_orders] } — for lab status icons (legacy fallback)
 let labOrdersByAppt    = {};   // { appointment_id: [lab_orders] } — preferred (direct link)
@@ -1227,16 +1244,34 @@ function classifyReminderForAppt(appt) {
   // No reminder for finished appointments (completed/cancelled/broken/no_show).
   // Uses the shared helper so Gap 1's status set stays the single source of truth.
   if (isFinishedStatus(appt.status)) return null;
-  const today = new Date(); today.setHours(0,0,0,0);
-  const d = new Date(appt.date + 'T12:00:00');
-  if (isNaN(d.getTime())) return null;
-  const diffMs = d.getTime() - today.getTime();
-  if (diffMs < 0) return null;
 
+  // Priority 1: if a reminder was already sent, show the "تم التذكير" badge
+  // regardless of whether the appointment is past or future. The user wants
+  // confirmation that the action was taken, especially for today's appts
+  // whose time has just passed — losing the badge in that small window would
+  // look like the reminder vanished.
   const log = reminderLogsByAppt[appt.id];
   if (log) {
     return { kind: 'sent', label: '✓ تم التذكير', title: 'آخر تذكير: ' + new Date(log.sent_at).toLocaleString('ar') };
   }
+
+  // H4 fix: compute against the appointment's actual moment (date + time), not
+  // against midday. Previously we hard-coded 'T12:00:00', so a 10am appointment
+  // on TODAY (already past at 2pm) would still classify as "urgent — موعد قريب"
+  // because midday lay 12h ahead of today-midnight. We now use appt.time when
+  // available; if it's missing (legacy / planned), fall back to midday so the
+  // old behaviour holds for those.
+  const now = new Date();
+  const timeStr = (appt.time && /^\d{2}:\d{2}/.test(appt.time)) ? appt.time.slice(0,5) : '12:00';
+  const d = new Date(appt.date + 'T' + timeStr + ':00');
+  if (isNaN(d.getTime())) return null;
+  const diffMs = d.getTime() - now.getTime();
+  // Past appointments (negative diff) with no reminder log get no badge —
+  // the slot has come and gone, no point nagging about a missed window. The
+  // log priority check above means "تم التذكير" still shows if a reminder
+  // was actually sent before the appointment.
+  if (diffMs < 0) return null;
+
   const diffH = diffMs / 36e5;
   const cfgHours = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminder_hours_before) || 24;
   if (diffH <= 24) {
@@ -1680,9 +1715,9 @@ function renderPlanned() {
     html += '<div class="planned-item">'
       + '<div class="planned-icon">📋</div>'
       + '<div class="planned-info">'
-      +   '<div class="planned-name">' + (p.patient_name || '—') + '</div>'
-      +   '<div class="planned-reason" title="' + reasonLine.replace(/"/g,'&quot;') + '">'
-      +     (reasonLine || '<span style="opacity:.5;">بدون تفاصيل</span>')
+      +   '<div class="planned-name">' + escapeHtml(p.patient_name || '—') + '</div>'
+      +   '<div class="planned-reason" title="' + escapeHtml(reasonLine) + '">'
+      +     (reasonLine ? escapeHtml(reasonLine) : '<span style="opacity:.5;">بدون تفاصيل</span>')
       +   '</div>'
       + '</div>'
       + '<div class="planned-actions">'
@@ -2237,8 +2272,7 @@ function populateApptTypePicker() {
   var html = '<option value="">— بدون قالب —</option>';
   for (var i = 0; i < _appointmentTypes.length; i++) {
     var t = _appointmentTypes[i];
-    var safeName = String(t.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    html += '<option value="' + t.id + '">' + safeName + '</option>';
+    html += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name || '') + '</option>';
   }
   sel.innerHTML = html;
   sel.value = '';
@@ -2375,7 +2409,7 @@ function cellHTML(day, ds, other, today, evts) {
     var _ec = getApptColor(e);
     var lb = getApptLabBadge(e);
     var lbHtml = lb ? `<span style="margin-left:3px;" title="${lb.title}">${lb.icon}</span>` : '';
-    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${lbHtml}${(e.time||'').slice(0,5)} ${(e.patient_name||'').split(' ')[0]}</div>`;
+    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${lbHtml}${(e.time||'').slice(0,5)} ${escapeHtml((e.patient_name||'').split(' ')[0])}</div>`;
   });
   // Mobile dots
   let dotHTML = '<div class="cal-dot-row">';
@@ -2429,8 +2463,8 @@ function renderDay() {
           <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${e.patient_name||'—'} ${lbHtml}${psHtml}${waHtml}</div>
-              <div class="appt-type">${e.type||'—'} (${e.duration} د)</div>
+              <div class="appt-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}</div>
+              <div class="appt-type">${escapeHtml(e.type)||'—'} (${e.duration} د)</div>
               ${renderTimeStrip(e)}
               <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
                 <span class="appt-status ${statusClass(e.status)}">${statusLabel(e.status)}</span>
@@ -2491,10 +2525,10 @@ function renderList() {
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${(e.time||'').slice(0,5)}</div>
-          <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${initials(e.patient_name||'؟')}</div>
+          <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${escapeHtml(initials(e.patient_name||'؟'))}</div>
           <div class="list-info">
-            <div class="list-name">${e.patient_name||'—'} ${lbHtml}${psHtml}${waHtml}</div>
-            <div class="list-type">${e.type||'—'} — ${e.duration} دقيقة</div>
+            <div class="list-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}</div>
+            <div class="list-type">${escapeHtml(e.type)||'—'} — ${e.duration} دقيقة</div>
             ${renderTimeStrip(e)}
           </div>
           <span class="list-badge ${statusClass(e.status)}">${statusLabel(e.status)}</span>
@@ -2564,7 +2598,7 @@ async function openModal(prefillDate) {
 
   // تعبئة قائمة المرضى من Supabase
   const names = await loadPatientNames();
-  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
+  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 
   document.getElementById('modalOverlay').classList.add('open');
 }
@@ -2618,7 +2652,7 @@ async function editAppt(id) {
   document.getElementById('fNotes').value  = isPlanned ? '' : (a.notes || '');
   // كذلك تعبئة قائمة المرضى للـ datalist
   const names = await loadPatientNames();
-  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${n}">`).join('');
+  document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 
   // Provider picker — preselect this appt's provider if any
   await populateApptProviderPicker(a.provider_id || null);
@@ -2707,7 +2741,7 @@ function renderApptProcedures(appt) {
         else if (s.arch && ALBL[s.arch]) toothPart = ' • ' + ALBL[s.arch];
       }
       html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">'
-        + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + (s.type || s.description || 'علاج') + toothPart + '</div>'
+        + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
         + '<div style="font-size:12px;color:var(--text2);">' + fmtCost(s.cost) + ' ل.س</div>'
         + statusBadge
         + '<button type="button" onclick="unlinkSessionFromAppt(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="فصل عن الموعد">✕</button>'
@@ -2820,8 +2854,8 @@ function renderApptLabOrders(appt) {
     var labLabel  = o.lab_name || '—';
 
     html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">'
-      + '<div style="flex:1;min-width:160px;font-size:13px;color:var(--text);">' + (o.work_type || 'طلب مخبر') + toothPart + '</div>'
-      + '<div style="font-size:11px;color:var(--text2);">المخبر: ' + labLabel + '</div>'
+      + '<div style="flex:1;min-width:160px;font-size:13px;color:var(--text);">' + escapeHtml(o.work_type || 'طلب مخبر') + toothPart + '</div>'
+      + '<div style="font-size:11px;color:var(--text2);">المخبر: ' + escapeHtml(labLabel) + '</div>'
       + '<div style="font-size:11px;color:var(--text2);">استحقاق: ' + dueDate + '</div>'
       + lateTag
       + '<span style="background:' + statusBg + ';color:' + statusCol + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + statusAr + '</span>'
@@ -3235,6 +3269,23 @@ async function submitAppt(e) {
     } catch(_) { /* ignore */ }
   }
 
+  // H3 fix: if the resolved patient is missing from patientsCache (e.g. user
+  // added the patient in another tab between page-load and now), flag a refresh
+  // after save so WhatsApp reminders and other features that read from the
+  // cache can resolve the phone number for this appointment. We use a flag
+  // (set here, executed after save below) so we make at most one extra DB
+  // round-trip per save, only when actually needed.
+  var _needsPatientCacheRefresh = false;
+  if (patientId && !patientsCache[patientId]) {
+    _needsPatientCacheRefresh = true;
+  } else if (patientName && !patientsCache['__name__' + patientName] && !patientId) {
+    // Edge case: user typed a free-text name that doesn't match any patient
+    // record. The phone-resolver later will return null (correct), but if the
+    // patient WAS just added with that name and our cache pre-dates it, we'd
+    // miss the cache lookup. Refresh defensively so the next reminder works.
+    _needsPatientCacheRefresh = true;
+  }
+
   // Gap 7: compute date/time/notes based on planned vs scheduled mode.
   //   - planned : date/time MUST be null; reason goes into notes
   //   - scheduled: original behavior (date+time required by HTML5)
@@ -3519,6 +3570,9 @@ async function submitAppt(e) {
         setMainTab('planned');
       }
       await loadAppointments();
+      // H3 fix: refresh phone cache if the appointment was for a patient added
+      // in another tab (so WhatsApp reminder for this appt can find the phone).
+      if (_needsPatientCacheRefresh) await loadPatientPhones();
     }
   } else {
     var ins = await window.sb.from('appointments').insert(apptData).select().single();
@@ -3613,6 +3667,8 @@ async function submitAppt(e) {
       // Gap 7: after adding a planned appt, jump straight to planned tab
       if (isPlannedNow) setMainTab('planned');
       await loadAppointments();
+      // H3 fix: refresh phone cache if patient was newly added in another tab
+      if (_needsPatientCacheRefresh) await loadPatientPhones();
     }
   }
 

@@ -810,19 +810,47 @@ function _dashIsFinishedForWa(s) {
   return s === 'completed' || s === 'cancelled' || s === 'broken' || s === 'no_show';
 }
 
+// H2 fix: escape user-controlled fields before innerHTML injection.
+// Patient names + appointment types are user-typed in patients.html /
+// treatments.html and reach the dashboard via Supabase. Same XSS-against-self
+// concern as appointments.html — defensive escape now prevents future
+// multi-user regressions.
+function _dashEscapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Returns badge HTML or '' — mirrors appointments.html classifyReminderForAppt
 // semantics but trimmed for dashboard density (short labels, no titles needed).
 function renderDashWaBadge(appt) {
   if (!_dashCfgWa || !_dashCfgWa.whatsapp_reminders_enabled) return '';
   if (!appt || !appt.id || _dashIsFinishedForWa(appt.status)) return '';
 
+  // Priority 1: log wins. If a reminder was sent, show "تم التذكير" badge
+  // regardless of whether the appointment time has already passed today.
   var log = _dashReminderLogs[appt.id];
-  // Today's appts: if no log → urgent (the day is already here)
   if (log) {
     return '<span class="wa-badge-dash sent" title="آخر تذكير: '
       + new Date(log.sent_at).toLocaleString('ar').replace(/"/g,'&quot;')
       + '" onclick="event.stopPropagation(); _dashGoToWaReminder(\'' + appt.id + '\')">✓ تم التذكير</span>';
   }
+
+  // H4 fix: skip the "أرسل تذكير" prompt for appointments whose time has
+  // already passed today — the slot is gone, nagging the user about a
+  // missed reminder window helps no one. Mirrors the appointments.html
+  // classifyReminderForAppt past-check. If `time` is missing/malformed we
+  // assume noon (matches the classifier fallback).
+  if (appt.date) {
+    var ts = (appt.time && /^\d{2}:\d{2}/.test(appt.time)) ? appt.time.slice(0,5) : '12:00';
+    var apptMoment = new Date(appt.date + 'T' + ts + ':00');
+    if (!isNaN(apptMoment.getTime()) && apptMoment.getTime() < Date.now()) return '';
+  }
+
   return '<span class="wa-badge-dash urgent" title="موعد اليوم بدون تذكير" '
     + 'onclick="event.stopPropagation(); _dashGoToWaReminder(\'' + appt.id + '\')">⚠️ أرسل تذكير</span>';
 }
@@ -848,8 +876,8 @@ function renderTodayApptsCard() {
   el.innerHTML = _dashApptsToday.map(function(a) {
     var stamps = renderDashStrip(a);
     var btn = renderDashActionBtn(a);
-    var safeName = (a.patient_name || '—');
-    var safeType = (a.type || '—');
+    var safeName = _dashEscapeHtml(a.patient_name || '—');
+    var safeType = _dashEscapeHtml(a.type || '—');
     var safeTime = (a.time || '').slice(0, 5) || '—';
     var waBadge = renderDashWaBadge(a);
     return '<div class="appt-item">'
@@ -982,8 +1010,8 @@ async function loadWaitingRoom(uid) {
     else if (waitMin >= 15) { color = '#f5c842'; emoji = '🟡'; }
     else { color = '#8da0bd'; emoji = '⚪'; }
     var arrivedStr = arrived.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
-    var safeName = (a.patient_name || '—');
-    var safeType = (a.type || '—');
+    var safeName = _dashEscapeHtml(a.patient_name || '—');
+    var safeType = _dashEscapeHtml(a.type || '—');
     return '<a class="appt-item" href="appointments.html" style="text-decoration:none;color:inherit">'
          +   '<div class="appt-time">' + arrivedStr + '</div>'
          +   '<div style="flex:1;min-width:0">'
