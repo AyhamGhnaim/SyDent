@@ -563,7 +563,15 @@ async function loadAll() {
     sel.value = 'all';
   }
 
-  await loadFilteredData();
+  // Phase 4: apply Doctor mode lock BEFORE loadFilteredData to prevent
+  // a brief flicker where the doctor would see all providers' data.
+  // applyDoctorModeFilter sets sel.value to their id and disables changes,
+  // so loadFilteredData filters from the start.
+  if (window.SyDentLock && window.SyDentLock.isDoctor() && typeof applyDoctorModeFilter === 'function') {
+    applyDoctorModeFilter();
+  } else {
+    await loadFilteredData();
+  }
 }
 
 async function loadFilteredData() {
@@ -1311,6 +1319,9 @@ window.onPTRRefresh = function() { loadAll(); };
   if (!user) return;
   currentUser = user;
 
+  // Phase 4: Lock guard — Owner + Doctor only (Secretary blocked)
+  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner', 'doctor'])) return;
+
   // Default: this month
   var now = new Date();
   var from = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1320,7 +1331,37 @@ window.onPTRRefresh = function() { loadAll(); };
   document.querySelectorAll('.preset-btn')[0].classList.add('active');
 
   await loadAll();
+
+  // Phase 4: Doctor mode auto-filter (lock the provider dropdown to the doctor's own id)
+  applyDoctorModeFilter();
 })();
+
+// Phase 4: When in Doctor mode, force the provider filter to the doctor's id
+// and disable the dropdown. Visible-but-locked pattern (transparency for the
+// doctor: "I see why I can't change this — I'm in Doctor mode").
+function applyDoctorModeFilter() {
+  if (!window.SyDentLock || !window.SyDentLock.isDoctor()) return;
+  var sel = document.getElementById('providerFilter');
+  if (!sel) return;
+  var did = window.SyDentLock.getDoctorId();
+  if (!did) return;
+  // Ensure the option exists (in case the filter dropdown was repopulated)
+  var hasOpt = false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === did) { hasOpt = true; break; }
+  }
+  if (hasOpt) {
+    sel.value = did;
+    sel.disabled = true;
+    sel.style.opacity = '0.7';
+    sel.style.cursor = 'not-allowed';
+    sel.title = 'الفلتر مقفول على إنتاجك في وضع الطبيب';
+    onFilterChange();
+  } else {
+    // Doctor id not found in clinic_doctors — show a clear message
+    console.warn('[SyDentLock] Doctor mode: doctor id not in clinic_doctors list');
+  }
+}
 
 async function doLogout() {
   await window.sb.auth.signOut();

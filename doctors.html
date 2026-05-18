@@ -626,6 +626,9 @@ document.addEventListener('click', function(e){
   if (!user) return;
   currentUser = user;
 
+  // Phase 4: Lock guard — Owner-only page
+  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
+
   // Load owner-doctor record from legacy 'doctors' table (one row per account)
   // Use maybeSingle so missing row doesn't throw — new users may not have one yet
   try {

@@ -49,3 +49,614 @@
 
   console.log('[SyDent] Supabase initialized');
 })();
+
+// ═══════════════════════════════════════════════════════════════════
+// SyDent — Device Lock Mode (Phase 4)
+// ═══════════════════════════════════════════════════════════════════
+// نظام أدوار محلي على مستوى الجهاز (Owner / Doctor / Secretary).
+// PIN واحد يُخزَّن hashed (SHA-256) في clinic_settings.lock_pin_hash.
+// الـ role يُحفظ في localStorage. Hierarchy: Owner > Doctor = Secretary.
+// Owner → أي شي بدون PIN (تخفيض). أي ترقية أو تبديل أفقي → PIN مطلوب.
+// Rate-limit: 5 محاولات خاطئة → 60 ثانية cooldown.
+// ═══════════════════════════════════════════════════════════════════
+
+(function() {
+  'use strict';
+
+  // ── Constants ──────────────────────────────────────────────────
+  const LS_ROLE       = 'sydent.lock.role';        // 'owner'|'doctor'|'secretary'
+  const LS_DOCTOR_ID  = 'sydent.lock.doctorId';    // UUID (when role=doctor)
+  const LS_FAIL_COUNT = 'sydent.lock.failCount';
+  const LS_COOLDOWN   = 'sydent.lock.cooldownUntil';
+  const MAX_FAILS     = 5;
+  const COOLDOWN_MS   = 60 * 1000; // 60 seconds
+
+  const ROLE_LABELS = {
+    owner:     'المالك',
+    doctor:    'الطبيب',
+    secretary: 'السكرتيرة'
+  };
+  const ROLE_ICONS = {
+    owner:     '👑',
+    doctor:    '👨‍⚕️',
+    secretary: '👩‍💼'
+  };
+  const ROLE_COLORS = {
+    owner:     { bg: 'rgba(46,232,158,0.14)',  border: 'rgba(46,232,158,0.40)',  text: '#2ee89e' },
+    doctor:    { bg: 'rgba(99,179,237,0.14)',  border: 'rgba(99,179,237,0.40)',  text: '#63b3ed' },
+    secretary: { bg: 'rgba(255,167,38,0.14)',  border: 'rgba(255,167,38,0.40)',  text: '#ffa726' }
+  };
+
+  // ── Cache (loaded once per page) ───────────────────────────────
+  let _pinHashCache = null;       // SHA-256 hex من DB
+  let _pinHashLoaded = false;
+  let _doctorsListCache = null;
+
+  // ── Low-level state ────────────────────────────────────────────
+  function getRole() {
+    try {
+      var r = localStorage.getItem(LS_ROLE);
+      if (r === 'owner' || r === 'doctor' || r === 'secretary') return r;
+    } catch(e) {}
+    return 'owner'; // default: جهاز جديد = Owner
+  }
+
+  function getDoctorId() {
+    try {
+      var d = localStorage.getItem(LS_DOCTOR_ID);
+      return d && d !== 'null' && d !== 'undefined' ? d : null;
+    } catch(e) { return null; }
+  }
+
+  function isOwner()     { return getRole() === 'owner'; }
+  function isDoctor()    { return getRole() === 'doctor'; }
+  function isSecretary() { return getRole() === 'secretary'; }
+
+  // ── Hierarchy: Owner=3 > Doctor=2 = Secretary=2 ───────────────
+  // الفلسفة: Owner → أي شي بدون PIN (تخفيض). أي ترقية → PIN.
+  // التبديل الأفقي (Doctor → Secretary أو العكس) → PIN.
+  // التبديل بين أطباء (Doctor:A → Doctor:B) → PIN.
+  function requirePin(targetRole, targetDoctorId) {
+    var curRole = getRole();
+    var curDoctorId = getDoctorId();
+
+    // Same exact state — no-op, no PIN
+    if (curRole === targetRole) {
+      if (targetRole === 'doctor') {
+        if ((curDoctorId || null) === (targetDoctorId || null)) return false;
+        // تبديل بين أطباء — PIN
+        return true;
+      }
+      return false;
+    }
+
+    // Owner → أي شي = تخفيض = بدون PIN
+    if (curRole === 'owner') return false;
+
+    // Secretary/Doctor → Owner = ترقية = PIN
+    if (targetRole === 'owner') return true;
+
+    // أفقي (Secretary ↔ Doctor) = PIN
+    return true;
+  }
+
+  // ── PIN hashing (SHA-256 hex) ──────────────────────────────────
+  async function hashPin(pin) {
+    if (typeof pin !== 'string') pin = String(pin || '');
+    var enc = new TextEncoder();
+    var buf = await crypto.subtle.digest('SHA-256', enc.encode(pin));
+    var arr = Array.from(new Uint8Array(buf));
+    return arr.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+  }
+
+  // ── DB: load/save PIN hash on clinic_settings ─────────────────
+  async function loadPinHash() {
+    if (_pinHashLoaded) return _pinHashCache;
+    try {
+      var user = await window.sbGetUser();
+      if (!user) return null;
+      var res = await window.sb.from('clinic_settings')
+        .select('lock_pin_hash')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+      if (res.error) {
+        // Migration not applied yet — fall back to "no PIN configured"
+        var m = (res.error.message || '') + ' ' + (res.error.code || '');
+        if (!/lock_pin_hash|42703|PGRST/i.test(m)) {
+          console.warn('[SyDentLock] loadPinHash:', res.error);
+        }
+        _pinHashCache = null;
+      } else {
+        _pinHashCache = res.data && res.data.lock_pin_hash || null;
+      }
+    } catch(e) {
+      console.warn('[SyDentLock] loadPinHash exception:', e);
+      _pinHashCache = null;
+    }
+    _pinHashLoaded = true;
+    return _pinHashCache;
+  }
+
+  // Force reload — used after PIN set/change
+  function invalidatePinCache() {
+    _pinHashLoaded = false;
+    _pinHashCache = null;
+  }
+
+  async function savePinHash(newHash) {
+    var user = await window.sbGetUser();
+    if (!user) throw new Error('not authenticated');
+    var res = await window.sb.from('clinic_settings')
+      .upsert({ owner_id: user.id, lock_pin_hash: newHash }, { onConflict: 'owner_id' })
+      .select('lock_pin_hash')
+      .maybeSingle();
+    if (res.error) throw res.error;
+    _pinHashCache = newHash;
+    _pinHashLoaded = true;
+    return true;
+  }
+
+  // ── Rate limit ─────────────────────────────────────────────────
+  function isInCooldown() {
+    try {
+      var until = parseInt(localStorage.getItem(LS_COOLDOWN) || '0', 10);
+      return !!(until && Date.now() < until);
+    } catch(e) { return false; }
+  }
+
+  function cooldownSecondsLeft() {
+    try {
+      var until = parseInt(localStorage.getItem(LS_COOLDOWN) || '0', 10);
+      var ms = until - Date.now();
+      return ms > 0 ? Math.ceil(ms / 1000) : 0;
+    } catch(e) { return 0; }
+  }
+
+  function recordFail() {
+    try {
+      var n = parseInt(localStorage.getItem(LS_FAIL_COUNT) || '0', 10);
+      n = (isNaN(n) ? 0 : n) + 1;
+      localStorage.setItem(LS_FAIL_COUNT, String(n));
+      if (n >= MAX_FAILS) {
+        localStorage.setItem(LS_COOLDOWN, String(Date.now() + COOLDOWN_MS));
+      }
+      return n;
+    } catch(e) { return 0; }
+  }
+
+  function resetFails() {
+    try {
+      localStorage.removeItem(LS_FAIL_COUNT);
+      localStorage.removeItem(LS_COOLDOWN);
+    } catch(e) {}
+  }
+
+  // ── Verify PIN ─────────────────────────────────────────────────
+  async function verifyPin(pin) {
+    if (isInCooldown()) {
+      return { ok: false, reason: 'cooldown', secondsLeft: cooldownSecondsLeft() };
+    }
+    var pinStr = String(pin || '').trim();
+    if (!/^\d{4,6}$/.test(pinStr)) {
+      return { ok: false, reason: 'invalid_format' };
+    }
+    var dbHash = await loadPinHash();
+    if (!dbHash) {
+      return { ok: false, reason: 'no_pin_set' };
+    }
+    var inputHash = await hashPin(pinStr);
+    if (inputHash === dbHash) {
+      resetFails();
+      return { ok: true };
+    }
+    var fails = recordFail();
+    if (fails >= MAX_FAILS) {
+      return { ok: false, reason: 'cooldown', secondsLeft: cooldownSecondsLeft() };
+    }
+    return { ok: false, reason: 'wrong', failsLeft: MAX_FAILS - fails };
+  }
+
+  // ── Apply a role transition (after PIN check, if any) ─────────
+  function applyRole(newRole, newDoctorId) {
+    try {
+      if (newRole === 'doctor') {
+        localStorage.setItem(LS_ROLE, 'doctor');
+        if (newDoctorId) localStorage.setItem(LS_DOCTOR_ID, newDoctorId);
+        else             localStorage.removeItem(LS_DOCTOR_ID);
+      } else if (newRole === 'secretary') {
+        localStorage.setItem(LS_ROLE, 'secretary');
+        localStorage.removeItem(LS_DOCTOR_ID);
+      } else {
+        // owner
+        localStorage.setItem(LS_ROLE, 'owner');
+        localStorage.removeItem(LS_DOCTOR_ID);
+      }
+    } catch(e) {
+      console.error('[SyDentLock] applyRole failed:', e);
+    }
+  }
+
+  // ── DOM guards: data-role-block / data-role-page / data-role-disable ──
+  function applyRoleGuards() {
+    var role = getRole();
+
+    // Hide elements blocked for this role: data-role-block="secretary doctor"
+    var hideEls = document.querySelectorAll('[data-role-block]');
+    for (var i = 0; i < hideEls.length; i++) {
+      var blocked = (hideEls[i].getAttribute('data-role-block') || '').split(/\s+/);
+      if (blocked.indexOf(role) >= 0) {
+        hideEls[i].style.display = 'none';
+        hideEls[i].setAttribute('data-role-hidden', '1');
+      } else if (hideEls[i].getAttribute('data-role-hidden') === '1') {
+        hideEls[i].style.display = '';
+        hideEls[i].removeAttribute('data-role-hidden');
+      }
+    }
+
+    // Disable interaction: data-role-disable="secretary"
+    var disableEls = document.querySelectorAll('[data-role-disable]');
+    for (var j = 0; j < disableEls.length; j++) {
+      var disabled = (disableEls[j].getAttribute('data-role-disable') || '').split(/\s+/);
+      var shouldDisable = disabled.indexOf(role) >= 0;
+      if (shouldDisable) {
+        disableEls[j].setAttribute('disabled', 'disabled');
+        disableEls[j].style.opacity = '0.55';
+        disableEls[j].style.cursor = 'not-allowed';
+      } else if (disableEls[j].hasAttribute('disabled') && disableEls[j].getAttribute('data-role-disabled-by-lock') === '1') {
+        disableEls[j].removeAttribute('disabled');
+        disableEls[j].style.opacity = '';
+        disableEls[j].style.cursor = '';
+        disableEls[j].removeAttribute('data-role-disabled-by-lock');
+      }
+      if (shouldDisable) disableEls[j].setAttribute('data-role-disabled-by-lock', '1');
+    }
+  }
+
+  // ── Page guard: redirect if role is not allowed on this page ─────
+  // Allowed roles passed as array, e.g. ['owner']
+  function guardPage(allowedRoles) {
+    var role = getRole();
+    if (allowedRoles.indexOf(role) < 0) {
+      showBlockedScreen(role);
+      return false;
+    }
+    return true;
+  }
+
+  function showBlockedScreen(role) {
+    try {
+      document.body.innerHTML =
+        '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;direction:rtl;">' +
+          '<div style="font-size:72px;margin-bottom:16px;">🔒</div>' +
+          '<div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">لا تملك صلاحية</div>' +
+          '<div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:360px;line-height:1.7;">' +
+            'الوضع الحالي (' + (ROLE_LABELS[role] || role) + ') لا يسمح بالوصول إلى هذه الصفحة.' +
+          '</div>' +
+          '<a href="index.html" style="padding:12px 24px;background:#2ee89e;border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:10px;">' +
+            '↩ العودة للصفحة الرئيسية' +
+          '</a>' +
+          '<button onclick="window.SyDentLock.openSwitchModal()" style="padding:10px 22px;background:transparent;border:1px solid rgba(255,255,255,0.18);border-radius:10px;color:#8a9ab5;font-family:\'Cairo\',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">' +
+            '🔓 تبديل الوضع' +
+          '</button>' +
+        '</div>';
+    } catch(e) {
+      console.error('[SyDentLock] showBlockedScreen failed:', e);
+    }
+  }
+
+  // ── Load doctors list (for Doctor role picker) ────────────────
+  async function loadDoctors() {
+    if (_doctorsListCache) return _doctorsListCache;
+    try {
+      var user = await window.sbGetUser();
+      if (!user) return [];
+      var res = await window.sb.from('clinic_doctors')
+        .select('id, name, is_active')
+        .eq('owner_id', user.id)
+        .eq('is_active', true)
+        .order('name');
+      if (res.error) {
+        console.warn('[SyDentLock] loadDoctors:', res.error);
+        return [];
+      }
+      _doctorsListCache = res.data || [];
+      return _doctorsListCache;
+    } catch(e) {
+      return [];
+    }
+  }
+
+  // ── CSS injection (once per page) ─────────────────────────────
+  function injectCSS() {
+    if (document.getElementById('sydent-lock-css')) return;
+    var style = document.createElement('style');
+    style.id = 'sydent-lock-css';
+    style.textContent =
+      '.sd-lock-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:transform .15s,filter .15s;border:1.5px solid transparent;background:transparent;white-space:nowrap;}' +
+      '.sd-lock-btn:hover{transform:translateY(-1px);filter:brightness(1.1);}' +
+      '.sd-lock-btn.sd-owner{background:rgba(46,232,158,0.14);border-color:rgba(46,232,158,0.40);color:#2ee89e;}' +
+      '.sd-lock-btn.sd-doctor{background:rgba(99,179,237,0.14);border-color:rgba(99,179,237,0.40);color:#63b3ed;}' +
+      '.sd-lock-btn.sd-secretary{background:rgba(255,167,38,0.14);border-color:rgba(255,167,38,0.40);color:#ffa726;}' +
+      '.sd-lock-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;direction:rtl;font-family:\'Cairo\',sans-serif;}' +
+      '.sd-lock-modal{background:#0f2038;border:1.5px solid rgba(46,232,158,0.25);border-radius:14px;padding:24px;max-width:440px;width:100%;color:#e1f4ee;max-height:90vh;overflow-y:auto;}' +
+      '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:#2ee89e;}' +
+      '.sd-lock-modal .sd-cur{font-size:13px;color:#8a9ab5;margin-bottom:16px;padding:10px 12px;background:rgba(46,232,158,0.06);border-radius:8px;}' +
+      '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:#132840;border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;}' +
+      '.sd-lock-modal .sd-opt:hover{border-color:rgba(46,232,158,0.30);background:rgba(46,232,158,0.05);}' +
+      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:#2ee89e;}' +
+      '.sd-lock-modal .sd-opt.sd-active{border-color:rgba(46,232,158,0.55);background:rgba(46,232,158,0.08);}' +
+      '.sd-lock-modal .sd-sub{padding:8px 12px 8px 28px;margin-top:6px;display:none;}' +
+      '.sd-lock-modal .sd-opt.sd-active .sd-sub{display:block;}' +
+      '.sd-lock-modal select{width:100%;padding:9px 10px;background:#0a1628;border:1px solid rgba(46,232,158,0.20);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:13px;}' +
+      '.sd-lock-modal .sd-pin-row{margin-top:14px;padding:12px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;}' +
+      '.sd-lock-modal .sd-pin-row label{display:block;font-size:12px;color:#8a9ab5;margin-bottom:6px;font-weight:700;}' +
+      '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:#0a1628;border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;}' +
+      '.sd-lock-modal .sd-msg{font-size:12px;color:#ef5350;margin-top:8px;min-height:18px;font-weight:700;}' +
+      '.sd-lock-modal .sd-msg.sd-ok{color:#2ee89e;}' +
+      '.sd-lock-modal .sd-actions{display:flex;gap:10px;margin-top:18px;}' +
+      '.sd-lock-modal .sd-btn{flex:1;padding:11px 14px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;border:1.5px solid transparent;}' +
+      '.sd-lock-modal .sd-btn-cancel{background:transparent;border-color:rgba(255,255,255,0.18);color:#8a9ab5;}' +
+      '.sd-lock-modal .sd-btn-cancel:hover{background:rgba(255,255,255,0.06);}' +
+      '.sd-lock-modal .sd-btn-primary{background:#2ee89e;color:#0a1628;}' +
+      '.sd-lock-modal .sd-btn-primary:hover{filter:brightness(1.08);}' +
+      '.sd-lock-modal .sd-btn-primary:disabled{opacity:0.5;cursor:not-allowed;}';
+    document.head.appendChild(style);
+  }
+
+  // ── Inject header lock button into topbar (or fallback container) ──
+  function injectHeaderButton() {
+    if (document.getElementById('sdLockBtn')) return; // already injected
+    injectCSS();
+    var role = getRole();
+    var btn = document.createElement('button');
+    btn.id = 'sdLockBtn';
+    btn.className = 'sd-lock-btn sd-' + role;
+    btn.type = 'button';
+    btn.title = 'تبديل الوضع';
+    btn.onclick = function(){ openSwitchModal(); };
+    refreshHeaderButton(btn);
+
+    // Insertion strategy: topbar → header-actions → header → body
+    var anchor = document.querySelector('.topbar') ||
+                 document.querySelector('.header-actions') ||
+                 document.querySelector('.header') ||
+                 document.querySelector('header');
+    if (anchor) {
+      anchor.appendChild(btn);
+    } else {
+      // floating fallback
+      btn.style.position = 'fixed';
+      btn.style.top = '12px';
+      btn.style.left = '12px';
+      btn.style.zIndex = '300';
+      document.body.appendChild(btn);
+    }
+  }
+
+  function refreshHeaderButton(btn) {
+    btn = btn || document.getElementById('sdLockBtn');
+    if (!btn) return;
+    var role = getRole();
+    btn.className = 'sd-lock-btn sd-' + role;
+    var label = ROLE_LABELS[role] || role;
+    var icon  = ROLE_ICONS[role]  || '🔒';
+    // For doctor mode, append name if loaded
+    if (role === 'doctor' && _doctorsListCache) {
+      var did = getDoctorId();
+      var d = (_doctorsListCache || []).find(function(x){ return x.id === did; });
+      if (d && d.name) label = 'د. ' + d.name;
+    }
+    // Escape label to prevent XSS via doctor names (defense per قاعدة #14)
+    btn.innerHTML = '<span>' + escapeHtmlLock(icon) + '</span><span>' + escapeHtmlLock(label) + '</span>';
+  }
+
+  // ── Switch modal ──────────────────────────────────────────────
+  async function openSwitchModal() {
+    injectCSS();
+    var doctors = await loadDoctors();
+    var curRole = getRole();
+    var curDoctorId = getDoctorId();
+    var hasPinSet = !!(await loadPinHash());
+
+    // Remove any existing modal
+    var ex = document.getElementById('sdLockModal');
+    if (ex) ex.remove();
+
+    var ov = document.createElement('div');
+    ov.id = 'sdLockModal';
+    ov.className = 'sd-lock-modal-overlay';
+
+    var doctorOptions = '';
+    doctors.forEach(function(d){
+      var sel = (d.id === curDoctorId) ? ' selected' : '';
+      doctorOptions += '<option value="'+d.id+'"'+sel+'>'+escapeHtmlLock(d.name)+'</option>';
+    });
+
+    var doctorBlock = doctors.length > 0
+      ? '<select id="sdDoctorSel">' + doctorOptions + '</select>'
+      : '<div style="color:#ef5350;font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
+
+    ov.innerHTML =
+      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع">' +
+        '<h3>🔓 تبديل الوضع</h3>' +
+        '<div class="sd-cur">الوضع الحالي: ' + (ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole) + '</div>' +
+        '<label class="sd-opt' + (curRole==='owner'?' sd-active':'') + '" data-role="owner">' +
+          '<input type="radio" name="sdRoleSel" value="owner"' + (curRole==='owner'?' checked':'') + '> 👑 المالك' +
+        '</label>' +
+        '<label class="sd-opt' + (curRole==='doctor'?' sd-active':'') + '" data-role="doctor">' +
+          '<input type="radio" name="sdRoleSel" value="doctor"' + (curRole==='doctor'?' checked':'') + '> 👨‍⚕️ طبيب' +
+          '<div class="sd-sub">' + doctorBlock + '</div>' +
+        '</label>' +
+        '<label class="sd-opt' + (curRole==='secretary'?' sd-active':'') + '" data-role="secretary">' +
+          '<input type="radio" name="sdRoleSel" value="secretary"' + (curRole==='secretary'?' checked':'') + '> 👩‍💼 السكرتيرة' +
+        '</label>' +
+        '<div class="sd-pin-row" id="sdPinRow" style="display:none;">' +
+          '<label>أدخل PIN للتأكيد:</label>' +
+          '<input type="password" inputmode="numeric" maxlength="6" id="sdPinInput" autocomplete="off">' +
+          '<div class="sd-msg" id="sdPinMsg"></div>' +
+        '</div>' +
+        '<div class="sd-msg" id="sdMsg" style="margin-top:4px;"></div>' +
+        '<div class="sd-actions">' +
+          '<button type="button" class="sd-btn sd-btn-cancel" id="sdBtnCancel">إلغاء</button>' +
+          '<button type="button" class="sd-btn sd-btn-primary" id="sdBtnConfirm">تبديل</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(ov);
+
+    // ── Event wiring ──
+    var radios = ov.querySelectorAll('input[name="sdRoleSel"]');
+    function updateActive() {
+      ov.querySelectorAll('.sd-opt').forEach(function(opt){
+        var r = opt.getAttribute('data-role');
+        var checked = opt.querySelector('input').checked;
+        opt.classList.toggle('sd-active', checked);
+      });
+      // PIN visibility
+      var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
+      var targetDocId = (targetRole === 'doctor') ? ov.querySelector('#sdDoctorSel') && ov.querySelector('#sdDoctorSel').value : null;
+      var need = requirePin(targetRole, targetDocId);
+      var pinRow = ov.querySelector('#sdPinRow');
+      pinRow.style.display = need ? 'block' : 'none';
+
+      // Warn if need PIN but none set
+      var msg = ov.querySelector('#sdMsg');
+      if (need && !hasPinSet) {
+        msg.textContent = '⚠ لم يتم تعيين PIN بعد. اذهب للإعدادات لتعيينه أولاً.';
+        msg.className = 'sd-msg';
+        ov.querySelector('#sdBtnConfirm').disabled = true;
+      } else if (isInCooldown()) {
+        msg.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + cooldownSecondsLeft() + ' ثانية.';
+        msg.className = 'sd-msg';
+        ov.querySelector('#sdBtnConfirm').disabled = true;
+      } else {
+        msg.textContent = '';
+        ov.querySelector('#sdBtnConfirm').disabled = false;
+      }
+    }
+    radios.forEach(function(r){ r.addEventListener('change', updateActive); });
+    var docSel = ov.querySelector('#sdDoctorSel');
+    if (docSel) docSel.addEventListener('change', updateActive);
+
+    // Click row → select radio
+    ov.querySelectorAll('.sd-opt').forEach(function(opt){
+      opt.addEventListener('click', function(e){
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
+        var input = opt.querySelector('input[type=radio]');
+        input.checked = true;
+        updateActive();
+      });
+    });
+
+    ov.querySelector('#sdBtnCancel').addEventListener('click', function(){ ov.remove(); });
+    ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+
+    ov.querySelector('#sdBtnConfirm').addEventListener('click', async function(){
+      var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
+      var targetDocId = null;
+      if (targetRole === 'doctor') {
+        var sel = ov.querySelector('#sdDoctorSel');
+        if (!sel || !sel.value) {
+          var m = ov.querySelector('#sdMsg');
+          m.textContent = 'اختر طبيباً أولاً.';
+          return;
+        }
+        targetDocId = sel.value;
+      }
+
+      // No-op? Just close.
+      if (targetRole === getRole() && (targetRole !== 'doctor' || targetDocId === getDoctorId())) {
+        ov.remove();
+        return;
+      }
+
+      var need = requirePin(targetRole, targetDocId);
+      if (need) {
+        var pin = (ov.querySelector('#sdPinInput').value || '').trim();
+        var ver = await verifyPin(pin);
+        if (!ver.ok) {
+          var pm = ov.querySelector('#sdPinMsg');
+          if (ver.reason === 'cooldown') {
+            pm.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية.';
+          } else if (ver.reason === 'no_pin_set') {
+            pm.textContent = '⚠ لم يتم تعيين PIN بعد.';
+          } else if (ver.reason === 'invalid_format') {
+            pm.textContent = 'PIN يجب أن يكون 4-6 أرقام.';
+          } else if (ver.reason === 'wrong') {
+            pm.textContent = '❌ PIN خاطئ. متبقّي ' + (ver.failsLeft || 0) + ' محاولات.';
+          }
+          return;
+        }
+      }
+
+      applyRole(targetRole, targetDocId);
+      ov.remove();
+      // Reload to apply guards page-wide
+      window.location.reload();
+    });
+
+    updateActive();
+    setTimeout(function(){ var pi = ov.querySelector('#sdPinInput'); if (pi && pi.offsetParent) pi.focus(); }, 80);
+  }
+
+  // ── HTML escape (local helper) ────────────────────────────────
+  function escapeHtmlLock(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ── Auto-init on every page that has supabase-init ────────────
+  async function autoInit() {
+    // Skip on auth & landing pages (pre-auth)
+    var path = (window.location.pathname || '').toLowerCase();
+    if (/auth\.html$|landing\.html$|^\/$/i.test(path)) return;
+
+    // Wait briefly for DOM
+    if (document.readyState === 'loading') {
+      await new Promise(function(r){ document.addEventListener('DOMContentLoaded', r, { once: true }); });
+    }
+    // Preload (don't await — fire and forget for speed)
+    loadPinHash();
+    loadDoctors().then(function(){ refreshHeaderButton(); });
+    injectHeaderButton();
+    applyRoleGuards();
+  }
+
+  // ── Public API ────────────────────────────────────────────────
+  window.SyDentLock = {
+    // state
+    getRole: getRole,
+    getDoctorId: getDoctorId,
+    isOwner: isOwner,
+    isDoctor: isDoctor,
+    isSecretary: isSecretary,
+    // pin
+    hashPin: hashPin,
+    verifyPin: verifyPin,
+    loadPinHash: loadPinHash,
+    savePinHash: savePinHash,
+    invalidatePinCache: invalidatePinCache,
+    // hierarchy
+    requirePin: requirePin,
+    // rate limit
+    isInCooldown: isInCooldown,
+    cooldownSecondsLeft: cooldownSecondsLeft,
+    resetFails: resetFails,
+    // role transition
+    applyRole: applyRole,
+    // UI
+    injectHeaderButton: injectHeaderButton,
+    refreshHeaderButton: refreshHeaderButton,
+    openSwitchModal: openSwitchModal,
+    applyRoleGuards: applyRoleGuards,
+    guardPage: guardPage,
+    showBlockedScreen: showBlockedScreen,
+    // constants (for UI consumers)
+    ROLE_LABELS: ROLE_LABELS,
+    ROLE_ICONS: ROLE_ICONS
+  };
+
+  // Fire-and-forget init (safe even if some pages don't want the button — guardPage runs first)
+  autoInit();
+})();

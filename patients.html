@@ -767,7 +767,7 @@ function render() {
             <button class="btn-sm pay" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&pay=1'">💰 تسجيل دفعة</button>
             <button class="dots-btn" onclick="toggleDotsMenu(this)">⋮</button>
             <div class="dots-menu">
-              <button onclick="deletePatient('${p.id}')">🗑️ حذف المريض</button>
+              <button onclick="deletePatient('${p.id}')" data-role-block="doctor secretary">🗑️ حذف المريض</button>
             </div>
           </div>
         </td>
@@ -788,6 +788,8 @@ function render() {
     pb.appendChild(b);
   }
   updateStats();
+  // Phase 4: re-apply role guards (delete-patient buttons are dynamically generated)
+  if (window.SyDentLock) window.SyDentLock.applyRoleGuards();
 }
 
 // ─── Modal ───
@@ -863,6 +865,11 @@ document.addEventListener('click', function() {
 });
 
 async function deletePatient(id) {
+  // Phase 4: Owner-only action (defense-in-depth — button also hidden via data-role-block)
+  if (window.SyDentLock && !window.SyDentLock.isOwner()) {
+    showToast('🔒 حذف المريض متاح للمالك فقط');
+    return;
+  }
   if (!confirm('هل أنت متأكد من حذف هذا المريض؟ سيتم حذف جميع بياناته.')) return;
   const { error } = await window.sb
     .from('patients')

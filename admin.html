@@ -264,6 +264,8 @@ window.addEventListener('DOMContentLoaded', async function() {
     window.location.replace('index.html');
     return;
   }
+  // Phase 4: Lock guard — Owner-only page (Secretary/Doctor locked devices can't access admin)
+  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
   document.getElementById('adminScreen').style.display = 'block';
   loadAndRender();
 });

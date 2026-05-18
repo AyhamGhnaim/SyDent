@@ -644,6 +644,8 @@ async function loadTreatments() {
   const user = await sbRequireAuth();
   if (!user) return;
   currentDoctor = user;
+  // Phase 4: Lock guard — Owner-only page
+  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
   const { data, error } = await window.sb
     .from('treatments')
     .select('*')
