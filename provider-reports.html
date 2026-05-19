@@ -520,6 +520,9 @@ function setBasis(b) {
   } else {
     help.textContent = 'التحصيل: نسبة الطبيب تُحسب من المبلغ المُحصَّل فعلاً (بناءً على نصيبه النسبي من إنتاج كل مريض).';
   }
+  // Phase 5g (Layer 1): tab clicks are the original leak path — block here too.
+  if (typeof applyInactiveDoctorBlockPage === 'function' &&
+      applyInactiveDoctorBlockPage()) return;
   render();
 }
 
@@ -824,6 +827,10 @@ function formatSharePctDisplay(provider) {
 
 // ─── Render ───
 function render() {
+  // Phase 5g (Layer 1 — ultimate fallback): if any code path calls render()
+  // directly (preset clicks, refresh, etc.), still block when inactive.
+  if (typeof applyInactiveDoctorBlockPage === 'function' &&
+      applyInactiveDoctorBlockPage()) return;
   var providerFilter = document.getElementById('providerFilter').value;
   // Phase 4: Defense-in-depth — in Doctor mode, force the filter to the
   // logged doctor's id regardless of what the dropdown says. Prevents any
@@ -1274,6 +1281,9 @@ async function onFilterChange() {
   // This is called *after* setPreset has already applied its highlight, so only clear
   // if no preset button is active or if this came from a non-preset change.
   // We rely on setPreset to re-apply its highlight after this returns.
+  // Phase 5g (Layer 1): block before any rebuild/reload
+  if (typeof applyInactiveDoctorBlockPage === 'function' &&
+      applyInactiveDoctorBlockPage()) return;
   // Rebuild the provider dropdown in case inactive filter changed
   rebuildProviderDropdown();
   await loadFilteredData();
@@ -1339,6 +1349,26 @@ window.onPTRRefresh = function() { loadAll(); };
 
   await loadAll();
 
+  // Phase 5g (Layer 1): ensure SyDentLock's employee+doctor caches are
+  // loaded BEFORE checking isDoctorAccountInactive (otherwise the check
+  // returns false on cache=null and the block fails silently).
+  // autoInit in supabase-init.js preloads these in parallel — await them
+  // explicitly here so timing is deterministic.
+  if (window.SyDentLock) {
+    if (typeof window.SyDentLock.loadEmployees === 'function') {
+      try { await window.SyDentLock.loadEmployees(); } catch(e) {}
+    }
+    if (typeof window.SyDentLock.loadDoctors === 'function') {
+      try { await window.SyDentLock.loadDoctors(); } catch(e) {}
+    }
+  }
+
+  // Phase 5g (Layer 1): if doctor account is inactive, block the entire
+  // page with an empty-state. Must run AFTER caches load (above) AND AFTER
+  // loadAll (provList exists) but BEFORE applyDoctorModeFilter (which
+  // would otherwise try to set up filters that we're about to wipe).
+  if (applyInactiveDoctorBlockPage()) return;
+
   // Phase 4: Doctor mode auto-filter (lock the provider dropdown to the doctor's own id)
   applyDoctorModeFilter();
 })();
@@ -1395,6 +1425,55 @@ function applyDoctorModeFilter() {
     sel.title = 'حسابك غير نشط — تواصل مع المالك';
     onFilterChange();
   }
+}
+
+// Phase 5g (Layer 1 — hardest block): if the locked doctor is inactive
+// (employee deactivated OR linked doctor row hidden from reports), replace
+// the entire reports area with a clear empty state. This prevents any
+// downstream filter race or dropdown rebuild from leaking other providers'
+// reports. Called from init, setBasis (tab clicks), and onFilterChange.
+//
+// Returns true if blocked (caller should bail out), false to continue normally.
+function applyInactiveDoctorBlockPage() {
+  if (!window.SyDentLock ||
+      typeof window.SyDentLock.isDoctorAccountInactive !== 'function' ||
+      !window.SyDentLock.isDoctorAccountInactive()) {
+    return false;
+  }
+  // Build a clear, friendly empty state directly inside provList.
+  // Also empty summaryRow so no totals leak through.
+  var summary = document.getElementById('summaryRow');
+  if (summary) summary.innerHTML = '';
+  var list = document.getElementById('provList');
+  if (list) {
+    list.innerHTML =
+      '<div class="empty-state" style="padding:60px 20px;text-align:center;">' +
+        '<div class="ic" style="font-size:64px;line-height:1;margin-bottom:14px;">🔒</div>' +
+        '<div class="ttl" style="font-size:18px;font-weight:800;color:var(--text);margin-bottom:8px;">' +
+          'تقاريرك مخفية حالياً' +
+        '</div>' +
+        '<div style="margin-top:8px;color:var(--text2);font-size:13px;line-height:1.7;max-width:420px;margin-left:auto;margin-right:auto;">' +
+          'تم إخفاء حسابك من التقارير من قِبَل صاحب العيادة. ' +
+          'لن تظهر بيانات أي طبيب آخر هنا. ' +
+          'الرجاء التواصل مع صاحب العيادة لإعادة الإظهار.' +
+        '</div>' +
+      '</div>';
+  }
+  // Also lock both filter dropdowns visually to prevent confusing interactions
+  var sel = document.getElementById('providerFilter');
+  if (sel) {
+    sel.disabled = true;
+    sel.style.opacity = '0.5';
+    sel.style.cursor = 'not-allowed';
+    sel.title = 'حسابك مخفي من التقارير';
+  }
+  var inactiveSel = document.getElementById('inactiveFilter');
+  if (inactiveSel) {
+    inactiveSel.disabled = true;
+    inactiveSel.style.opacity = '0.5';
+    inactiveSel.style.cursor = 'not-allowed';
+  }
+  return true;
 }
 
 async function doLogout() {

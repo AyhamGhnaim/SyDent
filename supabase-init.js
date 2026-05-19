@@ -1311,6 +1311,7 @@
     // Phase 5: per-employee identity
     getEmployeeId: getEmployeeId,
     loadEmployees: loadEmployees,
+    loadDoctors: loadDoctors,
     invalidateEmployeesCache: invalidateEmployeesCache,
     invalidateDoctorsCache: invalidateDoctorsCache,
     getCurrentEmployee: getCurrentEmployee,
