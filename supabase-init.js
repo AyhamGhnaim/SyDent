@@ -599,11 +599,9 @@
     if (empId && _employeesListCache) {
       var emp = (_employeesListCache || []).find(function(e){ return e.id === empId; });
       if (emp && emp.name) {
-        // Active employee → show their name + role icon
-        // Note: doctor row being hidden from reports does NOT affect the pill.
-        // Hiding a doctor from reports is purely a reports-filter operation
-        // (configured in doctors.html), not a device lock. The pill only
-        // turns red when the EMPLOYEE row is deactivated (employees.html).
+        // Active employee → show their name + role icon.
+        // The pill only turns red when the EMPLOYEE row is deactivated
+        // (toggled from employees.html).
         label = emp.name;
         icon = ROLE_ICONS[emp.role] || icon;
       } else if (_allEmployeesListCache) {
