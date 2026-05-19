@@ -164,6 +164,26 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   width: 100%; max-width: 480px;
   padding: 28px;
 }
+/* Phase 6 L: themed thin scrollbar for the appointment-type modal so the
+   default chunky browser scrollbar doesn't dominate the RTL layout when
+   the form gets tall (notes textarea + provider + lab pickers). */
+#apptTypeModal .modal::-webkit-scrollbar {
+  width: 6px;
+}
+#apptTypeModal .modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+#apptTypeModal .modal::-webkit-scrollbar-thumb {
+  background: rgba(141,160,189,0.3);
+  border-radius: 3px;
+}
+#apptTypeModal .modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(141,160,189,0.5);
+}
+#apptTypeModal .modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(141,160,189,0.3) transparent;
+}
 .modal-title {
   font-size: 18px; font-weight: 700;
   color: var(--red);
