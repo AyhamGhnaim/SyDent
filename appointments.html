@@ -730,7 +730,7 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="view-btn" id="btnDay"   onclick="setView('day')">🕐 يومي</button>
       <button class="view-btn" id="btnList"  onclick="setView('list')">☰ قائمة</button>
     </div>
-    <button class="btn btn-primary" onclick="openModal()">＋ موعد جديد</button>
+    <button class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block>＋ موعد جديد</button>
   </div>
 
   <!-- Content -->
@@ -3240,6 +3240,11 @@ function updateColorPreview() {
 
 async function submitAppt(e) {
   e.preventDefault();
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حفظ المواعيد');
+    return;
+  }
   var typeVal   = document.getElementById('fType').value;
   var _t        = getTreatment(typeVal);
   var typeName  = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);

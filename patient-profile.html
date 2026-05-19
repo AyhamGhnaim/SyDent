@@ -596,10 +596,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="topbar">
   <a href="patients.html" class="back-btn">← العودة للقائمة</a>
   <div class="topbar-actions">
-    <button class="btn btn-outline" onclick="openApptModal()">📅 موعد جديد</button>
-    <button class="btn btn-outline" onclick="openSessionModal()">🦷 جلسة جديدة</button>
+    <button class="btn btn-outline" onclick="openApptModal()" data-doctor-inactive-block>📅 موعد جديد</button>
+    <button class="btn btn-outline" onclick="openSessionModal()" data-doctor-inactive-block>🦷 جلسة جديدة</button>
     <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaReminderFromProfile()" style="display:none;">📱 تذكير WhatsApp</button>
-    <button class="btn btn-primary" onclick="openPayModal()">💰 تسجيل دفعة</button>
+    <button class="btn btn-primary" onclick="openPayModal()" data-doctor-inactive-block>💰 تسجيل دفعة</button>
   </div>
 </div>
 
@@ -724,7 +724,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="card">
       <div class="card-head">
         <span class="card-title">🦷 سجل الجلسات والعلاجات</span>
-        <button class="btn btn-primary btn-sm" onclick="openSessionModal()">＋ إضافة جلسة</button>
+        <button class="btn btn-primary btn-sm" onclick="openSessionModal()" data-doctor-inactive-block>＋ إضافة جلسة</button>
       </div>
       <div id="sessionsContent"></div>
     </div>
@@ -4976,6 +4976,11 @@ function backToStep1() {
 }
 
 async function saveToothTreatment() {
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل علاجات جديدة');
+    return;
+  }
   var costRaw = parseFloat(document.getElementById('toothCost').value);
   var date  = document.getElementById('toothDate').value;
   var notes = document.getElementById('toothNotes').value.trim();
@@ -5871,6 +5876,11 @@ function recalcSplitTotals() {
 async function saveManualSplits() {
   var saveBtn = document.getElementById('splitSaveBtn');
   if (saveBtn && saveBtn.disabled) return;
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive (read-only mode)
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل توزيع الدفعات');
+    return;
+  }
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جارٍ الحفظ…'; }
 
   try {
@@ -6035,6 +6045,11 @@ async function revertToFifo() {
 async function savePayment() {
   var saveBtn = document.getElementById('payModalSaveBtn');
   if (saveBtn && saveBtn.disabled) return;  // already in flight
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل دفعات جديدة');
+    return;
+  }
   var amount = parseFloat(document.getElementById('payAmount').value);
   var method = document.getElementById('payMethod').value;
   var date   = document.getElementById('payDate').value;
@@ -6080,6 +6095,11 @@ async function savePayment() {
 
 /* ── Save Session ── */
 async function saveSession() {
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل جلسات جديدة');
+    return;
+  }
   var typeVal = document.getElementById('sType').value;
   var cost    = parseFloat(document.getElementById('sCost').value);
   var desc    = document.getElementById('sDesc').value.trim();
@@ -6138,6 +6158,11 @@ async function saveSession() {
    applied yet, falls back to legacy behavior (today's date, 12:00) with a
    warning toast, mirroring the appointments.html pattern. */
 async function saveAppt() {
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إضافة مواعيد جديدة');
+    return;
+  }
   var typeVal    = document.getElementById('aType').value;
   var _t         = getTreatment(typeVal);
   var type       = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
@@ -6813,6 +6838,14 @@ async function editLabOrder(id) {
 }
 
 async function saveLabOrder() {
+  // Phase 4.1: defense-in-depth — block creating new lab orders if inactive.
+  // Editing existing orders is still allowed.
+  var labOrderIdField = document.getElementById('labOrderId');
+  var isNew = !labOrderIdField || !labOrderIdField.value;
+  if (isNew && window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إنشاء طلبات مخبر جديدة');
+    return;
+  }
   // Disable the save button immediately to prevent double-submit (especially
   // important when __new__ creates an appointment — a double-click would create two).
   // Respect the button's prior state so we don't accidentally re-enable a button
@@ -7107,6 +7140,11 @@ async function delLabOrder(id) {
 }
 
 async function saveToothAndOpenLab() {
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل علاجات جديدة');
+    return;
+  }
   // First save the tooth treatment as session — same fields/logic as saveToothTreatment,
   // so status (planned/completed/existing/referred) and provider_id are preserved.
   // Cost is OPTIONAL for all statuses (consistent with saveToothTreatment).

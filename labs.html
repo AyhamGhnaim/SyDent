@@ -555,7 +555,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
       <span class="search-icon">🔍</span>
       <input type="text" id="searchInput" placeholder="بحث باسم المريض أو المخبر…">
     </div>
-    <button class="btn-add" onclick="openLabOrderModal()">＋ طلب جديد</button>
+    <button class="btn-add" onclick="openLabOrderModal()" data-doctor-inactive-block>＋ طلب جديد</button>
   </div>
 
   <div class="content">
@@ -1341,6 +1341,12 @@ async function editLabOrder(id) {
 
 async function saveLabOrder() {
   var id = document.getElementById('labOrderId').value;
+  // Phase 4.1: defense-in-depth — block CREATING new lab orders if doctor inactive.
+  // Editing existing orders is still allowed (read+update status workflow).
+  if (!id && window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إنشاء طلبات مخبر جديدة');
+    return;
+  }
   var patientId = document.getElementById('labOrderPatient').value;
   var toothRaw  = document.getElementById('labOrderTooth').value.trim();
   var workSel   = document.getElementById('labOrderWorkType');

@@ -1381,6 +1381,8 @@ function applyDoctorModeFilter() {
     // Doctor id not found in clinic_doctors list (deactivated or deleted).
     // CRITICAL: don't let the doctor see other providers' data. Inject a
     // hidden invalid option so render() finds nothing.
+    // The global "حسابك معطّل" banner is shown by supabase-init.js
+    // (Phase 4.1 applyInactiveDoctorUI). No need to duplicate it here.
     console.warn('[SyDentLock] Doctor mode: doctor id not in clinic_doctors list — forcing empty state');
     var opt = document.createElement('option');
     opt.value = did;
@@ -1391,17 +1393,6 @@ function applyDoctorModeFilter() {
     sel.style.opacity = '0.7';
     sel.style.cursor = 'not-allowed';
     sel.title = 'حسابك غير نشط — تواصل مع المالك';
-    // Show a banner to inform the user
-    var banner = document.getElementById('docInactiveBanner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'docInactiveBanner';
-      banner.style.cssText = 'background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.45);color:#ef5350;padding:12px 16px;border-radius:10px;margin:14px 0;font-weight:700;text-align:center;';
-      banner.textContent = '⚠ حسابك غير نشط حالياً. لن تظهر أي بيانات إنتاج. الرجاء التواصل مع المالك.';
-      var content = document.querySelector('.content') || document.body;
-      if (content.firstChild) content.insertBefore(banner, content.firstChild);
-      else content.appendChild(banner);
-    }
     onFilterChange();
   }
 }

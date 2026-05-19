@@ -90,7 +90,8 @@
   // ── Cache (loaded once per page) ───────────────────────────────
   let _pinHashCache = null;       // SHA-256 hex من DB
   let _pinHashLoaded = false;
-  let _doctorsListCache = null;
+  let _doctorsListCache = null;    // active doctors only (for switch picker)
+  let _allDoctorsListCache = null; // ALL doctors incl inactive (for name recovery)
 
   // ── Low-level state ────────────────────────────────────────────
   function getRole() {
@@ -327,6 +328,11 @@
       }
       if (shouldDisable) disableEls[j].setAttribute('data-role-disabled-by-lock', '1');
     }
+
+    // Phase 4.1: also re-apply inactive-doctor guards (re-renders pick them up)
+    if (isDoctorAccountInactive()) {
+      applyInactiveActionGuards();
+    }
   }
 
   // ── Page guard: redirect if role is not allowed on this page ─────
@@ -362,6 +368,9 @@
   }
 
   // ── Load doctors list (for Doctor role picker) ────────────────
+  // Fetches ALL doctors (active + inactive). The active subset is used
+  // for the role-switch picker; the full list is used for name recovery
+  // when a device is locked to a doctor who was just deactivated.
   async function loadDoctors() {
     if (_doctorsListCache) return _doctorsListCache;
     try {
@@ -370,13 +379,13 @@
       var res = await window.sb.from('clinic_doctors')
         .select('id, name, is_active')
         .eq('owner_id', user.id)
-        .eq('is_active', true)
         .order('name');
       if (res.error) {
         console.warn('[SyDentLock] loadDoctors:', res.error);
         return [];
       }
-      _doctorsListCache = res.data || [];
+      _allDoctorsListCache = res.data || [];
+      _doctorsListCache = _allDoctorsListCache.filter(function(d){ return d.is_active !== false; });
       return _doctorsListCache;
     } catch(e) {
       return [];
@@ -454,14 +463,34 @@
     btn = btn || document.getElementById('sdLockBtn');
     if (!btn) return;
     var role = getRole();
+    var inactive = false;
     btn.className = 'sd-lock-btn sd-' + role;
     var label = ROLE_LABELS[role] || role;
     var icon  = ROLE_ICONS[role]  || '🔒';
-    // For doctor mode, append name if loaded
+    // For doctor mode, append name if loaded — also detect deactivation
     if (role === 'doctor' && _doctorsListCache) {
       var did = getDoctorId();
       var d = (_doctorsListCache || []).find(function(x){ return x.id === did; });
-      if (d && d.name) label = 'د. ' + d.name;
+      if (d && d.name) {
+        label = 'د. ' + d.name;
+      } else if (did) {
+        // Doctor account is inactive — try to recover the name from
+        // _allDoctorsListCache (loaded by loadAllDoctors), else show generic.
+        var dAny = (_allDoctorsListCache || []).find(function(x){ return x.id === did; });
+        if (dAny && dAny.name) label = 'د. ' + dAny.name + ' (معطّل)';
+        else label = ROLE_LABELS.doctor + ' (معطّل)';
+        inactive = true;
+      }
+    }
+    if (inactive) {
+      // Red accent overlay for inactive doctor
+      btn.style.borderColor = '#ef5350';
+      btn.style.background = 'rgba(239,83,80,0.14)';
+      btn.style.color = '#ef5350';
+    } else {
+      btn.style.borderColor = '';
+      btn.style.background = '';
+      btn.style.color = '';
     }
     // Escape label to prevent XSS via doctor names (defense per قاعدة #14)
     btn.innerHTML = '<span>' + escapeHtmlLock(icon) + '</span><span>' + escapeHtmlLock(label) + '</span>';
@@ -651,6 +680,79 @@
   }
 
   // ── Auto-init on every page that has supabase-init ────────────
+  // ── Phase 4.1: Deactivated doctor handling ────────────────────
+  // If the device is locked to a Doctor whose clinic_doctors record is
+  // inactive (is_active=false) or missing, render a permanent red banner
+  // and disable any element tagged [data-doctor-inactive-block]. This
+  // implements the OpenDental "Hidden provider = removed from selection"
+  // pattern: device stays usable for read access, but new productions
+  // are gated until the Owner reactivates the account.
+  //
+  // Reads from _doctorsListCache (preloaded in autoInit). The cache only
+  // contains is_active=true rows, so "not found in cache" = inactive.
+  function isDoctorAccountInactive() {
+    if (!isDoctor()) return false;
+    if (!_doctorsListCache) return false; // not loaded yet — assume active
+    var did = getDoctorId();
+    if (!did) return false;
+    return !_doctorsListCache.find(function(d){ return d.id === did; });
+  }
+
+  function injectInactiveBanner() {
+    if (document.getElementById('sdInactiveBanner')) return;
+    var banner = document.createElement('div');
+    banner.id = 'sdInactiveBanner';
+    banner.setAttribute('role', 'alert');
+    banner.style.cssText =
+      'position:sticky;top:0;left:0;right:0;z-index:200;' +
+      'background:linear-gradient(90deg,rgba(239,83,80,0.18),rgba(239,83,80,0.10));' +
+      'border-bottom:2px solid #ef5350;color:#ef5350;' +
+      'padding:10px 16px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;' +
+      'text-align:center;direction:rtl;white-space:normal;line-height:1.5;';
+    banner.innerHTML =
+      '⚠ <strong>حسابك معطّل من قِبَل المالك.</strong> ' +
+      'يمكنك تصفّح البيانات للقراءة فقط — تسجيل الجلسات والدفعات والمواعيد معطّل. ' +
+      'الرجاء التواصل مع المالك لإعادة التفعيل.';
+
+    // Placement: insert into .main (sidebar layout) or at body top (no sidebar).
+    // Either way, it should be ABOVE the topbar so it spans the working area
+    // without breaking the sidebar's vertical full-height layout.
+    var main = document.querySelector('.main');
+    if (main && main.firstChild) {
+      main.insertBefore(banner, main.firstChild);
+    } else if (main) {
+      main.appendChild(banner);
+    } else if (document.body.firstChild) {
+      document.body.insertBefore(banner, document.body.firstChild);
+    } else {
+      document.body.appendChild(banner);
+    }
+  }
+
+  function applyInactiveActionGuards() {
+    // Disable any element opted-in to inactive-doctor blocking
+    var els = document.querySelectorAll('[data-doctor-inactive-block]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      el.setAttribute('disabled', 'disabled');
+      el.setAttribute('aria-disabled', 'true');
+      el.style.opacity = '0.5';
+      el.style.cursor = 'not-allowed';
+      el.style.pointerEvents = 'none';
+      el.title = 'معطّل — حسابك غير نشط حالياً';
+      el.setAttribute('data-doctor-inactive-disabled-by-lock', '1');
+    }
+  }
+
+  function applyInactiveDoctorUI() {
+    if (!isDoctorAccountInactive()) return;
+    injectInactiveBanner();
+    applyInactiveActionGuards();
+    // Re-run guards after dynamic re-renders by listening for the
+    // applyRoleGuards call too (patients/labs/etc. call it after render)
+    // We also patch refreshHeaderButton to keep the banner visible.
+  }
+
   async function autoInit() {
     // Skip on auth & landing pages (pre-auth)
     var path = (window.location.pathname || '').toLowerCase();
@@ -662,7 +764,11 @@
     }
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
-    loadDoctors().then(function(){ refreshHeaderButton(); });
+    loadDoctors().then(function(){
+      refreshHeaderButton();
+      // Phase 4.1: check if locked doctor is still active, apply inactive UI if not
+      applyInactiveDoctorUI();
+    });
     injectHeaderButton();
     applyRoleGuards();
   }
@@ -675,6 +781,7 @@
     isOwner: isOwner,
     isDoctor: isDoctor,
     isSecretary: isSecretary,
+    isDoctorAccountInactive: isDoctorAccountInactive,
     // pin
     hashPin: hashPin,
     verifyPin: verifyPin,
@@ -695,6 +802,8 @@
     refreshHeaderButton: refreshHeaderButton,
     openSwitchModal: openSwitchModal,
     applyRoleGuards: applyRoleGuards,
+    applyInactiveDoctorUI: applyInactiveDoctorUI,
+    applyInactiveActionGuards: applyInactiveActionGuards,
     guardPage: guardPage,
     showBlockedScreen: showBlockedScreen,
     // constants (for UI consumers)

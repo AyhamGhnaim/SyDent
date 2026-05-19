@@ -503,7 +503,7 @@ textarea { resize: vertical; min-height: 80px; }
       <span class="search-icon">🔍</span>
       <input type="text" id="searchInput" placeholder="بحث بالاسم أو رقم الهاتف أو رقم المريض…">
     </div>
-    <button class="btn-add" onclick="openModal()">
+    <button class="btn-add" onclick="openModal()" data-doctor-inactive-block>
       ＋ مريض جديد
     </button>
   </div>
@@ -763,8 +763,8 @@ function render() {
         </td>
         <td>
           <div class="action-btns" onclick="event.stopPropagation()">
-            <button class="btn-sm outline" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&appt=1'">📅 موعد جديد</button>
-            <button class="btn-sm pay" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&pay=1'">💰 تسجيل دفعة</button>
+            <button class="btn-sm outline" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&appt=1'" data-doctor-inactive-block>📅 موعد جديد</button>
+            <button class="btn-sm pay" onclick="event.stopPropagation();location.href='patient-profile.html?id=${p.id}&pay=1'" data-doctor-inactive-block>💰 تسجيل دفعة</button>
             <button class="dots-btn" onclick="toggleDotsMenu(this)">⋮</button>
             <div class="dots-menu">
               <button onclick="deletePatient('${p.id}')" data-role-block="doctor secretary">🗑️ حذف المريض</button>
@@ -810,6 +810,11 @@ function handleOverlayClick(e) {
 
 async function submitPatient(e) {
   e.preventDefault();
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل بيانات جديدة');
+    return;
+  }
   const name      = document.getElementById('fName').value.trim();
   const phone     = document.getElementById('fPhone').value.trim();
   const dob       = document.getElementById('fDob').value || null;
