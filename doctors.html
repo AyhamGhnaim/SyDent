@@ -197,6 +197,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div>
       الأطباء الذين تضيفهم هنا سيظهرون في قائمة "الطبيب المعالج" عند تسجيل الجلسات.
       كل طبيب يمكن أن يكون له <b>سعر خاص لكل علاج</b> (يُضبط من صفحة العلاجات).
+      <br><br>
+      <span style="color:var(--yellow);"><b>⚠️ ملاحظة:</b></span>
+      زر "<b>إخفاء من التقارير</b>" هنا يُخفي الطبيب من التقارير المالية وقائمة "الطبيب المعالج" فقط. <b>لا</b> يمنع تسجيل الدخول إلى البرنامج.
+      لمنع جهاز موظف من تسجيل البيانات، استخدم زر "تعطيل الحساب" من
+      <a href="employees.html" style="color:var(--green);text-decoration:underline;">صفحة الموظفين</a>.
     </div>
   </div>
 
@@ -382,7 +387,7 @@ function renderList() {
 
   var html = '<div class="doc-grid">';
   doctors.forEach(function(d){
-    var inactiveBadge = d.is_active === false ? '<span class="inactive-badge">⏸️ معطل</span>' : '';
+    var inactiveBadge = d.is_active === false ? '<span class="inactive-badge">🚫 مخفي من التقارير</span>' : '';
     var youBadge = d.is_owner ? '<span class="you-badge">⭐ صاحب العيادة</span>' : '';
     var linkedBadge = (d.user_id === currentUser.id)
       ? '<span class="linked-badge" title="هذا الطبيب مرتبط بحسابك — سيكون الافتراضي عند تسجيلك للجلسات">🔗 حسابي</span>'
@@ -394,7 +399,10 @@ function renderList() {
     var phonePart = d.phone ? ('<b>الهاتف:</b> ' + escapeHtml(d.phone)) : '';
     var metaItems = [sharePart, hoursPart, phonePart].filter(function(x){ return x; }).join(' &nbsp;•&nbsp; ');
 
-    var toggleLabel = d.is_active === false ? '▶️ تفعيل' : '⏸️ تعطيل';
+    var toggleLabel = d.is_active === false ? '👁️ إظهار في التقارير' : '🚫 إخفاء من التقارير';
+    var toggleTitle = d.is_active === false
+      ? 'إعادة إظهار هذا الطبيب في تقارير الإنتاج والقوائم'
+      : 'إخفاء هذا الطبيب من تقارير الإنتاج والقوائم. لا يمنع تسجيل الدخول.';
     var delBtn = d.is_owner
       ? '<button title="لا يمكن حذف صاحب العيادة" disabled style="opacity:.4;cursor:not-allowed;">🔒 محمي</button>'
       : '<button class="btn-del" onclick="deleteDoctor(\'' + d.id + '\')">🗑️ حذف</button>';
@@ -420,7 +428,7 @@ function renderList() {
       + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')
       + '<div class="doc-actions">'
       + '<button class="btn-edit" onclick="editDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
-      + '<button class="btn-toggle" onclick="toggleActive(\'' + d.id + '\')">' + toggleLabel + '</button>'
+      + '<button class="btn-toggle" onclick="toggleActive(\'' + d.id + '\')" title="' + escapeHtml(toggleTitle) + '">' + toggleLabel + '</button>'
       + linkBtn
       + ownerBtn
       + delBtn
@@ -523,6 +531,17 @@ async function toggleActive(id) {
   var d = doctors.find(function(x){ return x.id === id; });
   if (!d) return;
   var newState = !(d.is_active !== false);
+
+  // Confirm only when HIDING (not when re-showing)
+  if (!newState) {
+    if (!confirm(
+      'هل تريد إخفاء الطبيب "' + d.name + '" من التقارير؟\n\n' +
+      '• سيختفي من تقارير الإنتاج وقوائم اختيار الطبيب\n' +
+      '• سجلّه التاريخي يبقى محفوظاً\n' +
+      '• هذا لا يمنع تسجيل الدخول — لذلك استخدم صفحة "الموظفين"'
+    )) return;
+  }
+
   var { error } = await window.sb.from('clinic_doctors')
     .update({ is_active: newState, updated_at: new Date().toISOString() })
     .eq('id', id);
@@ -538,12 +557,12 @@ async function toggleActive(id) {
   if (window.logAudit) {
     window.logAudit('doctor.toggle_active', {
       entityId: id,
-      description: (newState ? 'تفعيل' : 'تعطيل') + ' الطبيب: ' + d.name,
+      description: (newState ? 'إظهار في التقارير' : 'إخفاء من التقارير') + ': ' + d.name,
       oldValue: { is_active: d.is_active },
       newValue: { is_active: newState }
     });
   }
-  showToast(newState ? '▶️ تم التفعيل' : '⏸️ تم التعطيل');
+  showToast(newState ? '👁️ تم الإظهار في التقارير' : '🚫 تم الإخفاء من التقارير');
   await loadDoctors();
 }
 

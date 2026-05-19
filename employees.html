@@ -229,6 +229,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       • <span style="color:var(--green);"><b>المالك (Owner):</b></span> أنت — صاحب العيادة (واحد فقط)<br>
       • <span style="color:var(--blue);"><b>طبيب (Doctor):</b></span> الأطباء المتعاونون — مربوطون مع جدول الأطباء<br>
       • <span style="color:var(--orange);"><b>السكرتيرة (Secretary):</b></span> موظفو الاستقبال والإدارة
+      <br><br>
+      <span style="color:var(--yellow);"><b>⚠️ ملاحظة:</b></span>
+      زر "<b>تعطيل الحساب</b>" هنا يمنع جهاز هذا الموظف من تسجيل بيانات جديدة (الجهاز يصبح للقراءة فقط). لإخفاء طبيب من التقارير المالية فقط (بدون قفل الجهاز)، استخدم
+      <a href="doctors.html" style="color:var(--green);text-decoration:underline;">صفحة أطباء العيادة</a>.
     </div>
   </div>
 
@@ -443,10 +447,13 @@ function renderList() {
       actions =
         '<button class="btn btn-sm btn-outline" onclick="openOwnerPinModal()">🔐 تغيير رقم سرّي</button>';
     } else {
+      var toggleTitle = inactive
+        ? 'إعادة تفعيل حساب هذا الموظف ليتمكن من تسجيل البيانات من جهازه'
+        : 'منع جهاز هذا الموظف من تسجيل بيانات جديدة (الجهاز يصبح للقراءة فقط)';
       actions =
         '<button class="btn btn-sm btn-outline" onclick="openEditModal(\'' + e.id + '\')">✏️ تعديل</button>' +
-        '<button class="btn btn-sm btn-warning" onclick="toggleActive(\'' + e.id + '\')">' +
-          (inactive ? '✓ تفعيل' : '⏸ تعطيل') +
+        '<button class="btn btn-sm btn-warning" onclick="toggleActive(\'' + e.id + '\')" title="' + escapeHtml(toggleTitle) + '">' +
+          (inactive ? '✓ تفعيل الحساب' : '🔒 تعطيل الحساب') +
         '</button>' +
         '<button class="btn btn-sm btn-danger" onclick="deleteEmployee(\'' + e.id + '\')">🗑️ حذف</button>';
     }
@@ -707,6 +714,17 @@ async function toggleActive(id) {
   // Flip: if currently active (true or undefined), set to false; otherwise activate.
   var newState = (emp.is_active === false);
 
+  // Confirm only when DEACTIVATING (not when re-activating)
+  if (!newState) {
+    if (!confirm(
+      'هل تريد تعطيل حساب الموظف "' + emp.name + '"؟\n\n' +
+      '• جهازه سيصبح للقراءة فقط فوراً عند فتح التطبيق\n' +
+      '• لن يستطيع تسجيل جلسات أو دفعات أو مواعيد جديدة\n' +
+      '• يمكنه فقط تصفّح البيانات الموجودة\n' +
+      '• لإعادة تفعيل الحساب لاحقاً، اضغط "تفعيل الحساب"'
+    )) return;
+  }
+
   var res = await window.sb.from('clinic_employees')
     .update({ is_active: newState })
     .eq('id', id).eq('owner_id', currentUser.id);
@@ -719,12 +737,12 @@ async function toggleActive(id) {
 
   await window.logAudit('employee.toggle_active', {
     entityId: id,
-    description: (newState ? 'تفعيل' : 'تعطيل') + ' الموظف: ' + emp.name,
+    description: (newState ? 'تفعيل الحساب' : 'تعطيل الحساب') + ': ' + emp.name,
     oldValue: { is_active: emp.is_active },
     newValue: { is_active: newState }
   });
 
-  showToast(newState ? '✓ تم التفعيل' : '✓ تم التعطيل');
+  showToast(newState ? '✓ تم تفعيل الحساب' : '🔒 تم تعطيل الحساب');
   await loadData();
   renderList();
 }

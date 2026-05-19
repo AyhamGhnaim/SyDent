@@ -1083,9 +1083,38 @@
   // pattern: device stays usable for read access, but new productions
   // are gated until the Owner reactivates the account.
   //
-  // Reads from _doctorsListCache (preloaded in autoInit). The cache only
-  // contains is_active=true rows, so "not found in cache" = inactive.
+  // Reads from _doctorsListCache + _employeesListCache (preloaded in autoInit).
+  // The caches contain is_active=true rows only, so "not found in cache" = inactive.
+  //
+  // Phase 5 update: the locked identity on a device can be either:
+  //   (a) an employee (employees.is_active=false → device locked)
+  //   (b) a doctor (clinic_doctors.is_active=false → device locked)
+  //   (c) both (each deactivated separately) → device locked
+  // The device should go read-only if EITHER is deactivated, because the
+  // person on this device has effectively lost their working identity
+  // (their name as employee OR their billable identity as doctor).
   function isDoctorAccountInactive() {
+    // ── Path 1: Phase 5 employee-locked device ──
+    // If a specific employee is locked in, check if that employee is still
+    // active. This is the primary path for all post-Phase-5 devices.
+    var empId = getEmployeeId();
+    if (empId && _employeesListCache) {
+      var emp = _employeesListCache.find(function(e){ return e.id === empId; });
+      if (!emp) {
+        // Employee deactivated (or fully deleted) → device read-only
+        return true;
+      }
+      // Employee is active. If this employee is linked to a doctor row,
+      // ALSO check that doctor row is active (Owner may have deactivated
+      // the doctor independently of the employee).
+      if (emp.role === 'doctor' && emp.doctor_id && _doctorsListCache) {
+        return !_doctorsListCache.find(function(d){ return d.id === emp.doctor_id; });
+      }
+      return false; // active employee, no linked doctor needed
+    }
+
+    // ── Path 2: Phase 4.1 legacy doctor-only lock (pre-Phase-5 devices) ──
+    // Device locked to role=doctor WITHOUT an employee_id (legacy installs).
     if (!isDoctor()) return false;
     if (!_doctorsListCache) return false; // not loaded yet — assume active
     var did = getDoctorId();
@@ -1159,14 +1188,14 @@
     }
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
-    // Phase 5: also preload employees, then re-render header button
-    // (header may have been rendered with role-only label before employees loaded)
-    loadEmployees().then(function(){
-      refreshHeaderButton();
-    });
-    loadDoctors().then(function(){
-      refreshHeaderButton();
-      // Phase 4.1: check if locked doctor is still active, apply inactive UI if not
+    // Phase 5: preload BOTH caches in parallel; refresh header & apply inactive
+    // UI only once BOTH are loaded so isDoctorAccountInactive() has full data.
+    // Header is also refreshed as each cache lands so user sees the name asap.
+    var empPromise = loadEmployees().then(function(){ refreshHeaderButton(); });
+    var docPromise = loadDoctors().then(function(){ refreshHeaderButton(); });
+    Promise.all([empPromise, docPromise]).then(function(){
+      // Phase 4.1 + 5: now both caches are ready — check inactive status
+      // against employee AND doctor, render banner + apply guards if needed
       applyInactiveDoctorUI();
     });
     injectHeaderButton();
