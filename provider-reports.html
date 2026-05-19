@@ -825,10 +825,10 @@ function formatSharePctDisplay(provider) {
 // ─── Render ───
 function render() {
   var providerFilter = document.getElementById('providerFilter').value;
-  // Phase 4 + 5g: Defense-in-depth — in Doctor mode, force the filter to
+  // Phase 4 + 5: Defense-in-depth — in Doctor mode, force the filter to
   // the logged doctor's id regardless of what the dropdown says. Prevents
   // any race / edge case from leaking other providers' data. Uses the
-  // Phase 5g effective doctor id resolver (falls back to employee.doctor_id
+  // Phase 5 effective doctor id resolver (falls back to employee.doctor_id
   // if LS_DOCTOR_ID is empty — common in Phase 5 employee-locked devices).
   if (window.SyDentLock && window.SyDentLock.isDoctor()) {
     var lockedDid = (typeof window.SyDentLock.getEffectiveDoctorId === 'function')
@@ -1354,11 +1354,9 @@ window.onPTRRefresh = function() { loadAll(); };
     }
   }
 
-  // HARD GUARD: if the locked doctor's account is inactive (either employee
-  // deactivated OR doctor row hidden from reports — both unified in
-  // isDoctorAccountInactive as of Phase 5g), replace the main content with
-  // an empty state BEFORE loadAll runs. The autoInit banner+pill handle
-  // the rest of the device-wide UX.
+  // HARD GUARD: if the locked doctor's employee account is inactive,
+  // replace the main content with an empty state BEFORE loadAll runs.
+  // The autoInit banner+pill handle the rest of the device-wide UX.
   if (window.SyDentLock && window.SyDentLock.isDoctor()
       && typeof window.SyDentLock.isDoctorAccountInactive === 'function'
       && window.SyDentLock.isDoctorAccountInactive()) {
@@ -1395,7 +1393,7 @@ function applyDoctorModeFilter() {
   if (!window.SyDentLock || !window.SyDentLock.isDoctor()) return;
   var sel = document.getElementById('providerFilter');
   if (!sel) return;
-  // Phase 5g: resolve effective doctor id (LS_DOCTOR_ID or employee.doctor_id)
+  // Phase 5: resolve effective doctor id (LS_DOCTOR_ID or employee.doctor_id)
   var did = (typeof window.SyDentLock.getEffectiveDoctorId === 'function')
     ? window.SyDentLock.getEffectiveDoctorId()
     : window.SyDentLock.getDoctorId();
