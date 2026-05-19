@@ -1,0 +1,32 @@
+-- ============================================================
+-- Migration 10: Drop unused broken_appointment_fee column
+-- ============================================================
+-- Phase 6 M — Observation H cleanup (commit C1)
+--
+-- Background:
+--   The column `clinic_settings.broken_appointment_fee` was added during
+--   an early draft of Phase 2C (Broken Appointment Fee). Phase 2C was
+--   reverted in full, but this column was left behind in the schema.
+--
+--   The currently active fee feature is `no_show_fee_*` (Phase 2A —
+--   shipping with appointments.html as `applyNoShowFee`). The orphan
+--   column `broken_appointment_fee` has no readers and no writers in
+--   any client file (verified with a comprehensive grep across all
+--   *.html / *.js / *.md / *.sql files).
+--
+-- Safety:
+--   • Zero client-side references — confirmed by sweep
+--   • IF EXISTS guard makes the statement idempotent
+--   • No constraint, trigger, function, view or policy references it
+--   • No data loss for any active feature (feature itself was reverted)
+--
+-- Verification after running this migration:
+--   SELECT column_name
+--   FROM information_schema.columns
+--   WHERE table_name = 'clinic_settings'
+--     AND column_name = 'broken_appointment_fee';
+--   -- Expected: 0 rows
+-- ============================================================
+
+ALTER TABLE clinic_settings
+  DROP COLUMN IF EXISTS broken_appointment_fee;

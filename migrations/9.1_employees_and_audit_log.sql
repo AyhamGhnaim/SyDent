@@ -166,6 +166,19 @@ BEGIN
   END IF;
 
   -- ── Rule 2: تعديل سعر جلسة بأكثر من 50% ──────────────────────
+  -- ⚠️ DEAD-CODE NOTICE (Phase 6 M — Observation S, commit C1):
+  --   This rule is intentionally kept active in the trigger even though
+  --   no client feature currently emits `session.edit_price` (SyDent
+  --   does not yet support editing a session's cost after creation).
+  --   Rationale for keeping (not removing):
+  --     • Zero runtime cost — BEFORE INSERT, sub-millisecond on miss
+  --     • Forward-compatible — when an edit-session-price feature is
+  --       added later, the only change required will be a single
+  --       logAudit('session.edit_price', { oldValue:{cost:X},
+  --       newValue:{cost:Y} }) call. The alert detection works.
+  --     • Removing-then-re-adding would require a future migration
+  --   If the feature is later deemed unnecessary, this rule can be
+  --   safely dropped — no other code path depends on it.
   IF NEW.action_type = 'session.edit_price'
      AND NEW.old_value IS NOT NULL AND NEW.new_value IS NOT NULL THEN
     BEGIN
