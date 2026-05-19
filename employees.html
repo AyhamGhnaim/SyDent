@@ -808,6 +808,9 @@ async function saveOwnerPin() {
   // Page guard: Owner only
   if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
 
+  // Initialize sidebar (uses 'employees' as the active nav item)
+  if (typeof initSidebar === 'function') initSidebar('employees');
+
   await loadData();
   renderList();
 })();
