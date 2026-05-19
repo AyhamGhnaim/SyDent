@@ -647,6 +647,78 @@
     btn.innerHTML = '<span>' + escapeHtmlLock(icon) + '</span><span>' + escapeHtmlLock(label) + '</span>';
   }
 
+  // ── A11y enhancer for the lock modal ──────────────────────────
+  // Phase 6 M — Observation N: Focus trap + Escape + restore focus.
+  // Applies the four missing a11y bits to the lock modal overlay:
+  //   1. aria-modal="true" on the inner dialog
+  //   2. Focus trap — Tab/Shift+Tab cycle within the modal only
+  //   3. Restore focus to the element that opened the modal on close
+  //   4. Auto-focus the first interactive element if no input is shown yet
+  //
+  // Returns a `cleanup` function the caller must invoke when removing the
+  // modal so we clear the keydown listener and restore focus.
+  //
+  // The caller already wires Escape close + outside-click close — this
+  // helper does NOT duplicate those; it only adds keyboard navigation.
+  function _a11yEnhanceModal(ov) {
+    var dialog = ov.querySelector('.sd-lock-modal');
+    if (dialog) dialog.setAttribute('aria-modal', 'true');
+
+    // Capture the element that had focus before the modal opened so we
+    // can restore it on close (proper a11y pattern).
+    var prevFocus = document.activeElement;
+
+    // Build a fresh list of focusable elements on each Tab keydown.
+    // (Building dynamically handles the case where #sdPinRow toggles
+    //  visibility based on radio selection — its input enters/exits the
+    //  tab cycle live.)
+    function getFocusable() {
+      var sel = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      var nodes = ov.querySelectorAll(sel);
+      var out = [];
+      for (var i = 0; i < nodes.length; i++) {
+        var el = nodes[i];
+        // Skip hidden elements (display:none / parent hidden / radio in hidden row)
+        if (el.offsetParent === null && el.tagName !== 'INPUT') continue;
+        if (el.disabled) continue;
+        out.push(el);
+      }
+      return out;
+    }
+
+    function trapHandler(e) {
+      if (e.key !== 'Tab' && e.keyCode !== 9) return;
+      var list = getFocusable();
+      if (!list.length) { e.preventDefault(); return; }
+      var first = list[0];
+      var last = list[list.length - 1];
+      var active = document.activeElement;
+      // If focus is outside the modal entirely, pull it back in.
+      if (!ov.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+      if (e.shiftKey) {
+        if (active === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (active === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    document.addEventListener('keydown', trapHandler);
+
+    // Cleanup: remove listener + restore focus to opener.
+    // Caller invokes this in their existing closeModal().
+    return function cleanup() {
+      document.removeEventListener('keydown', trapHandler);
+      try {
+        if (prevFocus && typeof prevFocus.focus === 'function' && document.body.contains(prevFocus)) {
+          prevFocus.focus();
+        }
+      } catch (e) { /* ignore */ }
+    };
+  }
+
   // ── Switch modal ──────────────────────────────────────────────
   // Phase 5: employee-aware modal. Lists each employee by NAME (not role),
   // and verifies that employee's own pin_hash. Falls back to legacy
@@ -734,8 +806,8 @@
       : ((ROLE_ICONS[curRole] || '') + ' ' + (ROLE_LABELS[curRole] || curRole));
 
     ov.innerHTML =
-      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الموظف">' +
-        '<h3>🔓 تبديل الموظف</h3>' +
+      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الموظف" aria-labelledby="sdModalTitle">' +
+        '<h3 id="sdModalTitle">🔓 تبديل الموظف</h3>' +
         '<div class="sd-cur">الموظف الحالي: ' + escapeHtmlLock(curDisplay) + '</div>' +
         optionsHtml +
         '<div class="sd-pin-row" id="sdPinRow" style="display:none;">' +
@@ -751,6 +823,9 @@
       '</div>';
 
     document.body.appendChild(ov);
+
+    // Phase 6 M — Observation N: a11y enhancement (focus trap + restore)
+    var _a11yCleanup = _a11yEnhanceModal(ov);
 
     // ── Event wiring ──
     var radios = ov.querySelectorAll('input[name="sdEmpSel"]');
@@ -833,17 +908,17 @@
       });
     });
 
-    // Esc key closes the modal
+    // Esc key closes the modal (delegates to closeModal so a11y cleanup runs)
     var escHandler = function(e){
       if (e.key === 'Escape' || e.keyCode === 27) {
-        ov.remove();
-        document.removeEventListener('keydown', escHandler);
+        closeModal();
       }
     };
     document.addEventListener('keydown', escHandler);
 
     function closeModal() {
       document.removeEventListener('keydown', escHandler);
+      if (typeof _a11yCleanup === 'function') _a11yCleanup();
       ov.remove();
     }
 
@@ -927,7 +1002,14 @@
     updateActive();
     setTimeout(function(){
       var pi = ov.querySelector('#sdPinInput');
-      if (pi && pi.offsetParent) pi.focus();
+      if (pi && pi.offsetParent) { pi.focus(); return; }
+      // Phase 6 M (Obs N): if PIN row is hidden, focus the first interactive
+      // element (the active radio, or the Confirm button) so keyboard users
+      // have a clear entry point.
+      var checked = ov.querySelector('input[name="sdEmpSel"]:checked');
+      if (checked && checked.offsetParent !== null) { checked.focus(); return; }
+      var confirm = ov.querySelector('#sdBtnConfirm');
+      if (confirm) confirm.focus();
     }, 80);
   }
 
@@ -960,8 +1042,8 @@
       : '<div style="color:#ef5350;font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
 
     ov.innerHTML =
-      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع">' +
-        '<h3>🔓 تبديل الوضع</h3>' +
+      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع" aria-labelledby="sdLegacyTitle">' +
+        '<h3 id="sdLegacyTitle">🔓 تبديل الوضع</h3>' +
         '<div class="sd-cur">الوضع الحالي: ' + (ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole) + '</div>' +
         '<label class="sd-opt' + (curRole==='owner'?' sd-active':'') + '" data-role="owner">' +
           '<input type="radio" name="sdRoleSel" value="owner"' + (curRole==='owner'?' checked':'') + '> 👑 المالك' +
@@ -986,6 +1068,9 @@
       '</div>';
 
     document.body.appendChild(ov);
+
+    // Phase 6 M — Observation N: a11y enhancement (focus trap + restore)
+    var _a11yCleanup = _a11yEnhanceModal(ov);
 
     // ── Event wiring ──
     var radios = ov.querySelectorAll('input[name="sdRoleSel"]');
@@ -1030,14 +1115,14 @@
 
     var escHandler = function(e){
       if (e.key === 'Escape' || e.keyCode === 27) {
-        ov.remove();
-        document.removeEventListener('keydown', escHandler);
+        closeModal();
       }
     };
     document.addEventListener('keydown', escHandler);
 
     function closeModal() {
       document.removeEventListener('keydown', escHandler);
+      if (typeof _a11yCleanup === 'function') _a11yCleanup();
       ov.remove();
     }
 
@@ -1093,7 +1178,15 @@
     });
 
     updateActive();
-    setTimeout(function(){ var pi = ov.querySelector('#sdPinInput'); if (pi && pi.offsetParent) pi.focus(); }, 80);
+    setTimeout(function(){
+      var pi = ov.querySelector('#sdPinInput');
+      if (pi && pi.offsetParent) { pi.focus(); return; }
+      // Phase 6 M (Obs N): fallback focus if PIN row hidden
+      var checked = ov.querySelector('input[name="sdRoleSel"]:checked');
+      if (checked && checked.offsetParent !== null) { checked.focus(); return; }
+      var confirm = ov.querySelector('#sdBtnConfirm');
+      if (confirm) confirm.focus();
+    }, 80);
   }
 
   // ── HTML escape (local helper) ────────────────────────────────
