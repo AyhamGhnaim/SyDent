@@ -120,6 +120,33 @@
     } catch(err) { return null; }
   }
 
+  // Phase 5g: resolve the effective doctor_id for filter/lock purposes.
+  // Priority order:
+  //   1. LS_DOCTOR_ID  (legacy + Phase 5 with explicit doctor_id)
+  //   2. Phase 5 employee.doctor_id from cache (if LS_DOCTOR_ID is missing
+  //      but the locked employee has a doctor_id linkage in the DB)
+  //   3. null
+  //
+  // This is critical for provider-reports.html in Phase 5 where a device
+  // may have LS_EMPLOYEE_ID set but LS_DOCTOR_ID empty (e.g. employee was
+  // created without doctor_id link, or LS_DOCTOR_ID got cleared by an
+  // applyRole call that didn't propagate from the employee record).
+  function getEffectiveDoctorId() {
+    var did = getDoctorId();
+    if (did) return did;
+    // Fallback: look up the locked employee's doctor_id
+    var empId = getEmployeeId();
+    if (!empId || !_employeesListCache) return null;
+    var emp = _employeesListCache.find(function(e){ return e.id === empId; });
+    if (emp && emp.role === 'doctor' && emp.doctor_id) return emp.doctor_id;
+    // Also check allEmployees cache (in case employee is deactivated but row exists)
+    if (_allEmployeesListCache) {
+      var empAny = _allEmployeesListCache.find(function(e){ return e.id === empId; });
+      if (empAny && empAny.role === 'doctor' && empAny.doctor_id) return empAny.doctor_id;
+    }
+    return null;
+  }
+
   function isOwner()     { return getRole() === 'owner'; }
   function isDoctor()    { return getRole() === 'doctor'; }
   function isSecretary() { return getRole() === 'secretary'; }
@@ -1314,6 +1341,7 @@
     // state
     getRole: getRole,
     getDoctorId: getDoctorId,
+    getEffectiveDoctorId: getEffectiveDoctorId,
     isOwner: isOwner,
     isDoctor: isDoctor,
     isSecretary: isSecretary,

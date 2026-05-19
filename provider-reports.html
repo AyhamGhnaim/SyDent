@@ -832,11 +832,15 @@ function render() {
   if (typeof applyInactiveDoctorBlockPage === 'function' &&
       applyInactiveDoctorBlockPage()) return;
   var providerFilter = document.getElementById('providerFilter').value;
-  // Phase 4: Defense-in-depth — in Doctor mode, force the filter to the
-  // logged doctor's id regardless of what the dropdown says. Prevents any
-  // race / edge case from leaking other providers' data.
+  // Phase 4 + 5g: Defense-in-depth — in Doctor mode, force the filter to
+  // the logged doctor's id regardless of what the dropdown says. Prevents
+  // any race / edge case from leaking other providers' data. Uses the
+  // Phase 5g effective doctor id resolver (falls back to employee.doctor_id
+  // if LS_DOCTOR_ID is empty — common in Phase 5 employee-locked devices).
   if (window.SyDentLock && window.SyDentLock.isDoctor()) {
-    var lockedDid = window.SyDentLock.getDoctorId();
+    var lockedDid = (typeof window.SyDentLock.getEffectiveDoctorId === 'function')
+      ? window.SyDentLock.getEffectiveDoctorId()
+      : window.SyDentLock.getDoctorId();
     if (lockedDid) providerFilter = lockedDid;
   }
   var inactiveMode = document.getElementById('inactiveFilter').value; // 'hide' | 'show'
@@ -1347,13 +1351,12 @@ window.onPTRRefresh = function() { loadAll(); };
   // Mark "this month" preset as active
   document.querySelectorAll('.preset-btn')[0].classList.add('active');
 
-  await loadAll();
-
-  // Phase 5g (Layer 1): ensure SyDentLock's employee+doctor caches are
-  // loaded BEFORE checking isDoctorAccountInactive (otherwise the check
-  // returns false on cache=null and the block fails silently).
-  // autoInit in supabase-init.js preloads these in parallel — await them
-  // explicitly here so timing is deterministic.
+  // Phase 5g: ensure SyDentLock's employee+doctor caches are loaded BEFORE
+  // loadAll() — because loadAll internally calls applyDoctorModeFilter,
+  // which now uses getEffectiveDoctorId() (resolves employee.doctor_id
+  // fallback when LS_DOCTOR_ID is empty). Without explicit await here,
+  // the autoInit promise might not have resolved yet and the resolver
+  // would return null on first paint.
   if (window.SyDentLock) {
     if (typeof window.SyDentLock.loadEmployees === 'function') {
       try { await window.SyDentLock.loadEmployees(); } catch(e) {}
@@ -1363,10 +1366,12 @@ window.onPTRRefresh = function() { loadAll(); };
     }
   }
 
-  // Phase 5g (Layer 1): if doctor account is inactive, block the entire
-  // page with an empty-state. Must run AFTER caches load (above) AND AFTER
-  // loadAll (provList exists) but BEFORE applyDoctorModeFilter (which
-  // would otherwise try to set up filters that we're about to wipe).
+  await loadAll();
+
+  // Phase 5g (Layer 1): if doctor account is inactive (employee deactivated)
+  // OR the doctor row is hidden from reports, block the entire page.
+  // Must run AFTER loadAll (provList exists) but BEFORE applyDoctorModeFilter
+  // (which would otherwise try to set up filters that we're about to wipe).
   if (applyInactiveDoctorBlockPage()) return;
 
   // Phase 4: Doctor mode auto-filter (lock the provider dropdown to the doctor's own id)
@@ -1380,7 +1385,10 @@ function applyDoctorModeFilter() {
   if (!window.SyDentLock || !window.SyDentLock.isDoctor()) return;
   var sel = document.getElementById('providerFilter');
   if (!sel) return;
-  var did = window.SyDentLock.getDoctorId();
+  // Phase 5g: resolve effective doctor id (LS_DOCTOR_ID or employee.doctor_id)
+  var did = (typeof window.SyDentLock.getEffectiveDoctorId === 'function')
+    ? window.SyDentLock.getEffectiveDoctorId()
+    : window.SyDentLock.getDoctorId();
   if (!did) return;
 
   // Also lock the inactive filter — in Doctor mode, viewing only your own
