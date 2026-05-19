@@ -576,11 +576,16 @@
         label = emp.name;
         icon = ROLE_ICONS[emp.role] || icon;
       } else if (_allEmployeesListCache) {
-        // Employee might be deactivated → name recovery
+        // Employee might be deactivated OR fully deleted → name recovery
         var empAny = (_allEmployeesListCache || []).find(function(e){ return e.id === empId; });
         if (empAny && empAny.name) {
+          // Deactivated but row still exists → show name with (معطّل)
           label = empAny.name + ' (معطّل)';
           icon = ROLE_ICONS[empAny.role] || icon;
+          inactive = true;
+        } else {
+          // Fully deleted by owner from another device → name unrecoverable
+          label = (ROLE_LABELS[role] || 'موظف') + ' (محذوف)';
           inactive = true;
         }
       }
