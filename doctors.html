@@ -331,6 +331,12 @@ async function loadDoctors() {
 
   doctors = data || [];
 
+  // Phase 5g: keep SyDentLock's _doctorsListCache in sync — local edits
+  // (add/toggle/delete) need to be visible to lock detection without F5.
+  if (window.SyDentLock && window.SyDentLock.invalidateDoctorsCache) {
+    window.SyDentLock.invalidateDoctorsCache();
+  }
+
   // Auto-create the owner-doctor record on first visit (legacy upgrade path).
   // Uses data from the legacy 'doctors' table if available, otherwise sensible defaults.
   if (doctors.length === 0) {

@@ -480,6 +480,13 @@
     _allEmployeesListCache = null;
   }
 
+  // Force reload of doctors cache (after add/edit/toggle in doctors.html)
+  // Symmetric with invalidateEmployeesCache — same purpose, same shape.
+  function invalidateDoctorsCache() {
+    _doctorsListCache = null;
+    _allDoctorsListCache = null;
+  }
+
   // Get current employee object (or null if not set / migration not applied)
   // This is the snapshot used for audit logging.
   async function getCurrentEmployee() {
@@ -575,6 +582,16 @@
         // Active employee → show their name + role icon
         label = emp.name;
         icon = ROLE_ICONS[emp.role] || icon;
+        // Phase 5g: also check if linked doctor row is hidden from reports.
+        // If so, surface that state in the pill too (banner + guards already
+        // fire from isDoctorAccountInactive's Path 1 second check).
+        if (emp.role === 'doctor' && emp.doctor_id && _doctorsListCache) {
+          var linkedDoc = _doctorsListCache.find(function(x){ return x.id === emp.doctor_id; });
+          if (!linkedDoc) {
+            label = emp.name + ' (معطّل)';
+            inactive = true;
+          }
+        }
       } else if (_allEmployeesListCache) {
         // Employee might be deactivated OR fully deleted → name recovery
         var empAny = (_allEmployeesListCache || []).find(function(e){ return e.id === empId; });
@@ -1295,6 +1312,7 @@
     getEmployeeId: getEmployeeId,
     loadEmployees: loadEmployees,
     invalidateEmployeesCache: invalidateEmployeesCache,
+    invalidateDoctorsCache: invalidateDoctorsCache,
     getCurrentEmployee: getCurrentEmployee,
     // pin
     hashPin: hashPin,
