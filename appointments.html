@@ -830,9 +830,15 @@ textarea { resize: vertical; min-height: 72px; }
         <!-- Gap 8: Template picker (hidden in edit mode) -->
         <div class="form-group full" id="apptTypePickerWrap" style="display:none;">
           <label>⚡ قالب جاهز (اختياري) — لتعبئة المدة والعلاج تلقائياً</label>
+          <!-- Phase 6 L: chips view (auto-shown for ≤ 6 templates). Falls back
+               to the <select> below when there are more than 6 templates. -->
+          <div id="fApptTypeChips" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
           <select id="fApptTypePicker" onchange="onApptTypePicked()">
             <option value="">— بدون قالب —</option>
           </select>
+          <!-- Phase 6 L (Obs B): non-intrusive lab hint banner. Shown only when
+               the picked template has a default_lab_id. JS toggles display. -->
+          <div id="apptTypeLabHint" style="display:none;margin-top:8px;"></div>
         </div>
         <div class="form-group full">
           <label>اسم المريض *</label>
@@ -2240,6 +2246,10 @@ async function overrideApptTime(apptId, fieldKey) {
 
 var _appointmentTypes = [];   // cached templates for this session
 var _gap8TableMissing = false;
+// Phase 6 L (Obs B): cached labs for resolving default_lab_id → human name
+// in the lab-hint banner. Fault-tolerant: empty array means we just show a
+// generic "مخبر مرتبط" without the specific name (still informative).
+var _labsCache = [];
 
 function _gap8IsTableMissing(err) {
   if (!err) return false;
@@ -2247,13 +2257,35 @@ function _gap8IsTableMissing(err) {
   return /42P01|PGRST205|relation .* does not exist|appointment_types/i.test(msg);
 }
 
+// Phase 6 L (Obs B): one-shot loader for the labs cache, called alongside
+// loadAppointmentTypes(). Only active labs — matches the picker UX in
+// settings.html. Never throws.
+async function loadLabsForHint() {
+  if (!currentUser) return;
+  try {
+    var res = await window.sb.from('labs')
+      .select('id, name')
+      .eq('is_active', true);
+    if (res.error) {
+      console.warn('Phase 6 L: labs cache load failed (continuing):', res.error);
+      _labsCache = [];
+      return;
+    }
+    _labsCache = res.data || [];
+  } catch (e) {
+    console.warn('Phase 6 L: labs cache load exception:', e);
+    _labsCache = [];
+  }
+}
+
 async function loadAppointmentTypes() {
   if (!currentUser) return;
   try {
-    // Gap 8.2: select default_provider_id + default_lab_id alongside the
-    // original fields. If the columns don't exist yet (42703), retry with
-    // the old projection so the picker still works.
-    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, is_active, sort_order';
+    // Gap 8.2 / Migration 11: select default_provider_id + default_lab_id +
+    // default_notes alongside the original fields. If any of those columns
+    // don't exist yet (42703), retry with the legacy projection so the picker
+    // still works on older installations.
+    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, default_notes, is_active, sort_order';
     var legacyCols = 'id, name, default_duration_min, default_treatment_id, is_active, sort_order';
     var res = await window.sb.from('appointment_types')
       .select(fullCols)
@@ -2267,10 +2299,10 @@ async function loadAppointmentTypes() {
         console.warn('Gap 8: appointment_types table missing — template picker disabled.');
         return;
       }
-      // Gap 8.2 fallback: retry with legacy projection
+      // Gap 8.2 / Migration 11 fallback: retry with legacy projection
       var msg = (res.error.message || '') + ' ' + (res.error.code || '');
-      if (/42703|default_provider_id|default_lab_id/i.test(msg)) {
-        console.warn('Gap 8.2: provider/lab columns missing on SELECT — falling back to legacy columns.');
+      if (/42703|default_provider_id|default_lab_id|default_notes/i.test(msg)) {
+        console.warn('Gap 8.2 / Migration 11: optional columns missing on SELECT — falling back to legacy columns.');
         res = await window.sb.from('appointment_types')
           .select(legacyCols)
           .eq('doctor_id', currentUser.id)
@@ -2290,11 +2322,16 @@ async function loadAppointmentTypes() {
 }
 
 // Populates the <select> inside the modal. Idempotent — safe to call every
-// time the modal opens (cheap with a small list, and keeps the dropdown
-// fresh if the user added templates in another tab).
+// Populates the picker. Phase 6 L: when the practice has ≤ 6 templates, we
+// render colorful chips for one-tap selection (much friendlier on mobile +
+// secretaries). For > 6 templates we fall back to the standard <select> to
+// avoid an unbounded horizontal scroll. Idempotent — safe to call on every
+// modal open.
 function populateApptTypePicker() {
   var sel = document.getElementById('fApptTypePicker');
   if (!sel) return;
+  // Always keep the <select> populated as the canonical source of truth —
+  // chips dispatch into it via the existing onchange to reuse onApptTypePicked.
   var html = '<option value="">— بدون قالب —</option>';
   for (var i = 0; i < _appointmentTypes.length; i++) {
     var t = _appointmentTypes[i];
@@ -2302,6 +2339,90 @@ function populateApptTypePicker() {
   }
   sel.innerHTML = html;
   sel.value = '';
+
+  // Phase 6 L: chips mode for small template sets (≤ 6).
+  var chipsEl = document.getElementById('fApptTypeChips');
+  if (!chipsEl) return;
+  var CHIPS_THRESHOLD = 6;
+  if (_appointmentTypes.length === 0 || _appointmentTypes.length > CHIPS_THRESHOLD) {
+    chipsEl.style.display = 'none';
+    chipsEl.innerHTML = '';
+    sel.style.display = '';
+    return;
+  }
+  // Build chips. Each chip carries the template id; click sets the <select>
+  // value (which fires onchange → onApptTypePicked) AND visually toggles the
+  // active state. Color comes from the linked treatment if present.
+  var chipsHtml = '';
+  // "No template" reset chip — neutral styling.
+  chipsHtml += '<button type="button" class="appt-type-chip" data-tid="" '
+    + 'onclick="onApptTypeChipClick(this, \'\')" '
+    + 'style="padding:7px 14px;border-radius:18px;border:1.5px solid var(--border);'
+    + 'background:transparent;color:var(--text2);cursor:pointer;font-size:13px;'
+    + 'font-family:inherit;transition:all 0.15s;">— بدون قالب —</button>';
+  for (var j = 0; j < _appointmentTypes.length; j++) {
+    var ct = _appointmentTypes[j];
+    // Color: prefer the template-linked treatment's color, fall back to neutral.
+    var chipColor = '#63b3ed';
+    if (ct.default_treatment_id && typeof TREATMENTS !== 'undefined') {
+      for (var k = 0; k < TREATMENTS.length; k++) {
+        if (TREATMENTS[k].dbId === ct.default_treatment_id) {
+          chipColor = TREATMENTS[k].fill || TREATMENTS[k].color || chipColor;
+          break;
+        }
+      }
+    }
+    var safeId = escapeHtml(ct.id);
+    var safeName = escapeHtml(ct.name || '');
+    var safeColor = escapeHtml(chipColor);
+    chipsHtml += '<button type="button" class="appt-type-chip" data-tid="' + safeId + '" '
+      + 'data-color="' + safeColor + '" '
+      + 'onclick="onApptTypeChipClick(this, \'' + safeId + '\')" '
+      + 'style="padding:7px 14px;border-radius:18px;border:1.5px solid ' + safeColor + ';'
+      + 'background:transparent;color:var(--text);cursor:pointer;font-size:13px;'
+      + 'font-family:inherit;transition:all 0.15s;">' + safeName + '</button>';
+  }
+  chipsEl.innerHTML = chipsHtml;
+  chipsEl.style.display = 'flex';
+  // Hide the underlying <select> when chips are shown — chips are the UX,
+  // <select> stays as the model. The user can still see the picked label
+  // via the chip's active state.
+  sel.style.display = 'none';
+}
+
+// Phase 6 L: chip click → set <select>.value programmatically + dispatch
+// onchange so the existing onApptTypePicked pipeline runs unchanged. Also
+// updates active styling so the user sees what they picked.
+function onApptTypeChipClick(btn, tid) {
+  var sel = document.getElementById('fApptTypePicker');
+  if (!sel) return;
+  sel.value = tid || '';
+  // Reset all chips to inactive styling.
+  var chipsEl = document.getElementById('fApptTypeChips');
+  if (chipsEl) {
+    var all = chipsEl.querySelectorAll('.appt-type-chip');
+    for (var i = 0; i < all.length; i++) {
+      all[i].style.background = 'transparent';
+      all[i].style.fontWeight = 'normal';
+    }
+  }
+  // Activate the clicked chip. We compute the active fill from the chip's
+  // own data-color (HEX, set when rendering). Browsers may normalize the
+  // inline border-color to rgb(...) on read, so we cache the raw HEX on the
+  // element instead — safer and color-stable.
+  if (btn) {
+    var raw = btn.getAttribute('data-color');
+    if (raw && raw.charAt(0) === '#' && raw.length === 7) {
+      btn.style.background = raw + '2e';  // ~18% alpha
+    } else if (!btn.dataset.tid) {
+      btn.style.background = 'rgba(141,160,189,0.18)';  // neutral for "no template"
+    } else {
+      btn.style.background = 'rgba(99,179,237,0.18)';  // safe fallback
+    }
+    btn.style.fontWeight = '600';
+  }
+  // Fire the existing pipeline.
+  onApptTypePicked();
 }
 
 // Called from the picker's onchange. Pre-fills duration + treatment.
@@ -2312,7 +2433,14 @@ function onApptTypePicked() {
   var sel = document.getElementById('fApptTypePicker');
   if (!sel) return;
   var id = sel.value;
-  if (!id) return; // user picked "— بدون قالب —"
+  if (!id) {
+    // Phase 6 L (Obs B): user picked "— بدون قالب —" → clear any visible
+    // lab hint banner from a previous template. We don't touch the form
+    // fields (duration/treatment/notes) — those keep user edits per the
+    // "don't clobber" philosophy elsewhere in this function.
+    _renderApptTypeLabHint(null);
+    return;
+  }
   var t = _appointmentTypes.find(function(x){ return x.id === id; });
   if (!t) return;
 
@@ -2378,9 +2506,48 @@ function onApptTypePicked() {
   }
 
   // Gap 8.2: default_lab_id is intentionally NOT applied to the appointment
-  // form here (per the user's design choice — option A). It stays cached on
-  // the template and will be used later when creating a lab_order from this
-  // appointment, where it can suggest the lab automatically.
+  // form here — appointments don't directly carry a lab id. Phase 6 L (Obs B)
+  // surfaces it as a non-intrusive banner instead, so the user knows this
+  // template's lab association and can create the matching lab order from
+  // the Labs tab (or the per-appointment lab section) afterwards.
+  _renderApptTypeLabHint(t);
+
+  // Migration 11 (Phase 6 L): pre-fill the appointment notes field from the
+  // template's default_notes, BUT only if the user hasn't typed anything yet.
+  // This honors the user's edits while still providing a smart default — the
+  // same philosophy as duration/treatment above (don't clobber user input).
+  // If default_notes is null/empty, we leave the existing value alone.
+  if (t.default_notes) {
+    var notesEl = document.getElementById('fNotes');
+    if (notesEl && !notesEl.value.trim()) {
+      notesEl.value = t.default_notes;
+    }
+  }
+}
+
+// Phase 6 L (Obs B): Renders/clears the lab hint banner under the template
+// picker. Non-intrusive — just informs the user about the template's lab so
+// they can create the lab order afterwards. No automatic mutation.
+function _renderApptTypeLabHint(t) {
+  var wrap = document.getElementById('apptTypeLabHint');
+  if (!wrap) return;
+  if (!t || !t.default_lab_id) {
+    wrap.style.display = 'none';
+    wrap.innerHTML = '';
+    return;
+  }
+  // Resolve the lab name from the cache. If the lab was deleted/deactivated,
+  // we fall back to a generic notice rather than showing a broken UUID.
+  var labName = null;
+  for (var i = 0; i < _labsCache.length; i++) {
+    if (_labsCache[i].id === t.default_lab_id) { labName = _labsCache[i].name; break; }
+  }
+  var labText = labName ? escapeHtml(labName) : 'مخبر مرتبط بهذا القالب';
+  wrap.innerHTML = '<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:8px;font-size:13px;color:var(--text2);line-height:1.6;">'
+    + '<span style="font-size:16px;line-height:1;">💡</span>'
+    + '<span>هذا القالب مرتبط بـ <strong style="color:var(--text);">' + labText + '</strong> — أنشئ طلب مخبر من تبويب المخابر أو من الموعد بعد الحفظ.</span>'
+    + '</div>';
+  wrap.style.display = '';
 }
 
 // ─── Render ──────────────────────────────────────────
@@ -2616,6 +2783,10 @@ async function openModal(prefillDate) {
       atPickerWrap.style.display = '';
     }
   }
+  // Phase 6 L (Obs B): reset the lab hint banner on every fresh modal open.
+  // The user may have triggered it on a previous draft; without this reset
+  // the stale banner would briefly show until the user picked a new template.
+  _renderApptTypeLabHint(null);
   onPlannedToggle();  // sync visibility of date/time/reason/note
   updateColorPreview();
 
@@ -3814,6 +3985,7 @@ function showToast(msg) {
   currentUser = data.user;
   await loadClinicDoctors();
   await loadAppointmentTypes();  // Gap 8: cache templates for the modal picker
+  await loadLabsForHint();       // Phase 6 L: cache labs for the template hint banner
   // Phase 2A — WhatsApp Reminders state
   await loadClinicSettingsWa();
   await loadPatientPhones();

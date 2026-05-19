@@ -548,7 +548,7 @@ textarea::placeholder { color: var(--text2); }
 
 <!-- Gap 8: Modal إضافة/تعديل قالب موعد -->
 <div class="modal-overlay" id="apptTypeModal" onclick="if(event.target===this) closeApptTypeModal()">
-  <div class="modal">
+  <div class="modal" style="max-height:90vh;overflow-y:auto;">
     <div class="modal-title" id="apptTypeModalTitle">إضافة قالب جديد</div>
     <div class="form-group">
       <label>اسم القالب</label>
@@ -578,6 +578,11 @@ textarea::placeholder { color: var(--text2); }
         <option value="">— بدون مخبر —</option>
       </select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعلاجات التي تحتاج مخبر (تلبيسة، جسر، إلخ)</div>
+    </div>
+    <div class="form-group" id="fAtNotesWrap">
+      <label>📝 ملاحظات افتراضية</label>
+      <textarea id="fAtNotes" maxlength="500" rows="3" placeholder="مثال: تأكد من جاهزية المخبر قبل الموعد بيومين" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — تُضاف تلقائياً إلى حقل ملاحظات الموعد عند اختيار هذا القالب (500 حرف كحد أقصى)</div>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeApptTypeModal()">إلغاء</button>
@@ -1381,6 +1386,9 @@ function openApptTypeModal() {
   document.getElementById('fAtProvider').value = '';
   populateApptTypeLabSelect();
   document.getElementById('fAtLab').value = '';
+  // Migration 11: reset notes textarea
+  var notesEl = document.getElementById('fAtNotes');
+  if (notesEl) notesEl.value = '';
   document.getElementById('apptTypeModal').classList.add('open');
   setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
 }
@@ -1452,6 +1460,10 @@ function editApptType(id) {
     fAtLb.value = '';
   }
 
+  // Migration 11: pre-fill the optional default notes (graceful if column missing)
+  var fAtNotes = document.getElementById('fAtNotes');
+  if (fAtNotes) fAtNotes.value = t.default_notes || '';
+
   document.getElementById('apptTypeModal').classList.add('open');
   setTimeout(function() { document.getElementById('fAtName').focus(); }, 50);
 }
@@ -1470,6 +1482,14 @@ async function saveApptType() {
   // Gap 8.2: capture optional provider + lab ids (empty string → null)
   var providerId = document.getElementById('fAtProvider').value || null;
   var labId = document.getElementById('fAtLab').value || null;
+  // Migration 11: optional default notes (empty string → null, trimmed)
+  var notesEl = document.getElementById('fAtNotes');
+  var defaultNotes = notesEl ? (notesEl.value || '').trim() : '';
+  if (defaultNotes.length === 0) defaultNotes = null;
+  if (defaultNotes && defaultNotes.length > 500) {
+    showToast('⚠️ الملاحظات طويلة جداً (500 حرف كحد أقصى)', true);
+    return;
+  }
 
   if (!name) {
     showToast('⚠️ اسم القالب مطلوب', true);
@@ -1487,34 +1507,36 @@ async function saveApptType() {
   var btn = document.getElementById('btnSaveApptType');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
-  // Helper for Gap 8.2 graceful fallback: detects rejection of the new
-  // columns (42703 = undefined_column, or the column name in the error
-  // text). Lets us retry without provider/lab on pre-Gap-8.2 installations.
+  // Helper for Gap 8.2 / Migration 11 graceful fallback: detects rejection
+  // of any of the optional columns (42703 = undefined_column) or our 500-char
+  // CHECK constraint on default_notes (23514). Lets us retry without the
+  // missing column on legacy installations.
   function _isGap82ColumnMissing(err) {
     if (!err) return false;
     var msg = (err.message || '') + ' ' + (err.code || '');
-    return /42703|default_provider_id|default_lab_id/i.test(msg);
+    return /42703|23514|default_provider_id|default_lab_id|default_notes/i.test(msg);
   }
 
   try {
     var res;
     if (_editingApptTypeId) {
-      // UPDATE existing — include provider + lab in the payload
+      // UPDATE existing — include provider + lab + notes in the payload
       var updatePayload = {
         name: name,
         default_duration_min: duration,
         default_treatment_id: treatmentId,
         default_provider_id: providerId,
-        default_lab_id: labId
+        default_lab_id: labId,
+        default_notes: defaultNotes
       };
       res = await window.sb.from('appointment_types')
         .update(updatePayload)
         .eq('id', _editingApptTypeId)
         .eq('doctor_id', currentUser.id);
-      // Gap 8.2 retry: strip the new columns and try again
+      // Gap 8.2 / Migration 11 retry: strip the optional columns and try again
       if (res.error && _isGap82ColumnMissing(res.error)) {
         _gap82ColumnsMissing = true;
-        console.warn('Gap 8.2: provider/lab columns missing on UPDATE — retrying without them. Run the Gap 8.2 migration.');
+        console.warn('Gap 8.2 / Migration 11: optional columns missing on UPDATE — retrying without them. Run the latest migrations.');
         var legacy = { name: name, default_duration_min: duration, default_treatment_id: treatmentId };
         res = await window.sb.from('appointment_types')
           .update(legacy)
@@ -1534,13 +1556,14 @@ async function saveApptType() {
         default_treatment_id: treatmentId,
         default_provider_id: providerId,
         default_lab_id: labId,
+        default_notes: defaultNotes,
         sort_order: maxSort + 1
       };
       res = await window.sb.from('appointment_types').insert(insertPayload);
-      // Gap 8.2 retry: strip the new columns and try again
+      // Gap 8.2 / Migration 11 retry: strip the optional columns and try again
       if (res.error && _isGap82ColumnMissing(res.error)) {
         _gap82ColumnsMissing = true;
-        console.warn('Gap 8.2: provider/lab columns missing on INSERT — retrying without them. Run the Gap 8.2 migration.');
+        console.warn('Gap 8.2 / Migration 11: optional columns missing on INSERT — retrying without them. Run the latest migrations.');
         var legacyIns = {
           doctor_id: currentUser.id,
           name: name,
