@@ -659,6 +659,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
     <button class="tab" onclick="switchTab('labs',this)">🥽 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">📋 سجل النشاطات</button>
   </div>
 
   <!-- Tab: الملف -->
@@ -785,6 +786,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ طلب جديد</button>
       </div>
       <div id="labOrdersContent"></div>
+    </div>
+  </div>
+
+  <!-- Tab: سجل النشاطات (Owner-only — visibility controlled by init) -->
+  <div class="panel" id="tab-audit">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📋 سجل النشاطات على هذا المريض</span>
+        <span style="font-size:11px;color:var(--text2);">آخر 100 عملية</span>
+      </div>
+      <div id="patientAuditContent">
+        <div style="text-align:center;padding:40px;color:var(--text2);">انقر التبويب لتحميل السجل…</div>
+      </div>
     </div>
   </div>
 
@@ -7490,6 +7504,118 @@ async function init() {
   document.getElementById('aDate').value   = toDay();
   if (params.get('pay')  === '1') setTimeout(openPayModal,  350);
   if (params.get('appt') === '1') setTimeout(openApptModal, 350);
+
+  // Phase 5F: show audit-log tab for Owner only
+  var isOwner = !window.SyDentLock || window.SyDentLock.isOwner();
+  var auditTab = document.getElementById('tabBtnAudit');
+  if (auditTab && isOwner) auditTab.style.display = '';
+}
+
+/* ── Phase 5F: Patient audit log ──
+   Shows the audit_log rows for this specific patient, scoped by RLS owner_id.
+   Lazy-loaded on first tab click. Owner-only (UI gated; RLS gates the data).
+   Graceful fallback if Migration 9.1 not applied yet. */
+var _patientAuditLoaded = false;
+var _patientAuditInFlight = false;
+
+async function loadPatientAuditLog() {
+  if (_patientAuditInFlight) return;
+  if (_patientAuditLoaded) return; // already loaded once per session
+  _patientAuditInFlight = true;
+  var box = document.getElementById('patientAuditContent');
+  box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text2);">جارٍ التحميل…</div>';
+
+  try {
+    var res = await window.sb.from('audit_log')
+      .select('id, employee_name_snapshot, employee_role_snapshot, action_type, description, is_alert, alert_reason, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('is_archived', false)
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (res.error) {
+      var m = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (/audit_log|42P01|PGRST205/i.test(m)) {
+        box.innerHTML =
+          '<div style="text-align:center;padding:40px;color:var(--text2);">' +
+            '<div style="font-size:36px;margin-bottom:10px;opacity:0.6;">🛠️</div>' +
+            '<div style="font-weight:800;margin-bottom:6px;">السجل غير مفعّل بعد</div>' +
+            '<div style="font-size:12px;">يبدو أن Migration 9.1 لم يُشغَّل بعد.</div>' +
+          '</div>';
+        _patientAuditLoaded = true;
+        return;
+      }
+      console.warn('loadPatientAuditLog:', res.error);
+      box.innerHTML = '<div style="text-align:center;padding:40px;color:var(--red);">⚠ فشل التحميل</div>';
+      return;
+    }
+
+    var rows = res.data || [];
+    if (rows.length === 0) {
+      box.innerHTML =
+        '<div style="text-align:center;padding:40px;color:var(--text2);">' +
+          '<div style="font-size:36px;margin-bottom:10px;opacity:0.6;">📭</div>' +
+          '<div>لا توجد عمليات مسجَّلة على هذا المريض بعد</div>' +
+        '</div>';
+      _patientAuditLoaded = true;
+      return;
+    }
+
+    var actionLabels = {
+      'patient.create': '➕ إضافة',
+      'patient.edit': '✏️ تعديل',
+      'patient.delete': '🗑️ حذف',
+      'appointment.create': '📅 موعد جديد',
+      'appointment.edit': '✏️ تعديل موعد',
+      'appointment.status_change': '🔄 تغيير حالة',
+      'appointment.delete': '🗑️ حذف موعد',
+      'session.create': '🦷 جلسة جديدة',
+      'session.delete': '🗑️ حذف جلسة',
+      'payment.create': '💰 دفعة',
+      'payment.delete': '🗑️ حذف دفعة',
+      'lab.create': '🥽 طلب مخبر',
+      'lab.edit': '✏️ تعديل مخبر',
+      'lab.delete': '🗑️ حذف مخبر'
+    };
+    var roleLabels = { owner: 'المالك', doctor: 'طبيب', secretary: 'سكرتيرة' };
+
+    var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
+    rows.forEach(function(r){
+      var d = r.created_at ? new Date(r.created_at) : null;
+      var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+      var dateStr = d
+        ? (d.getDate() + ' ' + months[d.getMonth()] + ' • ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'))
+        : '—';
+      var actLabel = actionLabels[r.action_type] || r.action_type;
+      var roleLabel = roleLabels[r.employee_role_snapshot] || (r.employee_role_snapshot || '');
+      var alertBadge = r.is_alert
+        ? '<span style="display:inline-block;background:rgba(239,83,80,0.18);color:#ef5350;font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-right:6px;" title="' + escapeHtml(r.alert_reason || '') + '">⚠ تنبيه</span>'
+        : '';
+      var bg = r.is_alert ? 'rgba(239,83,80,0.06)' : 'var(--bg2)';
+      var bd = r.is_alert ? 'rgba(239,83,80,0.35)' : 'var(--border)';
+
+      html +=
+        '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 13px;display:flex;gap:10px;align-items:start;">' +
+          '<div style="font-size:11px;color:var(--text2);min-width:110px;direction:ltr;text-align:left;">' + escapeHtml(dateStr) + '</div>' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:13px;color:var(--text);margin-bottom:3px;">' +
+              alertBadge +
+              '<span style="font-weight:700;color:var(--green);">' + escapeHtml(actLabel) + '</span> · ' +
+              '<span>' + escapeHtml(r.description || '—') + '</span>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text2);">' +
+              '👤 ' + escapeHtml(r.employee_name_snapshot || '—') + ' (' + escapeHtml(roleLabel) + ')' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+    box.innerHTML = html;
+    _patientAuditLoaded = true;
+  } finally {
+    _patientAuditInFlight = false;
+  }
 }
 
 /* ── Bootstrap ── */
