@@ -315,12 +315,47 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   .two-col{grid-template-columns:1fr;}
   .tabs .tab{padding:9px 18px;font-size:13px;}
 }
+@media(max-width:820px){
+  /* Topbar: stack actions onto a new row so back-btn + 4 action buttons
+     don't overflow the right edge on phones (caught in user screenshot). */
+  .topbar{flex-wrap:wrap;}
+  .topbar-actions{width:100%;flex-wrap:wrap;gap:6px;}
+  .topbar-actions .btn{flex:1 1 auto;min-width:0;padding:8px 10px;font-size:12px;justify-content:center;}
+}
 @media(max-width:600px){
   .hcard{flex-direction:column;text-align:center;}
   .h-sub{justify-content:center;}
   .stats-row{flex-wrap:wrap;gap:10px;}
+  .stat-box{min-width:0;flex:1 1 calc(33.33% - 8px);padding:10px 8px;}
+  .stat-val{font-size:18px;}
   .form-row{grid-template-columns:1fr;}
   .data-table th:nth-child(3),.data-table td:nth-child(3){display:none;}
+  /* Modal: give back the lost width on small screens & let h3 ellipsize
+     so the close (×) button stays accessible and the box doesn't
+     stretch past the viewport. */
+  .modal-overlay{padding:10px;}
+  .modal-head{padding:14px 16px;gap:10px;}
+  .modal-head h3{font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .modal-body{padding:16px;}
+  .modal-foot{padding:12px 14px;gap:6px;flex-wrap:wrap;}
+  .modal-foot .btn-save-m,.modal-foot .btn-cancel-m,.modal-foot .btn-lab{flex:1 1 auto;padding:9px 12px;font-size:12px;}
+  /* Tighten the 3-col treatment picker grid so each card stays readable */
+  .tooth-opts{grid-template-columns:repeat(2,1fr);gap:8px;}
+  /* Status picker stays 2-col but reduce padding */
+  .status-opt{padding:9px 10px;font-size:12px;}
+  /* Tabs: keep horizontal scroll but reduce padding to fit more on screen */
+  .tabs .tab{padding:8px 14px;font-size:12px;}
+}
+@media(max-width:420px){
+  /* Very narrow phones (iPhone SE / 12 mini width): tighten the stat
+     numbers further so e.g. "1,800,000 ل.س" doesn't clip inside its
+     stat-box. Reducing font + nowrap is safer than letting it overflow. */
+  .stat-val{font-size:15px;}
+  .stat-box{padding:9px 6px;}
+  .stat-lbl{font-size:10px;}
+  .page{padding:12px;}
+  .hcard{padding:16px 14px;gap:12px;}
+  .h-name{font-size:20px;}
 }
 
 /* ── Custom hover tooltip (replaces native title attribute) ──
