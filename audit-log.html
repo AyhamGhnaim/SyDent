@@ -782,11 +782,65 @@ async function doArchive() {
 }
 
 // ── Export CSV ──
-function exportCSV() {
-  if (allLogs.length === 0) {
-    showToast('لا توجد سجلات لتصديرها', true);
-    return;
+// Phase 6 M (Obs T): Smart export — if more rows exist beyond what's
+// already loaded, prompt the user to either:
+//   (a) export only the loaded subset, or
+//   (b) load all remaining rows first, then export (slower but complete)
+// If the loaded set already contains everything (hasMore === false),
+// skip the prompt and export immediately.
+
+// Safety cap: never auto-load more than this many rows in a single export
+// to protect browser memory + Supabase rate limits. If exceeded, user is
+// told to use stricter date/employee/action filters.
+var EXPORT_MAX_ROWS = 5000;
+
+async function loadAllForExport() {
+  // Walks remaining pages (starting from current pageOffset) using the
+  // SAME filters as loadLogs(). Returns true on success, false on cap-hit
+  // or fetch error. Appends fetched rows into allLogs.
+  var range = getDateRange($('filterDate').value);
+  var employee = $('filterEmployee').value;
+  var action = $('filterAction').value;
+  var alertOnly = $('filterAlerts').value;
+  var offset = pageOffset;
+  var BATCH = 200; // larger than UI page size for speed
+  while (true) {
+    if (allLogs.length >= EXPORT_MAX_ROWS) {
+      showToast('⚠ تم بلوغ الحد الأقصى للتصدير (' + EXPORT_MAX_ROWS + ' سجل). استخدم فلاتر أضيق.', true);
+      return false;
+    }
+    var q = window.sb.from('audit_log')
+      .select('id, employee_id, employee_name_snapshot, employee_role_snapshot, action_type, entity_type, entity_id, patient_id, patient_name_snapshot, description, is_alert, alert_reason, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('is_archived', false);
+    if (range.from) q = q.gte('created_at', range.from);
+    if (employee !== 'all') q = q.eq('employee_id', employee);
+    if (action !== 'all') {
+      var actionList = ACTION_TYPES_BY_PREFIX[action] || [];
+      if (actionList.length > 0) q = q.in('action_type', actionList);
+    }
+    if (alertOnly === 'only') q = q.eq('is_alert', true);
+    q = q.order('created_at', { ascending: false }).range(offset, offset + BATCH - 1);
+    var res = await q;
+    if (res.error) {
+      console.error('loadAllForExport error:', res.error);
+      showToast('⚠ تعذّر تحميل بعض السجلات', true);
+      return false;
+    }
+    var batch = res.data || [];
+    if (batch.length === 0) break;
+    allLogs = allLogs.concat(batch);
+    offset += batch.length;
+    pageOffset = offset;
+    if (batch.length < BATCH) {
+      hasMore = false;
+      break;
+    }
   }
+  return true;
+}
+
+function writeCsvFromLoaded() {
   var headers = ['التاريخ والوقت', 'الموظف', 'الدور', 'نوع الإجراء', 'الوصف', 'المريض', 'تنبيه', 'سبب التنبيه'];
   var rows = [headers.join(',')];
   allLogs.forEach(function(row){
@@ -801,7 +855,7 @@ function exportCSV() {
       row.is_alert ? 'نعم' : 'لا',
       row.alert_reason || ''
     ];
-    // Escape quotes/commas
+    // Escape quotes/commas/newlines per RFC 4180
     var escaped = fields.map(function(f){
       var s = String(f).replace(/"/g, '""');
       return /[",\n]/.test(s) ? '"' + s + '"' : s;
@@ -819,6 +873,89 @@ function exportCSV() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast('✓ تم تصدير ' + allLogs.length + ' سجل');
+}
+
+function exportCSV() {
+  if (allLogs.length === 0) {
+    showToast('لا توجد سجلات لتصديرها', true);
+    return;
+  }
+  // If everything matching the current filters is already loaded → export now
+  if (!hasMore) {
+    writeCsvFromLoaded();
+    return;
+  }
+  // Otherwise warn the user — there are more rows on the server beyond
+  // what's currently visible in the page
+  openExportChoiceModal();
+}
+
+function openExportChoiceModal() {
+  // Build a lightweight inline modal (avoid pulling in a global modal lib)
+  var ex = document.getElementById('exportChoiceModal');
+  if (ex) ex.remove();
+  var ov = document.createElement('div');
+  ov.id = 'exportChoiceModal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;direction:rtl;font-family:\'Cairo\',sans-serif;';
+  ov.innerHTML =
+    '<div role="dialog" aria-modal="true" aria-labelledby="expChoiceTitle" style="background:#0f1f35;border:1px solid #1e3556;border-radius:14px;padding:22px;max-width:480px;width:100%;color:#e7eef9;box-shadow:0 20px 60px rgba(0,0,0,0.5);">' +
+      '<h3 id="expChoiceTitle" style="margin:0 0 10px;font-size:17px;">📥 تصدير سجل النشاطات</h3>' +
+      '<p style="margin:0 0 16px;color:#8da0bd;font-size:13px;line-height:1.7;">' +
+        'الصفحة تعرض حالياً <strong style="color:#e7eef9;">' + allLogs.length + '</strong> سجل، ' +
+        'لكن يوجد سجلات إضافية متطابقة مع الفلاتر لم تُحمَّل بعد. اختر طريقة التصدير:' +
+      '</p>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">' +
+        '<button type="button" id="expBtnLoaded" style="background:#142a45;border:1px solid #1e3556;color:#e7eef9;padding:12px;border-radius:8px;font-family:inherit;font-size:13px;text-align:right;cursor:pointer;">' +
+          '<strong>📄 تصدير المحمّل فقط</strong> — ' + allLogs.length + ' سجل (سريع)' +
+        '</button>' +
+        '<button type="button" id="expBtnAll" style="background:#1a3a2b;border:1px solid #2ee89e;color:#2ee89e;padding:12px;border-radius:8px;font-family:inherit;font-size:13px;text-align:right;cursor:pointer;">' +
+          '<strong>📦 تحميل الكل ثم تصدير</strong> — كل السجلات المطابقة (حتى ' + EXPORT_MAX_ROWS + ' سجل، أبطأ)' +
+        '</button>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:8px;">' +
+        '<button type="button" id="expBtnCancel" style="background:transparent;border:1px solid #1e3556;color:#8da0bd;padding:8px 16px;border-radius:8px;font-family:inherit;font-size:13px;cursor:pointer;">إلغاء</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(ov);
+
+  // Capture focus state for restore on close
+  var prevFocus = document.activeElement;
+
+  function closeChoice() {
+    document.removeEventListener('keydown', escHandler);
+    ov.remove();
+    try { if (prevFocus && document.body.contains(prevFocus)) prevFocus.focus(); } catch (e) {}
+  }
+  var escHandler = function(e){
+    if (e.key === 'Escape' || e.keyCode === 27) closeChoice();
+  };
+  document.addEventListener('keydown', escHandler);
+
+  $('expBtnCancel').onclick = closeChoice;
+  ov.addEventListener('click', function(e){ if (e.target === ov) closeChoice(); });
+
+  // Option A: export only what's loaded
+  $('expBtnLoaded').onclick = function(){
+    closeChoice();
+    writeCsvFromLoaded();
+  };
+
+  // Option B: load all remaining pages, then export
+  $('expBtnAll').onclick = async function(){
+    var btn = $('expBtnAll');
+    btn.disabled = true;
+    btn.innerHTML = '<strong>⏳ جارٍ التحميل…</strong>';
+    var ok = await loadAllForExport();
+    closeChoice();
+    if (ok && allLogs.length > 0) {
+      renderLogs(); // refresh visible list so the UI matches the export
+      $('loadMoreBtn').style.display = hasMore ? 'block' : 'none';
+      writeCsvFromLoaded();
+    }
+  };
+
+  // Focus the safer "loaded only" option by default
+  setTimeout(function(){ var b = $('expBtnLoaded'); if (b) b.focus(); }, 50);
 }
 
 // ── Init ──
