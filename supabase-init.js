@@ -1433,6 +1433,57 @@
   // Expose globally for convenience (every page can call window.logAudit directly)
   window.logAudit = logAudit;
 
+  // ═══════════════════════════════════════════════════════════════
+  // Phase 6 M (Obs E): Shared appointment migration-detection helpers
+  // ═══════════════════════════════════════════════════════════════
+  // Both appointments.html (saveAppt) and patient-profile.html (saveAppt)
+  // need to detect "Gap 7 migration not applied" errors and fall back
+  // to a legacy-row insert. Pre-Phase-6, both files defined IDENTICAL
+  // copies of isPlannedMigrationMissing() and buildLegacyRow(). This
+  // helper hoists them to a single source of truth without changing
+  // any retry orchestration (those remain page-specific because their
+  // surrounding state — editingId, autofill fields, no-show fees —
+  // differs).
+  //
+  // Usage in any page:
+  //   if (SyDentAppt.isPlannedMigrationMissing(err)) {
+  //     var legacy = SyDentAppt.buildLegacyRow(apptData);
+  //     // retry with legacy ...
+  //   }
+  //
+  // Behavior is byte-for-byte equivalent to the previous inline copies.
+  function _apptIsPlannedMigrationMissing(err) {
+    if (!err) return false;
+    var emsg = (err.message || '').toLowerCase();
+    var code = err.code || '';
+    var isPlannedCol = emsg.indexOf('is_planned') !== -1;
+    var notNullDate  = /violates not-null constraint.*"(date|time)"/i.test(err.message || '');
+    var schedHasDate = emsg.indexOf('scheduled_has_date') !== -1;
+    if (isPlannedCol && (code === '42703' || code === 'PGRST204' || emsg.indexOf('does not exist') !== -1 || emsg.indexOf('schema cache') !== -1)) return true;
+    if (notNullDate || schedHasDate) return true;
+    return false;
+  }
+
+  function _apptBuildLegacyRow(src) {
+    var row = Object.assign({}, src);
+    delete row.is_planned;
+    // Today's date in YYYY-MM-DD — matches the existing toDay() format.
+    // Inlined here because supabase-init.js doesn't import page helpers.
+    var t = new Date();
+    var yyyy = t.getFullYear();
+    var mm = String(t.getMonth() + 1).padStart(2, '0');
+    var dd = String(t.getDate()).padStart(2, '0');
+    var today = yyyy + '-' + mm + '-' + dd;
+    if (row.date === null) row.date = today;
+    if (row.time === null) row.time = '12:00';
+    return row;
+  }
+
+  window.SyDentAppt = {
+    isPlannedMigrationMissing: _apptIsPlannedMigrationMissing,
+    buildLegacyRow: _apptBuildLegacyRow
+  };
+
   // ── Public API ────────────────────────────────────────────────
   window.SyDentLock = {
     // state

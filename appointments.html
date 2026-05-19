@@ -3511,7 +3511,12 @@ async function submitAppt(e) {
   //   - PGRST204: schema cache miss for the column
   //   - 23514  : check constraint violation (e.g. scheduled_has_date for legacy rows)
   // When this fires we strip is_planned/null-date/null-time and retry.
+  // Phase 6 M (Obs E): delegates to the shared SyDentAppt namespace
+  // (supabase-init.js). Local fallback kept for robustness — same logic.
   function isPlannedMigrationMissing(err) {
+    if (window.SyDentAppt && window.SyDentAppt.isPlannedMigrationMissing) {
+      return window.SyDentAppt.isPlannedMigrationMissing(err);
+    }
     if (!err) return false;
     var msg = (err.message || '').toLowerCase() + ' ' + (err.code || '');
     var isPlannedCol = msg.indexOf('is_planned') !== -1;

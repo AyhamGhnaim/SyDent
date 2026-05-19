@@ -6376,7 +6376,13 @@ async function saveAppt() {
 
   // Gap 7: detect "is_planned column missing / NOT NULL on date|time" errors
   // so we can transparently fall back to a legacy insert.
+  // Phase 6 M (Obs E): delegates to the shared SyDentAppt namespace
+  // (supabase-init.js). Local fallback definitions kept for robustness
+  // in case supabase-init.js failed to load — same byte-for-byte logic.
   function isPlannedMigrationMissing(err) {
+    if (window.SyDentAppt && window.SyDentAppt.isPlannedMigrationMissing) {
+      return window.SyDentAppt.isPlannedMigrationMissing(err);
+    }
     if (!err) return false;
     var emsg = (err.message || '').toLowerCase();
     var code = err.code || '';
@@ -6388,6 +6394,9 @@ async function saveAppt() {
     return false;
   }
   function buildLegacyRow(src) {
+    if (window.SyDentAppt && window.SyDentAppt.buildLegacyRow) {
+      return window.SyDentAppt.buildLegacyRow(src);
+    }
     var row = Object.assign({}, src);
     delete row.is_planned;
     if (row.date === null) row.date = toDay();
