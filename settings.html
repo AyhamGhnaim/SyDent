@@ -2166,7 +2166,8 @@ async function removeLockPin() {
     if (res.error) throw res.error;
     window.SyDentLock.invalidatePinCache();
     // Reset to owner mode on this device (no more lock to enforce)
-    window.SyDentLock.applyRole('owner');
+    // Phase 5: also clear employee_id (lock fully disabled, no identity tracked)
+    window.SyDentLock.applyRole('owner', null, null);
     if (oldEl) oldEl.value = '';
     setMsg('✅ تم حذف الـ PIN', true);
     showToast('✅ تم حذف الـ PIN، الجهاز الآن في وضع المالك');

@@ -285,6 +285,35 @@
     return { ok: false, reason: 'wrong', failsLeft: MAX_FAILS - fails };
   }
 
+  // ── Phase 5: Verify a specific employee's PIN ────────────────
+  // Used by the new per-employee lock modal. Each employee has their
+  // own pin_hash in clinic_employees. This function verifies against
+  // THAT employee's hash, not the clinic-wide one.
+  // Returns same shape as verifyPin() for UI consistency.
+  // Rate limiting is shared (same fail count regardless of which employee).
+  async function verifyEmployeePin(employee, pin) {
+    if (isInCooldown()) {
+      return { ok: false, reason: 'cooldown', secondsLeft: cooldownSecondsLeft() };
+    }
+    if (!employee || !employee.pin_hash) {
+      return { ok: false, reason: 'no_pin_set' };
+    }
+    var pinStr = String(pin || '').trim();
+    if (!/^\d{4,6}$/.test(pinStr)) {
+      return { ok: false, reason: 'invalid_format' };
+    }
+    var inputHash = await hashPin(pinStr);
+    if (inputHash === employee.pin_hash) {
+      resetFails();
+      return { ok: true };
+    }
+    var fails = recordFail();
+    if (fails >= MAX_FAILS) {
+      return { ok: false, reason: 'cooldown', secondsLeft: cooldownSecondsLeft() };
+    }
+    return { ok: false, reason: 'wrong', failsLeft: MAX_FAILS - fails };
+  }
+
   // ── Apply a role transition (after PIN check, if any) ─────────
   // Phase 5: now also accepts employeeId. If provided, stored in localStorage.
   // Backward compat: if employeeId is undefined, the old value is preserved
@@ -537,8 +566,26 @@
     btn.className = 'sd-lock-btn sd-' + role;
     var label = ROLE_LABELS[role] || role;
     var icon  = ROLE_ICONS[role]  || '🔒';
-    // For doctor mode, append name if loaded — also detect deactivation
-    if (role === 'doctor' && _doctorsListCache) {
+
+    // Phase 5: if we have a specific employee identity locked in, prefer that name
+    var empId = getEmployeeId();
+    if (empId && _employeesListCache) {
+      var emp = (_employeesListCache || []).find(function(e){ return e.id === empId; });
+      if (emp && emp.name) {
+        // Active employee → show their name + role icon
+        label = emp.name;
+        icon = ROLE_ICONS[emp.role] || icon;
+      } else if (_allEmployeesListCache) {
+        // Employee might be deactivated → name recovery
+        var empAny = (_allEmployeesListCache || []).find(function(e){ return e.id === empId; });
+        if (empAny && empAny.name) {
+          label = empAny.name + ' (معطّل)';
+          icon = ROLE_ICONS[empAny.role] || icon;
+          inactive = true;
+        }
+      }
+    } else if (role === 'doctor' && _doctorsListCache) {
+      // Legacy fallback: device locked to a doctor but no employee_id yet
       var did = getDoctorId();
       var d = (_doctorsListCache || []).find(function(x){ return x.id === did; });
       if (d && d.name) {
@@ -553,7 +600,7 @@
       }
     }
     if (inactive) {
-      // Red accent overlay for inactive doctor
+      // Red accent overlay for inactive doctor/employee
       btn.style.borderColor = '#ef5350';
       btn.style.background = 'rgba(239,83,80,0.14)';
       btn.style.color = '#ef5350';
@@ -562,12 +609,298 @@
       btn.style.background = '';
       btn.style.color = '';
     }
-    // Escape label to prevent XSS via doctor names (defense per قاعدة #14)
+    // Escape label to prevent XSS via doctor/employee names (defense per قاعدة #14)
     btn.innerHTML = '<span>' + escapeHtmlLock(icon) + '</span><span>' + escapeHtmlLock(label) + '</span>';
   }
 
   // ── Switch modal ──────────────────────────────────────────────
+  // Phase 5: employee-aware modal. Lists each employee by NAME (not role),
+  // and verifies that employee's own pin_hash. Falls back to legacy
+  // role-picker if no employees are present (Migration 9.1 not run).
   async function openSwitchModal() {
+    injectCSS();
+    var employees = await loadEmployees();
+
+    // If no employees → legacy modal (backward compat for fresh installs
+    // pre-Phase 5 migration). This path uses the old role-picker UI.
+    if (!employees || employees.length === 0) {
+      return openSwitchModalLegacy();
+    }
+
+    var curRole = getRole();
+    var curDoctorId = getDoctorId();
+    var curEmployeeId = getEmployeeId();
+    var hasPinSet = !!(await loadPinHash());
+
+    // Remove any existing modal
+    var ex = document.getElementById('sdLockModal');
+    if (ex) ex.remove();
+
+    var ov = document.createElement('div');
+    ov.id = 'sdLockModal';
+    ov.className = 'sd-lock-modal-overlay';
+
+    // Sort: owner first, then doctors, then secretaries; alpha within group
+    var sorted = employees.slice().sort(function(a, b){
+      var rank = { owner: 1, doctor: 2, secretary: 3 };
+      var ra = rank[a.role] || 99, rb = rank[b.role] || 99;
+      if (ra !== rb) return ra - rb;
+      return String(a.name).localeCompare(String(b.name), 'ar');
+    });
+
+    // Determine which one is currently active in the device.
+    // Priority:
+    //   1. exact employee_id match (Phase 5 mode)
+    //   2. backward compat for legacy devices (no employee_id):
+    //      - role=doctor → match by doctor_id
+    //      - role=owner → match the one owner record (UNIQUE constraint guarantees)
+    //      - role=secretary → ambiguous (multiple secretaries possible); resolve to
+    //        FIRST secretary in alpha order to avoid double-selection in UI
+    var _legacySecretaryClaimedId = null;
+    function isCurrent(emp) {
+      if (curEmployeeId && emp.id === curEmployeeId) return true;
+      if (curEmployeeId) return false; // employee_id set but doesn't match
+      // Backward compat: no employee_id yet
+      if (emp.role !== curRole) return false;
+      if (emp.role === 'doctor') return emp.doctor_id === curDoctorId;
+      if (emp.role === 'owner') return true; // single owner per clinic (UNIQUE)
+      // secretary: claim only the first one encountered (sorted alpha)
+      if (emp.role === 'secretary') {
+        if (_legacySecretaryClaimedId === null) {
+          _legacySecretaryClaimedId = emp.id;
+          return true;
+        }
+        return emp.id === _legacySecretaryClaimedId;
+      }
+      return false;
+    }
+
+    var optionsHtml = '';
+    sorted.forEach(function(emp){
+      var current = isCurrent(emp);
+      var icon = ROLE_ICONS[emp.role] || '👤';
+      var roleLabel = ROLE_LABELS[emp.role] || emp.role;
+      var hasPinForThisEmployee = !!emp.pin_hash;
+      var pinWarn = (!hasPinForThisEmployee)
+        ? '<span style="color:#f5c842;font-size:11px;margin-right:6px;">⚠ بدون PIN</span>'
+        : '';
+      optionsHtml +=
+        '<label class="sd-opt' + (current ? ' sd-active' : '') + '" data-employee-id="' + escapeHtmlLock(emp.id) + '">' +
+          '<input type="radio" name="sdEmpSel" value="' + escapeHtmlLock(emp.id) + '"' + (current ? ' checked' : '') + '>' +
+          '<span style="font-weight:800;">' + icon + ' ' + escapeHtmlLock(emp.name) + '</span>' +
+          '<span style="color:#8a9ab5;font-size:11px;margin-right:8px;">' + escapeHtmlLock(roleLabel) + '</span>' +
+          pinWarn +
+        '</label>';
+    });
+
+    // Current employee display
+    var curEmp = sorted.find(isCurrent);
+    var curDisplay = curEmp
+      ? ((ROLE_ICONS[curEmp.role] || '') + ' ' + curEmp.name + ' (' + (ROLE_LABELS[curEmp.role] || curEmp.role) + ')')
+      : ((ROLE_ICONS[curRole] || '') + ' ' + (ROLE_LABELS[curRole] || curRole));
+
+    ov.innerHTML =
+      '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الموظف">' +
+        '<h3>🔓 تبديل الموظف</h3>' +
+        '<div class="sd-cur">الموظف الحالي: ' + escapeHtmlLock(curDisplay) + '</div>' +
+        optionsHtml +
+        '<div class="sd-pin-row" id="sdPinRow" style="display:none;">' +
+          '<label>أدخل رقم سرّ الموظف:</label>' +
+          '<input type="password" inputmode="numeric" maxlength="6" id="sdPinInput" autocomplete="off">' +
+          '<div class="sd-msg" id="sdPinMsg"></div>' +
+        '</div>' +
+        '<div class="sd-msg" id="sdMsg" style="margin-top:4px;"></div>' +
+        '<div class="sd-actions">' +
+          '<button type="button" class="sd-btn sd-btn-cancel" id="sdBtnCancel">إلغاء</button>' +
+          '<button type="button" class="sd-btn sd-btn-primary" id="sdBtnConfirm">تبديل</button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(ov);
+
+    // ── Event wiring ──
+    var radios = ov.querySelectorAll('input[name="sdEmpSel"]');
+
+    function getSelectedEmployee() {
+      var checked = ov.querySelector('input[name="sdEmpSel"]:checked');
+      if (!checked) return null;
+      return sorted.find(function(e){ return e.id === checked.value; }) || null;
+    }
+
+    function updateActive() {
+      ov.querySelectorAll('.sd-opt').forEach(function(opt){
+        var checked = opt.querySelector('input').checked;
+        opt.classList.toggle('sd-active', checked);
+      });
+
+      var target = getSelectedEmployee();
+      var pinRow = ov.querySelector('#sdPinRow');
+      var msg = ov.querySelector('#sdMsg');
+      var confirmBtn = ov.querySelector('#sdBtnConfirm');
+
+      if (!target) {
+        pinRow.style.display = 'none';
+        return;
+      }
+
+      // Determine if PIN is needed using employee-level hierarchy:
+      // - Selecting the SAME employee = no-op = no PIN
+      // - Owner role → ANY other = downgrade or sibling-downgrade = no PIN (owner already supreme)
+      // - Anything else → PIN required (which means PIN of the TARGET employee)
+      // - If lock not configured (no PINs anywhere) → free
+      var sameEmp = isCurrent(target);
+      var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
+
+      var needPin;
+      if (sameEmp) {
+        needPin = false;
+      } else if (!lockConfigured) {
+        needPin = false; // no PINs set anywhere yet
+      } else if (curRole === 'owner') {
+        needPin = false; // owner can switch freely (downgrade)
+      } else {
+        needPin = true;
+      }
+
+      // Edge case: target has NO pin_hash set yet → can't verify
+      if (needPin && !target.pin_hash) {
+        msg.textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد. اطلب من المالك إعداده.';
+        msg.className = 'sd-msg';
+        pinRow.style.display = 'none';
+        confirmBtn.disabled = true;
+        return;
+      }
+
+      pinRow.style.display = needPin ? 'block' : 'none';
+
+      if (isInCooldown()) {
+        msg.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + cooldownSecondsLeft() + ' ثانية.';
+        msg.className = 'sd-msg';
+        confirmBtn.disabled = true;
+      } else if (!lockConfigured) {
+        msg.textContent = 'ℹ️ القفل غير مفعّل. يمكن التبديل بحرية. لتفعيل القفل، عيّن رقم سر من صفحة الموظفين.';
+        msg.className = 'sd-msg sd-ok';
+        confirmBtn.disabled = false;
+      } else {
+        msg.textContent = '';
+        confirmBtn.disabled = false;
+      }
+    }
+
+    radios.forEach(function(r){ r.addEventListener('change', updateActive); });
+
+    // Click row → select radio
+    ov.querySelectorAll('.sd-opt').forEach(function(opt){
+      opt.addEventListener('click', function(e){
+        if (e.target.tagName === 'INPUT') return;
+        var input = opt.querySelector('input[type=radio]');
+        input.checked = true;
+        updateActive();
+      });
+    });
+
+    // Esc key closes the modal
+    var escHandler = function(e){
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        ov.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+
+    function closeModal() {
+      document.removeEventListener('keydown', escHandler);
+      ov.remove();
+    }
+
+    ov.querySelector('#sdBtnCancel').addEventListener('click', closeModal);
+    ov.addEventListener('click', function(e){ if (e.target === ov) closeModal(); });
+
+    var _switchInFlight = false;
+    ov.querySelector('#sdBtnConfirm').addEventListener('click', async function(){
+      if (_switchInFlight) return;
+      _switchInFlight = true;
+      var confirmBtn = ov.querySelector('#sdBtnConfirm');
+      confirmBtn.disabled = true;
+      try {
+        var target = getSelectedEmployee();
+        if (!target) {
+          ov.querySelector('#sdMsg').textContent = 'اختر موظفاً أولاً.';
+          return;
+        }
+
+        // No-op? Just close.
+        if (isCurrent(target)) {
+          closeModal();
+          return;
+        }
+
+        // PIN logic same as updateActive
+        var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
+        var needPin = false;
+        if (!lockConfigured) {
+          needPin = false;
+        } else if (curRole === 'owner') {
+          needPin = false;
+        } else {
+          needPin = true;
+        }
+
+        if (needPin) {
+          if (!target.pin_hash) {
+            ov.querySelector('#sdMsg').textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد.';
+            return;
+          }
+          var pin = (ov.querySelector('#sdPinInput').value || '').trim();
+          var ver = await verifyEmployeePin(target, pin);
+          if (!ver.ok) {
+            var pm = ov.querySelector('#sdPinMsg');
+            if (ver.reason === 'cooldown') {
+              pm.textContent = '⏳ تم تجاوز عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية.';
+            } else if (ver.reason === 'no_pin_set') {
+              pm.textContent = '⚠ لم يتم تعيين رقم سر لهذا الموظف.';
+            } else if (ver.reason === 'invalid_format') {
+              pm.textContent = 'رقم السر يجب أن يكون 4-6 أرقام.';
+            } else if (ver.reason === 'wrong') {
+              pm.textContent = '❌ رقم سر خاطئ. متبقّي ' + (ver.failsLeft || 0) + ' محاولات.';
+            }
+            return;
+          }
+        }
+
+        // Apply: role + doctor_id derived from the employee
+        var newDoctorId = (target.role === 'doctor') ? (target.doctor_id || null) : null;
+        applyRole(target.role, newDoctorId, target.id);
+
+        // Log to audit before reload (best effort, fire-and-forget)
+        try {
+          await logAudit('lock.role_switch', {
+            entityId: target.id,
+            description: 'تبديل إلى الموظف: ' + target.name + ' (' + (ROLE_LABELS[target.role] || target.role) + ')',
+            oldValue: { role: curRole, doctor_id: curDoctorId, employee_id: curEmployeeId },
+            newValue: { role: target.role, doctor_id: newDoctorId, employee_id: target.id }
+          });
+        } catch (e) { /* ignore */ }
+
+        closeModal();
+        window.location.reload();
+      } finally {
+        _switchInFlight = false;
+        if (confirmBtn && document.body.contains(confirmBtn)) confirmBtn.disabled = false;
+      }
+    });
+
+    updateActive();
+    setTimeout(function(){
+      var pi = ov.querySelector('#sdPinInput');
+      if (pi && pi.offsetParent) pi.focus();
+    }, 80);
+  }
+
+  // ── Legacy modal (pre-Phase 5 fallback) ──
+  // Used only when clinic_employees is empty (Migration 9.1 not run).
+  // Same behavior as the original Phase 4 modal: 3 role radios + PIN.
+  async function openSwitchModalLegacy() {
     injectCSS();
     var doctors = await loadDoctors();
     var curRole = getRole();
@@ -624,12 +957,9 @@
     var radios = ov.querySelectorAll('input[name="sdRoleSel"]');
     function updateActive() {
       ov.querySelectorAll('.sd-opt').forEach(function(opt){
-        var r = opt.getAttribute('data-role');
         var checked = opt.querySelector('input').checked;
         opt.classList.toggle('sd-active', checked);
       });
-      // PIN visibility — based on the *current* requirePin decision
-      // (which itself respects whether a PIN is set in DB)
       var targetRole = ov.querySelector('input[name="sdRoleSel"]:checked').value;
       var targetDocId = (targetRole === 'doctor') ? ov.querySelector('#sdDoctorSel') && ov.querySelector('#sdDoctorSel').value : null;
       var need = requirePin(targetRole, targetDocId);
@@ -643,7 +973,6 @@
         msg.className = 'sd-msg';
         confirmBtn.disabled = true;
       } else if (!hasPinSet) {
-        // Lock not yet configured — show informational hint (not an error)
         msg.textContent = 'ℹ️ القفل غير مفعّل (لا يوجد PIN). يمكن التبديل بحرية. لتفعيل القفل، عيّن PIN من الإعدادات.';
         msg.className = 'sd-msg sd-ok';
         confirmBtn.disabled = false;
@@ -656,7 +985,6 @@
     var docSel = ov.querySelector('#sdDoctorSel');
     if (docSel) docSel.addEventListener('change', updateActive);
 
-    // Click row → select radio
     ov.querySelectorAll('.sd-opt').forEach(function(opt){
       opt.addEventListener('click', function(e){
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION') return;
@@ -666,7 +994,6 @@
       });
     });
 
-    // Esc key closes the modal (declared early so all close handlers can clean up)
     var escHandler = function(e){
       if (e.key === 'Escape' || e.keyCode === 27) {
         ov.remove();
@@ -683,7 +1010,7 @@
     ov.querySelector('#sdBtnCancel').addEventListener('click', closeModal);
     ov.addEventListener('click', function(e){ if (e.target === ov) closeModal(); });
 
-    var _switchInFlight = false;  // prevent spam-clicking confirm during async verify
+    var _switchInFlight = false;
     ov.querySelector('#sdBtnConfirm').addEventListener('click', async function(){
       if (_switchInFlight) return;
       _switchInFlight = true;
@@ -695,19 +1022,15 @@
         if (targetRole === 'doctor') {
           var sel = ov.querySelector('#sdDoctorSel');
           if (!sel || !sel.value) {
-            var m = ov.querySelector('#sdMsg');
-            m.textContent = 'اختر طبيباً أولاً.';
+            ov.querySelector('#sdMsg').textContent = 'اختر طبيباً أولاً.';
             return;
           }
           targetDocId = sel.value;
         }
-
-        // No-op? Just close.
         if (targetRole === getRole() && (targetRole !== 'doctor' || targetDocId === getDoctorId())) {
           closeModal();
           return;
         }
-
         var need = requirePin(targetRole, targetDocId);
         if (need) {
           var pin = (ov.querySelector('#sdPinInput').value || '').trim();
@@ -726,13 +1049,10 @@
             return;
           }
         }
-
         applyRole(targetRole, targetDocId);
         closeModal();
-        // Reload to apply guards page-wide
         window.location.reload();
       } finally {
-        // If we didn't redirect, re-enable the button
         _switchInFlight = false;
         if (confirmBtn && document.body.contains(confirmBtn)) confirmBtn.disabled = false;
       }
@@ -834,7 +1154,11 @@
     }
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
-    loadEmployees();  // Phase 5: preload for logAudit + lock modal
+    // Phase 5: also preload employees, then re-render header button
+    // (header may have been rendered with role-only label before employees loaded)
+    loadEmployees().then(function(){
+      refreshHeaderButton();
+    });
     loadDoctors().then(function(){
       refreshHeaderButton();
       // Phase 4.1: check if locked doctor is still active, apply inactive UI if not
@@ -941,6 +1265,7 @@
     // pin
     hashPin: hashPin,
     verifyPin: verifyPin,
+    verifyEmployeePin: verifyEmployeePin,
     loadPinHash: loadPinHash,
     savePinHash: savePinHash,
     invalidatePinCache: invalidatePinCache,
