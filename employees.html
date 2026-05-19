@@ -808,12 +808,19 @@ async function saveOwnerPin() {
   // Page guard: Owner only
   if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
 
-  // Initialize sidebar (uses 'employees' as the active nav item)
-  if (typeof initSidebar === 'function') initSidebar('employees');
-
   await loadData();
   renderList();
 })();
+
+// Pull-to-refresh handler (called by sidebar.js on mobile pull)
+window.onPTRRefresh = async function() {
+  if (!currentUser) return;
+  await loadData();
+  renderList();
+};
+
+// Initialize sidebar (synchronous; injects nav + PTR + hamburger CSS)
+initSidebar('employees');
 
 // زر hamburger للـ topbar
 document.addEventListener('DOMContentLoaded', function() {
