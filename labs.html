@@ -637,7 +637,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
       </div>
       <div class="cards-list" id="ordersCards"></div>
       <div id="emptyState" style="display:none;" class="empty">
-        <div class="empty-icon">🦷</div>
+        <div class="empty-icon">🥽</div>
         <div class="empty-text">لا توجد طلبات مخابر</div>
         <div class="empty-sub">ابدأ بإضافة أول طلب من زر "طلب جديد"</div>
       </div>
@@ -650,7 +650,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
 <div class="modal-overlay" id="labOrderModal">
   <div class="modal">
     <div class="modal-head">
-      <h3 id="labOrderTitle"><span class="silver-tooth">🦷</span> طلب مخبر جديد</h3>
+      <h3 id="labOrderTitle">🥽 طلب مخبر جديد</h3>
       <button class="modal-close" onclick="closeModal('labOrderModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1273,7 +1273,7 @@ function onLabOrderAppointmentChange() {
 
 /* CRUD: Lab Orders */
 function openLabOrderModal() {
-  document.getElementById('labOrderTitle').textContent = '🦷 طلب مخبر جديد';
+  document.getElementById('labOrderTitle').textContent = '🥽 طلب مخبر جديد';
   document.getElementById('labOrderId').value = '';
   populatePatientSelect();
   populateWorkTypeSelect();
@@ -1309,7 +1309,7 @@ async function editLabOrder(id) {
     } catch(e) { console.warn('fetch linked appt:', e); fetchFailed = true; }
   }
 
-  document.getElementById('labOrderTitle').textContent = '🦷 تعديل طلب المخبر';
+  document.getElementById('labOrderTitle').textContent = '🥽 تعديل طلب المخبر';
   document.getElementById('labOrderId').value = lo.id;
   populatePatientSelect(lo.patient_id);
   populateWorkTypeSelect(lo.treatment_key);
