@@ -312,6 +312,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-footer">
       <button type="button" class="btn btn-outline" onclick="closeOwnerModal()">إلغاء</button>
+      <button type="button" class="btn" id="removeLockBtn" onclick="removeAllLockPins()" style="background:transparent;border:1px solid rgba(239,83,80,0.45);color:#ef5350;display:none;">🗑 تعطيل قفل العيادة</button>
       <button type="button" class="btn btn-primary" id="saveOwnerBtn" onclick="saveOwnerPin()">حفظ</button>
     </div>
   </div>
@@ -751,6 +752,14 @@ function openOwnerPinModal() {
   $('oNewPin').value = '';
   $('oNewPinConfirm').value = '';
   clearMsg('ownerMsg');
+  // Phase 6 M (Obs U): show the 'disable clinic lock' button only when
+  // the Owner already has a PIN (i.e. lock is currently configured).
+  // For fresh installs with no PIN, hide it (nothing to disable).
+  var rmBtn = $('removeLockBtn');
+  if (rmBtn) {
+    var ownerEmp = employees.find(function(e){ return e.role === 'owner'; });
+    rmBtn.style.display = (ownerEmp && ownerEmp.pin_hash) ? 'inline-block' : 'none';
+  }
   $('ownerPinModal').classList.add('show');
   setTimeout(function(){ $('oNewPin').focus(); }, 80);
 }
@@ -815,6 +824,63 @@ async function saveOwnerPin() {
   } finally {
     btn.disabled = false;
     btn.textContent = 'حفظ';
+  }
+}
+
+// Phase 6 M (Obs U): port of the old removeLockPin from settings.html.
+// Disables clinic-wide lock by clearing pin_hash on ALL employees AND
+// nulling clinic_settings.lock_pin_hash. After this, devices switch to
+// 'no PIN required' mode (Owner can still demote roles freely).
+async function removeAllLockPins() {
+  if (!confirm('تعطيل قفل العيادة سيحذف رقم السر لكل الموظفين وسيُعاد فتح كل الأجهزة بدون قيود.\n\nهل أنت متأكد؟')) return;
+
+  var rmBtn = $('removeLockBtn');
+  var saveBtn = $('saveOwnerBtn');
+  if (rmBtn) { rmBtn.disabled = true; rmBtn.textContent = '... جارٍ التعطيل'; }
+  if (saveBtn) saveBtn.disabled = true;
+  clearMsg('ownerMsg');
+
+  try {
+    // 1. Clear pin_hash on every employee row (per-employee PINs all gone)
+    var resEmp = await window.sb.from('clinic_employees')
+      .update({ pin_hash: null })
+      .eq('owner_id', currentUser.id);
+    if (resEmp.error) {
+      showMsg('ownerMsg', 'فشل حذف الـ PINs', true);
+      console.error(resEmp.error);
+      return;
+    }
+
+    // 2. Null clinic_settings.lock_pin_hash (the mirror SyDentLock reads from)
+    await window.sb.from('clinic_settings')
+      .update({ lock_pin_hash: null })
+      .eq('owner_id', currentUser.id);
+
+    // 3. Invalidate cache + reset THIS device to owner mode (no enforcement)
+    if (window.SyDentLock) {
+      if (window.SyDentLock.invalidatePinCache) window.SyDentLock.invalidatePinCache();
+      if (window.SyDentLock.applyRole) window.SyDentLock.applyRole('owner', null, null);
+    }
+
+    // 4. Audit log (security-relevant event)
+    await window.logAudit('lock.pin_clear', {
+      description: 'تعطيل قفل العيادة (حذف كل أرقام السر)',
+      oldValue: { pin_was_set: true }
+    });
+
+    showToast('✓ تم تعطيل قفل العيادة');
+    closeOwnerModal();
+    await loadData();
+    renderList();
+    if (window.SyDentLock && window.SyDentLock.refreshHeaderButton) {
+      window.SyDentLock.refreshHeaderButton();
+    }
+  } catch(err) {
+    showMsg('ownerMsg', 'فشل التعطيل: ' + (err && err.message || ''), true);
+    console.error(err);
+  } finally {
+    if (rmBtn) { rmBtn.disabled = false; rmBtn.textContent = '🗑 تعطيل قفل العيادة'; }
+    if (saveBtn) saveBtn.disabled = false;
   }
 }
 

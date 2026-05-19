@@ -396,9 +396,10 @@ var stats = { total: 0, today: 0, week: 0, alerts: 0 };
 // Phase 5 audit (post-cleanup): only action_types actually emitted by the code are listed.
 // Removed dead types: doctor.toggle_active (Phase 5G removed the feature),
 // session.edit / payment.edit / settings.edit (no edit feature in app),
-// lock.pin_set / lock.pin_clear were unused before — now lock.pin_clear is emitted
-// by removeLockPin in settings.html. settings.change_pin is emitted by both
-// employees.html (Owner PIN) and settings.html (clinic-wide PIN).
+// lock.pin_set is unused. After Phase 6 M (Obs U, commit C4), PIN management
+// is unified in employees.html — both lock.pin_clear and settings.change_pin
+// now originate from employees.html (saveOwnerPin / removeOwnerPin). The
+// settings.html lock section is now just a deep-link card.
 var ACTION_TYPES_BY_PREFIX = {
   patient:     ['patient.create', 'patient.edit', 'patient.delete'],
   appointment: ['appointment.create', 'appointment.edit', 'appointment.status_change', 'appointment.bulk_complete', 'appointment.delete'],

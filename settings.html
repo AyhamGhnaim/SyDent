@@ -393,7 +393,7 @@ textarea::placeholder { color: var(--text2); }
 
     <!-- 1.55 قفل الجهاز — Phase 4 (Owner only via data-role-block; non-owners hidden via JS guard) -->
     <div class="section" id="lockSection" data-role-block="doctor secretary">
-      <div class="section-title">🔒 قفل الجهاز</div>
+      <div class="section-title">🔒 قفل الجهاز و PIN</div>
       <div class="section-sub">
         قفل اختياري لتقييد صلاحيات الأجهزة بعد توزيع PIN. كل جهاز يبدأ بوضع <strong>المالك</strong>،
         ويمكن تبديله محلياً (Secretary/Doctor) لمنع الوصول للأقسام الحساسة.
@@ -401,38 +401,21 @@ textarea::placeholder { color: var(--text2); }
         <span style="color:#f5c842;font-size:12px;">⚠️ ملاحظة أمنية: هذا قفل سلوكي (يمنع الوصول العرضي)، ليس أمن صلب. لا تشارك PIN مع أشخاص غير موثوقين.</span>
       </div>
 
-      <!-- Status row -->
-      <div style="background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.25);border-radius:10px;padding:14px;margin-bottom:14px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div>
-            <div style="font-size:13px;color:var(--text2);margin-bottom:4px;">الوضع الحالي على هذا الجهاز:</div>
-            <div id="lockStatusRole" style="font-size:15px;font-weight:800;color:var(--green);">جارٍ التحميل…</div>
-          </div>
-          <div>
-            <div style="font-size:13px;color:var(--text2);margin-bottom:4px;">حالة الـ PIN:</div>
-            <div id="lockStatusPin" style="font-size:14px;font-weight:700;color:var(--text2);">جارٍ التحميل…</div>
+      <!-- Phase 6 M (Obs U): PIN management was unified into the Employees
+           page. Each employee now has their own PIN (Phase 5C per-employee
+           PIN architecture). The Owner manages all PINs (including their
+           own) from there. This card just deep-links the user. -->
+      <div style="background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.25);border-radius:10px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:6px;">🔐 إدارة PIN لكل موظف</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+            بعد تحديث Phase 5، كل موظف عنده PIN خاص فيه. الإدارة موحَّدة في صفحة الموظفين.
           </div>
         </div>
+        <a href="employees.html" class="btn btn-primary" style="text-decoration:none;white-space:nowrap;">
+          الذهاب لصفحة الموظفين ←
+        </a>
       </div>
-
-      <!-- Set/Change PIN form -->
-      <form onsubmit="saveLockPin(event)" id="lockPinForm">
-        <div id="lockOldPinGroup" class="form-group" style="display:none;">
-          <label>PIN الحالي</label>
-          <input type="password" id="fLockOldPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="4-6 أرقام" style="letter-spacing:6px;text-align:center;font-size:16px;font-weight:800;">
-        </div>
-        <div class="form-group">
-          <label>PIN جديد (4-6 أرقام)</label>
-          <input type="password" id="fLockNewPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="مثال: 1234" style="letter-spacing:6px;text-align:center;font-size:16px;font-weight:800;">
-        </div>
-        <div class="form-group">
-          <label>تأكيد الـ PIN الجديد</label>
-          <input type="password" id="fLockConfirmPin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="أعد إدخال الـ PIN" style="letter-spacing:6px;text-align:center;font-size:16px;font-weight:800;">
-        </div>
-        <div id="lockPinMsg" style="font-size:13px;font-weight:700;min-height:18px;margin-bottom:10px;"></div>
-        <button type="submit" class="btn btn-primary" id="btnSaveLockPin">حفظ PIN</button>
-        <button type="button" class="btn" id="btnRemoveLockPin" onclick="removeLockPin()" style="margin-right:8px;background:transparent;border:1px solid rgba(239,83,80,0.45);color:#ef5350;display:none;">🗑 إزالة الـ PIN</button>
-      </form>
     </div>
 
     <!-- 1.6 قوالب المواعيد — Gap 8 -->
@@ -2044,174 +2027,13 @@ document.addEventListener('DOMContentLoaded', function() {
   var topbar = document.querySelector('.topbar');
   if (topbar) topbar.insertBefore(btn, topbar.firstChild);
 });
-// ─── Phase 4: Device Lock — PIN management ────────────────────────
-// Owner-only section. Loads current PIN status, lets Owner set/change/remove
-// the PIN. PIN itself is hashed (SHA-256) before saving — raw never persisted.
-async function refreshLockStatus() {
-  try {
-    var roleEl = document.getElementById('lockStatusRole');
-    var pinEl  = document.getElementById('lockStatusPin');
-    var oldGrp = document.getElementById('lockOldPinGroup');
-    var rmBtn  = document.getElementById('btnRemoveLockPin');
-    if (!roleEl || !window.SyDentLock) return;
-
-    var role = window.SyDentLock.getRole();
-    var labels = window.SyDentLock.ROLE_LABELS || {};
-    var icons  = window.SyDentLock.ROLE_ICONS  || {};
-    var color = role === 'owner' ? '#2ee89e' : role === 'doctor' ? '#63b3ed' : '#ffa726';
-    roleEl.style.color = color;
-    roleEl.textContent = (icons[role] || '') + ' ' + (labels[role] || role);
-
-    var hash = await window.SyDentLock.loadPinHash();
-    if (hash) {
-      pinEl.textContent = '✅ تم تعيين PIN';
-      pinEl.style.color = '#2ee89e';
-      if (oldGrp) oldGrp.style.display = 'block';
-      if (rmBtn)  rmBtn.style.display  = 'inline-block';
-    } else {
-      pinEl.textContent = '⚠ لم يتم تعيين PIN بعد';
-      pinEl.style.color = '#f5c842';
-      if (oldGrp) oldGrp.style.display = 'none';
-      if (rmBtn)  rmBtn.style.display  = 'none';
-    }
-  } catch(e) {
-    console.warn('refreshLockStatus:', e);
-  }
-}
-
-async function saveLockPin(e) {
-  if (e && e.preventDefault) e.preventDefault();
-  var oldEl = document.getElementById('fLockOldPin');
-  var newEl = document.getElementById('fLockNewPin');
-  var conEl = document.getElementById('fLockConfirmPin');
-  var msgEl = document.getElementById('lockPinMsg');
-  var btn   = document.getElementById('btnSaveLockPin');
-  if (!newEl || !conEl || !msgEl) return;
-
-  function setMsg(text, ok) {
-    msgEl.textContent = text;
-    msgEl.style.color = ok ? '#2ee89e' : '#ef5350';
-  }
-
-  var newPin = (newEl.value || '').trim();
-  var conPin = (conEl.value || '').trim();
-  if (!/^\d{4,6}$/.test(newPin)) { setMsg('❌ الـ PIN يجب أن يكون 4-6 أرقام', false); return; }
-  if (newPin !== conPin) { setMsg('❌ الـ PIN وتأكيده غير متطابقين', false); return; }
-
-  // Defensive: SyDentLock should always be loaded (supabase-init.js is shared),
-  // but if it failed to load, fail gracefully instead of throwing.
-  if (!window.SyDentLock) { setMsg('❌ مكتبة القفل غير محمَّلة — أعد تحميل الصفحة', false); return; }
-
-  // If a PIN already exists, require the old PIN to change it
-  var existingHash = await window.SyDentLock.loadPinHash();
-  if (existingHash) {
-    var oldPin = (oldEl && oldEl.value || '').trim();
-    if (!/^\d{4,6}$/.test(oldPin)) { setMsg('❌ أدخل الـ PIN الحالي', false); return; }
-    var ver = await window.SyDentLock.verifyPin(oldPin);
-    if (!ver.ok) {
-      if (ver.reason === 'cooldown') setMsg('⏳ تجاوزت عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية', false);
-      else if (ver.reason === 'wrong') setMsg('❌ الـ PIN الحالي خاطئ — متبقّي ' + (ver.failsLeft || 0) + ' محاولات', false);
-      else setMsg('❌ فشل التحقق', false);
-      return;
-    }
-  }
-
-  if (btn) btn.disabled = true;
-  try {
-    var newHash = await window.SyDentLock.hashPin(newPin);
-    await window.SyDentLock.savePinHash(newHash);
-    if (oldEl) oldEl.value = '';
-    newEl.value = '';
-    conEl.value = '';
-    setMsg(existingHash ? '✅ تم تغيير الـ PIN بنجاح' : '✅ تم تعيين الـ PIN بنجاح', true);
-    showToast(existingHash ? '✅ تم تغيير الـ PIN' : '✅ تم تعيين الـ PIN');
-    // Phase 5: audit log (clinic-wide PIN change from settings — distinct from
-    // per-employee PIN changes which happen in employees.html). We use
-    // settings.change_pin for set/change and lock.pin_clear for removal.
-    if (window.logAudit) {
-      window.logAudit('settings.change_pin', {
-        description: existingHash ? 'تغيير PIN العيادة من الإعدادات' : 'تعيين PIN العيادة من الإعدادات',
-        newValue: { pin_changed: true, had_previous: !!existingHash }
-      });
-    }
-    await refreshLockStatus();
-  } catch(err) {
-    if (/lock_pin_hash|42703|PGRST/i.test((err && (err.message || err.code) || '').toString())) {
-      setMsg('⚠ يلزم تشغيل Migration 8.1 في Supabase', false);
-      showToast('⚠ يلزم Migration 8.1', true);
-    } else {
-      setMsg('❌ ' + (err && err.message || 'فشل الحفظ'), false);
-    }
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-async function removeLockPin() {
-  if (!window.SyDentLock) return;
-  var existing = await window.SyDentLock.loadPinHash();
-  if (!existing) return;
-  if (!confirm('هل أنت متأكد من إزالة الـ PIN؟ سيُعاد فتح كل الأجهزة بدون قيود.')) return;
-
-  var oldEl = document.getElementById('fLockOldPin');
-  var oldPin = (oldEl && oldEl.value || '').trim();
-  var msgEl = document.getElementById('lockPinMsg');
-  function setMsg(text, ok) { if (msgEl) { msgEl.textContent = text; msgEl.style.color = ok ? '#2ee89e' : '#ef5350'; } }
-
-  if (!/^\d{4,6}$/.test(oldPin)) { setMsg('❌ أدخل الـ PIN الحالي للتأكيد', false); return; }
-  var ver = await window.SyDentLock.verifyPin(oldPin);
-  if (!ver.ok) {
-    if (ver.reason === 'cooldown') setMsg('⏳ تجاوزت عدد المحاولات. أعد المحاولة بعد ' + ver.secondsLeft + ' ثانية', false);
-    else setMsg('❌ الـ PIN خاطئ', false);
-    return;
-  }
-
-  try {
-    var user = await window.sbGetUser();
-    if (!user) { setMsg('❌ غير مسجّل دخول', false); return; }
-    var res = await window.sb.from('clinic_settings')
-      .update({ lock_pin_hash: null })
-      .eq('owner_id', user.id);
-    if (res.error) throw res.error;
-    window.SyDentLock.invalidatePinCache();
-    // Reset to owner mode on this device (no more lock to enforce)
-    // Phase 5: also clear employee_id (lock fully disabled, no identity tracked)
-    window.SyDentLock.applyRole('owner', null, null);
-    if (oldEl) oldEl.value = '';
-    setMsg('✅ تم حذف الـ PIN', true);
-    showToast('✅ تم حذف الـ PIN، الجهاز الآن في وضع المالك');
-    // Phase 5: audit log (PIN removal is a security-relevant event — it disables
-    // device-lock enforcement clinic-wide. Owner needs visibility into who did it.)
-    if (window.logAudit) {
-      window.logAudit('lock.pin_clear', {
-        description: 'حذف PIN العيادة (تعطيل قفل الأجهزة)',
-        oldValue: { pin_was_set: true }
-      });
-    }
-    await refreshLockStatus();
-    if (window.SyDentLock.refreshHeaderButton) window.SyDentLock.refreshHeaderButton();
-  } catch(err) {
-    setMsg('❌ ' + (err && err.message || 'فشل الحذف'), false);
-  }
-}
-
-// Hide lock section entirely for non-owners (defense-in-depth; data-role-block also hides it)
-function hideLockSectionIfNotOwner() {
-  if (!window.SyDentLock) return;
-  if (!window.SyDentLock.isOwner()) {
-    var s = document.getElementById('lockSection');
-    if (s) s.style.display = 'none';
-  }
-}
-
-// Wire to init (after currentUser is loaded)
-document.addEventListener('DOMContentLoaded', function(){
-  // Small delay to let other init code run first
-  setTimeout(function(){
-    hideLockSectionIfNotOwner();
-    refreshLockStatus();
-  }, 200);
-});
+// ─── Phase 6 M (Obs U): PIN management moved to employees.html ────
+// The lock section in settings.html is now a deep-link card. All PIN
+// CRUD (set / change / remove) is unified in employees.html where
+// each employee row owns its own pin_hash (Phase 5C architecture).
+// The old saveLockPin / removeLockPin / refreshLockStatus / hide
+// helpers were removed in commit C4. The deep-link <a> tag does not
+// need any JS wiring.
 
 </script>
 <script>
