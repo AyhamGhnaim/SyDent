@@ -580,18 +580,12 @@
       var emp = (_employeesListCache || []).find(function(e){ return e.id === empId; });
       if (emp && emp.name) {
         // Active employee → show their name + role icon
+        // Note: doctor row being hidden from reports does NOT affect the pill.
+        // Hiding a doctor from reports is purely a reports-filter operation
+        // (configured in doctors.html), not a device lock. The pill only
+        // turns red when the EMPLOYEE row is deactivated (employees.html).
         label = emp.name;
         icon = ROLE_ICONS[emp.role] || icon;
-        // Phase 5g: also check if linked doctor row is hidden from reports.
-        // If so, surface that state in the pill too (banner + guards already
-        // fire from isDoctorAccountInactive's Path 1 second check).
-        if (emp.role === 'doctor' && emp.doctor_id && _doctorsListCache) {
-          var linkedDoc = _doctorsListCache.find(function(x){ return x.id === emp.doctor_id; });
-          if (!linkedDoc) {
-            label = emp.name + ' (معطّل)';
-            inactive = true;
-          }
-        }
       } else if (_allEmployeesListCache) {
         // Employee might be deactivated OR fully deleted → name recovery
         var empAny = (_allEmployeesListCache || []).find(function(e){ return e.id === empId; });
@@ -1092,24 +1086,19 @@
   }
 
   // ── Auto-init on every page that has supabase-init ────────────
-  // ── Phase 4.1: Deactivated doctor handling ────────────────────
-  // If the device is locked to a Doctor whose clinic_doctors record is
-  // inactive (is_active=false) or missing, render a permanent red banner
-  // and disable any element tagged [data-doctor-inactive-block]. This
-  // implements the OpenDental "Hidden provider = removed from selection"
-  // pattern: device stays usable for read access, but new productions
-  // are gated until the Owner reactivates the account.
+  // ── Phase 4.1 + 5g: Device lock detection ────────────────────
+  // Returns TRUE only if the EMPLOYEE row is deactivated (or fully deleted).
+  // Hiding a doctor from reports (clinic_doctors.is_active=false) does NOT
+  // lock the device — it only affects what shows in provider-reports.html.
   //
-  // Reads from _doctorsListCache + _employeesListCache (preloaded in autoInit).
-  // The caches contain is_active=true rows only, so "not found in cache" = inactive.
+  // Two distinct concepts:
+  //   • Employee deactivated  → device read-only (banner, guards, page block)
+  //   • Doctor row hidden     → provider-reports only (page block, nothing else)
   //
-  // Phase 5 update: the locked identity on a device can be either:
-  //   (a) an employee (employees.is_active=false → device locked)
-  //   (b) a doctor (clinic_doctors.is_active=false → device locked)
-  //   (c) both (each deactivated separately) → device locked
-  // The device should go read-only if EITHER is deactivated, because the
-  // person on this device has effectively lost their working identity
-  // (their name as employee OR their billable identity as doctor).
+  // For "doctor row hidden" detection, use isDoctorRowHidden() instead.
+  //
+  // Reads from _employeesListCache (preloaded in autoInit).
+  // Cache contains is_active=true rows only, so "not found" = deactivated.
   function isDoctorAccountInactive() {
     // ── Path 1: Phase 5 employee-locked device ──
     // If a specific employee is locked in, check if that employee is still
@@ -1121,19 +1110,40 @@
         // Employee deactivated (or fully deleted) → device read-only
         return true;
       }
-      // Employee is active. If this employee is linked to a doctor row,
-      // ALSO check that doctor row is active (Owner may have deactivated
-      // the doctor independently of the employee).
-      if (emp.role === 'doctor' && emp.doctor_id && _doctorsListCache) {
-        return !_doctorsListCache.find(function(d){ return d.id === emp.doctor_id; });
-      }
-      return false; // active employee, no linked doctor needed
+      return false; // active employee → device unlocked (regardless of doctor row state)
     }
 
     // ── Path 2: Phase 4.1 legacy doctor-only lock (pre-Phase-5 devices) ──
     // Device locked to role=doctor WITHOUT an employee_id (legacy installs).
     if (!isDoctor()) return false;
     if (!_doctorsListCache) return false; // not loaded yet — assume active
+    var did = getDoctorId();
+    if (!did) return false;
+    return !_doctorsListCache.find(function(d){ return d.id === did; });
+  }
+
+  // ── Phase 5g: Doctor row hidden from reports ──────────────────
+  // Returns TRUE if the locked doctor's clinic_doctors row is hidden
+  // (is_active=false in doctors.html). This is a REPORTS-ONLY flag:
+  // does NOT lock the device, does NOT trigger banner/guards.
+  // Used only by provider-reports.html to block that one page.
+  //
+  // Difference from isDoctorAccountInactive():
+  //   • isDoctorAccountInactive → employee inactive → device read-only
+  //   • isDoctorRowHidden       → doctor row hidden → reports page only
+  function isDoctorRowHidden() {
+    // Path 1: Phase 5 employee with linked doctor_id
+    var empId = getEmployeeId();
+    if (empId && _employeesListCache) {
+      var emp = _employeesListCache.find(function(e){ return e.id === empId; });
+      if (!emp) return false; // employee not active → that's a different state
+      if (emp.role !== 'doctor' || !emp.doctor_id) return false;
+      if (!_doctorsListCache) return false; // cache not loaded yet
+      return !_doctorsListCache.find(function(d){ return d.id === emp.doctor_id; });
+    }
+    // Path 2: legacy doctor-only lock
+    if (!isDoctor()) return false;
+    if (!_doctorsListCache) return false;
     var did = getDoctorId();
     if (!did) return false;
     return !_doctorsListCache.find(function(d){ return d.id === did; });
@@ -1308,6 +1318,7 @@
     isDoctor: isDoctor,
     isSecretary: isSecretary,
     isDoctorAccountInactive: isDoctorAccountInactive,
+    isDoctorRowHidden: isDoctorRowHidden,
     // Phase 5: per-employee identity
     getEmployeeId: getEmployeeId,
     loadEmployees: loadEmployees,

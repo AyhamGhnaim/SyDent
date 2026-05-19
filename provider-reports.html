@@ -1427,19 +1427,28 @@ function applyDoctorModeFilter() {
   }
 }
 
-// Phase 5g (Layer 1 — hardest block): if the locked doctor is inactive
-// (employee deactivated OR linked doctor row hidden from reports), replace
-// the entire reports area with a clear empty state. This prevents any
-// downstream filter race or dropdown rebuild from leaking other providers'
-// reports. Called from init, setBasis (tab clicks), and onFilterChange.
+// Phase 5g (Layer 1 — hardest block): replace the entire reports area
+// with a clear empty state if EITHER:
+//   1. The employee is deactivated (full device lock — banner+guards+page block)
+//   2. The doctor row is hidden from reports (this page only — rest of app works)
+//
+// The empty state message is identical for both — from the doctor's POV the
+// effect on THIS page is the same. The difference (whether the rest of the
+// app works) is handled by the inactive-doctor banner/guards in supabase-init.
 //
 // Returns true if blocked (caller should bail out), false to continue normally.
 function applyInactiveDoctorBlockPage() {
-  if (!window.SyDentLock ||
-      typeof window.SyDentLock.isDoctorAccountInactive !== 'function' ||
-      !window.SyDentLock.isDoctorAccountInactive()) {
-    return false;
-  }
+  if (!window.SyDentLock) return false;
+  var blocked = false;
+  try {
+    if (typeof window.SyDentLock.isDoctorAccountInactive === 'function' &&
+        window.SyDentLock.isDoctorAccountInactive()) blocked = true;
+    if (!blocked &&
+        typeof window.SyDentLock.isDoctorRowHidden === 'function' &&
+        window.SyDentLock.isDoctorRowHidden()) blocked = true;
+  } catch (e) { /* defensive */ }
+  if (!blocked) return false;
+
   // Build a clear, friendly empty state directly inside provList.
   // Also empty summaryRow so no totals leak through.
   var summary = document.getElementById('summaryRow');
