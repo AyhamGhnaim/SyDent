@@ -393,16 +393,22 @@ var stats = { total: 0, today: 0, week: 0, alerts: 0 };
 
 // Action type prefix → list of full action_types
 // Used to build explicit .in() queries (more reliable than .like across versions)
+// Phase 5 audit (post-cleanup): only action_types actually emitted by the code are listed.
+// Removed dead types: doctor.toggle_active (Phase 5G removed the feature),
+// session.edit / payment.edit / settings.edit (no edit feature in app),
+// lock.pin_set / lock.pin_clear were unused before — now lock.pin_clear is emitted
+// by removeLockPin in settings.html. settings.change_pin is emitted by both
+// employees.html (Owner PIN) and settings.html (clinic-wide PIN).
 var ACTION_TYPES_BY_PREFIX = {
   patient:     ['patient.create', 'patient.edit', 'patient.delete'],
-  appointment: ['appointment.create', 'appointment.edit', 'appointment.status_change', 'appointment.delete'],
-  session:     ['session.create', 'session.edit', 'session.delete'],
-  payment:     ['payment.create', 'payment.edit', 'payment.delete'],
+  appointment: ['appointment.create', 'appointment.edit', 'appointment.status_change', 'appointment.bulk_complete', 'appointment.delete'],
+  session:     ['session.create', 'session.delete'],
+  payment:     ['payment.create', 'payment.edit_splits', 'payment.delete'],
   lab:         ['lab.create', 'lab.edit', 'lab.delete'],
-  doctor:      ['doctor.create', 'doctor.edit', 'doctor.toggle_active', 'doctor.delete'],
+  doctor:      ['doctor.create', 'doctor.edit', 'doctor.delete'],
   employee:    ['employee.create', 'employee.edit', 'employee.toggle_active', 'employee.delete'],
-  settings:    ['settings.change_pin', 'settings.archive_audit', 'settings.edit'],
-  lock:        ['lock.role_switch', 'lock.pin_set', 'lock.pin_clear']
+  settings:    ['settings.change_pin', 'settings.archive_audit'],
+  lock:        ['lock.role_switch', 'lock.pin_clear']
 };
 
 // ── Helpers ──
@@ -450,7 +456,9 @@ function actionTypeLabel(t) {
   var opMap = {
     create:'إضافة', edit:'تعديل', delete:'حذف',
     status_change:'تغيير حالة', toggle_active:'تبديل حالة',
-    edit_price:'تعديل سعر', change_pin:'تغيير PIN', role_switch:'تبديل دور'
+    bulk_complete:'إكمال جماعي', edit_splits:'تعديل توزيع',
+    archive_audit:'أرشفة سجل', change_pin:'تغيير PIN',
+    role_switch:'تبديل دور', pin_clear:'حذف PIN'
   };
   return (opMap[op] || op) + ' ' + (entityMap[entity] || entity);
 }

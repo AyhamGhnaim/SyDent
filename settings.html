@@ -2125,6 +2125,15 @@ async function saveLockPin(e) {
     conEl.value = '';
     setMsg(existingHash ? '✅ تم تغيير الـ PIN بنجاح' : '✅ تم تعيين الـ PIN بنجاح', true);
     showToast(existingHash ? '✅ تم تغيير الـ PIN' : '✅ تم تعيين الـ PIN');
+    // Phase 5: audit log (clinic-wide PIN change from settings — distinct from
+    // per-employee PIN changes which happen in employees.html). We use
+    // settings.change_pin for set/change and lock.pin_clear for removal.
+    if (window.logAudit) {
+      window.logAudit('settings.change_pin', {
+        description: existingHash ? 'تغيير PIN العيادة من الإعدادات' : 'تعيين PIN العيادة من الإعدادات',
+        newValue: { pin_changed: true, had_previous: !!existingHash }
+      });
+    }
     await refreshLockStatus();
   } catch(err) {
     if (/lock_pin_hash|42703|PGRST/i.test((err && (err.message || err.code) || '').toString())) {
@@ -2171,6 +2180,14 @@ async function removeLockPin() {
     if (oldEl) oldEl.value = '';
     setMsg('✅ تم حذف الـ PIN', true);
     showToast('✅ تم حذف الـ PIN، الجهاز الآن في وضع المالك');
+    // Phase 5: audit log (PIN removal is a security-relevant event — it disables
+    // device-lock enforcement clinic-wide. Owner needs visibility into who did it.)
+    if (window.logAudit) {
+      window.logAudit('lock.pin_clear', {
+        description: 'حذف PIN العيادة (تعطيل قفل الأجهزة)',
+        oldValue: { pin_was_set: true }
+      });
+    }
     await refreshLockStatus();
     if (window.SyDentLock.refreshHeaderButton) window.SyDentLock.refreshHeaderButton();
   } catch(err) {

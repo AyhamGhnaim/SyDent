@@ -5093,7 +5093,19 @@ async function saveToothTreatment() {
         console.error('regional ledger insert error:', rReg.error);
       } else {
         regNewSess = rReg.data;
-        if (regNewSess) { sessions.unshift(regNewSess); sortByDateDesc(sessions); }
+        if (regNewSess) {
+          sessions.unshift(regNewSess); sortByDateDesc(sessions);
+          // Phase 5: audit log (regional treatment — quadrant/arch/mouth)
+          if (window.logAudit) {
+            window.logAudit('session.create', {
+              entityId: regNewSess.id,
+              patientId: patientId,
+              patientName: (patient && patient.name) || '',
+              description: 'إضافة جلسة (' + regAreaText + '): ' + pendingToothLabel + ' — ' + cost + ' ل.س',
+              newValue: { type: pendingToothLabel, cost: cost, date: date, status: pendingTreatStatus, provider_id: pendingProviderId, scope: pendingRegionalType }
+            });
+          }
+        }
       }
     }
 
@@ -5254,7 +5266,19 @@ async function saveToothTreatment() {
       showToast('⚠️ تسجيل الجلسة فشل: ' + rL.error.message);
     }
     newSess = rL.data;
-    if (newSess) { sessions.unshift(newSess); sortByDateDesc(sessions); }
+    if (newSess) {
+      sessions.unshift(newSess); sortByDateDesc(sessions);
+      // Phase 5: audit log (per-tooth treatment)
+      if (window.logAudit) {
+        window.logAudit('session.create', {
+          entityId: newSess.id,
+          patientId: patientId,
+          patientName: (patient && patient.name) || '',
+          description: 'إضافة جلسة (' + ledgerDescription + '): ' + pendingToothLabel + ' — ' + cost + ' ل.س',
+          newValue: { type: pendingToothLabel, cost: cost, date: date, status: pendingTreatStatus, provider_id: pendingProviderId, tooth_num: ledgerToothNum, surface: dbSurface }
+        });
+      }
+    }
   }
 
   // Reallocate funds: if there was unearned credit, it auto-flows to this session.
@@ -6089,6 +6113,20 @@ async function saveManualSplits() {
     await syncPaymentStatus();
     renderStats(); renderPayments(); renderSessions(); renderRecentSessions(); renderTimeline();
     closeModal('splitEditModal');
+    // Phase 5: audit log (manual payment split is a sensitive financial reallocation —
+    // it overrides FIFO auto-allocation and can shift money between sessions, so the
+    // Owner must be able to track who did it and when)
+    if (window.logAudit) {
+      var allocCount = newSplits.filter(function(s){ return !s.is_unearned; }).length;
+      window.logAudit('payment.edit_splits', {
+        entityId: paymentId,
+        patientId: patientId,
+        patientName: (patient && patient.name) || '',
+        description: 'تعديل توزيع دفعة يدوياً: ' + (p.amount || 0) + ' ل.س — ' + allocCount + ' جلسة، متبقّي ' + Math.max(0, total - allocated) + ' ل.س رصيد مقدّم',
+        oldValue: { payment_amount: p.amount, was_manual: !!p.manual_allocation },
+        newValue: { allocated_count: allocCount, total_allocated: allocated, unearned_leftover: Math.max(0, total - allocated), is_manual: true }
+      });
+    }
     showToast('✅ تم حفظ التوزيع');
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 حفظ التوزيع'; }
@@ -7328,6 +7366,16 @@ async function saveToothAndOpenLab() {
     newSess = sessRes2.data;
     if (newSess) {
       sessions.unshift(newSess); sortByDateDesc(sessions);
+      // Phase 5: audit log (tooth + lab combined flow — typically prostheses)
+      if (window.logAudit) {
+        window.logAudit('session.create', {
+          entityId: newSess.id,
+          patientId: patientId,
+          patientName: (patient && patient.name) || '',
+          description: 'إضافة جلسة (' + 'السن ' + currentTooth + ' — ' + areaForLabDesc + ') + طلب مخبر: ' + pendingToothLabel + ' — ' + cost + ' ل.س',
+          newValue: { type: pendingToothLabel, cost: cost, date: date, status: pendingTreatStatus, provider_id: pendingProviderId, tooth_num: String(currentTooth), surface: currentSurface, with_lab: true }
+        });
+      }
       // Reallocate funds: if there was unearned credit, it auto-flows to this session.
       await reallocatePatientFunds();
     }
@@ -7569,10 +7617,12 @@ async function loadPatientAuditLog() {
       'appointment.create': '📅 موعد جديد',
       'appointment.edit': '✏️ تعديل موعد',
       'appointment.status_change': '🔄 تغيير حالة',
+      'appointment.bulk_complete': '✅ إكمال موعد جماعي',
       'appointment.delete': '🗑️ حذف موعد',
       'session.create': '🦷 جلسة جديدة',
       'session.delete': '🗑️ حذف جلسة',
       'payment.create': '💰 دفعة',
+      'payment.edit_splits': '🔀 تعديل توزيع دفعة',
       'payment.delete': '🗑️ حذف دفعة',
       'lab.create': '🥽 طلب مخبر',
       'lab.edit': '✏️ تعديل مخبر',

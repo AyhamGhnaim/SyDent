@@ -1985,6 +1985,26 @@ async function applyNoShowFee(opts) {
       showToast('⚠️ تعذّر تسجيل الرسم: ' + (sessRes.error.message || 'سبب غير معروف'));
       return false;
     }
+    // Phase 5: audit log (no-show fee — chargeable session for a missed appointment).
+    // Note: applyNoShowFee runs across two code paths — auto-prompt inside saveAppt
+    // (when status flips to no_show) and the dedicated 💸 button (applyNoShowFeeFromModal).
+    // Both flow through here, so a single audit call covers them.
+    if (window.logAudit) {
+      // Resolve patient name from the cache populated by loadPatients() (best effort).
+      var pname = '';
+      try {
+        if (opts.patientId && patientsCache && patientsCache[opts.patientId]) {
+          pname = patientsCache[opts.patientId].name || '';
+        }
+      } catch (e) {}
+      window.logAudit('session.create', {
+        entityId: null, // sessRes.data is null because we didn't .select() — that's fine
+        patientId: opts.patientId,
+        patientName: pname,
+        description: 'رسم عدم حضور: ' + opts.amount + ' ل.س (موعد ' + feeDate + ')',
+        newValue: { type: NO_SHOW_FEE_TYPE_LABEL, cost: opts.amount, date: feeDate, status: 'completed', provider_id: opts.providerId || null, no_show_fee: true, appointment_id: opts.apptId || null }
+      });
+    }
     return true;
   } catch (e) {
     console.warn('applyNoShowFee fallback:', e);
@@ -3080,6 +3100,28 @@ async function completeApptWithProcedures() {
   if (migrationMissing) parts.push('حالة الموعد محفوظة كـ "مؤكد" (يلزم ترقية قاعدة البيانات)');
   var icon = (failed === 0 && labFailed === 0 && !migrationMissing) ? '✅' : '⚠️';
   showToast(icon + ' ' + parts.join(' • '));
+
+  // Phase 5: audit log (bulk completion is a major workflow event — converts N planned
+  // sessions to completed in one click, plus appointment status + linked labs. We use
+  // appointment.bulk_complete to distinguish from a single appointment.status_change.)
+  if (window.logAudit) {
+    var pname = '';
+    var apptObjForAudit = appointments.find(function(a){ return a.id === editingId; });
+    var pid = apptObjForAudit ? apptObjForAudit.patient_id : null;
+    try {
+      if (pid && patientsCache && patientsCache[pid]) pname = patientsCache[pid].name || '';
+    } catch (e) {}
+    window.logAudit('appointment.bulk_complete', {
+      entityId: editingId,
+      patientId: pid,
+      patientName: pname,
+      description: 'إكمال موعد جماعي: ' + (plannedOnes.length - failed) + '/' + plannedOnes.length + ' علاج'
+                   + (labUpdated ? ' + ' + labUpdated + ' طلب مخبر' : '')
+                   + (unifyProviders ? ' (مع توحيد الأطباء)' : ''),
+      oldValue: { sessions_planned: plannedOnes.length, appointment_status: apptObjForAudit ? apptObjForAudit.status : null },
+      newValue: { sessions_completed: plannedOnes.length - failed, sessions_failed: failed, labs_completed: labUpdated, labs_failed: labFailed, unified_providers: unifyProviders, new_status: migrationMissing ? 'confirmed' : 'completed' }
+    });
+  }
 
   await loadAppointments();
   var appt = appointments.find(function(a){ return a.id === editingId; });
