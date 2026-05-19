@@ -1946,6 +1946,11 @@ async function noShowFeeAlreadyApplied(apptId) {
 // credit, it will auto-flow to this new fee the next time their profile is
 // opened (saveSession path triggers reallocatePatientFunds there).
 async function applyNoShowFee(opts) {
+  // Phase 4.1: defense-in-depth — block production-creating ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل رسوم جديدة');
+    return;
+  }
   // opts: { patientId, providerId, amount, reason, apptId, apptDate }
   try {
     var feeDate = opts.apptDate || dateStr(new Date());
@@ -2904,6 +2909,11 @@ async function unlinkSessionFromAppt(sessId) {
    at least one attached procedure, there is a prompt." */
 async function completeApptWithProcedures() {
   if (!editingId) return;
+  // Phase 4.1: defense-in-depth — block production-creating ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إكمال المواعيد');
+    return;
+  }
   // Gap 7: Set Complete is meaningless on a planned appointment — it has no
   // date, no time, no chair-side reality. Force the user to schedule it first.
   var _curAppt = appointments.find(function(a){ return a.id === editingId; });
@@ -3208,6 +3218,11 @@ async function updateNoShowFeeBtnVisibility(appt) {
 // حذف الموعد من داخل المودال
 async function deleteApptFromModal() {
   if (!editingId) return;
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف المواعيد');
+    return;
+  }
   if (!confirm('هل أنت متأكد من حذف هذا الموعد؟')) return;
   const { error } = await window.sb.from('appointments').delete()
     .eq('id', editingId).eq('doctor_id', currentUser.id);
@@ -3681,6 +3696,11 @@ async function submitAppt(e) {
 }
 
 async function deleteAppt(id) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف المواعيد');
+    return;
+  }
   if (!confirm('حذف هذا الموعد؟')) return;
   const { error } = await window.sb.from('appointments').delete()
     .eq('id', id).eq('doctor_id', currentUser.id);

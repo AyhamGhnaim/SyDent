@@ -1496,6 +1496,11 @@ async function rejectLabOrder(id) {
 }
 
 async function delLabOrder(id) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف طلبات المخبر');
+    return;
+  }
   if (!confirm('هل تريد حذف هذا الطلب نهائياً؟')) return;
   const { error } = await window.sb.from('lab_orders')
     .delete().eq('id', id).eq('doctor_id', currentUser.id);

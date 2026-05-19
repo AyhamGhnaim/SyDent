@@ -4530,6 +4530,11 @@ function switchToWholeTooth() {
 
 /* Undo extraction: delete all teeth_status rows for this tooth, redraw */
 async function undoExtraction(num) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل حالة الأسنان');
+    return;
+  }
   // Determine the scope: just this tooth, or the whole bridge unit?
   var isPartOfBridge = isBridgeTooth(num);
   var confirmMsg = isPartOfBridge
@@ -4598,6 +4603,11 @@ async function undoExtraction(num) {
 
 /* Remove an implant: delete only the implant entry; tooth becomes extracted again (since implants are typically placed in missing tooth slots) */
 async function removeImplant(num) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل حالة الأسنان');
+    return;
+  }
   var choice = confirm('إزالة الزراعة من السن ' + num + '؟\n\nاضغط موافق لإزالة الزراعة (السن سيعود مقلوعاً)\nاضغط إلغاء للخروج بدون تغيير');
   if (!choice) return;
   var tn = String(num);
@@ -5549,6 +5559,11 @@ async function saveEditedPatient() {
 
 /* ── Delete Session / Payment ── */
 async function delSession(id) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف الجلسات');
+    return;
+  }
   if (!confirm('حذف هذه الجلسة؟')) return;
   // find session to check tooth+surface
   var sess = sessions.find(function(s){ return s.id === id; });
@@ -5597,6 +5612,11 @@ async function delSession(id) {
 }
 
 async function delPayment(id) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف الدفعات');
+    return;
+  }
   if (!confirm('حذف هذه الدفعة؟')) return;
   try {
     var res = await window.sb.from('ledger_payments').delete()
@@ -6003,6 +6023,11 @@ async function revertToFifo() {
   var paymentId = _splitEditing.paymentId;
   var p = _splitEditing.payment;
   if (!paymentId || !p || !currentUser) return;
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل توزيع الدفعات');
+    return;
+  }
   if (!confirm('إعادة التوزيع تلقائياً بنظام FIFO؟\n\nهذا سيحذف التوزيع اليدوي الحالي.')) return;
 
   var revertBtn = document.getElementById('splitRevertBtn');
@@ -6440,6 +6465,11 @@ function quickSchedulePlannedFromProfile(id) {
 
 /* Delete a planned appointment (with confirm). */
 async function deletePlannedFromProfile(id) {
+  // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف المواعيد المخطّطة');
+    return;
+  }
   if (!confirm('حذف هذا الموعد المخطّط؟')) return;
   var res = await window.sb.from('appointments').delete()
     .eq('id', id).eq('doctor_id', currentUser.id);
