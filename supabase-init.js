@@ -64,12 +64,13 @@
   'use strict';
 
   // ── Constants ──────────────────────────────────────────────────
-  const LS_ROLE       = 'sydent.lock.role';        // 'owner'|'doctor'|'secretary'
-  const LS_DOCTOR_ID  = 'sydent.lock.doctorId';    // UUID (when role=doctor)
-  const LS_FAIL_COUNT = 'sydent.lock.failCount';
-  const LS_COOLDOWN   = 'sydent.lock.cooldownUntil';
-  const MAX_FAILS     = 5;
-  const COOLDOWN_MS   = 60 * 1000; // 60 seconds
+  const LS_ROLE        = 'sydent.lock.role';        // 'owner'|'doctor'|'secretary'
+  const LS_DOCTOR_ID   = 'sydent.lock.doctorId';    // UUID (when role=doctor)
+  const LS_EMPLOYEE_ID = 'sydent.lock.employeeId';  // ← Phase 5: per-employee identity
+  const LS_FAIL_COUNT  = 'sydent.lock.failCount';
+  const LS_COOLDOWN    = 'sydent.lock.cooldownUntil';
+  const MAX_FAILS      = 5;
+  const COOLDOWN_MS    = 60 * 1000; // 60 seconds
 
   const ROLE_LABELS = {
     owner:     'المالك',
@@ -92,6 +93,8 @@
   let _pinHashLoaded = false;
   let _doctorsListCache = null;    // active doctors only (for switch picker)
   let _allDoctorsListCache = null; // ALL doctors incl inactive (for name recovery)
+  let _employeesListCache = null;  // Phase 5: active employees (for picker)
+  let _allEmployeesListCache = null; // Phase 5: all employees incl inactive (recovery)
 
   // ── Low-level state ────────────────────────────────────────────
   function getRole() {
@@ -107,6 +110,14 @@
       var d = localStorage.getItem(LS_DOCTOR_ID);
       return d && d !== 'null' && d !== 'undefined' ? d : null;
     } catch(e) { return null; }
+  }
+
+  // Phase 5: per-employee identity (which specific person is using this device)
+  function getEmployeeId() {
+    try {
+      var e = localStorage.getItem(LS_EMPLOYEE_ID);
+      return e && e !== 'null' && e !== 'undefined' ? e : null;
+    } catch(err) { return null; }
   }
 
   function isOwner()     { return getRole() === 'owner'; }
@@ -275,7 +286,11 @@
   }
 
   // ── Apply a role transition (after PIN check, if any) ─────────
-  function applyRole(newRole, newDoctorId) {
+  // Phase 5: now also accepts employeeId. If provided, stored in localStorage.
+  // Backward compat: if employeeId is undefined, the old value is preserved
+  // for backward compat (used by legacy callers like settings.html setup flow).
+  // If null is explicitly passed, the employeeId is cleared.
+  function applyRole(newRole, newDoctorId, newEmployeeId) {
     try {
       if (newRole === 'doctor') {
         localStorage.setItem(LS_ROLE, 'doctor');
@@ -288,6 +303,12 @@
         // owner
         localStorage.setItem(LS_ROLE, 'owner');
         localStorage.removeItem(LS_DOCTOR_ID);
+      }
+      // Phase 5: employee identity (explicit: undefined=preserve, null=clear, value=set)
+      if (newEmployeeId === null) {
+        localStorage.removeItem(LS_EMPLOYEE_ID);
+      } else if (typeof newEmployeeId === 'string' && newEmployeeId.length > 0) {
+        localStorage.setItem(LS_EMPLOYEE_ID, newEmployeeId);
       }
     } catch(e) {
       console.error('[SyDentLock] applyRole failed:', e);
@@ -390,6 +411,55 @@
     } catch(e) {
       return [];
     }
+  }
+
+  // ── Phase 5: Load employees list (for per-employee picker) ────
+  // Fetches ALL employees (active + inactive). The active subset is used
+  // for the lock modal picker; the full list is used for name recovery
+  // and audit-log historical display.
+  // Returns [] silently if Migration 9.1 is not applied yet (graceful fallback).
+  async function loadEmployees() {
+    if (_employeesListCache) return _employeesListCache;
+    try {
+      var user = await window.sbGetUser();
+      if (!user) return [];
+      var res = await window.sb.from('clinic_employees')
+        .select('id, name, role, doctor_id, pin_hash, is_active')
+        .eq('owner_id', user.id)
+        .order('role', { ascending: true })
+        .order('name', { ascending: true });
+      if (res.error) {
+        // Migration not applied yet — silently fall back to empty list
+        var m = (res.error.message || '') + ' ' + (res.error.code || '');
+        if (!/clinic_employees|42P01|PGRST205/i.test(m)) {
+          console.warn('[SyDentLock] loadEmployees:', res.error);
+        }
+        return [];
+      }
+      _allEmployeesListCache = res.data || [];
+      _employeesListCache = _allEmployeesListCache.filter(function(e){ return e.is_active !== false; });
+      return _employeesListCache;
+    } catch(e) {
+      console.warn('[SyDentLock] loadEmployees exception:', e);
+      return [];
+    }
+  }
+
+  // Force reload of employees cache (after add/edit/delete in employees.html)
+  function invalidateEmployeesCache() {
+    _employeesListCache = null;
+    _allEmployeesListCache = null;
+  }
+
+  // Get current employee object (or null if not set / migration not applied)
+  // This is the snapshot used for audit logging.
+  async function getCurrentEmployee() {
+    var eid = getEmployeeId();
+    if (!eid) return null;
+    var list = await loadEmployees();
+    return (list || []).find(function(e){ return e.id === eid; })
+        || (_allEmployeesListCache || []).find(function(e){ return e.id === eid; })
+        || null;
   }
 
   // ── CSS injection (once per page) ─────────────────────────────
@@ -764,6 +834,7 @@
     }
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
+    loadEmployees();  // Phase 5: preload for logAudit + lock modal
     loadDoctors().then(function(){
       refreshHeaderButton();
       // Phase 4.1: check if locked doctor is still active, apply inactive UI if not
@@ -772,6 +843,86 @@
     injectHeaderButton();
     applyRoleGuards();
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Phase 5: Audit Logging API
+  // ═══════════════════════════════════════════════════════════════
+  // Fire-and-forget logger for every important operation in the system.
+  // Records WHO (employee_id + snapshot), WHAT (action_type + entity),
+  // WHEN (created_at auto), and ON WHOM (patient_id + snapshot).
+  //
+  // Usage:
+  //   window.logAudit('payment.delete', {
+  //     entityId: paymentId,
+  //     patientId: patient.id,
+  //     patientName: patient.name,
+  //     description: 'حذف دفعة 5000 ل.س',
+  //     oldValue: { amount: 5000, created_at: '...' }
+  //   });
+  //
+  // Designed to be safe & non-blocking:
+  //   - Never throws (errors go to console)
+  //   - Fire-and-forget (returns immediately; logging happens async)
+  //   - Falls back silently if Migration 9.1 not applied
+  //   - employee_id may be NULL if device is on a legacy install (no per-employee setup)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Valid action_type prefixes (used for validation, not enforcement)
+  var VALID_ACTION_PREFIXES = [
+    'patient.', 'appointment.', 'session.', 'payment.',
+    'lab.', 'doctor.', 'employee.', 'settings.', 'lock.'
+  ];
+
+  async function logAudit(actionType, opts) {
+    opts = opts || {};
+    try {
+      // Validate action_type quickly
+      if (typeof actionType !== 'string' || !actionType.includes('.')) {
+        console.warn('[logAudit] invalid action_type:', actionType);
+        return;
+      }
+      // Soft validation — warn but don't block (in case new prefixes added later)
+      var validPrefix = VALID_ACTION_PREFIXES.some(function(p){ return actionType.indexOf(p) === 0; });
+      if (!validPrefix) {
+        console.warn('[logAudit] unrecognized action prefix:', actionType);
+      }
+
+      var user = await window.sbGetUser();
+      if (!user) return; // not authenticated — nothing to log
+
+      // Resolve employee snapshot (may be null on legacy devices)
+      var emp = await getCurrentEmployee();
+
+      var row = {
+        owner_id: user.id,
+        employee_id: emp ? emp.id : null,
+        employee_name_snapshot: emp ? emp.name : null,
+        employee_role_snapshot: emp ? emp.role : getRole(), // fallback to device role
+        action_type: actionType,
+        entity_type: opts.entityType || actionType.split('.')[0],
+        entity_id: opts.entityId || null,
+        patient_id: opts.patientId || null,
+        patient_name_snapshot: opts.patientName || null,
+        description: opts.description || null,
+        old_value: opts.oldValue || null,
+        new_value: opts.newValue || null
+      };
+
+      var res = await window.sb.from('audit_log').insert(row);
+      if (res.error) {
+        var m = (res.error.message || '') + ' ' + (res.error.code || '');
+        // Silently swallow "table does not exist" — Migration 9.1 not run yet
+        if (!/audit_log|42P01|PGRST205/i.test(m)) {
+          console.warn('[logAudit] insert failed:', res.error);
+        }
+      }
+    } catch (e) {
+      console.warn('[logAudit] exception:', e);
+    }
+  }
+
+  // Expose globally for convenience (every page can call window.logAudit directly)
+  window.logAudit = logAudit;
 
   // ── Public API ────────────────────────────────────────────────
   window.SyDentLock = {
@@ -782,6 +933,11 @@
     isDoctor: isDoctor,
     isSecretary: isSecretary,
     isDoctorAccountInactive: isDoctorAccountInactive,
+    // Phase 5: per-employee identity
+    getEmployeeId: getEmployeeId,
+    loadEmployees: loadEmployees,
+    invalidateEmployeesCache: invalidateEmployeesCache,
+    getCurrentEmployee: getCurrentEmployee,
     // pin
     hashPin: hashPin,
     verifyPin: verifyPin,
@@ -806,6 +962,8 @@
     applyInactiveActionGuards: applyInactiveActionGuards,
     guardPage: guardPage,
     showBlockedScreen: showBlockedScreen,
+    // Phase 5: audit log
+    logAudit: logAudit,
     // constants (for UI consumers)
     ROLE_LABELS: ROLE_LABELS,
     ROLE_ICONS: ROLE_ICONS

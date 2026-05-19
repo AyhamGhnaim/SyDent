@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="manifest" href="manifest.json">
+<title>الموظفون — SyDent</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js"></script>
+<script src="sidebar.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
+  --border:rgba(46,232,158,0.15);
+  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --blue:#63b3ed;--orange:#ffa726;--purple:#a78bfa;
+  --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
+}
+body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 28px;background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:20;gap:12px;
+}
+.tb-title{font-size:18px;font-weight:800;color:var(--green);}
+.tb-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 18px;border-radius:9px;
+  font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;
+}
+.btn-primary{background:var(--green);color:var(--bg);}
+.btn-primary:hover{background:#26d48e;}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
+.btn-outline:hover{border-color:var(--green);color:var(--green);}
+.btn-sm{padding:7px 14px;font-size:12px;}
+.btn-danger{background:rgba(239,83,80,0.14);border:1px solid rgba(239,83,80,0.4);color:var(--red);}
+.btn-danger:hover{background:rgba(239,83,80,0.25);}
+.btn-warning{background:rgba(245,200,66,0.14);border:1px solid rgba(245,200,66,0.4);color:var(--yellow);}
+.btn-warning:hover{background:rgba(245,200,66,0.25);}
+
+.page{padding:24px 28px;max-width:1200px;margin:0 auto;}
+
+.info-box{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:16px 20px;
+  margin-bottom:20px;
+  display:flex;align-items:flex-start;gap:12px;
+  font-size:13px;color:var(--text2);line-height:1.7;
+}
+.info-box .info-icon{font-size:24px;flex-shrink:0;line-height:1;}
+
+/* Employee grid */
+.emp-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+  gap:16px;
+}
+.emp-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+  transition:all .2s;
+}
+.emp-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--green);}
+.emp-card.inactive{opacity:0.6;}
+.emp-color-bar{height:5px;width:100%;}
+.emp-body{padding:16px 18px;}
+.emp-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.emp-avatar{
+  width:52px;height:52px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:24px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.emp-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.3;}
+.emp-role-badge{
+  display:inline-block;font-size:10px;font-weight:800;
+  padding:2px 8px;border-radius:8px;margin-top:4px;
+}
+.role-owner{background:rgba(46,232,158,0.14);color:var(--green);}
+.role-doctor{background:rgba(99,179,237,0.14);color:var(--blue);}
+.role-secretary{background:rgba(255,167,38,0.14);color:var(--orange);}
+
+.emp-info{font-size:12px;color:var(--text2);margin-bottom:4px;}
+.emp-info b{color:var(--text);font-weight:600;}
+
+.emp-pin-status{
+  margin-top:10px;padding:8px 10px;
+  border-radius:8px;font-size:11px;font-weight:700;
+  display:flex;align-items:center;gap:6px;
+}
+.pin-set{background:rgba(46,232,158,0.10);color:var(--green);}
+.pin-unset{background:rgba(245,200,66,0.10);color:var(--yellow);}
+.pin-none-required{background:rgba(99,179,237,0.10);color:var(--blue);}
+
+.emp-actions{
+  display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;
+  padding-top:12px;border-top:1px solid var(--border);
+}
+
+/* Modal */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.65);
+  display:none;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;
+}
+.modal-overlay.show{display:flex;}
+.modal-box{
+  background:var(--bg2);border:1.5px solid rgba(46,232,158,0.25);
+  border-radius:14px;max-width:480px;width:100%;
+  max-height:90vh;overflow-y:auto;
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--bg2);z-index:2;
+}
+.modal-head h3{font-size:17px;font-weight:800;color:var(--green);}
+.modal-close{
+  background:transparent;border:none;color:var(--text2);
+  font-size:28px;cursor:pointer;line-height:1;padding:0;
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+}
+.modal-close:hover{color:var(--red);}
+.modal-body{padding:20px 22px;}
+
+.form-group{margin-bottom:16px;}
+.form-group label{
+  display:block;font-size:12px;font-weight:700;
+  color:var(--text2);margin-bottom:6px;
+}
+.form-group input,.form-group select{
+  width:100%;padding:10px 12px;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:13px;
+}
+.form-group input:focus,.form-group select:focus{
+  outline:none;border-color:var(--green);
+}
+.form-group .hint{
+  font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5;
+}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+
+.pin-input{
+  text-align:center;letter-spacing:8px;
+  font-size:18px;font-weight:800;
+}
+
+.modal-msg{
+  font-size:12px;font-weight:700;
+  padding:8px 10px;border-radius:8px;
+  margin-top:8px;min-height:0;
+  display:none;
+}
+.modal-msg.show{display:block;}
+.modal-msg.ok{background:rgba(46,232,158,0.10);color:var(--green);}
+.modal-msg.err{background:rgba(239,83,80,0.10);color:var(--red);}
+
+.modal-footer{
+  display:flex;gap:10px;padding:14px 22px;
+  border-top:1px solid var(--border);
+  position:sticky;bottom:0;background:var(--bg2);
+}
+.modal-footer button{flex:1;padding:11px 14px;font-size:13px;}
+
+/* Empty state */
+.empty{
+  text-align:center;padding:60px 20px;
+  background:var(--bg2);border:1px dashed var(--border);
+  border-radius:var(--radius);
+}
+.empty .em-icon{font-size:48px;margin-bottom:14px;opacity:0.6;}
+.empty .em-title{font-size:16px;font-weight:800;margin-bottom:6px;}
+.empty .em-text{font-size:13px;color:var(--text2);}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--bg2);border:1px solid var(--green);
+  color:var(--text);padding:12px 22px;border-radius:10px;
+  font-size:13px;font-weight:700;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+  z-index:2000;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+#toast.err{border-color:var(--red);color:var(--red);}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .topbar{padding:12px 18px;}
+  .page{padding:16px 14px;}
+  .emp-grid{grid-template-columns:1fr;gap:12px;}
+  .form-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="main" id="sbMainContent">
+
+<div class="topbar">
+  <div>
+    <div class="tb-title">👥 الموظفون</div>
+    <div class="tb-sub">إدارة هويات الموظفين وأرقام السر</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-primary" onclick="openAddModal()">＋ إضافة موظف</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="info-box">
+    <span class="info-icon">💡</span>
+    <div>
+      كل موظف يصير عنده <b>اسم</b> + <b>دور</b> + <b>رقم سر خاص</b>. عند تشغيل البرنامج، تختار اسمك وتدخل رقمك السري — وبهذا يعرف البرنامج بالضبط <b>مين</b> يعمل في كل لحظة، فيُسجَّل في <b>سجل النشاطات</b>.
+      <br><br>
+      • <span style="color:var(--green);"><b>المالك (Owner):</b></span> أنت — صاحب العيادة (واحد فقط)<br>
+      • <span style="color:var(--blue);"><b>طبيب (Doctor):</b></span> الأطباء المتعاونون — مربوطون مع جدول الأطباء<br>
+      • <span style="color:var(--orange);"><b>السكرتيرة (Secretary):</b></span> موظفو الاستقبال والإدارة
+    </div>
+  </div>
+
+  <div id="empList"></div>
+
+</div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="empModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="modalTitle">＋ إضافة موظف</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-group">
+        <label>الاسم الكامل *</label>
+        <input type="text" id="eName" placeholder="مثلاً: فاطمة الأحمد">
+      </div>
+
+      <div class="form-group">
+        <label>الدور *</label>
+        <select id="eRole" onchange="onRoleChange()">
+          <option value="secretary">👩‍💼 سكرتيرة</option>
+          <option value="doctor">👨‍⚕️ طبيب</option>
+        </select>
+        <div class="hint">المالك (Owner) لا يمكن إضافته يدوياً — حساب الـ Owner محفوظ تلقائياً.</div>
+      </div>
+
+      <div class="form-group" id="doctorLinkGroup" style="display:none;">
+        <label>اربط بطبيب موجود (اختياري)</label>
+        <select id="eDoctorId">
+          <option value="">— لا ربط —</option>
+        </select>
+        <div class="hint">إذا اخترت طبيباً، الجلسات التي يسجلها هذا الموظف ستُنسب لذلك الطبيب في التقارير.</div>
+      </div>
+
+      <div class="form-group">
+        <label>رقم السر (PIN) — 4 إلى 6 أرقام *</label>
+        <input type="password" inputmode="numeric" maxlength="6" id="ePin" class="pin-input" placeholder="••••" autocomplete="off">
+        <div class="hint" id="pinHint">سيستخدم هذا الرقم للدخول من شاشة القفل. لا يمكن تركه فارغاً.</div>
+      </div>
+
+      <div class="form-group" id="confirmPinGroup">
+        <label>تأكيد رقم السر *</label>
+        <input type="password" inputmode="numeric" maxlength="6" id="ePinConfirm" class="pin-input" placeholder="••••" autocomplete="off">
+      </div>
+
+      <div class="modal-msg" id="modalMsg"></div>
+
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeModal()">إلغاء</button>
+      <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveEmployee()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Owner PIN Modal -->
+<div class="modal-overlay" id="ownerPinModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🔐 تغيير رقم سرّك (كمالك)</h3>
+      <button class="modal-close" onclick="closeOwnerModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>رقم السر الجديد *</label>
+        <input type="password" inputmode="numeric" maxlength="6" id="oNewPin" class="pin-input" placeholder="••••" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>تأكيد رقم السر *</label>
+        <input type="password" inputmode="numeric" maxlength="6" id="oNewPinConfirm" class="pin-input" placeholder="••••" autocomplete="off">
+      </div>
+      <div class="modal-msg" id="ownerMsg"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-outline" onclick="closeOwnerModal()">إلغاء</button>
+      <button type="button" class="btn btn-primary" id="saveOwnerBtn" onclick="saveOwnerPin()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── State ──
+var currentUser = null;
+var employees = [];        // all employees (active + inactive)
+var doctors = [];          // active clinic_doctors
+var editingId = null;      // employee being edited (null = adding new)
+
+// ── Helpers ──
+function $(id) { return document.getElementById(id); }
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function showToast(msg, isErr) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isErr ? ' err' : '');
+  setTimeout(function(){ t.className = isErr ? 'err' : ''; }, 2400);
+}
+function showMsg(box, msg, isErr) {
+  var m = $(box);
+  if (!m) return;
+  m.textContent = msg;
+  m.className = 'modal-msg show ' + (isErr ? 'err' : 'ok');
+}
+function clearMsg(box) {
+  var m = $(box);
+  if (!m) return;
+  m.textContent = '';
+  m.className = 'modal-msg';
+}
+
+function roleLabel(r) {
+  return r === 'owner' ? 'المالك' : (r === 'doctor' ? 'طبيب' : 'سكرتيرة');
+}
+function roleIcon(r) {
+  return r === 'owner' ? '👑' : (r === 'doctor' ? '👨‍⚕️' : '👩‍💼');
+}
+function avatarColor(r) {
+  return r === 'owner' ? '#2ee89e' : (r === 'doctor' ? '#63b3ed' : '#ffa726');
+}
+function initials(name) {
+  var parts = String(name || '').trim().split(/\s+/);
+  if (parts.length === 0 || !parts[0]) return '?';
+  if (parts.length === 1) return parts[0].charAt(0);
+  return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
+}
+
+// SHA-256 hash for PIN (delegates to SyDentLock.hashPin)
+async function hashPin(pin) {
+  return await window.SyDentLock.hashPin(pin);
+}
+
+// ── Data layer ──
+async function loadData() {
+  // Load employees
+  var empRes = await window.sb.from('clinic_employees')
+    .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at')
+    .eq('owner_id', currentUser.id)
+    .order('role', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (empRes.error) {
+    showToast('فشل تحميل قائمة الموظفين', true);
+    console.error(empRes.error);
+    return;
+  }
+  employees = empRes.data || [];
+
+  // Load active doctors for linking dropdown
+  var docRes = await window.sb.from('clinic_doctors')
+    .select('id, name, is_active, is_owner')
+    .eq('owner_id', currentUser.id)
+    .order('name');
+
+  if (!docRes.error) {
+    doctors = (docRes.data || []).filter(function(d){ return d.is_active !== false; });
+  }
+
+  // Invalidate the SyDentLock employees cache so other pages get fresh data
+  if (window.SyDentLock && window.SyDentLock.invalidateEmployeesCache) {
+    window.SyDentLock.invalidateEmployeesCache();
+  }
+}
+
+function renderList() {
+  var box = $('empList');
+  if (employees.length === 0) {
+    box.innerHTML =
+      '<div class="empty">' +
+        '<div class="em-icon">👥</div>' +
+        '<div class="em-title">لا يوجد موظفون بعد</div>' +
+        '<div class="em-text">ابدأ بإضافة سكرتيرة أو طبيب من زر "إضافة موظف" بالأعلى.</div>' +
+      '</div>';
+    return;
+  }
+
+  // Group: owner first, then doctors, then secretaries
+  var sorted = employees.slice().sort(function(a, b){
+    var rank = { owner: 1, doctor: 2, secretary: 3 };
+    var ra = rank[a.role] || 99, rb = rank[b.role] || 99;
+    if (ra !== rb) return ra - rb;
+    return String(a.name).localeCompare(String(b.name), 'ar');
+  });
+
+  var html = '<div class="emp-grid">';
+  sorted.forEach(function(e){
+    var color = avatarColor(e.role);
+    var inactive = e.is_active === false;
+    var pinSet = !!e.pin_hash;
+    var roleBadgeClass = 'role-' + e.role;
+
+    var pinStatus;
+    if (pinSet) {
+      pinStatus = '<div class="emp-pin-status pin-set">✅ رقم السر محفوظ</div>';
+    } else {
+      pinStatus = '<div class="emp-pin-status pin-unset">⚠️ لم يُعيَّن رقم السر بعد</div>';
+    }
+
+    var actions = '';
+    if (e.role === 'owner') {
+      actions =
+        '<button class="btn btn-sm btn-outline" onclick="openOwnerPinModal()">🔐 تغيير رقم سرّي</button>';
+    } else {
+      actions =
+        '<button class="btn btn-sm btn-outline" onclick="openEditModal(\'' + e.id + '\')">✏️ تعديل</button>' +
+        '<button class="btn btn-sm btn-warning" onclick="toggleActive(\'' + e.id + '\')">' +
+          (inactive ? '✓ تفعيل' : '⏸ تعطيل') +
+        '</button>' +
+        '<button class="btn btn-sm btn-danger" onclick="deleteEmployee(\'' + e.id + '\')">🗑️ حذف</button>';
+    }
+
+    html +=
+      '<div class="emp-card' + (inactive ? ' inactive' : '') + '">' +
+        '<div class="emp-color-bar" style="background:' + color + ';"></div>' +
+        '<div class="emp-body">' +
+          '<div class="emp-head">' +
+            '<div class="emp-avatar" style="background:' + color + ';">' + escapeHtml(initials(e.name)) + '</div>' +
+            '<div>' +
+              '<div class="emp-name">' + escapeHtml(e.name) +
+                (inactive ? ' <span style="color:var(--red);font-size:11px;font-weight:700;">(معطّل)</span>' : '') +
+              '</div>' +
+              '<div class="emp-role-badge ' + roleBadgeClass + '">' + roleIcon(e.role) + ' ' + roleLabel(e.role) + '</div>' +
+            '</div>' +
+          '</div>' +
+          (e.role === 'doctor' && e.doctor_id ? '<div class="emp-info">🔗 مربوط بطبيب في قائمة الأطباء</div>' : '') +
+          pinStatus +
+          '<div class="emp-actions">' + actions + '</div>' +
+        '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+// ── Add/Edit Modal ──
+function onRoleChange() {
+  var role = $('eRole').value;
+  $('doctorLinkGroup').style.display = (role === 'doctor') ? '' : 'none';
+}
+
+function openAddModal() {
+  editingId = null;
+  $('modalTitle').textContent = '＋ إضافة موظف';
+  $('eName').value = '';
+  $('eRole').value = 'secretary';
+  $('eDoctorId').value = '';
+  $('ePin').value = '';
+  $('ePinConfirm').value = '';
+  clearMsg('modalMsg');
+
+  // Populate doctor link dropdown: only doctors NOT already linked to an employee
+  var linkedDoctorIds = employees
+    .filter(function(e){ return e.doctor_id; })
+    .map(function(e){ return e.doctor_id; });
+
+  var sel = $('eDoctorId');
+  sel.innerHTML = '<option value="">— لا ربط —</option>';
+  doctors.forEach(function(d){
+    if (linkedDoctorIds.indexOf(d.id) >= 0) return; // skip already linked
+    if (d.is_owner) return; // owner-doctor is reserved for the owner employee
+    var opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    sel.appendChild(opt);
+  });
+
+  onRoleChange();
+  $('empModal').classList.add('show');
+  setTimeout(function(){ $('eName').focus(); }, 80);
+}
+
+function openEditModal(id) {
+  var emp = employees.find(function(e){ return e.id === id; });
+  if (!emp) { showToast('الموظف غير موجود', true); return; }
+  if (emp.role === 'owner') { showToast('استخدم زر تغيير رقم السر للمالك', true); return; }
+
+  editingId = id;
+  $('modalTitle').textContent = '✏️ تعديل: ' + emp.name;
+  $('eName').value = emp.name;
+  $('eRole').value = emp.role;
+  $('ePin').value = '';
+  $('ePinConfirm').value = '';
+  clearMsg('modalMsg');
+
+  // Populate doctor link dropdown (include this employee's current link)
+  var linkedDoctorIds = employees
+    .filter(function(e){ return e.doctor_id && e.id !== id; })
+    .map(function(e){ return e.doctor_id; });
+
+  var sel = $('eDoctorId');
+  sel.innerHTML = '<option value="">— لا ربط —</option>';
+  doctors.forEach(function(d){
+    if (linkedDoctorIds.indexOf(d.id) >= 0) return;
+    if (d.is_owner) return;
+    var opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    sel.appendChild(opt);
+  });
+  $('eDoctorId').value = emp.doctor_id || '';
+
+  // PIN hint: editing, leave empty to keep current
+  $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
+
+  onRoleChange();
+  $('empModal').classList.add('show');
+  setTimeout(function(){ $('eName').focus(); }, 80);
+}
+
+function closeModal() {
+  $('empModal').classList.remove('show');
+  editingId = null;
+  $('pinHint').textContent = 'سيستخدم هذا الرقم للدخول من شاشة القفل. لا يمكن تركه فارغاً.';
+}
+
+async function saveEmployee() {
+  clearMsg('modalMsg');
+  var btn = $('saveBtn');
+  btn.disabled = true;
+  btn.textContent = '... جاري الحفظ';
+
+  try {
+    var name = ($('eName').value || '').trim();
+    var role = $('eRole').value;
+    var doctorId = role === 'doctor' ? ($('eDoctorId').value || null) : null;
+    var pin = ($('ePin').value || '').trim();
+    var pinConfirm = ($('ePinConfirm').value || '').trim();
+
+    // Validation
+    if (!name) {
+      showMsg('modalMsg', 'الاسم مطلوب', true);
+      return;
+    }
+    if (role !== 'doctor' && role !== 'secretary') {
+      showMsg('modalMsg', 'اختر دوراً صحيحاً', true);
+      return;
+    }
+
+    var pinHash = null;
+    if (editingId) {
+      // Editing — PIN is optional (leave empty to keep current)
+      if (pin) {
+        if (!/^\d{4,6}$/.test(pin)) {
+          showMsg('modalMsg', 'رقم السر يجب أن يكون 4 إلى 6 أرقام', true);
+          return;
+        }
+        if (pin !== pinConfirm) {
+          showMsg('modalMsg', 'رقم السر والتأكيد غير متطابقين', true);
+          return;
+        }
+        pinHash = await hashPin(pin);
+      }
+    } else {
+      // Adding new — PIN is required
+      if (!pin) {
+        showMsg('modalMsg', 'رقم السر مطلوب', true);
+        return;
+      }
+      if (!/^\d{4,6}$/.test(pin)) {
+        showMsg('modalMsg', 'رقم السر يجب أن يكون 4 إلى 6 أرقام', true);
+        return;
+      }
+      if (pin !== pinConfirm) {
+        showMsg('modalMsg', 'رقم السر والتأكيد غير متطابقين', true);
+        return;
+      }
+      pinHash = await hashPin(pin);
+    }
+
+    var row = {
+      owner_id: currentUser.id,
+      name: name,
+      role: role,
+      doctor_id: doctorId,
+      is_active: true
+    };
+    if (pinHash) row.pin_hash = pinHash;
+
+    var res;
+    if (editingId) {
+      res = await window.sb.from('clinic_employees')
+        .update(row).eq('id', editingId).eq('owner_id', currentUser.id);
+      if (!res.error) {
+        var origEmp = employees.find(function(e){ return e.id === editingId; });
+        await window.logAudit('employee.edit', {
+          entityId: editingId,
+          description: 'تعديل بيانات الموظف: ' + name,
+          oldValue: origEmp ? { name: origEmp.name, role: origEmp.role, doctor_id: origEmp.doctor_id } : null,
+          newValue: { name: name, role: role, doctor_id: doctorId, pin_changed: !!pinHash }
+        });
+      }
+    } else {
+      res = await window.sb.from('clinic_employees').insert(row).select().single();
+      if (!res.error && res.data) {
+        await window.logAudit('employee.create', {
+          entityId: res.data.id,
+          description: 'إضافة موظف جديد: ' + name + ' (' + roleLabel(role) + ')',
+          newValue: { name: name, role: role, doctor_id: doctorId }
+        });
+      }
+    }
+
+    if (res.error) {
+      var msg = 'فشل الحفظ';
+      // Detect uniqueness violations
+      var em = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (/uq_clinic_employees_doctor_link|23505/i.test(em) && doctorId) {
+        msg = 'هذا الطبيب مربوط بموظف آخر بالفعل';
+      }
+      showMsg('modalMsg', msg, true);
+      console.error(res.error);
+      return;
+    }
+
+    showToast(editingId ? '✓ تم التعديل' : '✓ تمت الإضافة');
+    closeModal();
+    await loadData();
+    renderList();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'حفظ';
+  }
+}
+
+async function deleteEmployee(id) {
+  var emp = employees.find(function(e){ return e.id === id; });
+  if (!emp) return;
+  if (emp.role === 'owner') {
+    showToast('لا يمكن حذف المالك', true);
+    return;
+  }
+
+  // Confirm
+  var msg = 'هل تريد فعلاً حذف الموظف "' + emp.name + '"؟\n\n' +
+            'تنبيه: السجلات التاريخية لهذا الموظف ستبقى في سجل النشاطات مع اسمه، لكن لن يقدر يدخل البرنامج بعد الحذف.';
+  if (!confirm(msg)) return;
+
+  var res = await window.sb.from('clinic_employees')
+    .delete().eq('id', id).eq('owner_id', currentUser.id);
+
+  if (res.error) {
+    showToast('فشل الحذف', true);
+    console.error(res.error);
+    return;
+  }
+
+  await window.logAudit('employee.delete', {
+    entityId: id,
+    description: 'حذف الموظف: ' + emp.name,
+    oldValue: { name: emp.name, role: emp.role, doctor_id: emp.doctor_id }
+  });
+
+  showToast('✓ تم الحذف');
+  await loadData();
+  renderList();
+}
+
+async function toggleActive(id) {
+  var emp = employees.find(function(e){ return e.id === id; });
+  if (!emp) return;
+  if (emp.role === 'owner') {
+    showToast('لا يمكن تعطيل المالك', true);
+    return;
+  }
+  // Flip: if currently active (true or undefined), set to false; otherwise activate.
+  var newState = (emp.is_active === false);
+
+  var res = await window.sb.from('clinic_employees')
+    .update({ is_active: newState })
+    .eq('id', id).eq('owner_id', currentUser.id);
+
+  if (res.error) {
+    showToast('فشلت العملية', true);
+    console.error(res.error);
+    return;
+  }
+
+  await window.logAudit('employee.toggle_active', {
+    entityId: id,
+    description: (newState ? 'تفعيل' : 'تعطيل') + ' الموظف: ' + emp.name,
+    oldValue: { is_active: emp.is_active },
+    newValue: { is_active: newState }
+  });
+
+  showToast(newState ? '✓ تم التفعيل' : '✓ تم التعطيل');
+  await loadData();
+  renderList();
+}
+
+// ── Owner PIN Modal ──
+function openOwnerPinModal() {
+  $('oNewPin').value = '';
+  $('oNewPinConfirm').value = '';
+  clearMsg('ownerMsg');
+  $('ownerPinModal').classList.add('show');
+  setTimeout(function(){ $('oNewPin').focus(); }, 80);
+}
+
+function closeOwnerModal() {
+  $('ownerPinModal').classList.remove('show');
+}
+
+async function saveOwnerPin() {
+  clearMsg('ownerMsg');
+  var btn = $('saveOwnerBtn');
+  btn.disabled = true;
+  btn.textContent = '... جاري الحفظ';
+
+  try {
+    var pin = ($('oNewPin').value || '').trim();
+    var pinConfirm = ($('oNewPinConfirm').value || '').trim();
+
+    if (!/^\d{4,6}$/.test(pin)) {
+      showMsg('ownerMsg', 'رقم السر يجب أن يكون 4 إلى 6 أرقام', true);
+      return;
+    }
+    if (pin !== pinConfirm) {
+      showMsg('ownerMsg', 'رقم السر والتأكيد غير متطابقين', true);
+      return;
+    }
+
+    var hash = await hashPin(pin);
+    var ownerEmp = employees.find(function(e){ return e.role === 'owner'; });
+    if (!ownerEmp) {
+      showMsg('ownerMsg', 'لم يتم العثور على حساب المالك', true);
+      return;
+    }
+
+    // Update both: clinic_employees AND clinic_settings (keep sync)
+    var resEmp = await window.sb.from('clinic_employees')
+      .update({ pin_hash: hash }).eq('id', ownerEmp.id).eq('owner_id', currentUser.id);
+
+    if (resEmp.error) {
+      showMsg('ownerMsg', 'فشل الحفظ', true);
+      console.error(resEmp.error);
+      return;
+    }
+
+    // Mirror to clinic_settings.lock_pin_hash for backward compat (the SyDentLock module reads from there)
+    await window.sb.from('clinic_settings')
+      .upsert({ owner_id: currentUser.id, lock_pin_hash: hash }, { onConflict: 'owner_id' });
+
+    // Invalidate the PIN cache so the new PIN takes effect immediately
+    if (window.SyDentLock && window.SyDentLock.invalidatePinCache) {
+      window.SyDentLock.invalidatePinCache();
+    }
+
+    await window.logAudit('settings.change_pin', {
+      description: 'تغيير رقم السر الخاص بالمالك'
+    });
+
+    showToast('✓ تم تغيير رقم السر');
+    closeOwnerModal();
+    await loadData();
+    renderList();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'حفظ';
+  }
+}
+
+// ── Init ──
+(async function init() {
+  currentUser = await window.sbRequireAuth();
+  if (!currentUser) return;
+  // Page guard: Owner only
+  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
+
+  await loadData();
+  renderList();
+})();
+</script>
+
+</body>
+</html>
