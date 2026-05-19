@@ -476,6 +476,7 @@ async function saveDoctor() {
   var notes = document.getElementById('dNotes').value.trim() || null;
 
   if (editingId) {
+    var origDoc = doctors.find(function(x){ return x.id === editingId; });
     var { error } = await window.sb.from('clinic_doctors')
       .update({
         name: name, role: role, phone: phone,
@@ -485,16 +486,33 @@ async function saveDoctor() {
       })
       .eq('id', editingId);
     if (error) { showToast('⚠️ فشل التعديل: ' + error.message); return; }
+    // Phase 5: audit log
+    if (window.logAudit) {
+      window.logAudit('doctor.edit', {
+        entityId: editingId,
+        description: 'تعديل بيانات الطبيب: ' + name,
+        oldValue: origDoc ? { name: origDoc.name, role: origDoc.role, share_percent: origDoc.share_percent } : null,
+        newValue: { name: name, role: role, share_percent: share }
+      });
+    }
     showToast('✅ تم التعديل');
   } else {
-    var { error: insertErr } = await window.sb.from('clinic_doctors').insert({
+    var { data: newDoc, error: insertErr } = await window.sb.from('clinic_doctors').insert({
       owner_id: currentUser.id,
       name: name, role: role, phone: phone,
       share_percent: share, weekly_hours: hours,
       notes: notes, color: pickedColor,
       is_owner: false, is_active: true
-    });
+    }).select().single();
     if (insertErr) { showToast('⚠️ فشل الإضافة: ' + insertErr.message); return; }
+    // Phase 5: audit log
+    if (window.logAudit && newDoc) {
+      window.logAudit('doctor.create', {
+        entityId: newDoc.id,
+        description: 'إضافة طبيب جديد: ' + name,
+        newValue: { name: name, role: role, share_percent: share }
+      });
+    }
     showToast('✅ تمت إضافة الطبيب');
   }
   closeModal();
@@ -516,6 +534,15 @@ async function toggleActive(id) {
     }
     return;
   }
+  // Phase 5: audit log
+  if (window.logAudit) {
+    window.logAudit('doctor.toggle_active', {
+      entityId: id,
+      description: (newState ? 'تفعيل' : 'تعطيل') + ' الطبيب: ' + d.name,
+      oldValue: { is_active: d.is_active },
+      newValue: { is_active: newState }
+    });
+  }
   showToast(newState ? '▶️ تم التفعيل' : '⏸️ تم التعطيل');
   await loadDoctors();
 }
@@ -528,6 +555,14 @@ async function deleteDoctor(id) {
 
   var { error } = await window.sb.from('clinic_doctors').delete().eq('id', id);
   if (error) { showToast('⚠️ فشل الحذف: ' + error.message); return; }
+  // Phase 5: audit log
+  if (window.logAudit) {
+    window.logAudit('doctor.delete', {
+      entityId: id,
+      description: 'حذف الطبيب: ' + d.name,
+      oldValue: { name: d.name, role: d.role, share_percent: d.share_percent }
+    });
+  }
   showToast('🗑️ تم الحذف');
   await loadDoctors();
 }

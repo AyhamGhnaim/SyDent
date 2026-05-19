@@ -3594,6 +3594,24 @@ async function submitAppt(e) {
       // H3 fix: refresh phone cache if the appointment was for a patient added
       // in another tab (so WhatsApp reminder for this appt can find the phone).
       if (_needsPatientCacheRefresh) await loadPatientPhones();
+      // Phase 5: audit log (after save success, after reload)
+      if (window.logAudit) {
+        var _prevAppt = appointments.find(function(a){ return a.id === editingId; });
+        var _pname = getPatientName(patientId) || '';
+        var _isStatusChange = _prevAppt && _prevAppt.status !== apptData.status;
+        var _actionType = _isStatusChange ? 'appointment.status_change' : 'appointment.edit';
+        var _desc = _isStatusChange
+          ? 'تغيير حالة موعد ' + _pname + ' من "' + (_prevAppt.status || '') + '" إلى "' + apptData.status + '"'
+          : 'تعديل موعد المريض: ' + _pname;
+        window.logAudit(_actionType, {
+          entityId: editingId,
+          patientId: patientId,
+          patientName: _pname,
+          description: _desc,
+          oldValue: _prevAppt ? { date: _prevAppt.date, time: _prevAppt.time, status: _prevAppt.status } : null,
+          newValue: { date: apptData.date, time: apptData.time, status: apptData.status }
+        });
+      }
     }
   } else {
     var ins = await window.sb.from('appointments').insert(apptData).select().single();
@@ -3690,6 +3708,18 @@ async function submitAppt(e) {
       await loadAppointments();
       // H3 fix: refresh phone cache if patient was newly added in another tab
       if (_needsPatientCacheRefresh) await loadPatientPhones();
+      // Phase 5: audit log (after insert success, after reload)
+      if (window.logAudit && ins.data) {
+        var _pname2 = getPatientName(patientId) || '';
+        window.logAudit('appointment.create', {
+          entityId: ins.data.id,
+          patientId: patientId,
+          patientName: _pname2,
+          description: 'إضافة موعد جديد للمريض: ' + _pname2
+                       + (apptData.date ? ' (' + apptData.date + ' ' + (apptData.time || '') + ')' : ' (مخطّط)'),
+          newValue: { date: apptData.date, time: apptData.time, status: apptData.status, is_planned: !!apptData.is_planned }
+        });
+      }
     }
   }
 
@@ -3702,10 +3732,22 @@ async function deleteAppt(id) {
     showToast('🔒 حسابك غير نشط — لا يمكن حذف المواعيد');
     return;
   }
+  var origAppt = appointments.find(function(a){ return a.id === id; });
   if (!confirm('حذف هذا الموعد؟')) return;
   const { error } = await window.sb.from('appointments').delete()
     .eq('id', id).eq('doctor_id', currentUser.id);
   if (error) { showToast('❌ خطأ في الحذف'); return; }
+  // Phase 5: audit log
+  if (window.logAudit && origAppt) {
+    var _pname = getPatientName(origAppt.patient_id) || '';
+    window.logAudit('appointment.delete', {
+      entityId: id,
+      patientId: origAppt.patient_id,
+      patientName: _pname,
+      description: 'حذف موعد المريض: ' + _pname + ' (' + (origAppt.date || 'مخطّط') + ' ' + (origAppt.time || '') + ')',
+      oldValue: { date: origAppt.date, time: origAppt.time, status: origAppt.status }
+    });
+  }
   showToast('🗑️ تم حذف الموعد');
   await loadAppointments();
 }

@@ -826,13 +826,27 @@ async function submitPatient(e) {
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
   if (editingId) {
+    var origPat = patients.find(function(p){ return p.id === editingId; });
     const { error } = await window.sb
       .from('patients')
       .update({ name, phone, dob, gender, allergies, notes })
       .eq('id', editingId)
       .eq('doctor_id', currentUser.id);
     if (error) { showToast('❌ خطأ في التعديل'); }
-    else { showToast('✅ تم تعديل بيانات المريض'); closeModal(); await loadPatients(); }
+    else {
+      // Phase 5: audit log
+      if (window.logAudit) {
+        window.logAudit('patient.edit', {
+          entityId: editingId,
+          patientId: editingId,
+          patientName: name,
+          description: 'تعديل بيانات المريض: ' + name,
+          oldValue: origPat ? { name: origPat.name, phone: origPat.phone, allergies: origPat.allergies } : null,
+          newValue: { name: name, phone: phone, allergies: allergies }
+        });
+      }
+      showToast('✅ تم تعديل بيانات المريض'); closeModal(); await loadPatients();
+    }
   } else {
     const maxSeq = patients.reduce((mx, p) => {
       const n = parseInt((p.local_id || 'P000').slice(1));
@@ -841,14 +855,26 @@ async function submitPatient(e) {
     const local_id = 'P' + String(maxSeq + 1).padStart(3, '0');
     const today = new Date().toISOString().slice(0, 10);
 
-    const { error } = await window.sb.from('patients').insert({
+    const { data: newPat, error } = await window.sb.from('patients').insert({
       doctor_id: currentUser.id,
       local_id, name, phone, dob, gender,
       payment: 'متبقي', status: 'جديد',
       allergies, notes, last_visit: today
-    });
+    }).select().single();
     if (error) { showToast('❌ خطأ في الإضافة'); }
-    else { showToast('✅ تمت إضافة المريض بنجاح'); closeModal(); await loadPatients(); }
+    else {
+      // Phase 5: audit log
+      if (window.logAudit && newPat) {
+        window.logAudit('patient.create', {
+          entityId: newPat.id,
+          patientId: newPat.id,
+          patientName: name,
+          description: 'إضافة مريض جديد: ' + name + ' (' + local_id + ')',
+          newValue: { name: name, local_id: local_id, phone: phone }
+        });
+      }
+      showToast('✅ تمت إضافة المريض بنجاح'); closeModal(); await loadPatients();
+    }
   }
 
   btn.disabled = false;
@@ -875,6 +901,7 @@ async function deletePatient(id) {
     showToast('🔒 حذف المريض متاح للمالك فقط');
     return;
   }
+  var origPat = patients.find(function(p){ return p.id === id; });
   if (!confirm('هل أنت متأكد من حذف هذا المريض؟ سيتم حذف جميع بياناته.')) return;
   const { error } = await window.sb
     .from('patients')
@@ -882,6 +909,16 @@ async function deletePatient(id) {
     .eq('id', id)
     .eq('doctor_id', currentUser.id);
   if (error) { showToast('❌ خطأ في الحذف'); return; }
+  // Phase 5: audit log
+  if (window.logAudit && origPat) {
+    window.logAudit('patient.delete', {
+      entityId: id,
+      patientId: id,
+      patientName: origPat.name,
+      description: 'حذف المريض: ' + origPat.name + ' (' + (origPat.local_id || '') + ')',
+      oldValue: { name: origPat.name, local_id: origPat.local_id, phone: origPat.phone }
+    });
+  }
   showToast('🗑️ تم حذف المريض');
   await loadPatients();
 }

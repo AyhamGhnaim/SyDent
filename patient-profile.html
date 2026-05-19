@@ -5615,6 +5615,16 @@ async function delSession(id) {
     showToast('⚠️ فشل حذف الجلسة');
     return;
   }
+  // Phase 5: audit log
+  if (window.logAudit && sess) {
+    window.logAudit('session.delete', {
+      entityId: id,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'حذف جلسة: ' + (sess.type || '') + ' — ' + (sess.cost || 0) + ' ل.س',
+      oldValue: { type: sess.type, cost: sess.cost, date: sess.date, tooth_num: sess.tooth_num, status: sess.status }
+    });
+  }
   sessions = sessions.filter(function(s){ return s.id !== id; });
 
   // Rebuild all splits chronologically — handles every edge case automatically.
@@ -5652,6 +5662,7 @@ async function delPayment(id) {
     showToast('🔒 حسابك غير نشط — لا يمكن حذف الدفعات');
     return;
   }
+  var origPay = payments.find(function(p){ return p.id === id; });
   if (!confirm('حذف هذه الدفعة؟')) return;
   try {
     var res = await window.sb.from('ledger_payments').delete()
@@ -5665,6 +5676,23 @@ async function delPayment(id) {
     console.warn('delPayment threw:', e);
     showToast('⚠️ فشل حذف الدفعة');
     return;
+  }
+  // Phase 5: audit log (BEFORE filtering out so smart-alerts trigger checks
+  // 'payment.delete with old_value.created_at' for the 'deleted within 1h' rule)
+  if (window.logAudit && origPay) {
+    window.logAudit('payment.delete', {
+      entityId: id,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'حذف دفعة: ' + (origPay.amount || 0) + ' ل.س (' + (origPay.method || '') + ')',
+      oldValue: {
+        amount: origPay.amount,
+        method: origPay.method,
+        date: origPay.date,
+        notes: origPay.notes,
+        created_at: origPay.created_at  // ← Critical for smart-alert "deleted within 1h" detection
+      }
+    });
   }
   payments = payments.filter(function(p){ return p.id !== id; });
   // payment_splits.payment_id has ON DELETE CASCADE → DB already cleaned them up.
@@ -6141,6 +6169,16 @@ async function savePayment() {
     document.getElementById('payAmount').value = '';
     document.getElementById('payNotes').value  = '';
     document.getElementById('payDate').value   = toDay();
+    // Phase 5: audit log (after success)
+    if (window.logAudit) {
+      window.logAudit('payment.create', {
+        entityId: newPay.id,
+        patientId: patientId,
+        patientName: (patient && patient.name) || '',
+        description: 'تسجيل دفعة: ' + amount + ' ل.س (' + method + ')',
+        newValue: { amount: amount, method: method, date: date, notes: notes }
+      });
+    }
     if (realloc_ok) {
       showToast('✅ تم تسجيل الدفعة');
     } else {
@@ -6205,6 +6243,16 @@ async function saveSession() {
   document.getElementById('sDesc').value=''; document.getElementById('sNotes').value='';
   document.getElementById('sDate').value=toDay();
   if (apptEl) apptEl.value = '';
+  // Phase 5: audit log (after success)
+  if (window.logAudit) {
+    window.logAudit('session.create', {
+      entityId: newSess.id,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'إضافة جلسة: ' + type + ' — ' + cost + ' ل.س',
+      newValue: { type: type, cost: cost, date: date, status: 'completed', provider_id: defaultProvider }
+    });
+  }
   showToast('✅ تم حفظ الجلسة');
 }
 

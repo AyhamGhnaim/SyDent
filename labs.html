@@ -1422,6 +1422,7 @@ async function saveLabOrder() {
   }
 
   if (id) {
+    var origLO = allOrders.find(function(x){ return x.id === id; });
     var res = await window.sb.from('lab_orders')
       .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
     if (res.error && isMissingApptColumn(res.error)) {
@@ -1435,6 +1436,18 @@ async function saveLabOrder() {
     if (res.data) {
       var idx = allOrders.findIndex(function(x){ return x.id === id; });
       if (idx !== -1) allOrders[idx] = res.data;
+    }
+    // Phase 5: audit log
+    if (window.logAudit) {
+      var pname = getPatientName(payload.patient_id);
+      window.logAudit('lab.edit', {
+        entityId: id,
+        patientId: payload.patient_id,
+        patientName: pname,
+        description: 'تعديل طلب مخبر للمريض: ' + pname,
+        oldValue: origLO ? { lab_id: origLO.lab_id, work_type: origLO.work_type, status: origLO.status } : null,
+        newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: payload.status }
+      });
     }
     showToast('✅ تم تحديث الطلب');
   } else {
@@ -1450,6 +1463,17 @@ async function saveLabOrder() {
     }
     if (res2.error) { showToast('⚠️ فشل الحفظ: ' + res2.error.message); return; }
     if (res2.data) allOrders.unshift(res2.data);
+    // Phase 5: audit log
+    if (window.logAudit && res2.data) {
+      var pname2 = getPatientName(payload.patient_id);
+      window.logAudit('lab.create', {
+        entityId: res2.data.id,
+        patientId: payload.patient_id,
+        patientName: pname2,
+        description: 'إرسال طلب مخبر للمريض: ' + pname2 + ' — ' + (payload.work_type || ''),
+        newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: 'sent' }
+      });
+    }
     showToast('✅ تم إرسال الطلب للمخبر');
   }
 
@@ -1501,10 +1525,22 @@ async function delLabOrder(id) {
     showToast('🔒 حسابك غير نشط — لا يمكن حذف طلبات المخبر');
     return;
   }
+  var origLO = allOrders.find(function(x){ return x.id === id; });
   if (!confirm('هل تريد حذف هذا الطلب نهائياً؟')) return;
   const { error } = await window.sb.from('lab_orders')
     .delete().eq('id', id).eq('doctor_id', currentUser.id);
   if (error) { showToast('⚠️ فشل الحذف'); return; }
+  // Phase 5: audit log
+  if (window.logAudit && origLO) {
+    var pname = getPatientName(origLO.patient_id);
+    window.logAudit('lab.delete', {
+      entityId: id,
+      patientId: origLO.patient_id,
+      patientName: pname,
+      description: 'حذف طلب مخبر للمريض: ' + pname + ' — ' + (origLO.work_type || ''),
+      oldValue: { lab_id: origLO.lab_id, work_type: origLO.work_type, status: origLO.status }
+    });
+  }
   allOrders = allOrders.filter(function(x){ return x.id !== id; });
   renderStats();
   renderTable();
