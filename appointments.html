@@ -501,6 +501,26 @@ body {
   padding: 26px;
   animation: slideUp .25s ease;
 }
+/* Phase 6 L: themed thin scrollbar for modals — the default browser bar
+   was visually loud (especially in RTL where it lands on the left edge
+   and grabs attention). Matches design tokens (--text2 transparent). */
+.modal::-webkit-scrollbar {
+  width: 6px;
+}
+.modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.modal::-webkit-scrollbar-thumb {
+  background: rgba(141,160,189,0.3);
+  border-radius: 3px;
+}
+.modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(141,160,189,0.5);
+}
+.modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(141,160,189,0.3) transparent;
+}
 @keyframes slideUp {
   from { opacity:0; transform:translateY(16px); }
   to   { opacity:1; transform:translateY(0); }
@@ -2957,13 +2977,23 @@ function renderApptProcedures(appt) {
   }
 
   // Planned sessions dropdown (unattached, same patient)
+  // Phase 6 L bugfix: legacy appointments saved before patient_id became
+  // standard have patient_id=null but a valid patient_name. Backfill from
+  // the in-memory cache so the planned-procedure picker works on them too.
+  // No DB write here — just the in-memory resolution. The next save of this
+  // appointment will persist patient_id (the main save flow already resolves
+  // by name when patient_id is null).
   var pid = appt.patient_id;
+  if (!pid && appt.patient_name) {
+    var cached = patientsCache['__name__' + appt.patient_name];
+    if (cached && cached.id) pid = cached.id;
+  }
   var planned = pid ? (plannedSessionsByPatient[pid] || []) : [];
   selEl.innerHTML = '';
   if (!pid) {
     var opt = document.createElement('option');
     opt.value = '';
-    opt.textContent = '— هذا الموعد لا يحتوي patient_id (إصدار قديم) —';
+    opt.textContent = '— لم يتم العثور على مريض مرتبط بهذا الموعد —';
     selEl.appendChild(opt);
     addBtn.disabled = true;
     addBtn.style.opacity = '0.4';
