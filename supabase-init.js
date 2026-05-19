@@ -1137,7 +1137,16 @@
         // Employee deactivated (or fully deleted) → device read-only
         return true;
       }
-      return false; // active employee → device unlocked (regardless of doctor row state)
+      // Phase 5g (simplest path): if the employee is a doctor AND the
+      // linked clinic_doctors row is hidden from reports (is_active=false),
+      // treat as inactive. Same UX as employee deactivation: banner +
+      // pill + provider-reports empty state + action guards. Owner toggles
+      // this from doctors.html "إخفاء من التقارير".
+      if (emp.role === 'doctor' && emp.doctor_id && _doctorsListCache) {
+        var docRow = _doctorsListCache.find(function(d){ return d.id === emp.doctor_id; });
+        if (!docRow) return true; // doctor row hidden → treat device as read-only
+      }
+      return false; // active employee with visible doctor row → unlocked
     }
 
     // ── Path 2: Phase 4.1 legacy doctor-only lock (pre-Phase-5 devices) ──

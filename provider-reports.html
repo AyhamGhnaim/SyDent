@@ -1341,10 +1341,10 @@ window.onPTRRefresh = function() { loadAll(); };
   // Mark "this month" preset as active
   document.querySelectorAll('.preset-btn')[0].classList.add('active');
 
-  // Phase 5g: ensure SyDentLock's employee+doctor caches are loaded BEFORE
-  // any hidden/inactive check — otherwise the check returns false on null
-  // cache and the guard silently passes. autoInit preloads these in
-  // parallel — await them explicitly here so timing is deterministic.
+  // Ensure SyDentLock's employee+doctor caches are loaded BEFORE the
+  // inactive check — otherwise the check returns false on null cache and
+  // the guard silently passes. autoInit preloads these in parallel — await
+  // them explicitly here so timing is deterministic.
   if (window.SyDentLock) {
     if (typeof window.SyDentLock.loadEmployees === 'function') {
       try { await window.SyDentLock.loadEmployees(); } catch(e) {}
@@ -1354,40 +1354,32 @@ window.onPTRRefresh = function() { loadAll(); };
     }
   }
 
-  // Phase 5g (HARD GUARD): if doctor's account is inactive OR row is hidden
-  // from reports, replace the entire main content with a clear empty state
-  // BEFORE any data loads. Simplest and most reliable defense — runs before
-  // loadAll() so no other doctors' data is even fetched. Sidebar also hides
-  // the link, but this guard catches direct-URL access.
-  if (window.SyDentLock && window.SyDentLock.isDoctor()) {
-    var blockReason = null;
-    if (typeof window.SyDentLock.isDoctorAccountInactive === 'function'
-        && window.SyDentLock.isDoctorAccountInactive()) {
-      blockReason = 'inactive';
-    } else if (typeof window.SyDentLock.isDoctorRowHidden === 'function'
-               && window.SyDentLock.isDoctorRowHidden()) {
-      blockReason = 'hidden';
+  // HARD GUARD: if the locked doctor's account is inactive (either employee
+  // deactivated OR doctor row hidden from reports — both unified in
+  // isDoctorAccountInactive as of Phase 5g), replace the main content with
+  // an empty state BEFORE loadAll runs. The autoInit banner+pill handle
+  // the rest of the device-wide UX.
+  if (window.SyDentLock && window.SyDentLock.isDoctor()
+      && typeof window.SyDentLock.isDoctorAccountInactive === 'function'
+      && window.SyDentLock.isDoctorAccountInactive()) {
+    var mainEl = document.getElementById('sbMainContent') || document.querySelector('.main');
+    if (mainEl) {
+      mainEl.innerHTML =
+        '<div style="min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;font-family:\'Cairo\',sans-serif;">' +
+          '<div style="font-size:72px;line-height:1;margin-bottom:20px;">🔒</div>' +
+          '<div style="font-size:20px;font-weight:800;color:#e1f4ee;margin-bottom:12px;">' +
+            'تقارير الأطباء غير متاحة' +
+          '</div>' +
+          '<div style="font-size:13px;color:#8a9ab5;line-height:1.8;max-width:420px;">' +
+            'حسابك معطّل من قِبَل صاحب العيادة. ' +
+            'الرجاء التواصل معه لإعادة التفعيل.' +
+          '</div>' +
+          '<a href="index.html" style="margin-top:28px;padding:12px 28px;background:#2ee89e;border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;">' +
+            '↩ العودة للصفحة الرئيسية' +
+          '</a>' +
+        '</div>';
     }
-    if (blockReason) {
-      var mainEl = document.getElementById('sbMainContent') || document.querySelector('.main');
-      if (mainEl) {
-        mainEl.innerHTML =
-          '<div style="min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;font-family:\'Cairo\',sans-serif;">' +
-            '<div style="font-size:72px;line-height:1;margin-bottom:20px;">🔒</div>' +
-            '<div style="font-size:20px;font-weight:800;color:#e1f4ee;margin-bottom:12px;">' +
-              'تقارير الأطباء غير متاحة' +
-            '</div>' +
-            '<div style="font-size:13px;color:#8a9ab5;line-height:1.8;max-width:420px;">' +
-              'تم إخفاء حسابك من تقارير الإنتاج من قِبَل صاحب العيادة. ' +
-              'الرجاء التواصل معه لإعادة الإظهار.' +
-            '</div>' +
-            '<a href="index.html" style="margin-top:28px;padding:12px 28px;background:#2ee89e;border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;">' +
-              '↩ العودة للصفحة الرئيسية' +
-            '</a>' +
-          '</div>';
-      }
-      return;
-    }
+    return;
   }
 
   await loadAll();

@@ -174,24 +174,7 @@ function buildHTML(activeId) {
     doctor:    ['treatments', 'doctors', 'employees', 'settings', 'audit-log'],
     secretary: ['treatments', 'doctors', 'employees', 'settings', 'provider-reports', 'audit-log']
   };
-  // Copy the array (not by-reference) so we can safely append to it below
-  // without mutating the shared BLOCKED table on subsequent calls.
-  var blocked = (BLOCKED[role] || []).slice();
-
-  // Phase 5g: if this device is locked to a doctor whose clinic_doctors row
-  // is hidden from reports (toggled by Owner from doctors.html), hide the
-  // entire "تقارير الأطباء" link from the sidebar. Cleanest implementation:
-  // no link → no entry point → no possibility of leaking other doctors' data.
-  // The page itself also hard-guards on direct-URL access (defense in depth).
-  // Note: initial buildHTML may run before SyDentLock caches load — in that
-  // window isDoctorRowHidden() returns false (safe default = show the link),
-  // and refreshSidebarDynamic() will remove the link after caches load.
-  if (role === 'doctor' &&
-      window.SyDentLock &&
-      typeof window.SyDentLock.isDoctorRowHidden === 'function' &&
-      window.SyDentLock.isDoctorRowHidden()) {
-    if (blocked.indexOf('provider-reports') < 0) blocked.push('provider-reports');
-  }
+  var blocked = BLOCKED[role] || [];
 
   // Drop blocked items + drop adjacent section headers that would become orphans.
   var filtered = navItems.filter(function(item){
@@ -317,43 +300,6 @@ async function refreshSidebarDynamic() {
     } else if (badge) {
       badge.remove();
     }
-  }
-
-  // Phase 5g: post-cache cleanup. The initial buildHTML may have run BEFORE
-  // SyDentLock's _doctorsListCache + _employeesListCache loaded, so the
-  // "hide provider-reports for hidden doctor" check would have returned
-  // false and the link would still be visible. Re-check now and remove it
-  // if needed. This closes the 200-500ms window between page paint and
-  // cache hydration.
-  try {
-    if (window.SyDentLock &&
-        typeof window.SyDentLock.isDoctor === 'function' &&
-        window.SyDentLock.isDoctor()) {
-      // Ensure caches are loaded before checking
-      if (typeof window.SyDentLock.loadEmployees === 'function') {
-        await window.SyDentLock.loadEmployees();
-      }
-      if (typeof window.SyDentLock.loadDoctors === 'function') {
-        await window.SyDentLock.loadDoctors();
-      }
-      if (typeof window.SyDentLock.isDoctorRowHidden === 'function' &&
-          window.SyDentLock.isDoctorRowHidden()) {
-        var prLink = document.querySelector('.sb-item[href="provider-reports.html"]');
-        if (prLink) {
-          prLink.remove();
-          // Clean up orphan section header — if "تحليل" section now has no
-          // following items (audit-log already blocked for doctors), remove it.
-          document.querySelectorAll('.sb-section').forEach(function(sec){
-            var next = sec.nextElementSibling;
-            if (!next || next.classList.contains('sb-section')) {
-              sec.remove();
-            }
-          });
-        }
-      }
-    }
-  } catch(e) {
-    console.warn('[sidebar] provider-reports visibility refresh failed:', e);
   }
 }
 
