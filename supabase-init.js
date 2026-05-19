@@ -1304,6 +1304,53 @@
     });
     injectHeaderButton();
     applyRoleGuards();
+
+    // Phase 6 M (Obs M): multi-tab sync.
+    // The lock identity lives in localStorage. If another tab switches
+    // the role (or the Owner disables/changes the clinic PIN) while
+    // THIS tab has the lock modal open, the modal's local snapshot of
+    // curRole/curDoctorId/curEmployeeId becomes stale — the next click
+    // would apply a transition computed from outdated state. Listening
+    // for the 'storage' event (fires in OTHER tabs only, never in the
+    // tab that wrote) lets us react cleanly.
+    //
+    // Strategy:
+    //   • Identity keys (LS_ROLE, LS_DOCTOR_ID, LS_EMPLOYEE_ID) changed
+    //     → close any open lock modal in this tab AND reload, so the
+    //       page re-applies guards/banners with the new identity. This
+    //       matches the behavior of a fresh tab opening after the switch.
+    //   • Failure/cooldown keys (LS_FAIL_COUNT, LS_COOLDOWN) changed
+    //     → don't reload; just refresh any open modal's PIN message so
+    //       the cooldown countdown reflects reality.
+    //   • Anything else (settings, app preferences) → ignored here.
+    if (typeof window.addEventListener === 'function' && !window._sydLockStorageWired) {
+      window._sydLockStorageWired = true;
+      window.addEventListener('storage', function(e){
+        if (!e || !e.key) return;
+        var identityChanged = (e.key === LS_ROLE || e.key === LS_DOCTOR_ID || e.key === LS_EMPLOYEE_ID);
+        var rateLimitChanged = (e.key === LS_FAIL_COUNT || e.key === LS_COOLDOWN);
+        if (!identityChanged && !rateLimitChanged) return;
+        var openModal = document.getElementById('sdLockModal');
+        if (identityChanged) {
+          // Close the modal (if any) so a stale snapshot doesn't act.
+          // Don't bother with a11y cleanup — the page is about to reload.
+          if (openModal) openModal.remove();
+          // Tiny defer so the storage write in the other tab has fully
+          // landed in our localStorage (avoids racing the reload).
+          setTimeout(function(){ window.location.reload(); }, 50);
+          return;
+        }
+        // rateLimitChanged: just nudge the open modal's PIN message if any.
+        if (openModal) {
+          var pm = openModal.querySelector('#sdPinMsg');
+          if (pm) {
+            if (isInCooldown()) {
+              pm.textContent = '⏳ تم تجاوز عدد المحاولات (من جهاز آخر). أعد المحاولة بعد ' + cooldownSecondsLeft() + ' ثانية.';
+            }
+          }
+        }
+      });
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
