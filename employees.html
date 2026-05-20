@@ -257,9 +257,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label>الدور *</label>
+        <!-- Phase 6 W: Unified role + provider_type dropdown. Each option carries
+             a composite value 'role:provider_type' so a single pick captures both
+             clinical role (what they do) and employee category (where they fit
+             in the lock-mode hierarchy). The old separate "نوع المزوّد" dropdown
+             is gone — its information now lives in the role choice itself,
+             eliminating the contradiction where a chair-side assistant had to
+             be modeled as a "doctor" employee just to access the provider_type
+             field. onRoleChange() splits the composite value when the user picks. -->
         <select id="eRole" onchange="onRoleChange()">
-          <option value="secretary">👩‍💼 سكرتيرة</option>
-          <option value="doctor">👨‍⚕️ طبيب</option>
+          <option value="doctor:doctor">🦷 طبيب أسنان</option>
+          <option value="doctor:hygienist">🩺 مساعد/ممرض (Hygienist)</option>
+          <option value="doctor:assistant">🤝 مساعدة كرسي</option>
+          <option value="secretary:none">👩‍💼 سكرتيرة</option>
         </select>
         <div class="hint">المالك (Owner) لا يمكن إضافته يدوياً — حساب الـ Owner محفوظ تلقائياً.</div>
       </div>
@@ -286,62 +296,64 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           </div>
         </div>
 
-        <!-- Phase 6 R (Migration 13): provider_type + compensation_model.
-             Two foundational dropdowns laying the schema for the upcoming
-             payments + reports redesign. Today only provider_type affects
-             behavior (filtering in provider-reports + visual indicators
-             elsewhere). compensation_model is captured but not yet used;
-             the upcoming payments page will read it to decide whether a
-             given person earns by % of production, a fixed salary, both,
-             or nothing through this table.
-             Both default to the legacy values (doctor + percentage) so
-             pre-Migration-13 clinics keep current behavior unchanged. -->
-        <div class="form-row">
+        <!-- Phase 6 W (Migration 13 + 14): Dynamic compensation block.
+             provider_type comes from the unified role dropdown above
+             (e.g. 'doctor:hygienist'), so this section ONLY drives
+             compensation_model + the field(s) that model implies.
+
+             The four models map cleanly to the dental industry's standard
+             compensation formulas:
+
+               percentage → "%" only       (associate dentist pattern)
+               salary     → monthly amount (hygienist/secretary pattern)
+               hybrid     → both shown     (salary-plus pattern, ADA-described)
+               none       → no fields      (owner who draws profit directly)
+
+             updateCompensationFieldsVisibility() flips visibility on change
+             so the user never sees fields irrelevant to the chosen model.
+             A small hint line summarizes what each model means in plain Arabic. -->
+        <div class="form-group">
+          <label>نموذج التعويض</label>
+          <select id="eDocCompensation" onchange="updateCompensationFieldsVisibility()">
+            <option value="percentage">% من الإنتاج (طبيب مع نسبة)</option>
+            <option value="salary">راتب ثابت شهري</option>
+            <option value="hybrid">راتب ثابت + نسبة من الإنتاج</option>
+            <option value="none">بدون تعويض من هذا الجدول</option>
+          </select>
+          <div class="hint" id="compensationHint" style="font-size:11px;color:var(--text2);">سيُستخدم في صفحة الرواتب القادمة لحساب المستحقات.</div>
+        </div>
+
+        <!-- Share % field — visible for percentage + hybrid only. -->
+        <div class="form-row" id="shareFieldRow">
           <div class="form-group">
-            <label>نوع المزوّد <span style="color:var(--text2);font-weight:normal;font-size:11px;">(Phase 6 R)</span></label>
-            <select id="eDocProviderType">
-              <option value="doctor">🦷 طبيب أسنان</option>
-              <option value="hygienist">🩺 مساعد/ممرض (Hygienist)</option>
-              <option value="assistant">🤝 مساعدة كرسي</option>
-            </select>
-            <div class="hint" style="font-size:11px;color:var(--text2);">يحدد كيف يظهر في القوائم والتقارير</div>
+            <label>نسبة الطبيب من الجلسة (%)</label>
+            <input type="number" id="eDocShare" min="0" max="100" placeholder="مثلاً: 40">
+            <div class="hint" style="font-size:11px;color:var(--text2);">النسبة المئوية من قيمة الجلسة التي يستحقها هذا المزوّد.</div>
           </div>
           <div class="form-group">
-            <label>نموذج التعويض</label>
-            <select id="eDocCompensation">
-              <option value="percentage">% من الإنتاج</option>
-              <option value="salary">راتب ثابت</option>
-              <option value="hybrid">راتب + bonus</option>
-              <option value="none">بدون تعويض من هذا الجدول</option>
-            </select>
-            <div class="hint" style="font-size:11px;color:var(--text2);">سيُستخدم في صفحة الرواتب القادمة</div>
+            <label>ساعات العمل (أسبوعياً)</label>
+            <input type="number" id="eDocHours" min="0" placeholder="مثلاً: 24">
           </div>
         </div>
 
+        <!-- Monthly salary field — visible for salary + hybrid only. Hidden
+             by default; updateCompensationFieldsVisibility() reveals it when
+             the model needs it. The numeric input uses min=0; defensive
+             validation in saveEmployee() rejects negative or NaN. -->
+        <div class="form-group" id="salaryFieldGroup" style="display:none;">
+          <label>الراتب الشهري (ل.س)</label>
+          <input type="number" id="eDocMonthlySalary" min="0" step="1000" placeholder="مثلاً: 500000">
+          <div class="hint" style="font-size:11px;color:var(--text2);">المبلغ الثابت الذي يستحقه هذا المزوّد شهرياً.</div>
+        </div>
+
         <div class="form-group">
-          <label>اللون المميّز (يظهر بجانب اسم الطبيب)</label>
-          <!-- Phase 6 Q: uses shared SyDentColorPicker, identical pattern to
-               doctors.html (Phase 6 K2.2). Hidden #eDocColor preserves the
-               get/set API used by saveEmployee(). _setEmpDocColor() keeps the
-               swatch, hidden input, and module-scoped _empPickedColor variable
-               in sync — a single sync point per the established convention. -->
+          <label>اللون المميّز (يظهر بجانب الاسم)</label>
           <div style="display:flex;align-items:center;gap:10px;">
             <input type="hidden" id="eDocColor" value="#63b3ed">
             <button type="button" id="eDocColorSwatch" onclick="openEmpDocColorPicker()"
                     aria-label="اختيار اللون"
                     style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#63b3ed;flex-shrink:0;"></button>
-            <span style="font-size:12px;color:var(--text2);">اختر أي لون — يظهر بجانب اسم الطبيب</span>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>نسبة الطبيب من الجلسة (%)</label>
-            <input type="number" id="eDocShare" min="0" max="100" placeholder="مثلاً: 40">
-          </div>
-          <div class="form-group">
-            <label>ساعات العمل (أسبوعياً)</label>
-            <input type="number" id="eDocHours" min="0" placeholder="مثلاً: 24">
+            <span style="font-size:12px;color:var(--text2);">اختر أي لون — يظهر بجانب الاسم</span>
           </div>
         </div>
 
@@ -441,6 +453,22 @@ function roleLabel(r) {
 }
 function roleIcon(r) {
   return r === 'owner' ? '👑' : (r === 'doctor' ? '👨‍⚕️' : '👩‍💼');
+}
+// Phase 6 W: enhanced label that includes provider_type subtype for doctors.
+// Used in employee cards so the Owner sees at a glance that a 'doctor' is
+// actually a hygienist or chair-side assistant. Falls back to the basic
+// roleLabel() when no subtype information is available.
+function roleLabelExt(role, providerType) {
+  if (role !== 'doctor') return roleLabel(role);
+  if (providerType === 'hygienist') return 'مساعد/ممرض';
+  if (providerType === 'assistant') return 'مساعدة كرسي';
+  return 'طبيب';  // doctor or null/undefined → default
+}
+function roleIconExt(role, providerType) {
+  if (role !== 'doctor') return roleIcon(role);
+  if (providerType === 'hygienist') return '🩺';
+  if (providerType === 'assistant') return '🤝';
+  return '🦷';  // doctor → tooth icon
 }
 
 // Phase 6 T: avatarColor() now accepts the full employee row (not just role).
@@ -558,16 +586,23 @@ async function loadData() {
   // blank → saveEmployee would write null → data loss). Bandwidth cost
   // is negligible (the doctors table is tiny — usually <20 rows).
   // Phase 6 R (Migration 13): provider_type + compensation_model added to the
-  // SELECT list. Graceful fallback below if the migration hasn't run yet —
-  // the retry strips them and the modal defaults take over (doctor + percentage).
+  // SELECT list.
+  // Phase 6 W (Migration 14): monthly_salary added too. Two-stage retry: strip
+  // M14 first, then M13, then fall back to the legacy column list.
   var docRes = await window.sb.from('clinic_doctors')
-    .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner, provider_type, compensation_model')
+    .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner, provider_type, compensation_model, monthly_salary')
     .eq('owner_id', currentUser.id)
     .order('name');
 
-  // Pre-Migration-13 fallback: if PostgREST rejected the new columns (42703),
-  // retry with the legacy column set. The form will show empty dropdowns and
-  // saveEmployee() will gracefully skip writing those fields on the legacy path.
+  // Pre-Migration-14 fallback: drop monthly_salary if missing.
+  if (docRes.error && /42703|monthly_salary/i.test(
+        (docRes.error.message || '') + ' ' + (docRes.error.code || ''))) {
+    docRes = await window.sb.from('clinic_doctors')
+      .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner, provider_type, compensation_model')
+      .eq('owner_id', currentUser.id)
+      .order('name');
+  }
+  // Pre-Migration-13 fallback: drop provider_type + compensation_model too.
   if (docRes.error && /42703|provider_type|compensation_model/i.test(
         (docRes.error.message || '') + ' ' + (docRes.error.code || ''))) {
     docRes = await window.sb.from('clinic_doctors')
@@ -615,6 +650,14 @@ function renderList() {
     var pinSet = !!e.pin_hash;
     var roleBadgeClass = 'role-' + e.role;
 
+    // Phase 6 W: Resolve provider_type from the linked clinic_doctors row so
+    // the badge can show "🩺 مساعد/ممرض" instead of the generic "👨‍⚕️ طبيب"
+    // for hygienists and assistants. Falls back to 'doctor' if no linkage.
+    var linkedDocForBadge = (e.role === 'doctor' && e.doctor_id)
+      ? doctors.find(function(d){ return d.id === e.doctor_id; })
+      : null;
+    var empProviderType = linkedDocForBadge ? linkedDocForBadge.provider_type : null;
+
     var pinStatus;
     if (pinSet) {
       pinStatus = '<div class="emp-pin-status pin-set">✅ رقم السر محفوظ</div>';
@@ -648,7 +691,7 @@ function renderList() {
               '<div class="emp-name">' + escapeHtml(e.name) +
                 (inactive ? ' <span style="color:var(--red);font-size:11px;font-weight:700;">(معطّل)</span>' : '') +
               '</div>' +
-              '<div class="emp-role-badge ' + roleBadgeClass + '">' + roleIcon(e.role) + ' ' + roleLabel(e.role) + '</div>' +
+              '<div class="emp-role-badge ' + roleBadgeClass + '">' + roleIconExt(e.role, empProviderType) + ' ' + roleLabelExt(e.role, empProviderType) + '</div>' +
             '</div>' +
           '</div>' +
           (e.role === 'doctor' && e.doctor_id ? '<div class="emp-info">🔗 مربوط بطبيب في قائمة الأطباء</div>' : '') +
@@ -662,22 +705,75 @@ function renderList() {
 }
 
 // ── Add/Edit Modal ──
+
+// Phase 6 W: Composite-value parser for the unified role dropdown.
+// The dropdown's option values are 'role:provider_type' (e.g. 'doctor:hygienist').
+// Returns { role, providerType } — providerType is null for secretary.
+function parseEmpRoleValue(v) {
+  var parts = String(v || '').split(':');
+  var role = parts[0] || 'secretary';
+  var pt = parts[1] || (role === 'doctor' ? 'doctor' : null);
+  return { role: role, providerType: pt };
+}
+
+// Phase 6 W: Default compensation_model per provider type. Encodes the
+// industry-standard pattern (associate dentists = %, hygienists/assistants =
+// salary). The Owner can always override after picking the role — these are
+// starting points, not enforcement.
+function defaultCompensationForProviderType(pt) {
+  if (pt === 'doctor') return 'percentage';
+  if (pt === 'hygienist') return 'percentage';  // hygienists often on % too
+  if (pt === 'assistant') return 'salary';
+  return 'salary';  // secretary or anything else → salary
+}
+
+// Phase 6 W: Toggle the compensation field visibility based on the current
+// model selection. Called on initial modal open AND whenever the model
+// dropdown changes. Keeps a single source of truth for "which fields matter
+// for which model" so we don't drift between the form HTML and save logic.
+function updateCompensationFieldsVisibility() {
+  var model = ($('eDocCompensation') && $('eDocCompensation').value) || 'percentage';
+  var shareRow = $('shareFieldRow');
+  var salaryGrp = $('salaryFieldGroup');
+  var hint = $('compensationHint');
+  var showShare = (model === 'percentage' || model === 'hybrid');
+  var showSalary = (model === 'salary' || model === 'hybrid');
+  if (shareRow) shareRow.style.display = showShare ? '' : 'none';
+  if (salaryGrp) salaryGrp.style.display = showSalary ? '' : 'none';
+  // Per-model hint text — keeps the user oriented as they switch.
+  if (hint) {
+    if (model === 'percentage') hint.textContent = 'يحسب من الإنتاج × النسبة المئوية. مناسب للأطباء/المساعدين العاملين بالعمولة.';
+    else if (model === 'salary') hint.textContent = 'مبلغ ثابت شهري بغض النظر عن الإنتاج. مناسب لمساعدة الكرسي والسكرتيرة.';
+    else if (model === 'hybrid') hint.textContent = 'راتب أساسي + نسبة من الإنتاج. مرن للحالات الخاصة.';
+    else hint.textContent = 'هذا الموظف لا يأخذ مستحقات عبر صفحة الرواتب (مثلاً المالك يأخذ أرباحاً مباشرة).';
+  }
+}
+
 function onRoleChange() {
-  // Phase 6 Q: toggle the doctor-specific clinical fields based on role.
-  // The container holds the legacy schema's role/phone/color/share/hours/notes
-  // — they all live inside #doctorFieldsGroup and become visible only when the
-  // Owner picks role='doctor'. Element values persist across show/hide within
-  // a modal session, so the user can flip back and forth without losing input.
-  var role = $('eRole').value;
+  // Phase 6 W: Unified role parser. The dropdown value is now 'role:provider_type'
+  // (e.g. 'doctor:hygienist' or 'secretary:none'). doctorFieldsGroup is shown
+  // whenever the chosen role is doctor — that's any of طبيب/hygienist/assistant.
+  // Secretary hides the whole clinical block.
+  var parsed = parseEmpRoleValue($('eRole').value);
   var grp = $('doctorFieldsGroup');
-  if (grp) grp.style.display = (role === 'doctor') ? '' : 'none';
+  if (grp) grp.style.display = (parsed.role === 'doctor') ? '' : 'none';
+  // Auto-update compensation_model default whenever the user picks a new role
+  // — but ONLY in add mode. In edit mode we keep whatever was loaded from DB
+  // so the Owner doesn't lose their previous choice by toggling the dropdown.
+  // We detect add mode via editingId being null.
+  if (editingId === null && parsed.role === 'doctor') {
+    $('eDocCompensation').value = defaultCompensationForProviderType(parsed.providerType);
+  }
+  updateCompensationFieldsVisibility();
 }
 
 function openAddModal() {
   editingId = null;
   $('modalTitle').textContent = '＋ إضافة موظف';
   $('eName').value = '';
-  $('eRole').value = 'secretary';
+  // Phase 6 W: default to "secretary:none" (most common non-doctor add). Owner
+  // picks doctor sub-types from the same dropdown.
+  $('eRole').value = 'secretary:none';
   $('ePin').value = '';
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
@@ -692,9 +788,10 @@ function openAddModal() {
   $('eDocHours').value = '';
   $('eDocNotes').value = '';
   _setEmpDocColor(_pickRandomDoctorColor());
-  // Phase 6 R: reset to legacy defaults (preserves current behavior).
-  $('eDocProviderType').value = 'doctor';
+  // Phase 6 W: default to percentage (legacy doctor behavior). onRoleChange()
+  // will override this if the user picks an assistant role.
   $('eDocCompensation').value = 'percentage';
+  if ($('eDocMonthlySalary')) $('eDocMonthlySalary').value = '';
 
   onRoleChange();
   $('empModal').classList.add('show');
@@ -709,21 +806,32 @@ function openEditModal(id) {
   editingId = id;
   $('modalTitle').textContent = '✏️ تعديل: ' + emp.name;
   $('eName').value = emp.name;
-  $('eRole').value = emp.role;
+
+  // Phase 6 Q: If editing a doctor employee, pre-fill the clinical fields
+  // from the linked clinic_doctors row.
+  var linkedDoc = (emp.role === 'doctor' && emp.doctor_id)
+    ? doctors.find(function(d){ return d.id === emp.doctor_id; })
+    : null;
+
+  // Phase 6 W: reconstruct the composite role:provider_type value from the
+  // employee row + linked doctor row. For secretary it's 'secretary:none'.
+  // For doctor employees, provider_type comes from the linked doctor (default
+  // 'doctor' for legacy rows missing the column).
+  var providerType = (linkedDoc && linkedDoc.provider_type) || 'doctor';
+  var compositeValue;
+  if (emp.role === 'secretary') {
+    compositeValue = 'secretary:none';
+  } else if (emp.role === 'doctor') {
+    compositeValue = 'doctor:' + providerType;
+  } else {
+    compositeValue = 'secretary:none';  // safe fallback
+  }
+  $('eRole').value = compositeValue;
+
   $('ePin').value = '';
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Phase 6 Q: If editing a doctor employee, pre-fill the clinical fields
-  // from the linked clinic_doctors row. The `doctors` cache (loaded in
-  // loadData()) holds only ACTIVE doctors — if the link points to an
-  // inactive doctor the lookup returns undefined and we fall back to
-  // empty defaults so the form is still editable. The Owner can update
-  // the fields and saveEmployee() will sync them back. Secretaries skip
-  // this entirely (the container is hidden by onRoleChange anyway).
-  var linkedDoc = (emp.role === 'doctor' && emp.doctor_id)
-    ? doctors.find(function(d){ return d.id === emp.doctor_id; })
-    : null;
   $('eDocRole').value = (linkedDoc && linkedDoc.role) || '';
   $('eDocPhone').value = (linkedDoc && linkedDoc.phone) || '';
   $('eDocShare').value = (linkedDoc && linkedDoc.share_percent !== null && linkedDoc.share_percent !== undefined)
@@ -733,12 +841,12 @@ function openEditModal(id) {
   $('eDocNotes').value = (linkedDoc && linkedDoc.notes) || '';
   _setEmpDocColor((linkedDoc && linkedDoc.color) || _pickRandomDoctorColor());
 
-  // Phase 6 R: pre-fill the new dropdowns. The DEFAULT-on-add behavior of
-  // Migration 13 guarantees existing rows have ('doctor', 'percentage'), but
-  // we still guard against undefined for pre-migration installs where the
-  // SELECT fell back to the legacy column list and these fields are absent.
-  $('eDocProviderType').value = (linkedDoc && linkedDoc.provider_type) || 'doctor';
+  // Phase 6 W: Pre-fill compensation + monthly_salary from linked doctor.
   $('eDocCompensation').value = (linkedDoc && linkedDoc.compensation_model) || 'percentage';
+  if ($('eDocMonthlySalary')) {
+    $('eDocMonthlySalary').value = (linkedDoc && linkedDoc.monthly_salary !== null && linkedDoc.monthly_salary !== undefined)
+      ? linkedDoc.monthly_salary : '';
+  }
 
   // PIN hint: editing, leave empty to keep current
   $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
@@ -762,7 +870,14 @@ async function saveEmployee() {
 
   try {
     var name = ($('eName').value || '').trim();
-    var role = $('eRole').value;
+    // Phase 6 W: Parse the composite role:provider_type value from the
+    // unified dropdown. role drives clinic_employees.role; providerType
+    // drives clinic_doctors.provider_type. parseEmpRoleValue is defined
+    // alongside onRoleChange — both share the same parsing logic.
+    var roleParsed = parseEmpRoleValue($('eRole').value);
+    var role = roleParsed.role;
+    var providerTypeFromRole = roleParsed.providerType;  // null for secretary
+
     // Phase 6 P: doctorId is no longer set from a manual picker. For new
     // employees, it stays null until auto-create runs below. For edits, the
     // existing emp.doctor_id is preserved unless the role changes.
@@ -787,18 +902,46 @@ async function saveEmployee() {
     if (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex) {
       docColorField = window.SyDentColorPicker.sanitizeHex(docColorField);
     }
-    // Phase 6 R (Migration 13): read provider_type + compensation_model from
-    // the new dropdowns. Both have hard-coded option lists in the HTML, so
-    // the values are guaranteed to be from the allowed CHECK-constraint set
-    // (defensive whitelist below in case devtools tampering occurred).
-    var docProviderTypeField = $('eDocProviderType').value || 'doctor';
-    if (['doctor','hygienist','assistant'].indexOf(docProviderTypeField) === -1) {
-      docProviderTypeField = 'doctor';
+
+    // Phase 6 W: provider_type now comes from the unified role dropdown's
+    // parsed result (not a separate picker). For secretary it's null — the
+    // DB column doesn't apply. For doctor employees we whitelist defensively.
+    var docProviderTypeField = providerTypeFromRole;
+    if (role === 'doctor') {
+      if (['doctor','hygienist','assistant'].indexOf(docProviderTypeField) === -1) {
+        docProviderTypeField = 'doctor';
+      }
+    } else {
+      docProviderTypeField = null;  // secretary has no clinic_doctors row anyway
     }
+
     var docCompensationField = $('eDocCompensation').value || 'percentage';
     if (['percentage','salary','hybrid','none'].indexOf(docCompensationField) === -1) {
       docCompensationField = 'percentage';
     }
+
+    // Phase 6 W (Migration 14): read monthly_salary. Only meaningful when
+    // compensation_model ∈ {salary, hybrid}; for other models we clear it
+    // to null so the DB stays consistent (no orphan salary numbers on a
+    // %-only provider that would confuse the upcoming payroll page).
+    var docSalaryRaw = $('eDocMonthlySalary') ? $('eDocMonthlySalary').value : '';
+    var docMonthlySalaryField = null;
+    if (docCompensationField === 'salary' || docCompensationField === 'hybrid') {
+      docMonthlySalaryField = (docSalaryRaw === '' || docSalaryRaw === null) ? null : parseInt(docSalaryRaw, 10);
+      if (docMonthlySalaryField !== null && (isNaN(docMonthlySalaryField) || docMonthlySalaryField < 0)) {
+        showMsg('modalMsg', 'الراتب الشهري يجب أن يكون رقماً موجباً', true);
+        return;
+      }
+      // Soft enforcement: a 'salary'-only model with no salary entered is
+      // legal at save time (the row is still useful for tracking), but we
+      // warn the Owner to avoid a half-configured payroll record later.
+      if (docCompensationField === 'salary' && (docMonthlySalaryField === null || docMonthlySalaryField === 0)) {
+        if (!confirm('اخترت "راتب ثابت شهري" لكن لم تدخل المبلغ. هل تريد المتابعة بدون راتب؟')) {
+          return;
+        }
+      }
+    }
+
     // Validate share_percent / weekly_hours ranges (numeric inputs already
     // enforce min/max in HTML but a determined user can bypass them).
     if (docShareField !== null && (isNaN(docShareField) || docShareField < 0 || docShareField > 100)) {
@@ -809,6 +952,22 @@ async function saveEmployee() {
       showMsg('modalMsg', 'ساعات العمل يجب أن تكون رقماً موجباً', true);
       return;
     }
+
+    // Phase 6 W: zero out fields irrelevant to the chosen compensation model.
+    // Prevents stale numbers from a previous edit lingering and corrupting
+    // the upcoming payroll calculations. Specifically:
+    //   - percentage model: clear monthly_salary
+    //   - salary model:     clear share_percent
+    //   - none model:       clear both
+    if (docCompensationField === 'percentage') {
+      docMonthlySalaryField = null;
+    } else if (docCompensationField === 'salary') {
+      docShareField = null;
+    } else if (docCompensationField === 'none') {
+      docMonthlySalaryField = null;
+      docShareField = null;
+    }
+    // 'hybrid' keeps both fields as entered.
 
     // Validation
     if (!name) {
@@ -958,9 +1117,10 @@ async function saveEmployee() {
       if (needsAutoCreate && employeeIdForDoctorOps) {
         var newDocColor = docColorField || _pickRandomDoctorColor();
         // Phase 6 R: include provider_type + compensation_model in the insert.
-        // Migration 13 graceful fallback: if the columns aren't present yet,
-        // PostgREST returns 42703 — we retry without them so legacy clinics
-        // can still onboard doctors before running the migration.
+        // Phase 6 W: include monthly_salary too. Migration 13/14 graceful
+        // fallback: if any of the new columns aren't present yet, PostgREST
+        // returns 42703 — we retry without them so legacy clinics can still
+        // onboard doctors before running the migrations.
         var insDocPayload = {
           owner_id: currentUser.id,
           name: name,
@@ -973,15 +1133,26 @@ async function saveEmployee() {
           is_owner: false,
           is_active: true,
           provider_type: docProviderTypeField,
-          compensation_model: docCompensationField
+          compensation_model: docCompensationField,
+          monthly_salary: docMonthlySalaryField
         };
         var insDoc = await window.sb.from('clinic_doctors').insert(insDocPayload).select().single();
+        // First retry: strip Migration 14 column only.
+        if (insDoc.error && /42703|monthly_salary/i.test(
+              (insDoc.error.message || '') + ' ' + (insDoc.error.code || ''))) {
+          console.warn('Phase 6 W: Migration 14 not applied — retrying without monthly_salary');
+          var noSalary = Object.assign({}, insDocPayload);
+          delete noSalary.monthly_salary;
+          insDoc = await window.sb.from('clinic_doctors').insert(noSalary).select().single();
+        }
+        // Second retry: strip Migration 13 columns too if still failing.
         if (insDoc.error && /42703|provider_type|compensation_model/i.test(
               (insDoc.error.message || '') + ' ' + (insDoc.error.code || ''))) {
           console.warn('Phase 6 R: Migration 13 not applied — retrying without provider_type/compensation_model');
           var legacyPayload = Object.assign({}, insDocPayload);
           delete legacyPayload.provider_type;
           delete legacyPayload.compensation_model;
+          delete legacyPayload.monthly_salary;
           insDoc = await window.sb.from('clinic_doctors').insert(legacyPayload).select().single();
         }
         if (insDoc.error) {
@@ -1023,10 +1194,8 @@ async function saveEmployee() {
       if (editingId && origEmp && origEmp.role === 'doctor' && role === 'doctor' &&
           origEmp.doctor_id) {
         var origDoctor = doctors.find(function(d){ return d.id === origEmp.doctor_id; }) || {};
-        // Phase 6 R: include provider_type + compensation_model. Same retry
-        // pattern as the INSERT path — if Migration 13 hasn't run, strip the
-        // two new fields and re-issue the UPDATE so legacy clinics still get
-        // their existing fields synced.
+        // Phase 6 R + W: include provider_type + compensation_model + monthly_salary.
+        // Same staged retry pattern as the INSERT path: strip M14 first, then M13.
         var updatePayload = {
           name: name,
           role: docRoleField,
@@ -1037,18 +1206,32 @@ async function saveEmployee() {
           color: docColorField,
           provider_type: docProviderTypeField,
           compensation_model: docCompensationField,
+          monthly_salary: docMonthlySalaryField,
           updated_at: new Date().toISOString()
         };
         var syncRes = await window.sb.from('clinic_doctors')
           .update(updatePayload)
           .eq('id', origEmp.doctor_id)
           .eq('owner_id', currentUser.id);
+        // First retry: strip Migration 14 column if missing.
+        if (syncRes.error && /42703|monthly_salary/i.test(
+              (syncRes.error.message || '') + ' ' + (syncRes.error.code || ''))) {
+          console.warn('Phase 6 W: Migration 14 not applied — retrying UPDATE without monthly_salary');
+          var noSalaryUpd = Object.assign({}, updatePayload);
+          delete noSalaryUpd.monthly_salary;
+          syncRes = await window.sb.from('clinic_doctors')
+            .update(noSalaryUpd)
+            .eq('id', origEmp.doctor_id)
+            .eq('owner_id', currentUser.id);
+        }
+        // Second retry: strip Migration 13 columns too if still failing.
         if (syncRes.error && /42703|provider_type|compensation_model/i.test(
               (syncRes.error.message || '') + ' ' + (syncRes.error.code || ''))) {
           console.warn('Phase 6 R: Migration 13 not applied — retrying UPDATE without provider_type/compensation_model');
           var legacyUpd = Object.assign({}, updatePayload);
           delete legacyUpd.provider_type;
           delete legacyUpd.compensation_model;
+          delete legacyUpd.monthly_salary;
           syncRes = await window.sb.from('clinic_doctors')
             .update(legacyUpd)
             .eq('id', origEmp.doctor_id)
@@ -1066,14 +1249,16 @@ async function saveEmployee() {
               phone: origDoctor.phone, share_percent: origDoctor.share_percent,
               weekly_hours: origDoctor.weekly_hours, color: origDoctor.color,
               provider_type: origDoctor.provider_type,
-              compensation_model: origDoctor.compensation_model
+              compensation_model: origDoctor.compensation_model,
+              monthly_salary: origDoctor.monthly_salary
             },
             newValue: {
               name: name, role: docRoleField,
               phone: docPhoneField, share_percent: docShareField,
               weekly_hours: docHoursField, color: docColorField,
               provider_type: docProviderTypeField,
-              compensation_model: docCompensationField
+              compensation_model: docCompensationField,
+              monthly_salary: docMonthlySalaryField
             }
           });
         }
