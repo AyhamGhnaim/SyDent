@@ -905,6 +905,16 @@ textarea { resize: vertical; min-height: 72px; }
           <label>الطبيب</label>
           <select id="fProvider"></select>
         </div>
+        <!-- Phase 6 K (Migration 12): operatory picker. Hidden by default —
+             JS shows it only when at least one active operatory exists OR
+             we're editing an appointment that's already linked to one
+             (incl. an inactive operatory, so the user can clear/change). -->
+        <div class="form-group" id="fOperatoryGroup" style="display:none;">
+          <label>🏥 الغرفة</label>
+          <select id="fOperatory">
+            <option value="">— بدون تخصيص —</option>
+          </select>
+        </div>
         <div class="form-group full">
           <label>ملاحظات</label>
           <textarea id="fNotes" placeholder="أي ملاحظات إضافية…"></textarea>
@@ -1111,6 +1121,15 @@ let labOrdersByAppt    = {};   // { appointment_id: [lab_orders] } — preferred
 let sessionsByAppt = {};       // { appointment_id: [ledger_sessions] } — procedures attached to each appointment
 let plannedSessionsByPatient = {}; // { patient_id: [planned ledger_sessions with appointment_id IS NULL] }
 let CLINIC_DOCTORS = [];       // for provider picker
+// Phase 6 K (Migration 12): cached operatories list for the modal dropdown.
+// Stays empty if the migration isn't applied yet — the dropdown then stays
+// hidden (Soft mode, قاعدة #15). The list is read-only here; CRUD happens
+// in settings.html. We also keep the full list (incl. inactive) so an
+// appointment that's already linked to a now-inactive operatory still shows
+// the link in edit mode (ghost-option pattern).
+let OPERATORIES_ALL = [];      // full list incl. inactive — for edit-mode lookups
+let OPERATORIES = [];          // active subset used to populate the picker
+let _operatoriesMissingFlag = false;  // true if Migration 12 not applied
 let currentUser  = null;
 
 // ═══════════════════════════════════════════════════════════════
@@ -1444,6 +1463,37 @@ async function loadClinicDoctors() {
     if (error) { console.warn('clinic_doctors load:', error); CLINIC_DOCTORS = []; return; }
     CLINIC_DOCTORS = data || [];
   } catch(e) { console.warn('clinic_doctors fetch:', e); CLINIC_DOCTORS = []; }
+}
+
+// Phase 6 K (Migration 12): Load operatories. Best-effort — failures degrade
+// the operatory dropdown to "not shown" rather than breaking the page. Same
+// fault-tolerance philosophy as loadAppointmentTypes.
+async function loadOperatoriesCache() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await window.sb.from('operatories')
+      .select('id, name, color, default_provider_id, is_active, sort_order')
+      .eq('doctor_id', currentUser.id)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) {
+      var msg = (error.message || '') + ' ' + (error.code || '');
+      if (/42P01|PGRST205|relation .* does not exist|operatories/i.test(msg)) {
+        _operatoriesMissingFlag = true;
+      } else {
+        console.warn('operatories load:', error);
+      }
+      OPERATORIES_ALL = [];
+      OPERATORIES = [];
+      return;
+    }
+    OPERATORIES_ALL = data || [];
+    OPERATORIES = OPERATORIES_ALL.filter(function(o){ return o.is_active; });
+  } catch(e) {
+    console.warn('operatories fetch:', e);
+    OPERATORIES_ALL = [];
+    OPERATORIES = [];
+  }
 }
 
 // ─── Load from Supabase ──────────────────────────────
@@ -2513,6 +2563,10 @@ function onApptTypePicked() {
   // (which uses the OpenDental 3-tier default). We set its value to the template's
   // provider — if that doctor was deleted, the picker silently keeps its current
   // default (no crash). The doctor can always change it after.
+  // Phase 6 K: Track whether the template explicitly set a provider — if it
+  // didn't, we let the operatory's default_provider_id fill in as a fallback
+  // (priority decision: TEMPLATE provider > OPERATORY provider > 3-tier default).
+  var templateSetProvider = false;
   if (t.default_provider_id) {
     var provPicker = document.getElementById('fProvider');
     if (provPicker) {
@@ -2521,7 +2575,63 @@ function onApptTypePicked() {
       for (var k = 0; k < provPicker.options.length; k++) {
         if (provPicker.options[k].value === t.default_provider_id) { optExists = true; break; }
       }
-      if (optExists) provPicker.value = t.default_provider_id;
+      if (optExists) {
+        provPicker.value = t.default_provider_id;
+        templateSetProvider = true;
+      }
+    }
+  }
+
+  // Phase 6 K (Migration 12): Pre-fill the operatory picker from the
+  // template's default_operatory_id. Same robustness pattern as provider:
+  // verify the option exists; if it's there (active or ghost-restored
+  // because we're in edit mode), set it.
+  if (t.default_operatory_id) {
+    var opPicker = document.getElementById('fOperatory');
+    var opGroup = document.getElementById('fOperatoryGroup');
+    if (opPicker && opGroup) {
+      // The operatory picker might be hidden in Soft mode (no active
+      // operatories) — but if the template explicitly links one, we should
+      // surface it. Force the wrapper visible and ghost-restore if needed.
+      var opExists = false;
+      for (var kk = 0; kk < opPicker.options.length; kk++) {
+        if (opPicker.options[kk].value === t.default_operatory_id) { opExists = true; break; }
+      }
+      // Always resolve the full record (active OR inactive) so the provider
+      // fallback below works regardless of whether the option was already
+      // in the picker. Critical bug fix: previously 'found' was only set
+      // inside the !opExists branch, so active operatories silently skipped
+      // the provider fallback.
+      var found = null;
+      for (var ll = 0; ll < OPERATORIES_ALL.length; ll++) {
+        if (OPERATORIES_ALL[ll].id === t.default_operatory_id) { found = OPERATORIES_ALL[ll]; break; }
+      }
+      if (!opExists) {
+        // Inject a ghost option so the value sticks and the user sees the name.
+        // If missing entirely (deleted operatory), still inject a placeholder
+        // so saving doesn't silently null out the FK.
+        var ghost = document.createElement('option');
+        ghost.value = t.default_operatory_id;
+        ghost.textContent = found
+          ? ((found.name || '[غرفة]') + (found.is_active ? '' : ' (غير نشطة)'))
+          : '[غرفة محذوفة]';
+        opPicker.appendChild(ghost);
+      }
+      opPicker.value = t.default_operatory_id;
+      opGroup.style.display = 'block';
+
+      // Provider fallback: if the template didn't set a provider, try the
+      // operatory's default_provider_id (option A — template > operatory).
+      if (!templateSetProvider && found && found.default_provider_id) {
+        var prov2 = document.getElementById('fProvider');
+        if (prov2) {
+          var hasOpt = false;
+          for (var mm = 0; mm < prov2.options.length; mm++) {
+            if (prov2.options[mm].value === found.default_provider_id) { hasOpt = true; break; }
+          }
+          if (hasOpt) prov2.value = found.default_provider_id;
+        }
+      }
     }
   }
 
@@ -2812,6 +2922,8 @@ async function openModal(prefillDate) {
 
   // Populate provider picker (uses OpenDental 3-tier default)
   await populateApptProviderPicker(null);
+  // Phase 6 K: operatory picker — no preselect in create mode
+  populateOperatoryPicker(null);
 
   // تعبئة قائمة المرضى من Supabase
   const names = await loadPatientNames();
@@ -2873,6 +2985,8 @@ async function editAppt(id) {
 
   // Provider picker — preselect this appt's provider if any
   await populateApptProviderPicker(a.provider_id || null);
+  // Phase 6 K: operatory picker — preselect this appt's operatory if any
+  populateOperatoryPicker(a.operatory_id || null);
 
   // Show procedures section + render attached procs + planned options
   // Gap 7: hide the procedures section for planned appointments — they have
@@ -2930,6 +3044,57 @@ async function populateApptProviderPicker(preselectId) {
   // Preselect: explicit id if provided, else default
   var pick = preselectId || getDefaultProviderId(CLINIC_DOCTORS);
   if (pick) sel.value = pick;
+}
+
+/* Phase 6 K (Migration 12): Build the operatory <select>. Soft mode — the
+   group is hidden entirely when no active operatories exist (Single-chair
+   clinics). When editing an appointment already linked to an INACTIVE
+   operatory, we inject a ghost option and force-show the group so the user
+   can clear or change the stale link without silently dropping it. */
+function populateOperatoryPicker(preselectId) {
+  var group = document.getElementById('fOperatoryGroup');
+  var sel = document.getElementById('fOperatory');
+  if (!sel || !group) return;
+  sel.innerHTML = '<option value="">— بدون تخصيص —</option>';
+
+  // Build the active list first
+  for (var i = 0; i < OPERATORIES.length; i++) {
+    var op = OPERATORIES[i];
+    var opt = document.createElement('option');
+    opt.value = op.id;
+    opt.textContent = op.name;
+    sel.appendChild(opt);
+  }
+
+  // If preselectId points to an inactive operatory, inject a ghost option
+  // so we can keep the link visible (and the user can clear it intentionally).
+  var preselectInActive = false;
+  if (preselectId) {
+    for (var j = 0; j < sel.options.length; j++) {
+      if (sel.options[j].value === preselectId) { preselectInActive = true; break; }
+    }
+    if (!preselectInActive) {
+      // Look up the full record to display the name; fall back to a generic
+      // placeholder if even OPERATORIES_ALL doesn't have it (deleted FK).
+      var ghost = document.createElement('option');
+      ghost.value = preselectId;
+      var found = null;
+      for (var k = 0; k < OPERATORIES_ALL.length; k++) {
+        if (OPERATORIES_ALL[k].id === preselectId) { found = OPERATORIES_ALL[k]; break; }
+      }
+      ghost.textContent = found
+        ? ((found.name || '[غرفة]') + (found.is_active ? '' : ' (غير نشطة)'))
+        : '[غرفة محذوفة]';
+      sel.appendChild(ghost);
+    }
+  }
+
+  // Visibility: show the picker if there are active operatories OR a
+  // preselect that we just had to ghost-restore. Otherwise hide entirely.
+  var shouldShow = (OPERATORIES.length > 0) || !!preselectId;
+  group.style.display = shouldShow ? 'block' : 'none';
+
+  sel.value = preselectId || '';
 }
 
 /* Render attached procedures + the dropdown of planned procedures available to attach. */
@@ -3519,6 +3684,13 @@ async function submitAppt(e) {
 
   var providerSel = document.getElementById('fProvider');
   var providerId = (providerSel && providerSel.value) ? providerSel.value : getDefaultProviderId(CLINIC_DOCTORS);
+  // Phase 6 K (Migration 12): capture optional operatory selection. Empty
+  // string → null (the picker has a "— بدون تخصيص —" option). When the
+  // operatories table/column is missing on legacy installations, we still
+  // include the field — the graceful retry block below will strip it on
+  // 42703 errors so the appointment still saves.
+  var operatorySel = document.getElementById('fOperatory');
+  var operatoryId = (operatorySel && operatorySel.value) ? operatorySel.value : null;
 
   var patientName = document.getElementById('fPatient').value.trim();
 
@@ -3585,6 +3757,7 @@ async function submitAppt(e) {
     color:        apptColor,
     stroke:       apptStroke,
     provider_id:  providerId,
+    operatory_id: operatoryId,
     is_planned:   isPlannedNow
   };
 
@@ -3789,6 +3962,27 @@ async function submitAppt(e) {
       upd = await window.sb.from('appointments').update(stripped)
         .eq('id', editingId).eq('doctor_id', currentUser.id);
     }
+    // Phase 6 K retry: if appointments.operatory_id is missing (Migration 12
+    // not applied), strip it and try again. Mirrors the Gap 8 retry pattern.
+    if (upd.error && apptData.operatory_id !== undefined &&
+        /42703|operatory_id/i.test((upd.error.message || '') + ' ' + (upd.error.code || ''))) {
+      console.warn('Phase 6 K: operatory_id rejected on UPDATE — retrying without it. Run Migration 12.');
+      var strippedOp = Object.assign({}, apptData);
+      delete strippedOp.operatory_id;
+      if (plannedMigrationMissing) {
+        delete strippedOp.is_planned;
+        if (strippedOp.date === null) strippedOp.date = dateStr(new Date());
+        if (strippedOp.time === null) strippedOp.time = '12:00';
+      }
+      if (migrationMissing) strippedOp.status = 'confirmed';
+      if (_g6HasAutoFill) {
+        delete strippedOp.confirmed_at;
+        delete strippedOp.dismissed_at;
+        delete strippedOp.confirmation_status;
+      }
+      upd = await window.sb.from('appointments').update(strippedOp)
+        .eq('id', editingId).eq('doctor_id', currentUser.id);
+    }
     if (upd.error) {
       showToast('❌ خطأ في التعديل: ' + upd.error.message);
     } else {
@@ -3920,6 +4114,31 @@ async function submitAppt(e) {
       }
       ins = await window.sb.from('appointments').insert(strippedAt).select().single();
     }
+    // Phase 6 K retry: if appointments.operatory_id column is missing
+    // (Migration 12 not applied), strip and retry. Mirrors all prior retry
+    // patterns — preserves every earlier fallback so we don't regress.
+    if (ins.error && apptData.operatory_id !== undefined &&
+        /42703|operatory_id/i.test((ins.error.message || '') + ' ' + (ins.error.code || ''))) {
+      console.warn('Phase 6 K: operatory_id rejected on INSERT — retrying without it. Run Migration 12.');
+      var strippedOpIns = Object.assign({}, apptData);
+      delete strippedOpIns.operatory_id;
+      if (plannedMigrationMissing) {
+        delete strippedOpIns.is_planned;
+        if (strippedOpIns.date === null) strippedOpIns.date = dateStr(new Date());
+        if (strippedOpIns.time === null) strippedOpIns.time = '12:00';
+      }
+      if (migrationMissing) strippedOpIns.status = 'confirmed';
+      if (_g6HasAutoFill) {
+        delete strippedOpIns.confirmed_at;
+        delete strippedOpIns.dismissed_at;
+        delete strippedOpIns.confirmation_status;
+      }
+      // If the Gap 8 retry would also be needed (very unlikely but possible),
+      // strip appointment_type_id too — Gap 8 is much older so this is just
+      // defensive.
+      if (strippedOpIns.appointment_type_id === null) delete strippedOpIns.appointment_type_id;
+      ins = await window.sb.from('appointments').insert(strippedOpIns).select().single();
+    }
     if (ins.error) {
       showToast('❌ خطأ في الإضافة: ' + ins.error.message);
     } else {
@@ -4014,6 +4233,7 @@ function showToast(msg) {
   if (!data || !data.user) { window.location.href = 'auth.html'; return; }
   currentUser = data.user;
   await loadClinicDoctors();
+  await loadOperatoriesCache();   // Phase 6 K (Migration 12)
   await loadAppointmentTypes();  // Gap 8: cache templates for the modal picker
   await loadLabsForHint();       // Phase 6 L: cache labs for the template hint banner
   // Phase 2A — WhatsApp Reminders state

@@ -324,6 +324,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="lab">المخابر</option>
         <option value="doctor">الأطباء</option>
         <option value="employee">الموظفون</option>
+        <option value="operatory">الغرف</option>
         <option value="settings">الإعدادات</option>
         <option value="lock">القفل والتبديل</option>
       </select>
@@ -408,6 +409,7 @@ var ACTION_TYPES_BY_PREFIX = {
   lab:         ['lab.create', 'lab.edit', 'lab.delete'],
   doctor:      ['doctor.create', 'doctor.edit', 'doctor.delete'],
   employee:    ['employee.create', 'employee.edit', 'employee.toggle_active', 'employee.delete'],
+  operatory:   ['operatory.create', 'operatory.edit', 'operatory.delete'],
   settings:    ['settings.change_pin', 'settings.archive_audit'],
   lock:        ['lock.role_switch', 'lock.pin_clear']
 };
@@ -452,7 +454,8 @@ function actionTypeLabel(t) {
   var op = parts[1] || '';
   var entityMap = {
     patient:'مريض', appointment:'موعد', session:'جلسة', payment:'دفعة',
-    lab:'مخبر', doctor:'طبيب', employee:'موظف', settings:'إعدادات', lock:'قفل'
+    lab:'مخبر', doctor:'طبيب', employee:'موظف', operatory:'غرفة',
+    settings:'إعدادات', lock:'قفل'
   };
   var opMap = {
     create:'إضافة', edit:'تعديل', delete:'حذف',

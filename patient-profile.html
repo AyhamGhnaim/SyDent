@@ -7635,7 +7635,13 @@ async function loadPatientAuditLog() {
       'payment.delete': '🗑️ حذف دفعة',
       'lab.create': '🥽 طلب مخبر',
       'lab.edit': '✏️ تعديل مخبر',
-      'lab.delete': '🗑️ حذف مخبر'
+      'lab.delete': '🗑️ حذف مخبر',
+      // Phase 6 K: operatory entries are clinic-wide (no patient_id) so they
+      // won't normally appear in this patient-scoped tab. Defensive entry
+      // kept for label consistency if the audit query ever surfaces them.
+      'operatory.create': '🏥 إضافة غرفة',
+      'operatory.edit': '🏥 تعديل غرفة',
+      'operatory.delete': '🏥 حذف غرفة'
     };
     var roleLabels = { owner: 'المالك', doctor: 'طبيب', secretary: 'سكرتيرة' };
 

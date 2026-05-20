@@ -184,6 +184,23 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   scrollbar-width: thin;
   scrollbar-color: rgba(141,160,189,0.3) transparent;
 }
+/* Phase 6 K: same scrollbar treatment for the operatory modal. The form
+   is shorter than the appointment-type one but we keep the styling
+   consistent so a sudden chunky scrollbar doesn't appear if/when more
+   fields get added later. */
+#operatoryModal .modal::-webkit-scrollbar { width: 6px; }
+#operatoryModal .modal::-webkit-scrollbar-track { background: transparent; }
+#operatoryModal .modal::-webkit-scrollbar-thumb {
+  background: rgba(141,160,189,0.3);
+  border-radius: 3px;
+}
+#operatoryModal .modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(141,160,189,0.5);
+}
+#operatoryModal .modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(141,160,189,0.3) transparent;
+}
 .modal-title {
   font-size: 18px; font-weight: 700;
   color: var(--red);
@@ -446,6 +463,18 @@ textarea::placeholder { color: var(--text2); }
       <div id="apptTypesList" style="margin-top:18px;"></div>
     </div>
 
+    <!-- 1.7 الغرف (الكراسي) — Phase 6 K (Migration 12) -->
+    <!-- Optional feature: only meaningful for clinics with multiple chairs/rooms.
+         Small single-chair clinics can ignore this entirely; the operatory
+         dropdown in the appointment form stays hidden until at least one
+         active operatory exists (Soft mode — قاعدة #15). -->
+    <div class="section">
+      <div class="section-title">🏥 الغرف (الكراسي)</div>
+      <div class="section-sub">عرّف غرف/كراسي العيادة لتوزيع المواعيد عليها. اختيارية — إذا عيادتك بكرسي واحد، تجاهل هذا القسم. كل غرفة ممكن تكون لها لون مميّز وطبيب افتراضي.</div>
+      <button type="button" class="btn btn-primary" onclick="openOperatoryModal()" id="btnNewOperatory">+ إضافة غرفة جديدة</button>
+      <div id="operatoriesList" style="margin-top:18px;"></div>
+    </div>
+
     <!-- Phase 2A: WhatsApp Reminders -->
     <div class="section" style="border-color: rgba(46,232,158,0.25);">
       <div class="section-title">🔔 تذكيرات WhatsApp للمواعيد</div>
@@ -599,6 +628,16 @@ textarea::placeholder { color: var(--text2); }
       </select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعلاجات التي تحتاج مخبر (تلبيسة، جسر، إلخ)</div>
     </div>
+    <!-- Phase 6 K: optional operatory link. JS hides this wrapper entirely
+         when the clinic has no active operatories (Soft mode — قاعدة #15)
+         so single-chair clinics never see clutter. -->
+    <div class="form-group" id="fAtOperatoryWrap" style="display:none;">
+      <label>🏥 الغرفة الافتراضية</label>
+      <select id="fAtOperatory">
+        <option value="">— بدون غرفة —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعيادات متعددة الكراسي/الغرف</div>
+    </div>
     <div class="form-group" id="fAtNotesWrap">
       <label>📝 ملاحظات افتراضية</label>
       <textarea id="fAtNotes" maxlength="500" rows="3" placeholder="مثال: تأكد من جاهزية المخبر قبل الموعد بيومين" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
@@ -607,6 +646,43 @@ textarea::placeholder { color: var(--text2); }
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeApptTypeModal()">إلغاء</button>
       <button type="button" class="btn btn-primary" id="btnSaveApptType" onclick="saveApptType()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phase 6 K (Migration 12): Modal لإضافة/تعديل غرفة -->
+<div class="modal-overlay" id="operatoryModal" onclick="if(event.target===this) closeOperatoryModal()">
+  <div class="modal" style="max-height:90vh;overflow-y:auto;">
+    <div class="modal-title" id="operatoryModalTitle">إضافة غرفة جديدة</div>
+    <div class="form-group">
+      <label>اسم الغرفة *</label>
+      <input type="text" id="fOpName" placeholder="مثال: غرفة 1، الكرسي الرئيسي" maxlength="50" autocomplete="off">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">من 1 إلى 50 حرف</div>
+    </div>
+    <div class="form-group">
+      <label>لون مميّز</label>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input type="color" id="fOpColor" value="#2ee89e" style="width:50px;height:40px;padding:2px;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:transparent;">
+        <span style="font-size:12px;color:var(--text-muted);">يُستخدم لاحقاً في عرض جدول الغرف</span>
+      </div>
+    </div>
+    <div class="form-group" id="fOpDefaultProviderWrap">
+      <label>👨‍⚕️ الطبيب الافتراضي</label>
+      <select id="fOpDefaultProvider">
+        <option value="">— بدون طبيب افتراضي —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار الغرفة (إذا لم يُحدِّده القالب)</div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="fOpActive" checked style="width:auto;cursor:pointer;">
+        <span>الغرفة نشطة</span>
+      </label>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">إذا عُطِّلت، لا تظهر في قائمة اختيار الغرف عند الحجز (لكن المواعيد السابقة تبقى مرتبطة).</div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="closeOperatoryModal()">إلغاء</button>
+      <button type="button" class="btn btn-primary" id="btnSaveOperatory" onclick="saveOperatory()">💾 حفظ</button>
     </div>
   </div>
 </div>
@@ -686,6 +762,10 @@ function showToast(msg, isError = false) {
 
   // Gap 5: load appointment settings from clinic_settings (fault-tolerant)
   await loadAppointmentSettings();
+  // Phase 6 K: load operatories BEFORE templates so the template modal's
+  // operatory picker is populated when openApptTypeModal is invoked. This
+  // also sets _operatoriesActive which gates the wrapper visibility.
+  await loadOperatories();
   // Gap 8: load appointment-type templates + treatments dropdown
   await loadAppointmentTypes();
   // Phase 2A: load WhatsApp Reminders settings (fault-tolerant)
@@ -1343,6 +1423,15 @@ function renderApptTypesList() {
   for (var li = 0; li < _apptTypesLabs.length; li++) {
     labMap[_apptTypesLabs[li].id] = _apptTypesLabs[li];
   }
+  // Phase 6 K: build operatory lookup. We use _operatoriesList (the full
+  // unfiltered list, including inactive ones) here — same reasoning as the
+  // ghost-option logic in editApptType: a template might link to a now-
+  // inactive operatory and we want to display "[غرفة غير نشطة]" rather than
+  // silently dropping the badge.
+  var opMap = {};
+  for (var oi = 0; oi < _operatoriesList.length; oi++) {
+    opMap[_operatoriesList[oi].id] = _operatoriesList[oi];
+  }
   el.innerHTML = _apptTypes.map(function(t) {
     var safeName = String(t.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     var trName = t.default_treatment_id && trMap[t.default_treatment_id]
@@ -1370,6 +1459,20 @@ function renderApptTypesList() {
         ? String(labMap[t.default_lab_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
         : '[مخبر محذوف]';
       extras.push('🥽 ' + labName);
+    }
+    // Phase 6 K: show operatory badge when set. Uses the same '[<entity>
+    // محذوف/غير نشط]' fallback pattern as provider/lab so the doctor can
+    // always tell at a glance whether the link is still valid.
+    if (t.default_operatory_id) {
+      var opEntry = opMap[t.default_operatory_id];
+      var opName;
+      if (opEntry) {
+        opName = String(opEntry.name).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (!opEntry.is_active) opName += ' (غير نشطة)';
+      } else {
+        opName = '[غرفة محذوفة]';
+      }
+      extras.push('🏥 ' + opName);
     }
     var extrasLine = extras.length
       ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + extras.join(' · ') + '</div>'
@@ -1406,6 +1509,9 @@ function openApptTypeModal() {
   document.getElementById('fAtProvider').value = '';
   populateApptTypeLabSelect();
   document.getElementById('fAtLab').value = '';
+  // Phase 6 K: reset optional operatory picker (and update wrapper visibility)
+  populateApptTypeOperatorySelect();
+  document.getElementById('fAtOperatory').value = '';
   // Migration 11: reset notes textarea
   var notesEl = document.getElementById('fAtNotes');
   if (notesEl) notesEl.value = '';
@@ -1480,6 +1586,33 @@ function editApptType(id) {
     fAtLb.value = '';
   }
 
+  // Phase 6 K: pre-fill operatory with the same ghost-option pattern as
+  // provider/lab — if the linked operatory was deactivated AFTER this
+  // template was saved, we keep its id in a placeholder option so saving
+  // doesn't accidentally null out the FK.
+  populateApptTypeOperatorySelect();
+  var fAtOp = document.getElementById('fAtOperatory');
+  if (t.default_operatory_id) {
+    var opInActive = false;
+    for (var oi2 = 0; oi2 < fAtOp.options.length; oi2++) {
+      if (fAtOp.options[oi2].value === t.default_operatory_id) { opInActive = true; break; }
+    }
+    if (!opInActive) {
+      var ghostOp = document.createElement('option');
+      ghostOp.value = t.default_operatory_id;
+      ghostOp.textContent = '[غرفة غير نشطة — احتفظ بالحالي]';
+      fAtOp.appendChild(ghostOp);
+      // The wrapper is normally hidden when there are no active operatories,
+      // but an inactive one was previously linked — force-show the wrapper so
+      // the user can see and (optionally) clear the stale link.
+      var wrap = document.getElementById('fAtOperatoryWrap');
+      if (wrap) wrap.style.display = '';
+    }
+    fAtOp.value = t.default_operatory_id;
+  } else {
+    fAtOp.value = '';
+  }
+
   // Migration 11: pre-fill the optional default notes (graceful if column missing)
   var fAtNotes = document.getElementById('fAtNotes');
   if (fAtNotes) fAtNotes.value = t.default_notes || '';
@@ -1502,6 +1635,8 @@ async function saveApptType() {
   // Gap 8.2: capture optional provider + lab ids (empty string → null)
   var providerId = document.getElementById('fAtProvider').value || null;
   var labId = document.getElementById('fAtLab').value || null;
+  // Phase 6 K: capture optional operatory id (empty string → null)
+  var operatoryId = document.getElementById('fAtOperatory').value || null;
   // Migration 11: optional default notes (empty string → null, trimmed)
   var notesEl = document.getElementById('fAtNotes');
   var defaultNotes = notesEl ? (notesEl.value || '').trim() : '';
@@ -1527,14 +1662,14 @@ async function saveApptType() {
   var btn = document.getElementById('btnSaveApptType');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
 
-  // Helper for Gap 8.2 / Migration 11 graceful fallback: detects rejection
-  // of any of the optional columns (42703 = undefined_column) or our 500-char
-  // CHECK constraint on default_notes (23514). Lets us retry without the
-  // missing column on legacy installations.
+  // Helper for Gap 8.2 / Migration 11 / Migration 12 graceful fallback:
+  // detects rejection of any of the optional columns (42703 = undefined_column)
+  // or our 500-char CHECK constraint on default_notes (23514). Lets us retry
+  // without the missing column on legacy installations.
   function _isGap82ColumnMissing(err) {
     if (!err) return false;
     var msg = (err.message || '') + ' ' + (err.code || '');
-    return /42703|23514|default_provider_id|default_lab_id|default_notes/i.test(msg);
+    return /42703|23514|default_provider_id|default_lab_id|default_notes|default_operatory_id/i.test(msg);
   }
 
   try {
@@ -1547,7 +1682,8 @@ async function saveApptType() {
         default_treatment_id: treatmentId,
         default_provider_id: providerId,
         default_lab_id: labId,
-        default_notes: defaultNotes
+        default_notes: defaultNotes,
+        default_operatory_id: operatoryId
       };
       res = await window.sb.from('appointment_types')
         .update(updatePayload)
@@ -1577,6 +1713,7 @@ async function saveApptType() {
         default_provider_id: providerId,
         default_lab_id: labId,
         default_notes: defaultNotes,
+        default_operatory_id: operatoryId,
         sort_order: maxSort + 1
       };
       res = await window.sb.from('appointment_types').insert(insertPayload);
@@ -1639,6 +1776,395 @@ async function deleteApptType(id) {
     await loadAppointmentTypes();
   } catch (e) {
     console.error('deleteApptType exception:', e);
+    showToast('❌ خطأ غير متوقع', true);
+  }
+}
+
+// ─── Phase 6 K — Operatories (Chairs/Rooms) CRUD (Migration 12) ─────────────
+// Optional feature for multi-chair clinics. The whole UI degrades gracefully:
+// • If Migration 12 isn't applied yet → list shows a quiet hint, modal warns once.
+// • If 0 operatories exist → the operatory dropdown in appointment_types is
+//   hidden entirely (Soft mode, قاعدة #15). Single-chair clinics never notice
+//   this section unless they choose to use it.
+//
+// Storage: operatories table. RLS isolates by doctor_id = auth.uid().
+// Schema (Migration 12 K-Standard):
+//   id, doctor_id, name (1-50), color (default #2ee89e),
+//   default_provider_id (FK clinic_doctors), sort_order INT, is_active BOOL,
+//   created_at, updated_at (auto-managed by trg_operatories_updated_at).
+
+var _operatoriesList = [];          // full list incl. inactive (for ghost options + display)
+var _operatoriesActive = [];        // active subset used to populate the appt picker
+var _editingOperatoryId = null;     // id of operatory currently being edited
+var _operatoriesTableMissing = false; // true once we detect pre-migration state
+
+// Detects pre-migration state. Same heuristic as the other migration helpers.
+function _isOperatoriesMigrationMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /42P01|PGRST205|relation .* does not exist|operatories/i.test(msg);
+}
+
+// Load operatories + the active-provider list used in the modal picker. We
+// reuse _apptTypesProviders here so we don't run a duplicate clinic_doctors
+// query — loadAppointmentTypes (called immediately after this in init) will
+// repopulate it, but at first-load this can be empty. Solution: load providers
+// here too, so the operatory modal works even if opened before templates load.
+async function loadOperatories() {
+  var listEl = document.getElementById('operatoriesList');
+  if (!listEl) return;
+  listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0;">جارٍ التحميل…</div>';
+
+  // 1. Active providers for the modal picker. Best-effort.
+  try {
+    var docRes = await window.sb.from('clinic_doctors')
+      .select('id, name, is_active')
+      .eq('owner_id', currentUser.id)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    _apptTypesProviders = (docRes && docRes.data) ? docRes.data : [];
+  } catch (e) {
+    console.warn('Phase 6 K: providers load failed (continuing):', e);
+    // keep whatever _apptTypesProviders was previously
+  }
+
+  // 2. Operatories themselves
+  try {
+    var res = await window.sb.from('operatories')
+      .select('id, name, color, default_provider_id, sort_order, is_active')
+      .eq('doctor_id', currentUser.id)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (res.error) {
+      if (_isOperatoriesMigrationMissing(res.error)) {
+        _operatoriesTableMissing = true;
+        _operatoriesList = [];
+        _operatoriesActive = [];
+        listEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:10px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;">⚠️ يلزم ترقية قاعدة البيانات (Migration 12) لتفعيل ميزة الغرف.</div>';
+        console.warn('Migration 12 required:\nRun Migration 12 in Supabase SQL editor.');
+        return;
+      }
+      throw res.error;
+    }
+    _operatoriesList = res.data || [];
+    _operatoriesActive = _operatoriesList.filter(function(o){ return o.is_active; });
+    renderOperatoriesList();
+  } catch (e) {
+    console.error('loadOperatories exception:', e);
+    listEl.innerHTML = '<div style="color:var(--red);font-size:13px;">فشل تحميل الغرف</div>';
+  }
+}
+
+// Renders the operatories list. Empty state explicitly tells the doctor the
+// feature is optional — single-chair clinics shouldn't feel they "must" set
+// one up.
+function renderOperatoriesList() {
+  var el = document.getElementById('operatoriesList');
+  if (!el) return;
+  if (_operatoriesList.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:14px;background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:10px;text-align:center;">'
+      + 'لا توجد غرف بعد. <strong style="color:var(--text2);">الميزة اختيارية</strong> — العيادات الصغيرة لا تحتاجها.'
+      + '</div>';
+    return;
+  }
+  // Build a provider lookup so we can display the default_provider_id name.
+  // _apptTypesProviders only holds active doctors → an inactive linked doctor
+  // will show "[طبيب غير نشط]" rather than an empty badge.
+  var provMap = {};
+  for (var i = 0; i < _apptTypesProviders.length; i++) {
+    provMap[_apptTypesProviders[i].id] = _apptTypesProviders[i];
+  }
+  el.innerHTML = _operatoriesList.map(function(o) {
+    var safeName = String(o.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Defensive: even though saveOperatory enforces #RRGGBB, an old/manual
+    // DB row could contain something else. Sanitize before inlining into
+    // style="background:..." to avoid CSS injection.
+    var rawColor = o.color || '#2ee89e';
+    var color = /^#[0-9A-Fa-f]{6}$/.test(rawColor) ? rawColor : '#2ee89e';
+    var providerBadge = '';
+    if (o.default_provider_id) {
+      var pName = provMap[o.default_provider_id]
+        ? String(provMap[o.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        : '[طبيب غير نشط]';
+      providerBadge = '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">👨‍⚕️ ' + pName + '</div>';
+    }
+    var inactiveBadge = o.is_active
+      ? ''
+      : '<span style="font-size:11px;color:var(--text-muted);background:rgba(141,160,189,0.15);padding:2px 8px;border-radius:6px;margin-right:6px;">غير نشطة</span>';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;' + (o.is_active ? '' : 'opacity:0.7;') + '">'
+         +   '<div style="width:14px;height:14px;border-radius:4px;background:' + color + ';flex-shrink:0;border:1px solid rgba(255,255,255,0.15);"></div>'
+         +   '<div style="flex:1;min-width:0;">'
+         +     '<div style="font-weight:700;font-size:14px;color:var(--text);">' + safeName + inactiveBadge + '</div>'
+         +     providerBadge
+         +   '</div>'
+         +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="editOperatory(\'' + o.id + '\')">✏️ تعديل</button>'
+         +   '<button type="button" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="deleteOperatory(\'' + o.id + '\')">🗑️ حذف</button>'
+         + '</div>';
+  }).join('');
+}
+
+// Populates the operatory <select> inside the appointment-type modal.
+// Crucial: also toggles the wrapper's visibility (Soft mode, قاعدة #15).
+// When there are no active operatories AND the current template doesn't
+// link to one, we hide the wrapper entirely so single-chair clinics don't
+// see clutter. editApptType can override this when it loads a template
+// linked to an inactive operatory (so the user can clear the stale FK).
+function populateApptTypeOperatorySelect() {
+  var sel = document.getElementById('fAtOperatory');
+  var wrap = document.getElementById('fAtOperatoryWrap');
+  if (!sel || !wrap) return;
+  var html = '<option value="">— بدون غرفة —</option>';
+  for (var i = 0; i < _operatoriesActive.length; i++) {
+    var op = _operatoriesActive[i];
+    var safeName = String(op.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + op.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+  // Soft mode: only show the wrapper when there's something to pick.
+  wrap.style.display = (_operatoriesActive.length > 0) ? '' : 'none';
+}
+
+// Populates the provider <select> inside the operatory modal. Mirror of
+// populateApptTypeProviderSelect — kept separate so changes to one don't
+// silently affect the other.
+function populateOperatoryProviderSelect() {
+  var sel = document.getElementById('fOpDefaultProvider');
+  if (!sel) return;
+  var html = '<option value="">— بدون طبيب افتراضي —</option>';
+  for (var i = 0; i < _apptTypesProviders.length; i++) {
+    var d = _apptTypesProviders[i];
+    var safeName = String(d.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    html += '<option value="' + d.id + '">' + safeName + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+// Opens the operatory modal in CREATE mode. Resets all fields.
+function openOperatoryModal() {
+  if (_operatoriesTableMissing) {
+    showToast('⚠️ يلزم ترقية قاعدة البيانات أولاً (Migration 12)', true);
+    return;
+  }
+  _editingOperatoryId = null;
+  document.getElementById('operatoryModalTitle').textContent = 'إضافة غرفة جديدة';
+  document.getElementById('fOpName').value = '';
+  document.getElementById('fOpColor').value = '#2ee89e';
+  populateOperatoryProviderSelect();
+  document.getElementById('fOpDefaultProvider').value = '';
+  document.getElementById('fOpActive').checked = true;
+  document.getElementById('operatoryModal').classList.add('open');
+  setTimeout(function() { document.getElementById('fOpName').focus(); }, 50);
+}
+
+// Opens the operatory modal in EDIT mode. Uses the same ghost-option pattern
+// as editApptType so an inactive linked doctor doesn't get silently nulled.
+function editOperatory(id) {
+  var o = _operatoriesList.find(function(x){ return x.id === id; });
+  if (!o) { showToast('لم يتم العثور على الغرفة', true); return; }
+  _editingOperatoryId = id;
+  document.getElementById('operatoryModalTitle').textContent = 'تعديل غرفة';
+  document.getElementById('fOpName').value = o.name || '';
+  document.getElementById('fOpColor').value = o.color || '#2ee89e';
+  populateOperatoryProviderSelect();
+  var provSel = document.getElementById('fOpDefaultProvider');
+  if (o.default_provider_id) {
+    var inActive = false;
+    for (var pi = 0; pi < provSel.options.length; pi++) {
+      if (provSel.options[pi].value === o.default_provider_id) { inActive = true; break; }
+    }
+    if (!inActive) {
+      var ghost = document.createElement('option');
+      ghost.value = o.default_provider_id;
+      ghost.textContent = '[طبيب غير نشط — احتفظ بالحالي]';
+      provSel.appendChild(ghost);
+    }
+    provSel.value = o.default_provider_id;
+  } else {
+    provSel.value = '';
+  }
+  document.getElementById('fOpActive').checked = !!o.is_active;
+  document.getElementById('operatoryModal').classList.add('open');
+  setTimeout(function() { document.getElementById('fOpName').focus(); }, 50);
+}
+
+function closeOperatoryModal() {
+  document.getElementById('operatoryModal').classList.remove('open');
+  _editingOperatoryId = null;
+}
+
+// Save = INSERT (create) or UPDATE (edit). Validates name length to match
+// the DB CHECK (1-50 chars). doctor_id is multi-tenant (Migration 12 K-Standard)
+// not owner_id — قاعدة #6 reminds us to honor legacy patterns per-table.
+async function saveOperatory() {
+  // Defensive guard: deactivated employee can't mutate. The page-level
+  // guardPage(['owner']) already blocks Doctor/Secretary, but an Owner
+  // logged in as a deactivated Doctor identity should be blocked too.
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive
+      && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حفظ التعديلات', true);
+    return;
+  }
+
+  var name = (document.getElementById('fOpName').value || '').trim();
+  var color = document.getElementById('fOpColor').value || '#2ee89e';
+  var defaultProvider = document.getElementById('fOpDefaultProvider').value || null;
+  var isActive = !!document.getElementById('fOpActive').checked;
+
+  // Validate name (matches DB CHECK char_length BETWEEN 1 AND 50)
+  if (!name) {
+    showToast('⚠️ اسم الغرفة مطلوب', true);
+    return;
+  }
+  if (name.length > 50) {
+    showToast('⚠️ اسم الغرفة طويل جداً (50 حرف كحد أقصى)', true);
+    return;
+  }
+
+  // Sanity-check color: HTML5 color picker always returns #RRGGBB, but a
+  // hostile state could feed us garbage. Fall back to default if not hex.
+  if (!/^#[0-9A-Fa-f]{6}$/.test(color)) color = '#2ee89e';
+
+  var btn = document.getElementById('btnSaveOperatory');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+
+  try {
+    var res, opIdForAudit, isCreate;
+    if (_editingOperatoryId) {
+      isCreate = false;
+      opIdForAudit = _editingOperatoryId;
+      // Capture old values for audit diff (best-effort — non-blocking)
+      var oldOp = _operatoriesList.find(function(x){ return x.id === _editingOperatoryId; }) || {};
+      res = await window.sb.from('operatories')
+        .update({
+          name: name,
+          color: color,
+          default_provider_id: defaultProvider,
+          is_active: isActive
+        })
+        .eq('id', _editingOperatoryId)
+        .eq('doctor_id', currentUser.id);
+      if (!res.error && window.logAudit) {
+        window.logAudit('operatory.edit', {
+          entityId: _editingOperatoryId,
+          description: 'تعديل غرفة: ' + name,
+          oldValue: {
+            name: oldOp.name,
+            color: oldOp.color,
+            default_provider_id: oldOp.default_provider_id,
+            is_active: oldOp.is_active
+          },
+          newValue: {
+            name: name,
+            color: color,
+            default_provider_id: defaultProvider,
+            is_active: isActive
+          }
+        });
+      }
+    } else {
+      isCreate = true;
+      // Compute next sort_order so new operatories land at the end
+      var maxSort = 0;
+      for (var i = 0; i < _operatoriesList.length; i++) {
+        if ((_operatoriesList[i].sort_order || 0) > maxSort) maxSort = _operatoriesList[i].sort_order;
+      }
+      res = await window.sb.from('operatories')
+        .insert({
+          doctor_id: currentUser.id,
+          name: name,
+          color: color,
+          default_provider_id: defaultProvider,
+          is_active: isActive,
+          sort_order: maxSort + 1
+        })
+        .select()
+        .single();
+      if (!res.error && res.data) {
+        opIdForAudit = res.data.id;
+        if (window.logAudit) {
+          window.logAudit('operatory.create', {
+            entityId: opIdForAudit,
+            description: 'إضافة غرفة: ' + name,
+            newValue: {
+              name: name,
+              color: color,
+              default_provider_id: defaultProvider,
+              is_active: isActive
+            }
+          });
+        }
+      }
+    }
+
+    btn.disabled = false; btn.textContent = '💾 حفظ';
+
+    if (res.error) {
+      if (_isOperatoriesMigrationMissing(res.error)) {
+        _operatoriesTableMissing = true;
+        showToast('⚠️ يلزم ترقية قاعدة البيانات', true);
+      } else {
+        showToast('❌ ' + (res.error.message || 'فشل الحفظ'), true);
+      }
+      return;
+    }
+
+    showToast(isCreate ? '✅ تم إضافة الغرفة' : '✅ تم تعديل الغرفة');
+    closeOperatoryModal();
+    await loadOperatories();
+    // The operatory list changed → repopulate template-modal picker too,
+    // in case the user opens the template modal immediately after.
+    populateApptTypeOperatorySelect();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '💾 حفظ';
+    console.error('saveOperatory exception:', e);
+    showToast('❌ خطأ غير متوقع', true);
+  }
+}
+
+// Delete with native confirm. FKs:
+//   • appointments.operatory_id            → ON DELETE SET NULL (preserves history)
+//   • appointment_types.default_operatory_id → ON DELETE SET NULL
+// So past appointments and templates survive the delete; they just lose
+// the operatory link. Same UX philosophy as deleteApptType.
+async function deleteOperatory(id) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive
+      && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن الحذف', true);
+    return;
+  }
+  var o = _operatoriesList.find(function(x){ return x.id === id; });
+  if (!o) return;
+  var ok = confirm('حذف الغرفة "' + (o.name || '') + '"؟\n\n'
+    + 'المواعيد والقوالب التي تستخدم هذه الغرفة ستبقى كما هي (تفقد الربط بالغرفة فقط).\n\n'
+    + 'بديل أنظف: يمكنك تعطيل الغرفة بدل حذفها (إزالة "نشطة" من تعديلها).');
+  if (!ok) return;
+
+  try {
+    var res = await window.sb.from('operatories')
+      .delete()
+      .eq('id', id)
+      .eq('doctor_id', currentUser.id);
+    if (res.error) {
+      showToast('❌ ' + (res.error.message || 'فشل الحذف'), true);
+      return;
+    }
+    if (window.logAudit) {
+      window.logAudit('operatory.delete', {
+        entityId: id,
+        description: 'حذف غرفة: ' + (o.name || ''),
+        oldValue: {
+          name: o.name,
+          color: o.color,
+          default_provider_id: o.default_provider_id,
+          is_active: o.is_active
+        }
+      });
+    }
+    showToast('✅ تم حذف الغرفة');
+    await loadOperatories();
+    populateApptTypeOperatorySelect();
+  } catch (e) {
+    console.error('deleteOperatory exception:', e);
     showToast('❌ خطأ غير متوقع', true);
   }
 }
