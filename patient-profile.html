@@ -7710,7 +7710,12 @@ async function loadPatientAuditLog() {
       // kept for label consistency if the audit query ever surfaces them.
       'operatory.create': '🏥 إضافة غرفة',
       'operatory.edit': '🏥 تعديل غرفة',
-      'operatory.delete': '🏥 حذف غرفة'
+      'operatory.delete': '🏥 حذف غرفة',
+      // Phase 6 L-B: appointment-type templates are also clinic-wide.
+      // Defensive labels for consistency.
+      'appointment_type.create': '🎨 إضافة قالب موعد',
+      'appointment_type.edit': '🎨 تعديل قالب موعد',
+      'appointment_type.delete': '🎨 حذف قالب موعد'
     };
     var roleLabels = { owner: 'المالك', doctor: 'طبيب', secretary: 'سكرتيرة' };
 

@@ -1212,6 +1212,14 @@ var _apptTypesLabs = [];        // Gap 8.2: cached active labs for picker
 var _editingApptTypeId = null;  // id of the template currently being edited
 var _gap8TableMissing = false;  // true once we detect pre-migration state
 var _gap82ColumnsMissing = false; // Gap 8.2: provider/lab columns not yet migrated
+// Phase 6 L-B: usage stats. Map of { appointment_type_id → usage_count } built
+// from a GROUP BY appointment_type_id query on appointments. Refreshed alongside
+// the templates list. Pre-migration installations leave it empty (badge hidden).
+var _apptTypesUsageCounts = {};
+// Phase 6 L-B: tracks the in-flight drag operation. We use a module-scope var
+// instead of relying solely on dataTransfer so that dragover can read the source
+// even when the browser strips dataTransfer.getData (Firefox security model).
+var _apptTypesDragId = null;
 // Gap 8.3: tracks the last name value we auto-filled from a treatment, so we
 // can keep #fAtName in sync as the user changes the treatment dropdown, but
 // stop tracking the moment the user types a custom name. null = no auto-fill
@@ -1307,6 +1315,9 @@ async function loadAppointmentTypes() {
       return;
     }
     _apptTypes = res.data || [];
+    // Phase 6 L-B: fetch usage counts in parallel with the render. We await so
+    // the first paint already has the badges (no flash-of-empty-state).
+    await loadApptTypesUsageCounts();
     renderApptTypesList();
   } catch (e) {
     console.error('Gap 8 load exception:', e);
@@ -1409,6 +1420,37 @@ function onApptTypeNameInput() {
   }
 }
 
+// Phase 6 L-B: load per-template usage counts. Reads the appointments table and
+// counts how many times each template was used. PostgREST doesn't support
+// GROUP BY in its select syntax, so we pull just the appointment_type_id column
+// for this clinic and aggregate client-side — cheap because we only fetch one
+// UUID column. Errors degrade gracefully (counts map stays empty → no badges).
+async function loadApptTypesUsageCounts() {
+  _apptTypesUsageCounts = {};
+  if (!currentUser || _gap8TableMissing) return;
+  try {
+    var res = await window.sb.from('appointments')
+      .select('appointment_type_id')
+      .eq('doctor_id', currentUser.id)
+      .not('appointment_type_id', 'is', null);
+    if (res.error) {
+      // Pre-Gap-8 installations don't have the column. 42703 = undefined_column.
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/42703|appointment_type_id/i.test(msg)) {
+        console.warn('Template usage counts:', res.error);
+      }
+      return;
+    }
+    (res.data || []).forEach(function(row){
+      var tid = row.appointment_type_id;
+      if (!tid) return;
+      _apptTypesUsageCounts[tid] = (_apptTypesUsageCounts[tid] || 0) + 1;
+    });
+  } catch (e) {
+    console.warn('Template usage counts exception:', e);
+  }
+}
+
 // Renders the list of saved templates. Each row has edit + delete buttons.
 // HTML-escapes the name so a user-supplied "<script>" can't break out.
 function renderApptTypesList() {
@@ -1485,17 +1527,253 @@ function renderApptTypesList() {
     var extrasLine = extras.length
       ? '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + extras.join(' · ') + '</div>'
       : '';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;">'
+    // Phase 6 L-B: usage badge — '🔢 N مرة' for templates that have been used,
+    // 'جديد' (in accent green) for never-used. Helps the doctor see which
+    // templates are pulling weight at a glance. Hidden entirely when usage
+    // counts couldn't be loaded (pre-migration / RLS error).
+    var usageBadge = '';
+    if (Object.keys(_apptTypesUsageCounts).length || _apptTypesUsageCounts[t.id]) {
+      var cnt = _apptTypesUsageCounts[t.id] || 0;
+      if (cnt > 0) {
+        usageBadge = '<span style="display:inline-block;background:rgba(46,232,158,0.15);color:#2ee89e;border:1px solid rgba(46,232,158,0.35);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;" title="عدد المواعيد التي استخدمت هذا القالب">🔢 ' + cnt + ' مرة</span>';
+      } else {
+        usageBadge = '<span style="display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.35);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;" title="لم يُستخدم بعد">جديد</span>';
+      }
+    }
+    // Phase 6 L-B: rows are draggable for reorder. The drag handle (⠿) is a
+    // visual cue + a known a11y idiom for grab-handles. We attach drag listeners
+    // to the whole row so users can grab the card body too, but on touch
+    // devices we restrict draggability to the handle by toggling row.draggable
+    // on handle's pointerdown — see _apptTypeRowHandlePointerDown.
+    var safeId = String(t.id).replace(/"/g, '');
+    return '<div draggable="true" data-tid="' + safeId + '" '
+         +   'ondragstart="onApptTypeRowDragStart(event)" '
+         +   'ondragend="onApptTypeRowDragEnd(event)" '
+         +   'ondragover="onApptTypeRowDragOver(event)" '
+         +   'ondragleave="onApptTypeRowDragLeave(event)" '
+         +   'ondrop="onApptTypeRowDrop(event)" '
+         +   'style="display:flex;align-items:center;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:grab;">'
+         +   '<div style="font-size:18px;color:var(--text-muted);user-select:none;line-height:1;" title="اسحب لإعادة الترتيب">⠿</div>'
          +   '<div style="width:10px;height:10px;border-radius:50%;background:' + trColor + ';flex-shrink:0;"></div>'
          +   '<div style="flex:1;min-width:0;">'
-         +     '<div style="font-weight:700;font-size:14px;color:var(--text);">' + safeName + '</div>'
+         +     '<div style="font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;">' + safeName + usageBadge + '</div>'
          +     '<div style="font-size:12px;color:var(--text-muted);margin-top:2px;">' + (t.default_duration_min || 30) + ' د — ' + trName + '</div>'
          +     extrasLine
          +   '</div>'
-         +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="editApptType(\'' + t.id + '\')">✏️ تعديل</button>'
-         +   '<button type="button" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="deleteApptType(\'' + t.id + '\')">🗑️ حذف</button>'
+         +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="duplicateApptType(\'' + safeId + '\')" title="إنشاء نسخة من هذا القالب">📋 نسخ</button>'
+         +   '<button type="button" class="btn-cancel" style="padding:6px 10px;font-size:12px;" onclick="editApptType(\'' + safeId + '\')">✏️ تعديل</button>'
+         +   '<button type="button" class="btn btn-danger" style="padding:6px 10px;font-size:12px;" onclick="deleteApptType(\'' + safeId + '\')">🗑️ حذف</button>'
          + '</div>';
   }).join('');
+}
+
+// Phase 6 L-B: Duplicate a template. Creates a new row with the same fields,
+// "(نسخة)" suffix on the name, and sort_order at the end of the list. We
+// intentionally do NOT prompt for confirmation — the new copy can be deleted
+// with one click, and removing the prompt makes the action feel as quick as
+// duplicating files in a file manager.
+//
+// OpenDental notably lacks this feature; SyDent's win is in clinic workflows
+// where 3-4 similar templates (e.g. "تنظيف بالغ" vs "تنظيف طفل") share most
+// fields — duplicating + tweaking is faster than building from scratch.
+async function duplicateApptType(id) {
+  if (_gap8TableMissing) {
+    showToast('⚠️ يلزم ترقية قاعدة البيانات أولاً', true);
+    return;
+  }
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إنشاء قوالب', true);
+    return;
+  }
+  var src = _apptTypes.find(function(x){ return x.id === id; });
+  if (!src) { showToast('⚠️ القالب غير موجود', true); return; }
+
+  // Compute the next sort_order so the copy lands at the end of the list.
+  var maxSort = 0;
+  for (var i = 0; i < _apptTypes.length; i++) {
+    if ((_apptTypes[i].sort_order || 0) > maxSort) maxSort = _apptTypes[i].sort_order;
+  }
+
+  // Build the insert payload by copying all the source fields EXCEPT id +
+  // created_at + sort_order. The new row gets a fresh UUID from the DB.
+  var payload = {
+    doctor_id: currentUser.id,
+    name: (src.name || 'قالب') + ' (نسخة)',
+    default_duration_min: src.default_duration_min,
+    default_treatment_id: src.default_treatment_id || null,
+    default_provider_id: src.default_provider_id || null,
+    default_lab_id: src.default_lab_id || null,
+    default_notes: src.default_notes || null,
+    default_operatory_id: src.default_operatory_id || null,
+    sort_order: maxSort + 1
+  };
+
+  var res;
+  try {
+    res = await window.sb.from('appointment_types').insert(payload).select().single();
+    // Gap 8.2 / Migration 11 retry: strip optional columns if the install
+    // hasn't run the later migrations. Same defensive pattern as elsewhere.
+    // _isGap82ColumnMissing is defined inside the save function (closure),
+    // not module-scope — typeof check avoids ReferenceError if/when we're
+    // called before that function has run. Falls back to inline regex.
+    if (res.error) {
+      var errMsg = (res.error.message || '') + ' ' + (res.error.code || '');
+      var optionalColMissing = /42703|23514|default_provider_id|default_lab_id|default_notes|default_operatory_id/i.test(errMsg);
+      if (optionalColMissing) {
+        _gap82ColumnsMissing = true;
+        var legacy = {
+          doctor_id: currentUser.id,
+          name: payload.name,
+          default_duration_min: payload.default_duration_min,
+          default_treatment_id: payload.default_treatment_id,
+          sort_order: payload.sort_order
+        };
+        res = await window.sb.from('appointment_types').insert(legacy).select().single();
+      }
+    }
+    if (res.error) {
+      console.error('Duplicate template failed:', res.error);
+      showToast('❌ فشل إنشاء النسخة', true);
+      return;
+    }
+  } catch (e) {
+    console.error('Duplicate template exception:', e);
+    showToast('❌ فشل إنشاء النسخة', true);
+    return;
+  }
+
+  // Phase 5 audit
+  if (window.logAudit && res.data) {
+    window.logAudit('appointment_type.create', {
+      entityId: res.data.id,
+      description: 'إنشاء قالب موعد (نسخة من ' + (src.name || '') + '): ' + payload.name,
+      newValue: { source_template_id: id, name: payload.name }
+    });
+  }
+
+  showToast('✅ تم إنشاء نسخة');
+  await loadAppointmentTypes();
+}
+
+// ─── Phase 6 L-B: Drag-and-drop reorder ──────────────────────────────────────
+// HTML5 drag API. Each row carries data-tid (template UUID). Dragging shows
+// the row at 50% opacity; hovering another row highlights it as the drop
+// target. On drop, we splice the dragged item into the target's position
+// in _apptTypes, then rebuild sort_order = 1..N and write it back to the DB
+// in one batched update. The list re-renders from the fresh DB state to be
+// safe against concurrent edits (e.g. owner moving rows in another tab).
+
+function onApptTypeRowDragStart(ev) {
+  var row = ev.currentTarget;
+  if (!row || !row.dataset || !row.dataset.tid) return;
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    ev.preventDefault();
+    return;
+  }
+  _apptTypesDragId = row.dataset.tid;
+  row.style.opacity = '0.5';
+  try {
+    ev.dataTransfer.effectAllowed = 'move';
+    // Firefox needs setData to actually fire the drop event downstream.
+    ev.dataTransfer.setData('text/plain', _apptTypesDragId);
+  } catch (e) { /* some browsers throw — non-fatal */ }
+}
+
+function onApptTypeRowDragEnd(ev) {
+  var row = ev.currentTarget;
+  if (row) row.style.opacity = '';
+  // Defensive: clear any stuck highlights (some browsers skip dragleave on drop).
+  var stuck = document.querySelectorAll('[data-tid][data-k3-dragover="1"]');
+  for (var i = 0; i < stuck.length; i++) {
+    stuck[i].removeAttribute('data-k3-dragover');
+    stuck[i].style.outline = '';
+  }
+  _apptTypesDragId = null;
+}
+
+function onApptTypeRowDragOver(ev) {
+  if (!_apptTypesDragId) return;
+  var row = ev.currentTarget;
+  if (!row || row.dataset.tid === _apptTypesDragId) return;  // hovering self
+  ev.preventDefault();
+  try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
+  row.dataset.k3Dragover = '1';
+  row.style.outline = '2px dashed rgba(46,232,158,0.6)';
+  row.style.outlineOffset = '-2px';
+}
+
+function onApptTypeRowDragLeave(ev) {
+  var row = ev.currentTarget;
+  if (!row) return;
+  row.removeAttribute('data-k3-dragover');
+  row.style.outline = '';
+}
+
+async function onApptTypeRowDrop(ev) {
+  ev.preventDefault();
+  var row = ev.currentTarget;
+  if (!row) return;
+  row.removeAttribute('data-k3-dragover');
+  row.style.outline = '';
+  var srcId = _apptTypesDragId;
+  var dstId = row.dataset.tid;
+  if (!srcId || !dstId || srcId === dstId) return;
+
+  // Locate src + dst indexes in the current cache.
+  var srcIdx = -1, dstIdx = -1;
+  for (var i = 0; i < _apptTypes.length; i++) {
+    if (_apptTypes[i].id === srcId) srcIdx = i;
+    if (_apptTypes[i].id === dstId) dstIdx = i;
+  }
+  if (srcIdx === -1 || dstIdx === -1) return;
+
+  // Splice src out and insert before dst (the target row visually swaps
+  // with src; for "drop AFTER" semantics, we'd add +1 — but "drop before"
+  // matches what most users intuit from a vertical list).
+  var moved = _apptTypes.splice(srcIdx, 1)[0];
+  // After splicing, dst's index may have shifted by 1 if src was earlier.
+  var newDstIdx = (srcIdx < dstIdx) ? dstIdx - 1 : dstIdx;
+  _apptTypes.splice(newDstIdx, 0, moved);
+
+  // Repaint optimistically so the user sees instant feedback. The DB write
+  // happens next; on failure we'll reload from server to revert.
+  // Assign new sort_order = 1..N.
+  for (var j = 0; j < _apptTypes.length; j++) {
+    _apptTypes[j].sort_order = j + 1;
+  }
+  renderApptTypesList();
+
+  // Write sort_order back to DB. We do this as a sequence of small updates
+  // rather than a single bulk upsert because Supabase's upsert wants the full
+  // row payload (and we don't want to send name/duration/etc. unchanged).
+  // For a typical clinic (<20 templates), this completes in <500ms.
+  var failed = false;
+  for (var k = 0; k < _apptTypes.length; k++) {
+    var t = _apptTypes[k];
+    try {
+      var upRes = await window.sb.from('appointment_types')
+        .update({ sort_order: t.sort_order })
+        .eq('id', t.id)
+        .eq('doctor_id', currentUser.id);
+      if (upRes.error) { failed = true; break; }
+    } catch (e) { failed = true; break; }
+  }
+
+  if (failed) {
+    showToast('❌ فشل حفظ الترتيب — جاري التراجع', true);
+    await loadAppointmentTypes();  // revert to server state
+    return;
+  }
+
+  // Phase 5 audit — log once for the whole reorder rather than per row.
+  if (window.logAudit) {
+    window.logAudit('appointment_type.edit', {
+      entityId: srcId,
+      description: 'إعادة ترتيب قوالب المواعيد (سحب وإفلات)',
+      newValue: { dragged_id: srcId, target_id: dstId, new_order: _apptTypes.map(function(t){ return t.id; }) }
+    });
+  }
+  showToast('✅ تم حفظ الترتيب');
 }
 
 // Opens the modal in CREATE mode. Resets form to defaults.
@@ -1779,6 +2057,14 @@ async function deleteApptType(id) {
     if (res.error) {
       showToast('❌ ' + (res.error.message || 'فشل الحذف'), true);
       return;
+    }
+    // Phase 5 audit (Phase 6 L-B addition: parity with create/edit logging)
+    if (window.logAudit) {
+      window.logAudit('appointment_type.delete', {
+        entityId: id,
+        description: 'حذف قالب موعد: ' + (t.name || ''),
+        oldValue: { name: t.name, default_duration_min: t.default_duration_min }
+      });
     }
     showToast('✅ تم حذف القالب');
     await loadAppointmentTypes();

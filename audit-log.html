@@ -320,6 +320,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="all">كل الإجراءات</option>
         <option value="patient">المرضى</option>
         <option value="appointment">المواعيد</option>
+        <option value="appointment_type">قوالب المواعيد</option>
         <option value="session">الجلسات</option>
         <option value="payment">الدفعات</option>
         <option value="lab">المخابر</option>
@@ -405,6 +406,7 @@ var stats = { total: 0, today: 0, week: 0, alerts: 0 };
 var ACTION_TYPES_BY_PREFIX = {
   patient:     ['patient.create', 'patient.edit', 'patient.delete'],
   appointment: ['appointment.create', 'appointment.edit', 'appointment.status_change', 'appointment.bulk_complete', 'appointment.delete'],
+  appointment_type: ['appointment_type.create', 'appointment_type.edit', 'appointment_type.delete'],
   session:     ['session.create', 'session.delete'],
   payment:     ['payment.create', 'payment.edit_splits', 'payment.delete'],
   lab:         ['lab.create', 'lab.edit', 'lab.delete'],
@@ -454,7 +456,7 @@ function actionTypeLabel(t) {
   var entity = parts[0] || '';
   var op = parts[1] || '';
   var entityMap = {
-    patient:'مريض', appointment:'موعد', session:'جلسة', payment:'دفعة',
+    patient:'مريض', appointment:'موعد', appointment_type:'قالب موعد', session:'جلسة', payment:'دفعة',
     lab:'مخبر', doctor:'طبيب', employee:'موظف', operatory:'غرفة',
     settings:'إعدادات', lock:'قفل'
   };
