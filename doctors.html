@@ -420,14 +420,19 @@ function renderList() {
       ? '<span class="linked-badge" title="هذا الطبيب هو معالجك الافتراضي — سيظهر تلقائياً عند تسجيلك للجلسات">⭐ معالجي</span>'
       : '';
     var roleBadge = d.role ? '<span class="role-badge">' + escapeHtml(d.role) + '</span>' : '';
-    // Phase 6 R: provider_type badge. We only render it when non-default
-    // (hygienist or assistant) — keeps regular doctor cards visually clean.
-    // The badge styling reuses .role-badge to inherit the existing chip look.
+    // Phase 6 R + X: provider_type badge. Renders a colored chip for any
+    // non-doctor provider type. Doctor stays unbadged (the default) to keep
+    // the card visually clean. The five chips match the role icons used
+    // throughout the app for consistency.
     var typeBadge = '';
     if (d.provider_type === 'hygienist') {
-      typeBadge = '<span class="role-badge" style="background:rgba(99,179,237,0.18);color:#63b3ed;border-color:rgba(99,179,237,0.35);" title="مساعد/ممرض (Hygienist)">🩺 مساعد/ممرض</span>';
+      typeBadge = '<span class="role-badge" style="background:rgba(99,179,237,0.18);color:#63b3ed;border-color:rgba(99,179,237,0.35);" title="متدرب/مساعد (Hygienist)">🩺 متدرب/مساعد</span>';
     } else if (d.provider_type === 'assistant') {
       typeBadge = '<span class="role-badge" style="background:rgba(255,167,38,0.18);color:#ffa726;border-color:rgba(255,167,38,0.35);" title="مساعدة كرسي">🤝 مساعدة كرسي</span>';
+    } else if (d.provider_type === 'secretary') {
+      typeBadge = '<span class="role-badge" style="background:rgba(245,200,66,0.18);color:#f5c842;border-color:rgba(245,200,66,0.35);" title="سكرتيرة">👩‍💼 سكرتيرة</span>';
+    } else if (d.provider_type === 'other') {
+      typeBadge = '<span class="role-badge" style="background:rgba(141,160,189,0.18);color:#8da0bd;border-color:rgba(141,160,189,0.35);" title="موظف آخر (محاسب/عامل/إلخ)">👥 موظف آخر</span>';
     }
 
     var sharePart = (d.share_percent !== null && d.share_percent !== undefined) ? ('<b>النسبة:</b> ' + d.share_percent + '%') : '';

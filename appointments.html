@@ -3682,7 +3682,17 @@ async function populateApptProviderPicker(preselectId) {
   var group = document.getElementById('fProviderGroup');
   var sel = document.getElementById('fProvider');
   if (!sel || !group) return;
-  if (!CLINIC_DOCTORS.length) {
+  // Phase 6 X: Filter the appointment picker to clinical providers only.
+  // Secretary + 'other' employees have clinic_doctors rows for payroll, but
+  // they don't take patient appointments — so they shouldn't appear in this
+  // dropdown. Includes: doctor, hygienist, assistant (chair-side assistant
+  // does sometimes get assigned to an appointment as the helping provider).
+  // Legacy rows (no provider_type) default to 'doctor' so they remain visible.
+  var clinicalOnly = CLINIC_DOCTORS.filter(function(d){
+    var pt = d.provider_type || 'doctor';
+    return pt === 'doctor' || pt === 'hygienist' || pt === 'assistant';
+  });
+  if (!clinicalOnly.length) {
     group.style.display = 'none';
     sel.innerHTML = '';
     return;
@@ -3690,8 +3700,8 @@ async function populateApptProviderPicker(preselectId) {
   group.style.display = 'block';
   sel.innerHTML = '';
   // Active first, then inactive
-  var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
-  var inactive = CLINIC_DOCTORS.filter(function(d){ return d.is_active === false; });
+  var active = clinicalOnly.filter(function(d){ return d.is_active !== false; });
+  var inactive = clinicalOnly.filter(function(d){ return d.is_active === false; });
   var ordered = active.concat(inactive);
   ordered.forEach(function(d){
     var opt = document.createElement('option');
@@ -3699,11 +3709,11 @@ async function populateApptProviderPicker(preselectId) {
     var prefix = '';
     if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
     else if (d.is_owner) prefix = '⭐ ';
-    // Phase 6 R: provider_type visual indicator. Layered AFTER the existing
+    // Phase 6 R/X: provider_type visual indicator. Layered AFTER the existing
     // prefix so the user-linked + owner badges still take precedence on the
-    // owner's own row (which is doctor-type anyway). For hygienist/assistant
-    // rows the linked/owner prefixes are usually absent, so the type emoji
-    // sits at the start and the dropdown reads cleanly.
+    // owner's own row. For hygienist/assistant rows the linked/owner prefixes
+    // are usually absent, so the type emoji sits at the start and the
+    // dropdown reads cleanly.
     var typeIcon = '';
     if (d.provider_type === 'hygienist') typeIcon = '🩺 ';
     else if (d.provider_type === 'assistant') typeIcon = '🤝 ';

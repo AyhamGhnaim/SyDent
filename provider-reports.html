@@ -324,8 +324,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <select id="providerTypeFilter" onchange="onFilterChange()">
         <option value="all">📊 شامل</option>
         <option value="doctor">🦷 أطباء فقط</option>
-        <option value="hygienist">🩺 مساعدين/ممرضين فقط</option>
+        <option value="hygienist">🩺 متدربين/مساعدين فقط</option>
         <option value="assistant">🤝 مساعدات كرسي فقط</option>
+        <option value="secretary">👩‍💼 سكرتيرات فقط</option>
+        <option value="other">👥 موظفون آخرون فقط</option>
       </select>
     </div>
     <div class="filter-group">
@@ -450,6 +452,17 @@ function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Phase 6 X: Provider type prefix helper. Returns the emoji prefix (with
+// trailing space) for non-default provider types. Empty string for doctors
+// (the default, no prefix needed) and any unknown value (defensive).
+function providerTypePrefix(pt) {
+  if (pt === 'hygienist') return '🩺 ';
+  if (pt === 'assistant') return '🤝 ';
+  if (pt === 'secretary') return '👩‍💼 ';
+  if (pt === 'other') return '👥 ';
+  return '';  // doctor or unknown → no prefix
+}
+
 // Phase 3 Feature G: format the "tooth" column for both tooth-based and regional sessions.
 // Tooth-based: show the FDI number. Regional: show a compact Arabic label.
 var __QLBL_PR = {'UR':'علوي يمين','UL':'علوي يسار','LL':'سفلي يسار','LR':'سفلي يمين'};
@@ -570,7 +583,7 @@ async function loadAll() {
   });
   var allLabel = inactiveModeForDropdown === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
   sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
-    var typePrefix = (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''));
+    var typePrefix = providerTypePrefix(d.provider_type);
     var lbl = typePrefix + d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
@@ -980,7 +993,7 @@ function render() {
           + '<div class="prov-avatar" style="background:' + color + ';">' + initials(d.name) + '</div>'
           + '<div style="flex:1;">'
             + '<div class="prov-name">'
-              + (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''))
+              + providerTypePrefix(d.provider_type)
               + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + inactiveBadge
             + '</div>'
             + '<div class="prov-role">' + (d.role ? escapeHtml(d.role) + ' • ' : '') + 'نسبة: ' + sharePctDisplay + '</div>'
@@ -1331,7 +1344,7 @@ function rebuildProviderDropdown() {
   });
   var allLabel = inactiveMode === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
   sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
-    var typePrefix = (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''));
+    var typePrefix = providerTypePrefix(d.provider_type);
     var lbl = typePrefix + d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');

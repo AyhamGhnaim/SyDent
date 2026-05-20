@@ -257,35 +257,52 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label>الدور *</label>
-        <!-- Phase 6 W: Unified role + provider_type dropdown. Each option carries
-             a composite value 'role:provider_type' so a single pick captures both
-             clinical role (what they do) and employee category (where they fit
-             in the lock-mode hierarchy). The old separate "نوع المزوّد" dropdown
-             is gone — its information now lives in the role choice itself,
-             eliminating the contradiction where a chair-side assistant had to
-             be modeled as a "doctor" employee just to access the provider_type
-             field. onRoleChange() splits the composite value when the user picks. -->
+        <!-- Phase 6 W + X: Unified role + provider_type dropdown. Each option
+             carries a composite value 'role:provider_type' so a single pick
+             captures both clinical role (what they do) and employee category
+             (where they fit in the lock-mode hierarchy).
+
+             Phase 6 X expansion: Secretary now has a clinic_doctors row too
+             (provider_type='secretary'), and a new 'other' bucket covers
+             cleaners, accountants, managers — any team member with a salary
+             who isn't a clinical provider. The role for both 'secretary' and
+             'other' employees maps to clinic_employees.role='secretary' (since
+             they share the same lock-mode permissions: front desk access).
+
+             Internal value 'hygienist' kept stable even though the UI label
+             changed to 'متدرب/مساعد' (more idiomatic for the Syrian market).
+             Renaming the DB value would invalidate Migration 13 data without
+             benefit. -->
         <select id="eRole" onchange="onRoleChange()">
           <option value="doctor:doctor">🦷 طبيب أسنان</option>
-          <option value="doctor:hygienist">🩺 مساعد/ممرض (Hygienist)</option>
+          <option value="doctor:hygienist">🩺 متدرب/مساعد</option>
           <option value="doctor:assistant">🤝 مساعدة كرسي</option>
-          <option value="secretary:none">👩‍💼 سكرتيرة</option>
+          <option value="secretary:secretary">👩‍💼 سكرتيرة</option>
+          <option value="secretary:other">👥 أخر (محاسب/عامل/إلخ)</option>
         </select>
         <div class="hint">المالك (Owner) لا يمكن إضافته يدوياً — حساب الـ Owner محفوظ تلقائياً.</div>
       </div>
 
-      <!-- ───── Phase 6 Q: Doctor-specific clinical fields ─────
-           Replaces the previous (Phase 6 P) hidden doctorLinkGroup.
-           Shows ONLY when role='doctor'. All fields are optional — the Owner
-           can save the employee row immediately and fill clinical details
-           later (any blank → null). When the role changes between
-           secretary and doctor, onRoleChange() toggles this container's
-           visibility; the underlying DOM elements stay mounted so their
-           values persist across visibility toggles within a single modal
-           session (no accidental data loss). -->
+      <!-- ───── Phase 6 W + X: Clinical/staff fields container ─────
+           Now visible for ALL non-owner employees (doctor, hygienist,
+           assistant, secretary, other). The container's contents adapt
+           per-role via onRoleChange + updateCompensationFieldsVisibility:
+
+             • Specialty/role text: shown for doctor sub-types only
+             • Phone + color + notes + hours: shown for everyone
+             • Compensation dropdown: shown for everyone (with role-appropriate
+               defaults — % for doctors/hygienists, salary for the rest)
+             • Share % field: hidden when compensation_model excludes it
+             • Monthly salary field: hidden when compensation_model excludes it
+
+           Field DOM elements stay mounted across visibility toggles so values
+           persist within a single modal session (no accidental data loss). -->
       <div id="doctorFieldsGroup" style="display:none;">
 
-        <div class="form-row">
+        <!-- Specialty/role text field — meaningful only for clinical roles
+             (doctor sub-types). Hidden for secretary/other; onRoleChange
+             toggles #specialtyFieldRow. -->
+        <div class="form-row" id="specialtyFieldRow">
           <div class="form-group">
             <label>التخصص / الدور</label>
             <input type="text" id="eDocRole" placeholder="مثلاً: تقويم / لب وجذور / طبيب عام">
@@ -294,6 +311,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <label>الهاتف</label>
             <input type="tel" id="eDocPhone" placeholder="09xxxxxxxx" dir="ltr">
           </div>
+        </div>
+
+        <!-- Phone-only row — shown for non-doctor roles so the phone field
+             stays visible when #specialtyFieldRow is hidden. onRoleChange
+             toggles between #specialtyFieldRow and #phoneOnlyRow so exactly
+             one of them is visible at a time. -->
+        <div class="form-group" id="phoneOnlyRow" style="display:none;">
+          <label>الهاتف</label>
+          <input type="tel" id="eDocPhoneAlt" placeholder="09xxxxxxxx" dir="ltr">
         </div>
 
         <!-- Phase 6 W (Migration 13 + 14): Dynamic compensation block.
@@ -323,17 +349,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <div class="hint" id="compensationHint" style="font-size:11px;color:var(--text2);">سيُستخدم في صفحة الرواتب القادمة لحساب المستحقات.</div>
         </div>
 
-        <!-- Share % field — visible for percentage + hybrid only. -->
-        <div class="form-row" id="shareFieldRow">
-          <div class="form-group">
-            <label>نسبة الطبيب من الجلسة (%)</label>
-            <input type="number" id="eDocShare" min="0" max="100" placeholder="مثلاً: 40">
-            <div class="hint" style="font-size:11px;color:var(--text2);">النسبة المئوية من قيمة الجلسة التي يستحقها هذا المزوّد.</div>
-          </div>
-          <div class="form-group">
-            <label>ساعات العمل (أسبوعياً)</label>
-            <input type="number" id="eDocHours" min="0" placeholder="مثلاً: 24">
-          </div>
+        <!-- Share % field — visible for percentage + hybrid only, and only
+             for clinical roles (doctor sub-types). Non-clinical roles
+             (secretary/other) never see this field because they don't earn
+             from production. -->
+        <div class="form-group" id="shareFieldRow">
+          <label>نسبة الطبيب من الجلسة (%)</label>
+          <input type="number" id="eDocShare" min="0" max="100" placeholder="مثلاً: 40">
+          <div class="hint" style="font-size:11px;color:var(--text2);">النسبة المئوية من قيمة الجلسة التي يستحقها هذا المزوّد.</div>
         </div>
 
         <!-- Monthly salary field — visible for salary + hybrid only. Hidden
@@ -344,6 +367,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <label>الراتب الشهري (ل.س)</label>
           <input type="number" id="eDocMonthlySalary" min="0" step="1000" placeholder="مثلاً: 500000">
           <div class="hint" style="font-size:11px;color:var(--text2);">المبلغ الثابت الذي يستحقه هذا المزوّد شهرياً.</div>
+        </div>
+
+        <!-- Hours field — visible for ALL non-owner employees regardless of
+             compensation model. Useful for scheduling and labor tracking
+             whether the person earns by % or by salary. -->
+        <div class="form-group">
+          <label>ساعات العمل (أسبوعياً)</label>
+          <input type="number" id="eDocHours" min="0" placeholder="مثلاً: 24">
         </div>
 
         <div class="form-group">
@@ -458,17 +489,34 @@ function roleIcon(r) {
 // Used in employee cards so the Owner sees at a glance that a 'doctor' is
 // actually a hygienist or chair-side assistant. Falls back to the basic
 // roleLabel() when no subtype information is available.
+// Phase 6 W + X: Enhanced label that includes provider_type subtype for both
+// doctor and secretary employees. Used in employee cards so the Owner sees at
+// a glance whether a 'doctor' is a hygienist/assistant, or a 'secretary' is
+// actually 'other staff'. Falls back to the basic roleLabel() when no
+// subtype information is available.
 function roleLabelExt(role, providerType) {
-  if (role !== 'doctor') return roleLabel(role);
-  if (providerType === 'hygienist') return 'مساعد/ممرض';
-  if (providerType === 'assistant') return 'مساعدة كرسي';
-  return 'طبيب';  // doctor or null/undefined → default
+  if (role === 'doctor') {
+    if (providerType === 'hygienist') return 'متدرب/مساعد';
+    if (providerType === 'assistant') return 'مساعدة كرسي';
+    return 'طبيب';  // doctor or null/undefined → default
+  }
+  if (role === 'secretary') {
+    if (providerType === 'other') return 'موظف آخر';
+    return 'سكرتيرة';  // 'secretary' or null/undefined → default
+  }
+  return roleLabel(role);  // owner or unknown
 }
 function roleIconExt(role, providerType) {
-  if (role !== 'doctor') return roleIcon(role);
-  if (providerType === 'hygienist') return '🩺';
-  if (providerType === 'assistant') return '🤝';
-  return '🦷';  // doctor → tooth icon
+  if (role === 'doctor') {
+    if (providerType === 'hygienist') return '🩺';
+    if (providerType === 'assistant') return '🤝';
+    return '🦷';  // doctor → tooth icon
+  }
+  if (role === 'secretary') {
+    if (providerType === 'other') return '👥';
+    return '👩‍💼';  // secretary → office worker
+  }
+  return roleIcon(role);
 }
 
 // Phase 6 T: avatarColor() now accepts the full employee row (not just role).
@@ -653,7 +701,10 @@ function renderList() {
     // Phase 6 W: Resolve provider_type from the linked clinic_doctors row so
     // the badge can show "🩺 مساعد/ممرض" instead of the generic "👨‍⚕️ طبيب"
     // for hygienists and assistants. Falls back to 'doctor' if no linkage.
-    var linkedDocForBadge = (e.role === 'doctor' && e.doctor_id)
+    // Phase 6 W + X: Resolve provider_type from the linked clinic_doctors row
+    // for ALL non-owner employees (secretaries also have linkedDoc since
+    // Phase 6 X). Falls back to a sensible default per role if no linkage.
+    var linkedDocForBadge = (e.role !== 'owner' && e.doctor_id)
       ? doctors.find(function(d){ return d.id === e.doctor_id; })
       : null;
     var empProviderType = linkedDocForBadge ? linkedDocForBadge.provider_type : null;
@@ -706,65 +757,138 @@ function renderList() {
 
 // ── Add/Edit Modal ──
 
-// Phase 6 W: Composite-value parser for the unified role dropdown.
-// The dropdown's option values are 'role:provider_type' (e.g. 'doctor:hygienist').
-// Returns { role, providerType } — providerType is null for secretary.
+// Phase 6 W + X: Composite-value parser for the unified role dropdown.
+// The dropdown's option values are 'role:provider_type' (e.g. 'doctor:hygienist',
+// 'secretary:secretary', 'secretary:other'). Returns { role, providerType }.
+// Phase 6 X adds 'secretary' and 'other' as valid provider_type values.
 function parseEmpRoleValue(v) {
   var parts = String(v || '').split(':');
   var role = parts[0] || 'secretary';
-  var pt = parts[1] || (role === 'doctor' ? 'doctor' : null);
-  // Normalize sentinel 'none' to null so callers don't see a non-null value
-  // for non-clinical providers (secretary). The DB column allows NULL anyway.
-  if (pt === 'none') pt = null;
+  var pt = parts[1] || (role === 'doctor' ? 'doctor' : 'secretary');
+  // Legacy 'none' sentinel from Phase 6 W maps to a real provider_type now
+  // (the secretary role itself has provider_type='secretary' so payroll rows
+  // can be filtered by what the person does). Without this normalization, a
+  // pre-Phase-X clinic_doctors row with provider_type='none' would violate
+  // the Migration 15 CHECK constraint on UPDATE.
+  if (pt === 'none') pt = 'secretary';
   return { role: role, providerType: pt };
 }
 
-// Phase 6 W: Default compensation_model per provider type. Encodes the
-// industry-standard pattern (associate dentists = %, hygienists/assistants =
-// salary). The Owner can always override after picking the role — these are
-// starting points, not enforcement.
+// Phase 6 W + X: Default compensation_model per provider type. Encodes the
+// industry-standard pattern (clinical providers default to %, support staff
+// default to salary). The Owner can override after picking the role — these
+// are starting points, not enforcement.
 function defaultCompensationForProviderType(pt) {
   if (pt === 'doctor') return 'percentage';
-  if (pt === 'hygienist') return 'percentage';  // hygienists often on % too
+  if (pt === 'hygienist') return 'percentage';  // trainee/cleaning often %
   if (pt === 'assistant') return 'salary';
-  return 'salary';  // secretary or anything else → salary
+  if (pt === 'secretary') return 'salary';
+  if (pt === 'other') return 'salary';
+  return 'salary';
 }
 
-// Phase 6 W: Toggle the compensation field visibility based on the current
-// model selection. Called on initial modal open AND whenever the model
-// dropdown changes. Keeps a single source of truth for "which fields matter
-// for which model" so we don't drift between the form HTML and save logic.
+// Phase 6 X: Two distinct "is clinical?" concepts:
+//   • providerTypeTakesAppointments — appears in appointment picker
+//     (doctor + hygienist + assistant). Assistants take appts as the
+//     helping provider on a session.
+//   • providerTypeEarnsByProduction — can take a % of production
+//     (doctor + hygienist only). Assistants are paid salary, not %.
+function providerTypeTakesAppointments(pt) {
+  return pt === 'doctor' || pt === 'hygienist' || pt === 'assistant';
+}
+function providerTypeEarnsByProduction(pt) {
+  return pt === 'doctor' || pt === 'hygienist';
+}
+// Backward-compat alias — earlier code uses providerTypeIsClinical for the
+// "earns by production" meaning. Keep it pointing there to avoid breaking
+// the existing share-field visibility logic.
+function providerTypeIsClinical(pt) {
+  return providerTypeEarnsByProduction(pt);
+}
+
+// Phase 6 W + X: Toggle the compensation field visibility based on the current
+// model selection AND the current provider_type. Keeps a single source of
+// truth for "which fields matter for which (role, model) combination".
 function updateCompensationFieldsVisibility() {
   var model = ($('eDocCompensation') && $('eDocCompensation').value) || 'percentage';
+  var parsed = parseEmpRoleValue($('eRole').value);
+  var isClinical = providerTypeIsClinical(parsed.providerType);
+
   var shareRow = $('shareFieldRow');
   var salaryGrp = $('salaryFieldGroup');
   var hint = $('compensationHint');
-  var showShare = (model === 'percentage' || model === 'hybrid');
+
+  // Share field visible only when:
+  //   1. the role earns by clinical production (doctor or hygienist), AND
+  //   2. the compensation model includes a percentage component.
+  // Salary field visible only when the model includes a fixed component.
+  var showShare = isClinical && (model === 'percentage' || model === 'hybrid');
   var showSalary = (model === 'salary' || model === 'hybrid');
   if (shareRow) shareRow.style.display = showShare ? '' : 'none';
   if (salaryGrp) salaryGrp.style.display = showSalary ? '' : 'none';
-  // Per-model hint text — keeps the user oriented as they switch.
+
+  // Per-model hint text — keeps the Owner oriented as they switch.
   if (hint) {
-    if (model === 'percentage') hint.textContent = 'يحسب من الإنتاج × النسبة المئوية. مناسب للأطباء/المساعدين العاملين بالعمولة.';
-    else if (model === 'salary') hint.textContent = 'مبلغ ثابت شهري بغض النظر عن الإنتاج. مناسب لمساعدة الكرسي والسكرتيرة.';
+    if (model === 'percentage') hint.textContent = 'يحسب من الإنتاج × النسبة المئوية. مناسب للأطباء/المتدربين العاملين بالعمولة.';
+    else if (model === 'salary') hint.textContent = 'مبلغ ثابت شهري بغض النظر عن الإنتاج. مناسب لمساعدة الكرسي والسكرتيرة وباقي الموظفين.';
     else if (model === 'hybrid') hint.textContent = 'راتب أساسي + نسبة من الإنتاج. مرن للحالات الخاصة.';
     else hint.textContent = 'هذا الموظف لا يأخذ مستحقات عبر صفحة الرواتب (مثلاً المالك يأخذ أرباحاً مباشرة).';
   }
 }
 
+// Phase 6 X: Filter the compensation dropdown options to only those that
+// make sense for the chosen provider_type. Non-clinical roles (secretary,
+// assistant, other) can't earn by percentage of production, so 'percentage'
+// and 'hybrid' are hidden for them. The hidden options remain in the DOM
+// (display:none on <option>) so we can re-show them when the role changes
+// back — preserves the current selection if the Owner toggles a doctor
+// employee back from hygienist to doctor.
+function syncCompensationDropdownForRole() {
+  var sel = $('eDocCompensation');
+  if (!sel) return;
+  var parsed = parseEmpRoleValue($('eRole').value);
+  var isClinical = providerTypeIsClinical(parsed.providerType);
+  for (var i = 0; i < sel.options.length; i++) {
+    var opt = sel.options[i];
+    if (opt.value === 'percentage' || opt.value === 'hybrid') {
+      opt.style.display = isClinical ? '' : 'none';
+      opt.disabled = !isClinical;
+    }
+  }
+  // If the current selection became hidden (e.g. user switched from doctor
+  // to secretary while 'percentage' was chosen), snap to 'salary' so the
+  // form doesn't leave an invisible-but-active option selected.
+  if (!isClinical && (sel.value === 'percentage' || sel.value === 'hybrid')) {
+    sel.value = 'salary';
+  }
+}
+
 function onRoleChange() {
-  // Phase 6 W: Unified role parser. The dropdown value is now 'role:provider_type'
-  // (e.g. 'doctor:hygienist' or 'secretary:none'). doctorFieldsGroup is shown
-  // whenever the chosen role is doctor — that's any of طبيب/hygienist/assistant.
-  // Secretary hides the whole clinical block.
+  // Phase 6 W + X: Unified role parser. The dropdown value is now
+  // 'role:provider_type' (e.g. 'doctor:hygienist' or 'secretary:other').
+  // doctorFieldsGroup (now broader — clinical/staff fields) shows for ALL
+  // non-owner employees; only the specialty-text row hides for non-doctors.
   var parsed = parseEmpRoleValue($('eRole').value);
   var grp = $('doctorFieldsGroup');
-  if (grp) grp.style.display = (parsed.role === 'doctor') ? '' : 'none';
+  if (grp) grp.style.display = '';  // always visible for any non-owner role
+
+  // Phase 6 X: Specialty text field shown for ALL clinical providers (doctor,
+  // hygienist, assistant) — they all take appointments and may have a
+  // specialty/skill label. Hidden for secretary/other (use the phone-only
+  // row instead).
+  var takesAppts = providerTypeTakesAppointments(parsed.providerType);
+  var specRow = $('specialtyFieldRow');
+  var phoneOnly = $('phoneOnlyRow');
+  if (specRow) specRow.style.display = takesAppts ? '' : 'none';
+  if (phoneOnly) phoneOnly.style.display = takesAppts ? 'none' : '';
+
+  // Filter the compensation dropdown to role-appropriate options.
+  syncCompensationDropdownForRole();
+
   // Auto-update compensation_model default whenever the user picks a new role
   // — but ONLY in add mode. In edit mode we keep whatever was loaded from DB
   // so the Owner doesn't lose their previous choice by toggling the dropdown.
-  // We detect add mode via editingId being null.
-  if (editingId === null && parsed.role === 'doctor') {
+  if (editingId === null) {
     $('eDocCompensation').value = defaultCompensationForProviderType(parsed.providerType);
   }
   updateCompensationFieldsVisibility();
@@ -774,26 +898,24 @@ function openAddModal() {
   editingId = null;
   $('modalTitle').textContent = '＋ إضافة موظف';
   $('eName').value = '';
-  // Phase 6 W: default to "secretary:none" (most common non-doctor add). Owner
-  // picks doctor sub-types from the same dropdown.
-  $('eRole').value = 'secretary:none';
+  // Phase 6 X: default to "secretary:secretary" (most common non-doctor add).
+  // The Owner picks doctor sub-types or 'other' from the same dropdown.
+  $('eRole').value = 'secretary:secretary';
   $('ePin').value = '';
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Phase 6 Q: Reset all doctor-specific fields. Picks a fresh color from
-  // the curated palette (avoids duplicating an existing doctor's color when
-  // possible) so the swatch isn't always green and feels personalized from
-  // the start. The Owner can still override it via the swatch button.
+  // Reset all clinical/staff fields. Picks a fresh color from the curated
+  // palette (avoids duplicating an existing doctor's color when possible).
   $('eDocRole').value = '';
   $('eDocPhone').value = '';
+  if ($('eDocPhoneAlt')) $('eDocPhoneAlt').value = '';
   $('eDocShare').value = '';
   $('eDocHours').value = '';
   $('eDocNotes').value = '';
   _setEmpDocColor(_pickRandomDoctorColor());
-  // Phase 6 W: default to percentage (legacy doctor behavior). onRoleChange()
-  // will override this if the user picks an assistant role.
-  $('eDocCompensation').value = 'percentage';
+  // Compensation default set by onRoleChange below (depends on chosen role).
+  $('eDocCompensation').value = 'salary';
   if ($('eDocMonthlySalary')) $('eDocMonthlySalary').value = '';
 
   onRoleChange();
@@ -810,24 +932,34 @@ function openEditModal(id) {
   $('modalTitle').textContent = '✏️ تعديل: ' + emp.name;
   $('eName').value = emp.name;
 
-  // Phase 6 Q: If editing a doctor employee, pre-fill the clinical fields
-  // from the linked clinic_doctors row.
-  var linkedDoc = (emp.role === 'doctor' && emp.doctor_id)
+  // Phase 6 X: Pre-fill clinical/staff fields from the linked clinic_doctors
+  // row for ALL employees (not just doctors). Secretary + other employees now
+  // also have clinic_doctors rows where their salary/phone/color/hours live.
+  // Legacy data (pre-Phase-6-X secretaries with no clinic_doctors row) falls
+  // back to empty defaults so the form is still editable; saveEmployee will
+  // create the missing row on next save.
+  var linkedDoc = emp.doctor_id
     ? doctors.find(function(d){ return d.id === emp.doctor_id; })
     : null;
 
-  // Phase 6 W: reconstruct the composite role:provider_type value from the
-  // employee row + linked doctor row. For secretary it's 'secretary:none'.
-  // For doctor employees, provider_type comes from the linked doctor (default
-  // 'doctor' for legacy rows missing the column).
-  var providerType = (linkedDoc && linkedDoc.provider_type) || 'doctor';
+  // Phase 6 W + X: reconstruct the composite role:provider_type value.
+  //   doctor employee     → 'doctor:<sub-type>' (sub-type from linkedDoc)
+  //   secretary employee  → 'secretary:<provider_type>' where provider_type
+  //                          is 'secretary' (normal) or 'other' (catch-all)
+  //   Legacy 'secretary' rows without a linkedDoc default to 'secretary:secretary'
+  //   so the dropdown has a valid selection.
+  var providerType = (linkedDoc && linkedDoc.provider_type) ||
+                     (emp.role === 'doctor' ? 'doctor' : 'secretary');
   var compositeValue;
-  if (emp.role === 'secretary') {
-    compositeValue = 'secretary:none';
-  } else if (emp.role === 'doctor') {
+  if (emp.role === 'doctor') {
     compositeValue = 'doctor:' + providerType;
+  } else if (emp.role === 'secretary') {
+    // For secretary employees, the sub-type is either 'secretary' or 'other'.
+    // Anything else (legacy) collapses to 'secretary'.
+    var subForSec = (providerType === 'other') ? 'other' : 'secretary';
+    compositeValue = 'secretary:' + subForSec;
   } else {
-    compositeValue = 'secretary:none';  // safe fallback
+    compositeValue = 'secretary:secretary';  // safe fallback
   }
   $('eRole').value = compositeValue;
 
@@ -837,6 +969,8 @@ function openEditModal(id) {
 
   $('eDocRole').value = (linkedDoc && linkedDoc.role) || '';
   $('eDocPhone').value = (linkedDoc && linkedDoc.phone) || '';
+  // Mirror phone to the alt input used when specialty row is hidden.
+  if ($('eDocPhoneAlt')) $('eDocPhoneAlt').value = (linkedDoc && linkedDoc.phone) || '';
   $('eDocShare').value = (linkedDoc && linkedDoc.share_percent !== null && linkedDoc.share_percent !== undefined)
     ? linkedDoc.share_percent : '';
   $('eDocHours').value = (linkedDoc && linkedDoc.weekly_hours !== null && linkedDoc.weekly_hours !== undefined)
@@ -845,7 +979,7 @@ function openEditModal(id) {
   _setEmpDocColor((linkedDoc && linkedDoc.color) || _pickRandomDoctorColor());
 
   // Phase 6 W: Pre-fill compensation + monthly_salary from linked doctor.
-  $('eDocCompensation').value = (linkedDoc && linkedDoc.compensation_model) || 'percentage';
+  $('eDocCompensation').value = (linkedDoc && linkedDoc.compensation_model) || 'salary';
   if ($('eDocMonthlySalary')) {
     $('eDocMonthlySalary').value = (linkedDoc && linkedDoc.monthly_salary !== null && linkedDoc.monthly_salary !== undefined)
       ? linkedDoc.monthly_salary : '';
@@ -887,13 +1021,26 @@ async function saveEmployee() {
     var pin = ($('ePin').value || '').trim();
     var pinConfirm = ($('ePinConfirm').value || '').trim();
 
-    // ── Phase 6 Q: read doctor-specific clinical fields ──
-    // We always read them — even when role='secretary' — to keep the code
-    // path uniform. They are only USED below when the resolved post-save
-    // role is 'doctor'. Empty strings normalize to null so the DB stays
-    // clean (no '' rows for share_percent / weekly_hours).
+    // ── Phase 6 Q + W + X: read clinical/staff fields ──
+    // We always read them to keep the code path uniform. Phase 6 X expanded
+    // the form to be visible for ALL non-owner employees, so secretary and
+    // 'other' employees now have phone/color/hours/salary captured too.
+    // Empty strings normalize to null so the DB stays clean.
     var docRoleField = ($('eDocRole').value || '').trim() || null;
-    var docPhoneField = ($('eDocPhone').value || '').trim() || null;
+    // Phase 6 X: phone has two inputs — #eDocPhone (inside specialty row,
+    // shown for clinical doctor sub-types) and #eDocPhoneAlt (standalone row,
+    // shown for non-clinical roles). Read whichever one is currently visible.
+    var docPhoneField;
+    {
+      var phoneMain = ($('eDocPhone') && $('eDocPhone').value || '').trim();
+      var phoneAlt = ($('eDocPhoneAlt') && $('eDocPhoneAlt').value || '').trim();
+      // The visible one is the one with the non-empty value; if both are
+      // empty we still write null. If both have values (unlikely but possible
+      // if the user typed in both), prefer the visible one's input.
+      var specRowEl = $('specialtyFieldRow');
+      var specVisible = specRowEl && specRowEl.style.display !== 'none';
+      docPhoneField = (specVisible ? phoneMain : phoneAlt) || null;
+    }
     var docShareRaw = $('eDocShare').value;
     var docShareField = (docShareRaw === '' || docShareRaw === null) ? null : parseFloat(docShareRaw);
     var docHoursRaw = $('eDocHours').value;
@@ -906,16 +1053,22 @@ async function saveEmployee() {
       docColorField = window.SyDentColorPicker.sanitizeHex(docColorField);
     }
 
-    // Phase 6 W: provider_type now comes from the unified role dropdown's
-    // parsed result (not a separate picker). For secretary it's null — the
-    // DB column doesn't apply. For doctor employees we whitelist defensively.
+    // Phase 6 W + X: provider_type comes from the unified role dropdown's
+    // parsed result. Phase 6 X extends the whitelist to include 'secretary'
+    // and 'other' so the role dropdown's full option set is honored.
+    // Every employee (doctor + secretary + other) now has a clinic_doctors
+    // row backing their payroll/contact fields.
     var docProviderTypeField = providerTypeFromRole;
     if (role === 'doctor') {
       if (['doctor','hygienist','assistant'].indexOf(docProviderTypeField) === -1) {
         docProviderTypeField = 'doctor';
       }
+    } else if (role === 'secretary') {
+      if (['secretary','other'].indexOf(docProviderTypeField) === -1) {
+        docProviderTypeField = 'secretary';
+      }
     } else {
-      docProviderTypeField = null;  // secretary has no clinic_doctors row anyway
+      docProviderTypeField = 'secretary';  // defensive fallback
     }
 
     var docCompensationField = $('eDocCompensation').value || 'percentage';
@@ -1034,26 +1187,47 @@ async function saveEmployee() {
         doctorId = origEmp.doctor_id || null;
       } else if (origEmp.role === 'doctor' && role === 'secretary') {
         pendingRoleSwitch = 'doctor→secretary';
-        // Ask the Owner whether to deactivate the doctor card too
+        // Ask the Owner whether to deactivate the doctor card too. Phase 6 X
+        // change: the "deactivate the clinic_doctors row" prompt is shown
+        // ONLY when the linked row is a clinical sub-type (doctor/hygienist/
+        // assistant). If the linked row was already a non-clinical type
+        // (legacy edge case — shouldn't happen but defensive), no prompt.
         if (origEmp.doctor_id) {
           var doctorCard = doctors.find(function(d){ return d.id === origEmp.doctor_id; });
           var cardActive = doctorCard ? (doctorCard.is_active !== false) : false;
-          if (cardActive) {
+          var cardIsClinical = doctorCard ? providerTypeTakesAppointments(doctorCard.provider_type || 'doctor') : false;
+          if (cardActive && cardIsClinical) {
             var deactivateMsg =
               '🩺 د. ' + (origEmp.name) + ' مرتبط ببطاقة طبيب نشطة.\n\n' +
               'بعد تغيير دوره إلى سكرتيرة، هل تريد إلغاء تنشيط بطاقة الطبيب أيضاً؟\n\n' +
               '• السجلات التاريخية ستبقى محفوظة في كل الأحوال\n' +
               '• إذا اخترت "موافق" — البطاقة في صفحة الأطباء ستصبح غير نشطة\n' +
-              '• إذا اخترت "إلغاء" — البطاقة تبقى نشطة لكن غير مربوطة بهذا الموظف';
+              '• إذا اخترت "إلغاء" — البطاقة تبقى مربوطة وستتحوّل لنوع "سكرتيرة"';
             if (confirm(deactivateMsg)) {
               pendingDeactivateDoctorId = origEmp.doctor_id;
+              doctorId = null;  // un-link only when deactivating
+            } else {
+              // Owner kept the row — preserve link, Case 2 will UPDATE
+              // its provider_type to 'secretary' to keep things consistent.
+              doctorId = origEmp.doctor_id;
             }
+          } else {
+            // No prompt needed — just preserve the link so Case 2 can
+            // UPDATE the row's provider_type to the new sub-type.
+            doctorId = origEmp.doctor_id;
           }
         }
-        doctorId = null;  // un-link regardless
+        // Note: if origEmp had no doctor_id (legacy pre-Phase-X secretary
+        // edge case), there's nothing to preserve.
       } else if (origEmp.role === 'secretary' && role === 'doctor') {
         pendingRoleSwitch = 'secretary→doctor';
-        doctorId = null;  // will be filled by auto-create below
+        // Phase 6 X: preserve the existing clinic_doctors row when present
+        // (Phase-X-era secretaries have backing rows). Case 2's expanded
+        // condition will UPDATE the row in-place, flipping provider_type
+        // from 'secretary'/'other' to 'doctor'/'hygienist'/'assistant'.
+        // Only fall back to "create a new row" via Case 1 when origEmp
+        // genuinely has no doctor_id (legacy data).
+        doctorId = origEmp.doctor_id || null;
       }
     } else if (!editingId && role === 'doctor') {
       // New doctor employee — auto-create flow runs below
@@ -1110,24 +1284,45 @@ async function saveEmployee() {
     try {
       var employeeIdForDoctorOps = editingId || (res.data && res.data.id);
 
-      // Case 1: Auto-create a new clinic_doctors row when this employee
-      // transitions into (or starts as) a doctor with no existing link.
-      // Phase 6 Q: extended with the full clinical field set captured from
-      // the modal. Color falls back to a palette pick if the user didn't
-      // pick one (defensive — the swatch always has a value).
-      var needsAutoCreate = (!editingId && role === 'doctor') ||
-                            (editingId && pendingRoleSwitch === 'secretary→doctor');
+      // Case 1: Auto-create a new clinic_doctors row.
+      // Phase 6 X: This now runs for ALL non-owner employees (doctor, hygienist,
+      // assistant, secretary, other) — not just doctor roles. The DB row holds
+      // payroll/contact fields for everyone in one place; the provider_type
+      // column tells us what they are. Triggers:
+      //   • New employee with any non-owner role (no existing doctor_id by
+      //     definition since the employee row was just inserted), OR
+      //   • Edit transitioning a secretary→doctor AND origEmp had no
+      //     doctor_id (legacy pre-Phase-X secretary without a backing row).
+      //     If the origEmp ALREADY has a doctor_id (Phase-X-era secretary
+      //     whose row was auto-created when first added), Case 2 (UPDATE)
+      //     handles the role flip instead — Case 1 would create a duplicate
+      //     orphan row.
+      var hasExistingDoctorRow = !!(origEmp && origEmp.doctor_id);
+      var needsAutoCreate = (!editingId && role !== 'owner') ||
+                            (editingId && pendingRoleSwitch === 'secretary→doctor' && !hasExistingDoctorRow);
+
       if (needsAutoCreate && employeeIdForDoctorOps) {
         var newDocColor = docColorField || _pickRandomDoctorColor();
         // Phase 6 R: include provider_type + compensation_model in the insert.
-        // Phase 6 W: include monthly_salary too. Migration 13/14 graceful
+        // Phase 6 W: include monthly_salary too. Migration 13/14/15 graceful
         // fallback: if any of the new columns aren't present yet, PostgREST
         // returns 42703 — we retry without them so legacy clinics can still
         // onboard doctors before running the migrations.
+        // Phase 6 X: 'role' column on clinic_doctors holds the specialty text
+        // for clinical providers and a role label for support staff. Use a
+        // sensible default per provider_type when the field is blank.
+        var defaultRoleLabel = (function() {
+          if (docProviderTypeField === 'doctor') return 'طبيب أسنان';
+          if (docProviderTypeField === 'hygienist') return 'متدرب/مساعد';
+          if (docProviderTypeField === 'assistant') return 'مساعدة كرسي';
+          if (docProviderTypeField === 'secretary') return 'سكرتيرة';
+          if (docProviderTypeField === 'other') return 'موظف';
+          return 'موظف';
+        })();
         var insDocPayload = {
           owner_id: currentUser.id,
           name: name,
-          role: docRoleField || 'طبيب أسنان',
+          role: docRoleField || defaultRoleLabel,
           phone: docPhoneField,
           share_percent: docShareField,
           weekly_hours: docHoursField,
@@ -1140,6 +1335,20 @@ async function saveEmployee() {
           monthly_salary: docMonthlySalaryField
         };
         var insDoc = await window.sb.from('clinic_doctors').insert(insDocPayload).select().single();
+        // Phase 6 X retry: Migration 15 (expanded provider_type CHECK).
+        // If 23514 fires on provider_type, the CHECK still only allows the
+        // Phase 6 R trio — fall back to inserting the row as 'assistant' (the
+        // closest legacy match) so the row still gets created. The Owner can
+        // re-edit after running Migration 15. This path is rare but defensive.
+        if (insDoc.error && /23514|provider_type/i.test(
+              (insDoc.error.message || '') + ' ' + (insDoc.error.code || ''))) {
+          if (insDocPayload.provider_type === 'secretary' || insDocPayload.provider_type === 'other') {
+            console.warn('Phase 6 X: Migration 15 not applied — coercing provider_type to "assistant" so the row creates');
+            var coerced = Object.assign({}, insDocPayload);
+            coerced.provider_type = 'assistant';
+            insDoc = await window.sb.from('clinic_doctors').insert(coerced).select().single();
+          }
+        }
         // First retry: strip Migration 14 column only.
         if (insDoc.error && /42703|monthly_salary/i.test(
               (insDoc.error.message || '') + ' ' + (insDoc.error.code || ''))) {
@@ -1159,7 +1368,7 @@ async function saveEmployee() {
           insDoc = await window.sb.from('clinic_doctors').insert(legacyPayload).select().single();
         }
         if (insDoc.error) {
-          console.warn('Phase 6 Q: clinic_doctors auto-create failed:', insDoc.error);
+          console.warn('Phase 6 X: clinic_doctors auto-create failed:', insDoc.error);
           showToast('⚠️ تم حفظ الموظف، لكن إنشاء بطاقة الطبيب فشل — راجع صفحة الأطباء', true);
         } else if (insDoc.data) {
           // Link the new clinic_doctors row back to the employee
@@ -1173,13 +1382,14 @@ async function saveEmployee() {
           if (window.logAudit) {
             window.logAudit('doctor.create', {
               entityId: insDoc.data.id,
-              description: 'إنشاء تلقائي لبطاقة طبيب: ' + name + ' (من إضافة موظف)',
+              description: 'إنشاء تلقائي لبطاقة موظف: ' + name + ' (' + (docProviderTypeField || 'staff') + ')',
               newValue: {
                 name: name, role: docRoleField, phone: docPhoneField,
                 share_percent: docShareField, weekly_hours: docHoursField,
                 color: newDocColor,
                 provider_type: docProviderTypeField,
                 compensation_model: docCompensationField,
+                monthly_salary: docMonthlySalaryField,
                 auto: true
               }
             });
@@ -1194,11 +1404,29 @@ async function saveEmployee() {
       // (no diff check) because the values came from the form and a noop UPDATE
       // is cheaper than computing per-field diffs. The audit log captures the
       // old vs new snapshot so changes remain traceable.
-      if (editingId && origEmp && origEmp.role === 'doctor' && role === 'doctor' &&
-          origEmp.doctor_id) {
+      // Case 2: Sync the FULL clinic_doctors row when editing an employee
+      // who already has a linked doctor row. Phase 6 X expanded this to:
+      //   1. Same-to-same edits (doctor→doctor, secretary→secretary) — most common.
+      //   2. Role transitions (doctor↔secretary) when origEmp.doctor_id exists
+      //      — Phase-X-era secretaries have backing rows, so UPDATE the row
+      //      in-place rather than insert a duplicate. This is the missing
+      //      sibling to Case 1's existing-row guard. The provider_type column
+      //      flips with the role; the share/salary fields follow the new
+      //      compensation_model.
+      // We still UPDATE unconditionally (no diff check) — a noop UPDATE is
+      // cheaper than computing per-field diffs, and audit log captures the
+      // old vs new snapshot so changes remain traceable.
+      // Deactivation guard: if Case 3 is about to deactivate this row (the
+      // Owner confirmed the prompt during a doctor→secretary transition), we
+      // skip Case 2 to avoid an UPDATE+is_active=false flip-flop in the same
+      // transaction. The deactivation already preserves prior payroll values.
+      var case2WouldBeDeactivated = (editingId && pendingDeactivateDoctorId &&
+                                      pendingDeactivateDoctorId === (origEmp && origEmp.doctor_id));
+      if (editingId && origEmp && origEmp.role !== 'owner' &&
+          origEmp.doctor_id && !case2WouldBeDeactivated) {
         var origDoctor = doctors.find(function(d){ return d.id === origEmp.doctor_id; }) || {};
-        // Phase 6 R + W: include provider_type + compensation_model + monthly_salary.
-        // Same staged retry pattern as the INSERT path: strip M14 first, then M13.
+        // Phase 6 R + W + X: include provider_type + compensation_model +
+        // monthly_salary. Staged retry: Migration 15 (CHECK), then 14, then 13.
         var updatePayload = {
           name: name,
           role: docRoleField,
@@ -1216,6 +1444,19 @@ async function saveEmployee() {
           .update(updatePayload)
           .eq('id', origEmp.doctor_id)
           .eq('owner_id', currentUser.id);
+        // Phase 6 X retry: Migration 15 CHECK constraint may be old.
+        if (syncRes.error && /23514|provider_type/i.test(
+              (syncRes.error.message || '') + ' ' + (syncRes.error.code || ''))) {
+          if (updatePayload.provider_type === 'secretary' || updatePayload.provider_type === 'other') {
+            console.warn('Phase 6 X: Migration 15 not applied — coercing provider_type to "assistant" for UPDATE');
+            var coercedUpd = Object.assign({}, updatePayload);
+            coercedUpd.provider_type = 'assistant';
+            syncRes = await window.sb.from('clinic_doctors')
+              .update(coercedUpd)
+              .eq('id', origEmp.doctor_id)
+              .eq('owner_id', currentUser.id);
+          }
+        }
         // First retry: strip Migration 14 column if missing.
         if (syncRes.error && /42703|monthly_salary/i.test(
               (syncRes.error.message || '') + ' ' + (syncRes.error.code || ''))) {
