@@ -119,6 +119,27 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   background:var(--bg2);border:1.5px solid rgba(46,232,158,0.25);
   border-radius:14px;max-width:480px;width:100%;
   max-height:90vh;overflow-y:auto;
+  /* Phase 6 X: Themed scrollbar — the default white bar clashed against the
+     dark modal. Firefox uses scrollbar-color (thumb track). WebKit uses
+     ::-webkit-scrollbar pseudo-elements. Both kept narrow (8px) so they
+     don't eat the form's right padding in RTL. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(46,232,158,0.35) transparent;
+}
+.modal-box::-webkit-scrollbar{
+  width:8px;
+  height:8px;
+}
+.modal-box::-webkit-scrollbar-track{
+  background:transparent;
+}
+.modal-box::-webkit-scrollbar-thumb{
+  background:rgba(46,232,158,0.35);
+  border-radius:4px;
+  border:2px solid var(--bg2);
+}
+.modal-box::-webkit-scrollbar-thumb:hover{
+  background:rgba(46,232,158,0.55);
 }
 .modal-head{
   display:flex;align-items:center;justify-content:space-between;
@@ -1291,15 +1312,15 @@ async function saveEmployee() {
       // column tells us what they are. Triggers:
       //   • New employee with any non-owner role (no existing doctor_id by
       //     definition since the employee row was just inserted), OR
-      //   • Edit transitioning a secretary→doctor AND origEmp had no
-      //     doctor_id (legacy pre-Phase-X secretary without a backing row).
-      //     If the origEmp ALREADY has a doctor_id (Phase-X-era secretary
-      //     whose row was auto-created when first added), Case 2 (UPDATE)
-      //     handles the role flip instead — Case 1 would create a duplicate
-      //     orphan row.
+      //   • Edit transitioning a secretary→doctor with no existing row, OR
+      //   • Edit of ANY legacy employee whose doctor_id is null (pre-Phase-X
+      //     secretary without a backing row, getting "upgraded" on first
+      //     save so their phone/color/salary actually persist).
+      // The hasExistingDoctorRow guard prevents duplicate orphan rows.
       var hasExistingDoctorRow = !!(origEmp && origEmp.doctor_id);
       var needsAutoCreate = (!editingId && role !== 'owner') ||
-                            (editingId && pendingRoleSwitch === 'secretary→doctor' && !hasExistingDoctorRow);
+                            (editingId && pendingRoleSwitch === 'secretary→doctor' && !hasExistingDoctorRow) ||
+                            (editingId && !pendingRoleSwitch && !hasExistingDoctorRow && role !== 'owner');
 
       if (needsAutoCreate && employeeIdForDoctorOps) {
         var newDocColor = docColorField || _pickRandomDoctorColor();
