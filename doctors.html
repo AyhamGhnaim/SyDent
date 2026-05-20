@@ -48,14 +48,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .page{padding:24px 28px;max-width:1200px;margin:0 auto;}
 
-.info-box{
-  background:var(--bg2);border:1px solid var(--border);
-  border-radius:var(--radius);padding:16px 20px;
-  margin-bottom:20px;
-  display:flex;align-items:center;gap:12px;
-  font-size:13px;color:var(--text2);
-}
-.info-box .info-icon{font-size:24px;}
+/* Phase 6 S: .info-box CSS removed — the box was deleted from the HTML
+   when doctors.html became read-mostly. Class still exists in other pages
+   (employees.html) which carry their own scoped definition. */
 
 /* Doctors grid */
 .doc-grid{
@@ -91,8 +86,18 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .doc-actions .btn-edit:hover{color:var(--blue);border-color:var(--blue);}
 .doc-actions .btn-del:hover{color:var(--red);border-color:var(--red);}
 .doc-actions .btn-make-owner:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
-.doc-actions .btn-link:hover{color:var(--blue);border-color:var(--blue);background:rgba(99,179,237,0.08);}
-.doc-actions .btn-unlink:hover{color:var(--text2);border-color:var(--text2);}
+/* Phase 6 S: 'Default provider' toggle.
+   Two visual states make it instantly clear which doctor is the default
+   treating provider for the current logged-in user:
+     • .btn-default-on  → ACTIVE state (this is the user's default).
+       Solid green background + white text + filled star — high contrast,
+       can't be missed when scanning a list of doctor cards.
+     • .btn-default-off → INACTIVE state (other doctor or no link).
+       Default outline + hollow star + green hover hint — same shape so
+       toggling between states doesn't shift layout. */
+.doc-actions .btn-default-on{background:var(--green);border-color:var(--green);color:#0a1628;font-weight:800;}
+.doc-actions .btn-default-on:hover{background:rgba(46,232,158,0.85);border-color:rgba(46,232,158,0.85);}
+.doc-actions .btn-default-off:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
 
 .you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(46,232,158,.15);color:var(--green);border:1px solid rgba(46,232,158,.4);margin-right:4px;}
 .linked-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.4);margin-right:4px;}
@@ -179,32 +184,23 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tb-title">👨‍⚕️ أطباء العيادة</div>
     <div class="tb-sub">إدارة الأطباء وأسعارهم الخاصة</div>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <!-- Phase 6 Q: 'Add doctor' is no longer initiated from this page.
-         The unified flow is: add an Employee (role='doctor') from
-         employees.html, which auto-creates the clinic_doctors row. This
-         button now becomes a deep-link to the right place. The label and
-         icon make the new flow explicit so the Owner never wonders where
-         to add doctors. -->
-    <a class="btn btn-primary" href="employees.html?action=add-doctor">＋ إضافة طبيب (من صفحة الموظفين)</a>
-  </div>
+  <!-- Phase 6 S: Header action buttons removed.
+       Previously held a deep-link to employees.html (Phase 6 Q) for adding
+       doctors. After Phase 6 R + S, doctors.html is fully read-mostly:
+       the sidebar nav already lists 'الموظفون' page, and the empty-state
+       on this page surfaces the link when there are zero doctors. -->
 </div>
 
 <div class="page">
 
-  <div class="info-box">
-    <span class="info-icon">💡</span>
-    <div>
-      الأطباء الذين تضيفهم هنا سيظهرون في قائمة "الطبيب المعالج" عند تسجيل الجلسات.
-      كل طبيب يمكن أن يكون له <b>سعر خاص لكل علاج</b> (يُضبط من صفحة العلاجات).
-      <br><br>
-      <span style="color:var(--yellow);"><b>⚠️ ملاحظة:</b></span>
-      <b>الإضافة والحذف والتعديل</b> صارت من <a href="employees.html" style="color:var(--green);text-decoration:underline;">صفحة الموظفين</a> —
-      كل موظف بدور "طبيب" يظهر هنا تلقائياً ببطاقة كاملة.
-      <br>
-      لمنع جهاز موظف من تسجيل البيانات، استخدم زر "تعطيل الحساب" من نفس الصفحة.
-    </div>
-  </div>
+  <!-- Phase 6 S: info-box removed.
+       The previous box contained 3 explanatory messages:
+       1) 'Doctors here appear in session forms' — implicit by sidebar nav
+       2) 'Add/Edit/Delete moved to employees page' — already shown when
+          the doctor list is empty (empty-state link below)
+       3) 'Use deactivate button to lock employee device' — belongs in
+          employees.html context, not here
+       Result: a cleaner header → straight to the doctor cards. -->
 
   <div id="docList"></div>
 
@@ -421,7 +417,7 @@ function renderList() {
   doctors.forEach(function(d){
     var youBadge = d.is_owner ? '<span class="you-badge">⭐ صاحب العيادة</span>' : '';
     var linkedBadge = (d.user_id === currentUser.id)
-      ? '<span class="linked-badge" title="هذا الطبيب مرتبط بحسابك — سيكون الافتراضي عند تسجيلك للجلسات">🔗 حسابي</span>'
+      ? '<span class="linked-badge" title="هذا الطبيب هو معالجك الافتراضي — سيظهر تلقائياً عند تسجيلك للجلسات">⭐ معالجي</span>'
       : '';
     var roleBadge = d.role ? '<span class="role-badge">' + escapeHtml(d.role) + '</span>' : '';
 
@@ -452,10 +448,18 @@ function renderList() {
     //                    provider default resolution. Still useful when the
     //                    Owner runs the clinic together with hired doctors.
 
-    // "Link to my account" button — toggles user_id between current user and null
-    var linkBtn = (d.user_id === currentUser.id)
-      ? '<button class="btn-unlink" onclick="unlinkFromUser(\'' + d.id + '\')" title="فك ربط هذا الطبيب من حسابك">🔓 فك الربط</button>'
-      : '<button class="btn-link" onclick="linkToUser(\'' + d.id + '\')" title="اربط هذا الطبيب بحسابك ليكون الافتراضي عند تسجيلك للجلسات">🔗 اربط بحسابي</button>';
+    // Phase 6 S: 'Default provider' toggle.
+    // Same underlying behavior as the previous link/unlink pair — it just
+    // toggles d.user_id between currentUser.id and null (consumed by the
+    // OpenDental-style 3-tier provider default resolution: user_id →
+    // is_owner → first active). New phrasing is meaningful for the Owner:
+    // 'this is the doctor who shows up by default in the session form when
+    // I'm logged in'. The active state gets a filled, high-contrast button
+    // so it's instantly visible on the doctor cards grid.
+    var isDefault = (d.user_id === currentUser.id);
+    var defaultBtn = isDefault
+      ? '<button class="btn-default-on" onclick="unlinkFromUser(\'' + d.id + '\')" title="هذا هو معالجك الافتراضي — اضغط للإلغاء">⭐ المعالج الافتراضي</button>'
+      : '<button class="btn-default-off" onclick="linkToUser(\'' + d.id + '\')" title="تعيين هذا الطبيب كمعالج افتراضي عند تسجيلك للجلسات">☆ تعيين كمعالج افتراضي</button>';
 
     html += '<div class="doc-card">'
       + '<div class="doc-color-bar" style="background:' + (d.color || '#2ee89e') + '"></div>'
@@ -470,7 +474,7 @@ function renderList() {
       + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')
       + '<div class="doc-actions">'
       + '<button class="btn-edit" onclick="goEditDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
-      + linkBtn
+      + defaultBtn
       + '</div></div></div>';
   });
   html += '</div>';
@@ -639,14 +643,17 @@ async function saveDoctor() {
 // OpenDental-style: user_id ↔ provider mapping. The linked doctor becomes the
 // default treating provider for sessions created by this logged-in user.
 // Only one doctor at a time can be linked to a given user_id.
+// Phase 6 S: function name preserved (kept as a stable hook for any callers),
+// but user-facing strings now use 'المعالج الافتراضي' terminology to match
+// the new button label. The underlying behavior is unchanged.
 async function linkToUser(id) {
   var d = doctors.find(function(x){ return x.id === id; });
   if (!d) return;
   // Find any other doctor currently linked to me (only one allowed)
   var currentLinked = doctors.find(function(x){ return x.user_id === currentUser.id && x.id !== id; });
   var msg = currentLinked
-    ? 'ربط "' + d.name + '" بحسابك بدلاً من "' + currentLinked.name + '"؟\n\nهذا الطبيب سيكون الافتراضي عند تسجيلك لأي جلسة جديدة.'
-    : 'ربط "' + d.name + '" بحسابك؟\n\nهذا الطبيب سيكون الافتراضي عند تسجيلك لأي جلسة جديدة.';
+    ? 'تعيين "' + d.name + '" كمعالج افتراضي بدلاً من "' + currentLinked.name + '"؟\n\nهذا الطبيب سيكون الافتراضي عند تسجيلك لأي جلسة جديدة.'
+    : 'تعيين "' + d.name + '" كمعالج افتراضي؟\n\nسيكون هذا الطبيب هو الافتراضي عند تسجيلك لأي جلسة جديدة.';
   if (!confirm(msg)) return;
 
   // Step 1: unlink previous (if different)
@@ -655,7 +662,7 @@ async function linkToUser(id) {
       .update({ user_id: null, updated_at: new Date().toISOString() })
       .eq('id', currentLinked.id)
       .eq('owner_id', currentUser.id);
-    if (r1.error) { showToast('⚠️ فشل فك الربط السابق: ' + r1.error.message); return; }
+    if (r1.error) { showToast('⚠️ فشل إلغاء المعالج السابق: ' + r1.error.message); return; }
   }
 
   // Step 2: link new one
@@ -663,24 +670,24 @@ async function linkToUser(id) {
     .update({ user_id: currentUser.id, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('owner_id', currentUser.id);
-  if (r2.error) { showToast('⚠️ فشل الربط: ' + r2.error.message); return; }
+  if (r2.error) { showToast('⚠️ فشل التعيين: ' + r2.error.message); return; }
 
-  showToast('🔗 تم ربط "' + d.name + '" بحسابك');
+  showToast('⭐ تم تعيين "' + d.name + '" كمعالج افتراضي');
   await loadDoctors();
 }
 
 async function unlinkFromUser(id) {
   var d = doctors.find(function(x){ return x.id === id; });
   if (!d) return;
-  if (!confirm('فك ربط "' + d.name + '" من حسابك؟\n\nسيتم استخدام الافتراضي الآخر (صاحب العيادة أو أول طبيب نشط) عند تسجيل جلسات جديدة.')) return;
+  if (!confirm('إلغاء "' + d.name + '" كمعالج افتراضي؟\n\nسيتم استخدام الافتراضي الآخر (صاحب العيادة أو أول طبيب نشط) عند تسجيل جلسات جديدة.')) return;
 
   var r = await window.sb.from('clinic_doctors')
     .update({ user_id: null, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('owner_id', currentUser.id);
-  if (r.error) { showToast('⚠️ فشل فك الربط: ' + r.error.message); return; }
+  if (r.error) { showToast('⚠️ فشل الإلغاء: ' + r.error.message); return; }
 
-  showToast('🔓 تم فك الربط');
+  showToast('☆ تم إلغاء المعالج الافتراضي');
   await loadDoctors();
 }
 
