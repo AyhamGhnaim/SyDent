@@ -286,6 +286,38 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           </div>
         </div>
 
+        <!-- Phase 6 R (Migration 13): provider_type + compensation_model.
+             Two foundational dropdowns laying the schema for the upcoming
+             payments + reports redesign. Today only provider_type affects
+             behavior (filtering in provider-reports + visual indicators
+             elsewhere). compensation_model is captured but not yet used;
+             the upcoming payments page will read it to decide whether a
+             given person earns by % of production, a fixed salary, both,
+             or nothing through this table.
+             Both default to the legacy values (doctor + percentage) so
+             pre-Migration-13 clinics keep current behavior unchanged. -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>نوع المزوّد <span style="color:var(--text2);font-weight:normal;font-size:11px;">(Phase 6 R)</span></label>
+            <select id="eDocProviderType">
+              <option value="doctor">🦷 طبيب أسنان</option>
+              <option value="hygienist">🩺 مساعد/ممرض (Hygienist)</option>
+              <option value="assistant">🤝 مساعدة كرسي</option>
+            </select>
+            <div class="hint" style="font-size:11px;color:var(--text2);">يحدد كيف يظهر في القوائم والتقارير</div>
+          </div>
+          <div class="form-group">
+            <label>نموذج التعويض</label>
+            <select id="eDocCompensation">
+              <option value="percentage">% من الإنتاج</option>
+              <option value="salary">راتب ثابت</option>
+              <option value="hybrid">راتب + bonus</option>
+              <option value="none">بدون تعويض من هذا الجدول</option>
+            </select>
+            <div class="hint" style="font-size:11px;color:var(--text2);">سيُستخدم في صفحة الرواتب القادمة</div>
+          </div>
+        </div>
+
         <div class="form-group">
           <label>اللون المميّز (يظهر بجانب اسم الطبيب)</label>
           <!-- Phase 6 Q: uses shared SyDentColorPicker, identical pattern to
@@ -525,10 +557,24 @@ async function loadData() {
   // columns, edits would silently null them out (the form would show
   // blank → saveEmployee would write null → data loss). Bandwidth cost
   // is negligible (the doctors table is tiny — usually <20 rows).
+  // Phase 6 R (Migration 13): provider_type + compensation_model added to the
+  // SELECT list. Graceful fallback below if the migration hasn't run yet —
+  // the retry strips them and the modal defaults take over (doctor + percentage).
   var docRes = await window.sb.from('clinic_doctors')
-    .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner')
+    .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner, provider_type, compensation_model')
     .eq('owner_id', currentUser.id)
     .order('name');
+
+  // Pre-Migration-13 fallback: if PostgREST rejected the new columns (42703),
+  // retry with the legacy column set. The form will show empty dropdowns and
+  // saveEmployee() will gracefully skip writing those fields on the legacy path.
+  if (docRes.error && /42703|provider_type|compensation_model/i.test(
+        (docRes.error.message || '') + ' ' + (docRes.error.code || ''))) {
+    docRes = await window.sb.from('clinic_doctors')
+      .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner')
+      .eq('owner_id', currentUser.id)
+      .order('name');
+  }
 
   if (!docRes.error) {
     doctors = (docRes.data || []).filter(function(d){ return d.is_active !== false; });
@@ -646,6 +692,9 @@ function openAddModal() {
   $('eDocHours').value = '';
   $('eDocNotes').value = '';
   _setEmpDocColor(_pickRandomDoctorColor());
+  // Phase 6 R: reset to legacy defaults (preserves current behavior).
+  $('eDocProviderType').value = 'doctor';
+  $('eDocCompensation').value = 'percentage';
 
   onRoleChange();
   $('empModal').classList.add('show');
@@ -683,6 +732,13 @@ function openEditModal(id) {
     ? linkedDoc.weekly_hours : '';
   $('eDocNotes').value = (linkedDoc && linkedDoc.notes) || '';
   _setEmpDocColor((linkedDoc && linkedDoc.color) || _pickRandomDoctorColor());
+
+  // Phase 6 R: pre-fill the new dropdowns. The DEFAULT-on-add behavior of
+  // Migration 13 guarantees existing rows have ('doctor', 'percentage'), but
+  // we still guard against undefined for pre-migration installs where the
+  // SELECT fell back to the legacy column list and these fields are absent.
+  $('eDocProviderType').value = (linkedDoc && linkedDoc.provider_type) || 'doctor';
+  $('eDocCompensation').value = (linkedDoc && linkedDoc.compensation_model) || 'percentage';
 
   // PIN hint: editing, leave empty to keep current
   $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
@@ -730,6 +786,18 @@ async function saveEmployee() {
     // input was tampered with via devtools).
     if (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex) {
       docColorField = window.SyDentColorPicker.sanitizeHex(docColorField);
+    }
+    // Phase 6 R (Migration 13): read provider_type + compensation_model from
+    // the new dropdowns. Both have hard-coded option lists in the HTML, so
+    // the values are guaranteed to be from the allowed CHECK-constraint set
+    // (defensive whitelist below in case devtools tampering occurred).
+    var docProviderTypeField = $('eDocProviderType').value || 'doctor';
+    if (['doctor','hygienist','assistant'].indexOf(docProviderTypeField) === -1) {
+      docProviderTypeField = 'doctor';
+    }
+    var docCompensationField = $('eDocCompensation').value || 'percentage';
+    if (['percentage','salary','hybrid','none'].indexOf(docCompensationField) === -1) {
+      docCompensationField = 'percentage';
     }
     // Validate share_percent / weekly_hours ranges (numeric inputs already
     // enforce min/max in HTML but a determined user can bypass them).
@@ -889,7 +957,11 @@ async function saveEmployee() {
                             (editingId && pendingRoleSwitch === 'secretary→doctor');
       if (needsAutoCreate && employeeIdForDoctorOps) {
         var newDocColor = docColorField || _pickRandomDoctorColor();
-        var insDoc = await window.sb.from('clinic_doctors').insert({
+        // Phase 6 R: include provider_type + compensation_model in the insert.
+        // Migration 13 graceful fallback: if the columns aren't present yet,
+        // PostgREST returns 42703 — we retry without them so legacy clinics
+        // can still onboard doctors before running the migration.
+        var insDocPayload = {
           owner_id: currentUser.id,
           name: name,
           role: docRoleField || 'طبيب أسنان',
@@ -899,8 +971,19 @@ async function saveEmployee() {
           notes: docNotesField,
           color: newDocColor,
           is_owner: false,
-          is_active: true
-        }).select().single();
+          is_active: true,
+          provider_type: docProviderTypeField,
+          compensation_model: docCompensationField
+        };
+        var insDoc = await window.sb.from('clinic_doctors').insert(insDocPayload).select().single();
+        if (insDoc.error && /42703|provider_type|compensation_model/i.test(
+              (insDoc.error.message || '') + ' ' + (insDoc.error.code || ''))) {
+          console.warn('Phase 6 R: Migration 13 not applied — retrying without provider_type/compensation_model');
+          var legacyPayload = Object.assign({}, insDocPayload);
+          delete legacyPayload.provider_type;
+          delete legacyPayload.compensation_model;
+          insDoc = await window.sb.from('clinic_doctors').insert(legacyPayload).select().single();
+        }
         if (insDoc.error) {
           console.warn('Phase 6 Q: clinic_doctors auto-create failed:', insDoc.error);
           showToast('⚠️ تم حفظ الموظف، لكن إنشاء بطاقة الطبيب فشل — راجع صفحة الأطباء', true);
@@ -920,7 +1003,10 @@ async function saveEmployee() {
               newValue: {
                 name: name, role: docRoleField, phone: docPhoneField,
                 share_percent: docShareField, weekly_hours: docHoursField,
-                color: newDocColor, auto: true
+                color: newDocColor,
+                provider_type: docProviderTypeField,
+                compensation_model: docCompensationField,
+                auto: true
               }
             });
           }
@@ -937,19 +1023,37 @@ async function saveEmployee() {
       if (editingId && origEmp && origEmp.role === 'doctor' && role === 'doctor' &&
           origEmp.doctor_id) {
         var origDoctor = doctors.find(function(d){ return d.id === origEmp.doctor_id; }) || {};
+        // Phase 6 R: include provider_type + compensation_model. Same retry
+        // pattern as the INSERT path — if Migration 13 hasn't run, strip the
+        // two new fields and re-issue the UPDATE so legacy clinics still get
+        // their existing fields synced.
+        var updatePayload = {
+          name: name,
+          role: docRoleField,
+          phone: docPhoneField,
+          share_percent: docShareField,
+          weekly_hours: docHoursField,
+          notes: docNotesField,
+          color: docColorField,
+          provider_type: docProviderTypeField,
+          compensation_model: docCompensationField,
+          updated_at: new Date().toISOString()
+        };
         var syncRes = await window.sb.from('clinic_doctors')
-          .update({
-            name: name,
-            role: docRoleField,
-            phone: docPhoneField,
-            share_percent: docShareField,
-            weekly_hours: docHoursField,
-            notes: docNotesField,
-            color: docColorField,
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq('id', origEmp.doctor_id)
           .eq('owner_id', currentUser.id);
+        if (syncRes.error && /42703|provider_type|compensation_model/i.test(
+              (syncRes.error.message || '') + ' ' + (syncRes.error.code || ''))) {
+          console.warn('Phase 6 R: Migration 13 not applied — retrying UPDATE without provider_type/compensation_model');
+          var legacyUpd = Object.assign({}, updatePayload);
+          delete legacyUpd.provider_type;
+          delete legacyUpd.compensation_model;
+          syncRes = await window.sb.from('clinic_doctors')
+            .update(legacyUpd)
+            .eq('id', origEmp.doctor_id)
+            .eq('owner_id', currentUser.id);
+        }
         if (syncRes.error) {
           console.warn('Phase 6 Q: clinic_doctors full sync failed:', syncRes.error);
           showToast('⚠️ تم حفظ الموظف، لكن مزامنة بيانات الطبيب فشلت', true);
@@ -960,12 +1064,16 @@ async function saveEmployee() {
             oldValue: {
               name: origDoctor.name, role: origDoctor.role,
               phone: origDoctor.phone, share_percent: origDoctor.share_percent,
-              weekly_hours: origDoctor.weekly_hours, color: origDoctor.color
+              weekly_hours: origDoctor.weekly_hours, color: origDoctor.color,
+              provider_type: origDoctor.provider_type,
+              compensation_model: origDoctor.compensation_model
             },
             newValue: {
               name: name, role: docRoleField,
               phone: docPhoneField, share_percent: docShareField,
-              weekly_hours: docHoursField, color: docColorField
+              weekly_hours: docHoursField, color: docColorField,
+              provider_type: docProviderTypeField,
+              compensation_model: docCompensationField
             }
           });
         }

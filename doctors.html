@@ -420,6 +420,15 @@ function renderList() {
       ? '<span class="linked-badge" title="هذا الطبيب هو معالجك الافتراضي — سيظهر تلقائياً عند تسجيلك للجلسات">⭐ معالجي</span>'
       : '';
     var roleBadge = d.role ? '<span class="role-badge">' + escapeHtml(d.role) + '</span>' : '';
+    // Phase 6 R: provider_type badge. We only render it when non-default
+    // (hygienist or assistant) — keeps regular doctor cards visually clean.
+    // The badge styling reuses .role-badge to inherit the existing chip look.
+    var typeBadge = '';
+    if (d.provider_type === 'hygienist') {
+      typeBadge = '<span class="role-badge" style="background:rgba(99,179,237,0.18);color:#63b3ed;border-color:rgba(99,179,237,0.35);" title="مساعد/ممرض (Hygienist)">🩺 مساعد/ممرض</span>';
+    } else if (d.provider_type === 'assistant') {
+      typeBadge = '<span class="role-badge" style="background:rgba(255,167,38,0.18);color:#ffa726;border-color:rgba(255,167,38,0.35);" title="مساعدة كرسي">🤝 مساعدة كرسي</span>';
+    }
 
     var sharePart = (d.share_percent !== null && d.share_percent !== undefined) ? ('<b>النسبة:</b> ' + d.share_percent + '%') : '';
     var hoursPart = d.weekly_hours ? ('<b>الساعات/الأسبوع:</b> ' + d.weekly_hours) : '';
@@ -468,7 +477,7 @@ function renderList() {
       + '<div class="doc-avatar" style="background:' + (d.color || '#2ee89e') + '">' + initials(d.name) + '</div>'
       + '<div style="flex:1;">'
       + '<div class="doc-name">' + escapeHtml(d.name) + ' ' + youBadge + ' ' + linkedBadge + '</div>'
-      + '<div class="doc-role">' + roleBadge + '</div>'
+      + '<div class="doc-role">' + roleBadge + ' ' + typeBadge + '</div>'
       + '</div></div>'
       + (metaItems ? '<div class="doc-meta">' + metaItems + '</div>' : '')
       + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')

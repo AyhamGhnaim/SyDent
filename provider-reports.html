@@ -312,6 +312,22 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="all">كل الأطباء النشطين</option>
       </select>
     </div>
+    <!-- Phase 6 R (Migration 13): provider_type filter. Lets the owner
+         narrow the reports to just doctors, just hygienists, or just
+         chair-side assistants. Default 'شامل' preserves current behavior.
+         When the migration hasn't run, all rows will still show as
+         provider_type='doctor' (from the SELECT fallback in loadAll), so
+         filtering to anything other than شامل/أطباء فقط will yield empty
+         results — which is the correct outcome on pre-migration installs. -->
+    <div class="filter-group">
+      <label>نوع المزوّد</label>
+      <select id="providerTypeFilter" onchange="onFilterChange()">
+        <option value="all">📊 شامل</option>
+        <option value="doctor">🦷 أطباء فقط</option>
+        <option value="hygienist">🩺 مساعدين/ممرضين فقط</option>
+        <option value="assistant">🤝 مساعدات كرسي فقط</option>
+      </select>
+    </div>
     <div class="filter-group">
       <label>حالة الجلسات</label>
       <select id="statusFilter" onchange="onFilterChange()">
@@ -554,7 +570,8 @@ async function loadAll() {
   });
   var allLabel = inactiveModeForDropdown === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
   sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
-    var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
+    var typePrefix = (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''));
+    var lbl = typePrefix + d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
   // Restore selection if still valid; otherwise reset to all
@@ -838,10 +855,22 @@ function render() {
     if (lockedDid) providerFilter = lockedDid;
   }
   var inactiveMode = document.getElementById('inactiveFilter').value; // 'hide' | 'show'
+  // Phase 6 R: provider_type filter. 'all' = no filter (current behavior).
+  // Otherwise restrict the displayed doctors to the picked type. On
+  // pre-migration installs, doctors won't have a provider_type field at all,
+  // so we treat undefined as 'doctor' (the legacy default) to keep the
+  // 'أطباء فقط' filter useful even before Migration 13 runs.
+  var providerTypeFilterEl = document.getElementById('providerTypeFilter');
+  var providerTypeFilter = providerTypeFilterEl ? providerTypeFilterEl.value : 'all';
   var visibleDoctors = doctors.filter(function(d){
     // Hide inactive unless explicitly showing them OR they're specifically picked
     if (inactiveMode === 'hide' && d.is_active === false && providerFilter !== d.id) return false;
-    return providerFilter === 'all' || d.id === providerFilter;
+    if (providerFilter !== 'all' && d.id !== providerFilter) return false;
+    if (providerTypeFilter !== 'all') {
+      var dType = d.provider_type || 'doctor'; // pre-migration → doctor
+      if (dType !== providerTypeFilter) return false;
+    }
+    return true;
   });
 
   // Detect unassigned sessions (no provider_id)
@@ -950,7 +979,10 @@ function render() {
         + '<div class="prov-head">'
           + '<div class="prov-avatar" style="background:' + color + ';">' + initials(d.name) + '</div>'
           + '<div style="flex:1;">'
-            + '<div class="prov-name">' + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + inactiveBadge + '</div>'
+            + '<div class="prov-name">'
+              + (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''))
+              + escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') + inactiveBadge
+            + '</div>'
             + '<div class="prov-role">' + (d.role ? escapeHtml(d.role) + ' • ' : '') + 'نسبة: ' + sharePctDisplay + '</div>'
           + '</div>'
         + '</div>'
@@ -1299,7 +1331,8 @@ function rebuildProviderDropdown() {
   });
   var allLabel = inactiveMode === 'show' ? 'كل الأطباء' : 'كل الأطباء النشطين';
   sel.innerHTML = '<option value="all">' + allLabel + '</option>' + doctorsForDropdown.map(function(d){
-    var lbl = d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
+    var typePrefix = (d.provider_type === 'hygienist' ? '🩺 ' : (d.provider_type === 'assistant' ? '🤝 ' : ''));
+    var lbl = typePrefix + d.name + (d.is_owner ? ' ⭐' : '') + (d.is_active === false ? ' (معطل)' : '');
     return '<option value="' + d.id + '">' + escapeHtml(lbl) + '</option>';
   }).join('');
   if (current === 'all' || doctorsForDropdown.find(function(d){ return d.id === current; })) {

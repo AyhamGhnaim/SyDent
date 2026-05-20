@@ -1639,11 +1639,25 @@ function fmtCost(n) {
 async function loadClinicDoctors() {
   if (!currentUser) return;
   try {
-    const { data, error } = await window.sb.from('clinic_doctors')
-      .select('id, name, color, is_active, is_owner, user_id, share_percent')
+    // Phase 6 R: include provider_type so the picker can render the
+    // 🩺/🤝 prefix. Migration 13 fallback: if the column doesn't exist
+    // yet (42703), retry with the legacy column list — the picker just
+    // won't render type prefixes (everyone shows as a plain doctor),
+    // which is the correct degraded behavior.
+    let { data, error } = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_active, is_owner, user_id, share_percent, provider_type')
       .eq('owner_id', currentUser.id)
       .order('is_active', { ascending: false })
       .order('name', { ascending: true });
+    if (error && /42703|provider_type/i.test((error.message || '') + ' ' + (error.code || ''))) {
+      var legacy = await window.sb.from('clinic_doctors')
+        .select('id, name, color, is_active, is_owner, user_id, share_percent')
+        .eq('owner_id', currentUser.id)
+        .order('is_active', { ascending: false })
+        .order('name', { ascending: true });
+      data = legacy.data;
+      error = legacy.error;
+    }
     if (error) { console.warn('clinic_doctors load:', error); CLINIC_DOCTORS = []; return; }
     CLINIC_DOCTORS = data || [];
   } catch(e) { console.warn('clinic_doctors fetch:', e); CLINIC_DOCTORS = []; }
@@ -3685,7 +3699,15 @@ async function populateApptProviderPicker(preselectId) {
     var prefix = '';
     if (d.user_id === (currentUser && currentUser.id)) prefix = '🔗 ';
     else if (d.is_owner) prefix = '⭐ ';
-    opt.textContent = prefix + d.name + (d.is_active === false ? ' (غير نشط)' : '');
+    // Phase 6 R: provider_type visual indicator. Layered AFTER the existing
+    // prefix so the user-linked + owner badges still take precedence on the
+    // owner's own row (which is doctor-type anyway). For hygienist/assistant
+    // rows the linked/owner prefixes are usually absent, so the type emoji
+    // sits at the start and the dropdown reads cleanly.
+    var typeIcon = '';
+    if (d.provider_type === 'hygienist') typeIcon = '🩺 ';
+    else if (d.provider_type === 'assistant') typeIcon = '🤝 ';
+    opt.textContent = prefix + typeIcon + d.name + (d.is_active === false ? ' (غير نشط)' : '');
     sel.appendChild(opt);
   });
   // Preselect: explicit id if provided, else default
