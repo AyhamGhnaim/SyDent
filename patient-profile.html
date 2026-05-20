@@ -3985,28 +3985,89 @@ function buildTooth(num, surfaceMap, isUpper) {
   // ── Surface overlay rectangles (clickable) ──
   // Each overlay is filled transparent if no treatment, or with treatment color (60% opacity) if treated.
   // The overlay is clipped visually by the crown outline because it's drawn within the SVG.
+  //
+  // Crown silhouette fix (Phase 6 N follow-up):
+  // For COLORED surfaces (has a treatment), expand the rect outward by OVERSHOOT
+  // so the clip-path actually clips against the crown outline — otherwise small
+  // inner rects sit entirely inside the silhouette and appear as floating
+  // rectangles with sharp edges (e.g. the green box on tooth 11 in the live test
+  // — that was a B-only fill, where the inner rect is naturally narrower than
+  // the crown at its equator so clip-path had nothing to clip).
+  // The clipPath (cc${gid}) is built from anat.outlineD, so any overshoot is
+  // trimmed away exactly along the natural crown curve.
+  //
+  // The expansion is DIRECTIONAL per surface, and draw-order is M/D LAST so
+  // that if both B and M (or D) carry colors, the M/D strip cleanly overlays
+  // any lateral bleed-through from B's expansion.
+  //
+  // Crown grid (recap):
+  //   ┌──┬───────┬──┐
+  //   │  │   O   │  │  ← top: O/I — overshoots UP toward incisal/occlusal edge
+  //   │M │   B   │D │  ← middle: B — lateral overshoot (covered by M/D if present)
+  //   │  │   L   │  │  ← bottom: L — overshoots DOWN toward cervical
+  //   └──┴───────┴──┘
+  //   ↑              ↑
+  //   M/D strips overshoot LATERALLY + slight vertical (drawn last → on top)
+  //
+  // Click zones (transparent rects) stay at their original geometry so that
+  // hit-testing remains accurate and the inter-surface dividers below still
+  // line up with the logical M/D/B/O/L boundaries.
+  var OVERSHOOT = 12;
   function overlayRect(rect, isCenter) {
     var fillKey = rect.key;
     var tk = sm[fillKey];
-    var fill, opacity;
+    var fill, opacity, useColor = false;
     if (hasWhole) { fill = wholeColor; opacity = 0; } // whole already painted via outline
     else if (hasCrownFull) { fill = crownFullColor; opacity = 0; } // crown_full painted as overlay below
-    else if (tk) { fill = T_FILL[tk] || crownBase; opacity = 0.75; }
+    else if (tk) { fill = T_FILL[tk] || crownBase; opacity = 0.75; useColor = true; }
     else { fill = '#000'; opacity = 0; } // transparent click zone
-    // Clip to crown outline so colored regions hug the tooth silhouette,
-    // not appear as floating rectangles
+    // Directional overshoot — only when actually painting a colored surface.
+    var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    if (useColor) {
+      var padT = 0, padB = 0, padL = 0, padR = 0;
+      if (fillKey === 'M' || fillKey === 'D') {
+        // Side strips: overshoot toward the lateral edge of the crown
+        // (the bulge area). Direction depends on which side this strip sits on.
+        if (rect.x <= anat.crownL + 0.1) { padL = OVERSHOOT; } else { padR = OVERSHOOT; }
+        // Small vertical padding to cover the rounded crown corners
+        padT = OVERSHOOT; padB = OVERSHOOT;
+      } else if (fillKey === 'O' || fillKey === 'I') {
+        // Incisal/occlusal: overshoot UP toward the edge, plus a small
+        // lateral pad to hug the curving corners
+        padT = OVERSHOOT;
+        padL = OVERSHOOT; padR = OVERSHOOT;
+      } else if (fillKey === 'L') {
+        // Lingual: overshoot DOWN toward the cervical line, plus a small
+        // lateral pad to hug the curving corners
+        padB = OVERSHOOT;
+        padL = OVERSHOOT; padR = OVERSHOOT;
+      } else if (fillKey === 'B') {
+        // Buccal/labial: the middle facial body. The inner rect is naturally
+        // narrower than the crown at its equator (where the crown bulges out),
+        // so a lateral overshoot is essential — without it the colored area
+        // looks like a small inner rectangle floating on the crown.
+        // M/D strips are drawn AFTER B and will cleanly overlay any bleed
+        // when those surfaces also carry colours.
+        padL = OVERSHOOT; padR = OVERSHOOT;
+      }
+      rx -= padL; ry -= padT;
+      rw += padL + padR; rh += padT + padB;
+    }
     return '<rect class="crown-surface" data-tooth="' + num + '" data-surface="' + fillKey + '" '
-        + 'x="' + rect.x + '" y="' + rect.y + '" width="' + rect.w + '" height="' + rect.h + '" '
+        + 'x="' + rx + '" y="' + ry + '" width="' + rw + '" height="' + rh + '" '
         + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
         + 'clip-path="url(#cc' + gid + ')"></rect>';
   }
 
   var s = anat.surfaces;
+  // Draw order: middle column (O → B → L) FIRST, then side strips (M/D) LAST.
+  // The M/D strips drawn last cleanly overlay any lateral overshoot from B/O/L,
+  // preserving the anatomical meaning of each surface when multiple are colored.
+  svg += overlayRect(s.O, true);
+  svg += overlayRect(s.B, false);
+  svg += overlayRect(s.L, false);
   svg += overlayRect(s.left, false);
   svg += overlayRect(s.right, false);
-  svg += overlayRect(s.B, false);
-  svg += overlayRect(s.O, true);
-  svg += overlayRect(s.L, false);
 
   // Faint internal dividers between surfaces (decorative, very subtle)
   svg += '<g class="tooth-detail" stroke="' + crownStroke + '" stroke-width="0.3" opacity="0.18" fill="none">';
