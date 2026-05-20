@@ -1717,6 +1717,43 @@ function getApptLabBadge(appt) {
   return null;
 }
 
+// Phase 6 K display: build a small chip showing which operatory (chair/room)
+// an appointment is booked in. The chip mirrors the visual pattern of the
+// lab/procs/WA badges so it sits naturally in the same row.
+//
+// Returns an HTML string ready to interpolate, or '' if no chip should show.
+// Resilience:
+//   • Empty/missing appt.operatory_id → '' (most appointments don't have one)
+//   • OPERATORIES_ALL not loaded yet (race during initial paint) → ''
+//   • Operatory exists in OPERATORIES_ALL → show name + color
+//   • Operatory id present but not in OPERATORIES_ALL (deleted FK) →
+//     show "[غرفة محذوفة]" in neutral gray, matches populateOperatoryPicker
+//   • Color missing on the operatory → neutral gray fallback (#8da0bd)
+//   • Inactive operatory → show with name (no special styling — the user
+//     deliberately linked the appt to it, and it remains a valid record)
+function getApptOperatoryBadge(appt) {
+  if (!appt || !appt.operatory_id) return '';
+  if (!Array.isArray(OPERATORIES_ALL) || !OPERATORIES_ALL.length) return '';
+  var op = null;
+  for (var i = 0; i < OPERATORIES_ALL.length; i++) {
+    if (OPERATORIES_ALL[i].id === appt.operatory_id) { op = OPERATORIES_ALL[i]; break; }
+  }
+  var name, color;
+  if (op) {
+    name  = op.name || '[غرفة]';
+    color = (op.color && /^#[0-9A-Fa-f]{6}$/.test(op.color)) ? op.color : '#8da0bd';
+  } else {
+    name  = '[غرفة محذوفة]';
+    color = '#8da0bd';
+  }
+  // 22 hex = ~13% alpha background, 55 hex = ~33% alpha border. Identical
+  // pattern to lbHtml/psHtml so the visual rhythm of the row stays uniform.
+  return '<span style="display:inline-block;background:' + color + '22;color:'
+       + color + ';border:1px solid ' + color + '55;padding:2px 8px;border-radius:12px;'
+       + 'font-size:11px;font-weight:700;margin-right:6px;" title="' + escapeHtml(name)
+       + '">🪑 ' + escapeHtml(name) + '</span>';
+}
+
 // ─── View switch ───────────────────────────────────
 function setView(v) {
   view = v;
@@ -2783,12 +2820,13 @@ function renderDay() {
         ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
+      var opHtml = getApptOperatoryBadge(e);
       html += `
         <div class="time-slot">
           <div class="slot-time">${(e.time||'').slice(0,5)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
-              <div class="appt-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}</div>
+              <div class="appt-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}${opHtml}</div>
               <div class="appt-type">${escapeHtml(e.type)||'—'} (${e.duration} د)</div>
               ${renderTimeStrip(e)}
               <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
@@ -2847,12 +2885,13 @@ function renderList() {
         ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
+      var opHtml = getApptOperatoryBadge(e);
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
           <div class="list-time">${(e.time||'').slice(0,5)}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${escapeHtml(initials(e.patient_name||'؟'))}</div>
           <div class="list-info">
-            <div class="list-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}</div>
+            <div class="list-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}${opHtml}</div>
             <div class="list-type">${escapeHtml(e.type)||'—'} — ${e.duration} دقيقة</div>
             ${renderTimeStrip(e)}
           </div>

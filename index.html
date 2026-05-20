@@ -639,6 +639,10 @@ async function loadDashboard() {
   // Phase 2A: load WhatsApp settings + reminder logs for today's appts before
   // rendering the card so badges appear on first paint (no flicker).
   await loadDashWaState(uid);
+  // Phase 6 K display: load operatory lookup cache so chair chips appear on
+  // the first paint of today's card AND the Waiting Room widget. Best-effort
+  // (errors → empty map → chips silently skipped).
+  await loadDashOperatoriesCache(uid);
   renderTodayApptsCard();
 
   // ── دخل الشهر ──
@@ -757,6 +761,53 @@ async function loadLabOrdersCard(uid, patientsList) {
 
 var _dashApptsToday = [];
 var _dashUid = null;
+
+// Phase 6 K display: lightweight operatory lookup cached for the dashboard.
+// Keyed by operatory id → { name, color }. Loaded once per loadDashboard call
+// via loadDashOperatoriesCache(). Best-effort: pre-migration or RLS errors
+// leave the map empty, which makes _dashOperatoryChipHtml() return '' (graceful
+// degradation — the dashboard still renders without operatory chips).
+var _dashOperatoriesById = {};
+
+async function loadDashOperatoriesCache(uid) {
+  _dashOperatoriesById = {};
+  if (!uid) return;
+  try {
+    var res = await window.sb.from('operatories')
+      .select('id, name, color, is_active')
+      .eq('doctor_id', uid);
+    if (res.error) return;  // pre-migration / RLS — degrade silently
+    (res.data || []).forEach(function(o){
+      if (o && o.id) _dashOperatoriesById[o.id] = {
+        name:   o.name || '[غرفة]',
+        color:  (o.color && /^#[0-9A-Fa-f]{6}$/.test(o.color)) ? o.color : '#8da0bd'
+      };
+    });
+  } catch (e) { /* swallow — best effort */ }
+}
+
+// Builds a small chip (HTML string) for an appointment's operatory. Identical
+// visual pattern to the lab/WA badges in renderTodayApptsCard/loadWaitingRoom
+// for visual rhythm. Returns '' when nothing should render.
+function _dashOperatoryChipHtml(operatoryId) {
+  if (!operatoryId) return '';
+  var op = _dashOperatoriesById[operatoryId];
+  var name, color;
+  if (op) {
+    name  = op.name;
+    color = op.color;
+  } else {
+    // FK present but lookup missed (table not migrated yet, or operatory
+    // hard-deleted). Show a neutral placeholder so the user still sees
+    // *something* — mirrors appointments.html's [غرفة محذوفة] pattern.
+    name  = '[غرفة محذوفة]';
+    color = '#8da0bd';
+  }
+  return '<span style="display:inline-block;background:' + color + '22;color:'
+       + color + ';border:1px solid ' + color + '55;padding:2px 8px;border-radius:12px;'
+       + 'font-size:11px;font-weight:700;margin-right:6px;vertical-align:middle;" title="'
+       + _dashEscapeHtml(name) + '">🪑 ' + _dashEscapeHtml(name) + '</span>';
+}
 
 // Stage definitions for the dashboard. Excludes 'confirmed_at' on purpose —
 // see comment above. Mirrors the keys/labels/colors used in appointments.html
@@ -932,10 +983,14 @@ function renderTodayApptsCard() {
     var safeType = _dashEscapeHtml(a.type || '—');
     var safeTime = (a.time || '').slice(0, 5) || '—';
     var waBadge = renderDashWaBadge(a);
+    // Phase 6 K display: operatory chip after the WA badge, before the
+    // dot. Empty string when no operatory_id, so existing layout unchanged
+    // for the common (single-chair clinic) case.
+    var opChip = _dashOperatoryChipHtml(a.operatory_id);
     return '<div class="appt-item">'
          +   '<div class="appt-time">' + safeTime + '</div>'
          +   '<div style="flex:1;min-width:0">'
-         +     '<div class="appt-name">' + safeName + ' ' + waBadge + '</div>'
+         +     '<div class="appt-name">' + safeName + ' ' + waBadge + ' ' + opChip + '</div>'
          +     '<div class="appt-type">' + safeType + '</div>'
          +     (stamps ? '<div style="margin-top:3px">' + stamps + '</div>' : '')
          +   '</div>'
@@ -1022,7 +1077,7 @@ async function loadWaitingRoom(uid) {
   var rows = [];
   try {
     var res = await window.sb.from('appointments')
-      .select('id, patient_name, type, time, arrived_at, color')
+      .select('id, patient_name, type, time, arrived_at, color, operatory_id')
       .eq('doctor_id', uid)
       .eq('date', today)
       .not('arrived_at', 'is', null)
@@ -1064,10 +1119,13 @@ async function loadWaitingRoom(uid) {
     var arrivedStr = arrived.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
     var safeName = _dashEscapeHtml(a.patient_name || '—');
     var safeType = _dashEscapeHtml(a.type || '—');
+    // Phase 6 K display: chair chip so the doctor/secretary knows at a glance
+    // which room the patient is waiting for. Empty when no operatory_id.
+    var opChip = _dashOperatoryChipHtml(a.operatory_id);
     return '<a class="appt-item" href="appointments.html" style="text-decoration:none;color:inherit">'
          +   '<div class="appt-time">' + arrivedStr + '</div>'
          +   '<div style="flex:1;min-width:0">'
-         +     '<div class="appt-name">' + safeName + '</div>'
+         +     '<div class="appt-name">' + safeName + ' ' + opChip + '</div>'
          +     '<div class="appt-type">' + safeType + '</div>'
          +   '</div>'
          +   '<div style="color:' + color + ';font-weight:700;font-size:13px;white-space:nowrap;padding-right:8px">'
