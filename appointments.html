@@ -4331,6 +4331,11 @@ function showToast(msg) {
     var qp = new URLSearchParams(window.location.search);
     var waId = qp.get('wa');
     var editApptId = qp.get('editAppt');
+    // Phase 6 L extras: dashboard quick-template chip sends user here with
+    // ?newWithTemplate=<id>. Open a brand-new appt modal + apply the template
+    // automatically. Lowest priority — if 'wa' or 'editAppt' are also set,
+    // they win (they refer to existing appointments and are more urgent).
+    var newWithTemplateId = qp.get('newWithTemplate');
     if (waId) {
       var matched = appointments.find(function(a){ return a.id === waId; });
       if (matched) {
@@ -4341,8 +4346,9 @@ function showToast(msg) {
       // Clean the URL so a refresh doesn't re-open the modal
       var url = new URL(window.location.href);
       url.searchParams.delete('wa');
-      // Also drop editAppt if present — wa took priority, don't double-open
+      // Also drop editAppt + newWithTemplate if present — wa took priority
       url.searchParams.delete('editAppt');
+      url.searchParams.delete('newWithTemplate');
       window.history.replaceState({}, '', url.toString());
     } else if (editApptId) {
       var matchedEdit = appointments.find(function(a){ return a.id === editApptId; });
@@ -4359,7 +4365,53 @@ function showToast(msg) {
       }
       var url2 = new URL(window.location.href);
       url2.searchParams.delete('editAppt');
+      url2.searchParams.delete('newWithTemplate');
       window.history.replaceState({}, '', url2.toString());
+    } else if (newWithTemplateId) {
+      // Phase 6 L extras: quick-template flow from dashboard chips.
+      // Verify the template still exists in the local cache (loadAppointmentTypes
+      // ran in init above). If it's been deleted since the dashboard rendered,
+      // we still open a blank new-appt modal so the user isn't blocked.
+      var tplExists = _appointmentTypes.some(function(t){ return t.id === newWithTemplateId; });
+      if (!tplExists) {
+        showToast('⚠️ القالب المختار لم يعد موجوداً');
+      }
+      if (typeof setView === 'function') setView('list');
+      // Delay a tick so the page has finished its initial paint before the
+      // modal pops up — matches the wa/editAppt patterns above.
+      setTimeout(function(){
+        openModal();
+        // Wait one more frame for openModal() to populate the template picker,
+        // then programmatically pick the template. .value = ... does NOT fire
+        // onchange (qaeda #22), so we explicitly call onApptTypePicked() to run
+        // the full template-apply pipeline (duration, treatment, provider,
+        // operatory, notes, lab hint banner).
+        if (tplExists) {
+          setTimeout(function(){
+            var sel = document.getElementById('fApptTypePicker');
+            if (sel) {
+              sel.value = newWithTemplateId;
+              if (typeof onApptTypePicked === 'function') onApptTypePicked();
+              // Also reflect the active chip styling if chips mode is active,
+              // so the picked template looks selected.
+              var chipsEl = document.getElementById('fApptTypeChips');
+              if (chipsEl && chipsEl.style.display !== 'none') {
+                var chip = chipsEl.querySelector('[data-tid="' + newWithTemplateId + '"]');
+                if (chip && typeof onApptTypeChipClick === 'function') {
+                  onApptTypeChipClick(chip, newWithTemplateId);
+                }
+              }
+            }
+            // Focus the patient-name field so the user can start typing
+            // immediately — that's the only thing the template can't fill.
+            var pf = document.getElementById('fPatient');
+            if (pf) pf.focus();
+          }, 80);
+        }
+      }, 200);
+      var url3 = new URL(window.location.href);
+      url3.searchParams.delete('newWithTemplate');
+      window.history.replaceState({}, '', url3.toString());
     }
   } catch(e) { console.warn('deep-link:', e); }
 })();

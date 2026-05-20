@@ -465,6 +465,21 @@
     </div>
   </div>
 
+  <!-- ⚡ Phase 6 L extras: Quick Template Chips (one-tap new appointment).
+       Hidden by default — JS shows it only if at least one appointment_type
+       template exists. Each chip deep-links to appointments.html with
+       ?newWithTemplate=<id>, which auto-opens the new-appt modal with the
+       template's fields pre-filled (duration, treatment, provider, operatory,
+       notes). Saves ~3 clicks per recurring appointment type. -->
+  <div class="card" id="quickTplCard" style="margin-top:20px;display:none;">
+    <div class="card-header">
+      <div class="card-title">⚡ موعد سريع</div>
+      <a class="card-action" href="settings.html#apptTypes">إدارة القوالب ←</a>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">اضغط قالباً لفتح موعد جديد بكل الحقول جاهزة — فقط اكتب اسم المريض.</div>
+    <div id="quickTplChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+
   <div class="grid-2">
 
     <div class="card">
@@ -652,6 +667,9 @@ async function loadDashboard() {
   // the first paint of today's card AND the Waiting Room widget. Best-effort
   // (errors → empty map → chips silently skipped).
   await loadDashOperatoriesCache(uid);
+  // Phase 6 L extras: quick template chips on the dashboard. Best-effort,
+  // hides the card entirely if no active templates exist.
+  loadDashQuickTemplates(uid);  // fire-and-forget — non-blocking
   renderTodayApptsCard();
 
   // ── دخل الشهر ──
@@ -830,6 +848,103 @@ function _dashOperatoryChipHtml(operatoryId) {
        + color + ';border:1px solid ' + color + '55;padding:2px 8px;border-radius:12px;'
        + 'font-size:11px;font-weight:700;margin-right:6px;vertical-align:middle;" title="'
        + _dashEscapeHtml(name) + '">🪑 ' + _dashEscapeHtml(name) + '</span>';
+}
+
+// ─── Phase 6 L extras: Quick Template Chips ─────────────────────────────────
+// One-tap new appointment from the dashboard. Each chip links to
+// appointments.html?newWithTemplate=<id> which opens a new-appt modal with
+// every template field pre-applied. The card hides itself entirely when:
+//   • the appointment_types table is pre-migration (Gap 8 not run)
+//   • there are zero active templates
+//   • the load fails for any other reason (best-effort)
+// So a fresh clinic that hasn't built templates yet sees no clutter.
+//
+// Treatment-color lookup: we cache a small {id → fill} map from `treatments`
+// so the chip border can use the linked treatment's color. If the treatment
+// is missing, the chip falls back to a neutral blue — matches the existing
+// chip styling in appointments.html (single source of visual truth).
+var _dashTreatmentColorById = {};
+
+async function loadDashQuickTemplates(uid) {
+  var cardEl = document.getElementById('quickTplCard');
+  var chipsEl = document.getElementById('quickTplChips');
+  if (!cardEl || !chipsEl) return;
+  // Default to hidden; we only reveal once we know there's something to show.
+  cardEl.style.display = 'none';
+  chipsEl.innerHTML = '';
+  if (!uid) return;
+
+  // 1) Treatments color lookup (best-effort — chip styling degrades gracefully
+  //    to neutral if this fails). treatments uses owner_id + RLS gates it.
+  _dashTreatmentColorById = {};
+  try {
+    var trRes = await window.sb.from('treatments').select('id, fill');
+    if (!trRes.error && trRes.data) {
+      trRes.data.forEach(function(t){
+        if (t && t.id && t.fill) _dashTreatmentColorById[t.id] = t.fill;
+      });
+    }
+  } catch (e) { /* swallow — fallback color still works */ }
+
+  // 2) Active appointment templates. Pre-migration → table missing → silent
+  //    return (card stays hidden). Active templates only — the dashboard
+  //    shouldn't expose deactivated templates to one-click recreation.
+  var tpls = [];
+  try {
+    var res = await window.sb.from('appointment_types')
+      .select('id, name, default_treatment_id, default_duration_min, is_active, sort_order')
+      .eq('doctor_id', uid)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (res.error) {
+      // Pre-migration is fine (chip card just stays hidden). Other errors
+      // get a console warning so misconfigured environments are debuggable.
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (!/42P01|PGRST205|relation .* does not exist|appointment_types/i.test(msg)) {
+        console.warn('Quick templates load failed:', msg);
+      }
+      return;
+    }
+    tpls = res.data || [];
+  } catch (e) {
+    console.warn('Quick templates exception:', e);
+    return;
+  }
+
+  if (!tpls.length) return;  // card stays hidden — clean empty state
+
+  // 3) Render chips. Each chip is an <a> so middle-click / Ctrl+click opens
+  //    in a new tab naturally (no JS event handling needed for that). The
+  //    border color mirrors the linked treatment's fill, the inside stays
+  //    on the dashboard background for readability.
+  var html = '';
+  for (var i = 0; i < tpls.length; i++) {
+    var t = tpls[i];
+    var col = '#63b3ed';  // neutral blue fallback
+    if (t.default_treatment_id && _dashTreatmentColorById[t.default_treatment_id]) {
+      var raw = _dashTreatmentColorById[t.default_treatment_id];
+      if (/^#[0-9A-Fa-f]{6}$/.test(raw)) col = raw;
+    }
+    var safeId = encodeURIComponent(t.id);
+    var safeName = _dashEscapeHtml(t.name || '');
+    var durLabel = (t.default_duration_min ? ' • ' + t.default_duration_min + 'د' : '');
+    html += '<a href="appointments.html?newWithTemplate=' + safeId + '" '
+         +  'title="فتح موعد جديد بقالب: ' + safeName + '" '
+         +  'style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;'
+         +  'border-radius:18px;border:1.5px solid ' + col + ';background:' + col + '14;'
+         +  'color:var(--text-primary);text-decoration:none;font-size:13px;font-weight:600;'
+         +  'transition:all 0.15s;cursor:pointer;" '
+         +  'onmouseover="this.style.background=\'' + col + '2e\'" '
+         +  'onmouseout="this.style.background=\'' + col + '14\'">'
+         +  '<span style="font-size:14px;">⚡</span>'
+         +  '<span>' + safeName + '</span>'
+         +  (durLabel ? '<span style="font-size:11px;color:var(--text-muted);">' + durLabel + '</span>' : '')
+         +  '</a>';
+  }
+  chipsEl.innerHTML = html;
+  cardEl.style.display = '';
+  console.log('[Phase 6 L extras] Dashboard cached ' + tpls.length + ' quick templates.');
 }
 
 // Stage definitions for the dashboard. Excludes 'confirmed_at' on purpose —
