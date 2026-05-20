@@ -180,7 +180,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tb-sub">إدارة الأطباء وأسعارهم الخاصة</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-primary" onclick="openAddModal()">＋ إضافة طبيب</button>
+    <!-- Phase 6 Q: 'Add doctor' is no longer initiated from this page.
+         The unified flow is: add an Employee (role='doctor') from
+         employees.html, which auto-creates the clinic_doctors row. This
+         button now becomes a deep-link to the right place. The label and
+         icon make the new flow explicit so the Owner never wonders where
+         to add doctors. -->
+    <a class="btn btn-primary" href="employees.html?action=add-doctor">＋ إضافة طبيب (من صفحة الموظفين)</a>
   </div>
 </div>
 
@@ -404,8 +410,8 @@ function renderList() {
     el.innerHTML =
       '<div class="empty-state"><div class="ic">👨‍⚕️</div>' +
       '<div class="ttl">لا يوجد أطباء بعد</div>' +
-      '<div style="margin-top:6px;">أضف أول طبيب لبدء تسجيل الجلسات لكل طبيب على حدة.</div>' +
-      '<button class="btn btn-primary" style="margin-top:16px;" onclick="openAddModal()">＋ إضافة طبيب</button></div>';
+      '<div style="margin-top:6px;">أضف أول طبيب من صفحة الموظفين — سيظهر هنا تلقائياً.</div>' +
+      '<a class="btn btn-primary" style="margin-top:16px;display:inline-block;text-decoration:none;" href="employees.html?action=add-doctor">＋ إضافة طبيب من صفحة الموظفين</a></div>';
     return;
   }
 
@@ -446,7 +452,7 @@ function renderList() {
       + (metaItems ? '<div class="doc-meta">' + metaItems + '</div>' : '')
       + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')
       + '<div class="doc-actions">'
-      + '<button class="btn-edit" onclick="editDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
+      + '<button class="btn-edit" onclick="goEditDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
       + linkBtn
       + ownerBtn
       + delBtn
@@ -468,6 +474,57 @@ function openAddModal() {
   _setDocColor('#63b3ed');
   document.getElementById('docModal').classList.add('show');
   setTimeout(function(){ document.getElementById('dName').focus(); }, 100);
+}
+
+// Phase 6 Q: 'goEditDoctor' is the entry point used by the action buttons
+// in the doctor cards. It routes ALL non-owner doctor edits to employees.html
+// (via the linked clinic_employees row) so the unified modal is the single
+// place to manage doctor data. Edge cases:
+//   • Owner-doctor (is_owner=true): the owner profile is edited via the
+//     owner-only flow on employees.html (PIN management). We forward to
+//     employees.html with no special action — the user can use the
+//     owner-specific UI there.
+//   • Orphan clinic_doctors (no linked employee): falls back to the legacy
+//     in-page editDoctor() so legacy data is still editable. This covers
+//     pre-Phase-6-P rows where the link was never established.
+function goEditDoctor(id) {
+  var d = doctors.find(function(x){ return x.id === id; });
+  if (!d) { showToast('⚠️ الطبيب غير موجود'); return; }
+
+  // Phase 6 Q: Owner-doctor is a special case. The employees.html edit
+  // modal blocks role==='owner' (the Owner profile is managed via the
+  // separate PIN-change flow), so deep-linking there would just bounce
+  // the user back with a toast. Instead, route owner-doctor edits to
+  // the legacy in-page modal where the clinical fields (color, share,
+  // notes) can still be tweaked. This keeps the Owner's doctor card
+  // editable without conflicting with the unified PIN-management flow.
+  if (d.is_owner) {
+    editDoctor(id);
+    return;
+  }
+
+  // Try to find the linked employee. Lookup via the employees cache (loaded
+  // by loadDoctors via loadEmployees fallback isn't available here — but the
+  // direct DB query is cheap and reliable).
+  window.sb.from('clinic_employees')
+    .select('id')
+    .eq('owner_id', currentUser.id)
+    .eq('doctor_id', id)
+    .limit(1)
+    .maybeSingle()
+    .then(function(res){
+      if (res && res.data && res.data.id) {
+        // Linked employee exists — deep-link to its edit modal in employees.html
+        window.location.href = 'employees.html?action=edit&id=' + encodeURIComponent(res.data.id);
+      } else {
+        // Orphan doctor row (no employee linked) — fall back to legacy in-page edit
+        editDoctor(id);
+      }
+    })
+    .catch(function(err){
+      console.warn('Phase 6 Q: linked employee lookup failed, falling back to in-page edit:', err);
+      editDoctor(id);
+    });
 }
 
 function editDoctor(id) {

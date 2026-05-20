@@ -264,13 +264,60 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="hint">المالك (Owner) لا يمكن إضافته يدوياً — حساب الـ Owner محفوظ تلقائياً.</div>
       </div>
 
-      <div class="form-group" id="doctorLinkGroup" style="display:none;">
-        <!-- Phase 6 P: This field is intentionally hidden. The previous manual
-             link between an employee and an existing clinic_doctors record has
-             been replaced by an automatic flow: when an employee is created
-             with role='doctor', a matching clinic_doctors row is created
-             automatically in saveEmployee(). The hidden element is preserved
-             to keep onRoleChange() and the legacy form layout untouched. -->
+      <!-- ───── Phase 6 Q: Doctor-specific clinical fields ─────
+           Replaces the previous (Phase 6 P) hidden doctorLinkGroup.
+           Shows ONLY when role='doctor'. All fields are optional — the Owner
+           can save the employee row immediately and fill clinical details
+           later (any blank → null). When the role changes between
+           secretary and doctor, onRoleChange() toggles this container's
+           visibility; the underlying DOM elements stay mounted so their
+           values persist across visibility toggles within a single modal
+           session (no accidental data loss). -->
+      <div id="doctorFieldsGroup" style="display:none;">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>التخصص / الدور</label>
+            <input type="text" id="eDocRole" placeholder="مثلاً: تقويم / لب وجذور / طبيب عام">
+          </div>
+          <div class="form-group">
+            <label>الهاتف</label>
+            <input type="tel" id="eDocPhone" placeholder="09xxxxxxxx" dir="ltr">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>اللون المميّز (يظهر بجانب اسم الطبيب)</label>
+          <!-- Phase 6 Q: uses shared SyDentColorPicker, identical pattern to
+               doctors.html (Phase 6 K2.2). Hidden #eDocColor preserves the
+               get/set API used by saveEmployee(). _setEmpDocColor() keeps the
+               swatch, hidden input, and module-scoped _empPickedColor variable
+               in sync — a single sync point per the established convention. -->
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input type="hidden" id="eDocColor" value="#63b3ed">
+            <button type="button" id="eDocColorSwatch" onclick="openEmpDocColorPicker()"
+                    aria-label="اختيار اللون"
+                    style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#63b3ed;flex-shrink:0;"></button>
+            <span style="font-size:12px;color:var(--text2);">اختر أي لون — يظهر بجانب اسم الطبيب</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>نسبة الطبيب من الجلسة (%)</label>
+            <input type="number" id="eDocShare" min="0" max="100" placeholder="مثلاً: 40">
+          </div>
+          <div class="form-group">
+            <label>ساعات العمل (أسبوعياً)</label>
+            <input type="number" id="eDocHours" min="0" placeholder="مثلاً: 24">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>ملاحظات (اختياري)</label>
+          <textarea id="eDocNotes" rows="2" placeholder="أي تفاصيل إضافية..." style="width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+        </div>
+
       </div>
 
       <div class="form-group">
@@ -371,6 +418,9 @@ function avatarColor(r) {
 // from a curated palette of distinct, theme-friendly hues, avoiding any color
 // already used by existing active doctors when possible. If all colors are
 // taken, falls back to a random choice from the palette.
+// Phase 6 Q: still used as a defensive fallback when the Owner saves a
+// doctor employee without explicitly picking a color (shouldn't happen
+// because the swatch always has a value, but the helper is harmless).
 function _pickRandomDoctorColor() {
   var palette = [
     '#63b3ed', '#f5a623', '#a78bfa', '#f06292',
@@ -385,6 +435,37 @@ function _pickRandomDoctorColor() {
   var pool = available.length > 0 ? available : palette;
   return pool[Math.floor(Math.random() * pool.length)];
 }
+
+// ── Phase 6 Q: Doctor color picker integration ──
+// Mirrors the established pattern in doctors.html (Phase 6 K2.2):
+//   • _empPickedColor is the module-scoped source of truth.
+//   • _setEmpDocColor() is the single sync point — sanitizes via the shared
+//     picker, then updates the swatch, hidden input, and _empPickedColor
+//     atomically. All call sites (openAddModal, openEditModal, picker
+//     callback) route through it so the three values never drift.
+//   • openEmpDocColorPicker() opens the shared SyDentColorPicker; degrades
+//     to a defensive prompt() fallback if the component fails to load.
+var _empPickedColor = '#63b3ed';
+function _setEmpDocColor(hex) {
+  var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
+    ? window.SyDentColorPicker.sanitizeHex(hex) : (hex || '#63b3ed');
+  _empPickedColor = safe;
+  var hidden = document.getElementById('eDocColor');
+  if (hidden) hidden.value = safe;
+  var sw = document.getElementById('eDocColorSwatch');
+  if (sw) sw.style.background = safe;
+}
+function openEmpDocColorPicker() {
+  if (!window.SyDentColorPicker) {
+    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', _empPickedColor);
+    if (typed) _setEmpDocColor(typed);
+    return;
+  }
+  window.SyDentColorPicker.open(_empPickedColor, function(newHex) {
+    _setEmpDocColor(newHex);
+  });
+}
+
 function initials(name) {
   var parts = String(name || '').trim().split(/\s+/);
   if (parts.length === 0 || !parts[0]) return '?';
@@ -413,9 +494,14 @@ async function loadData() {
   }
   employees = empRes.data || [];
 
-  // Load active doctors for linking dropdown
+  // Load active doctors. Phase 6 Q: expanded SELECT to fetch the full
+  // clinical field set, because openEditModal() now pre-fills these into
+  // the employee modal when editing a doctor employee. Without these
+  // columns, edits would silently null them out (the form would show
+  // blank → saveEmployee would write null → data loss). Bandwidth cost
+  // is negligible (the doctors table is tiny — usually <20 rows).
   var docRes = await window.sb.from('clinic_doctors')
-    .select('id, name, is_active, is_owner')
+    .select('id, name, role, phone, share_percent, weekly_hours, notes, color, is_active, is_owner')
     .eq('owner_id', currentUser.id)
     .order('name');
 
@@ -504,9 +590,14 @@ function renderList() {
 
 // ── Add/Edit Modal ──
 function onRoleChange() {
-  // Phase 6 P: The doctor link group is permanently hidden — role-based
-  // doctor linkage is now fully automatic. Function retained as a stable
-  // hook in case future UI elements need to react to role changes.
+  // Phase 6 Q: toggle the doctor-specific clinical fields based on role.
+  // The container holds the legacy schema's role/phone/color/share/hours/notes
+  // — they all live inside #doctorFieldsGroup and become visible only when the
+  // Owner picks role='doctor'. Element values persist across show/hide within
+  // a modal session, so the user can flip back and forth without losing input.
+  var role = $('eRole').value;
+  var grp = $('doctorFieldsGroup');
+  if (grp) grp.style.display = (role === 'doctor') ? '' : 'none';
 }
 
 function openAddModal() {
@@ -518,9 +609,16 @@ function openAddModal() {
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Phase 6 P: Doctor linking is now automatic. When the user picks role='doctor'
-  // and saves, saveEmployee() creates a matching clinic_doctors row and links
-  // it via doctor_id automatically. No manual linking UI required.
+  // Phase 6 Q: Reset all doctor-specific fields. Picks a fresh color from
+  // the curated palette (avoids duplicating an existing doctor's color when
+  // possible) so the swatch isn't always green and feels personalized from
+  // the start. The Owner can still override it via the swatch button.
+  $('eDocRole').value = '';
+  $('eDocPhone').value = '';
+  $('eDocShare').value = '';
+  $('eDocHours').value = '';
+  $('eDocNotes').value = '';
+  _setEmpDocColor(_pickRandomDoctorColor());
 
   onRoleChange();
   $('empModal').classList.add('show');
@@ -540,9 +638,24 @@ function openEditModal(id) {
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Phase 6 P: Doctor linking is now automatic. The employee's current
-  // doctor_id link (if any) is preserved unchanged through saveEmployee()
-  // unless the role itself changes. No manual picker UI needed.
+  // Phase 6 Q: If editing a doctor employee, pre-fill the clinical fields
+  // from the linked clinic_doctors row. The `doctors` cache (loaded in
+  // loadData()) holds only ACTIVE doctors — if the link points to an
+  // inactive doctor the lookup returns undefined and we fall back to
+  // empty defaults so the form is still editable. The Owner can update
+  // the fields and saveEmployee() will sync them back. Secretaries skip
+  // this entirely (the container is hidden by onRoleChange anyway).
+  var linkedDoc = (emp.role === 'doctor' && emp.doctor_id)
+    ? doctors.find(function(d){ return d.id === emp.doctor_id; })
+    : null;
+  $('eDocRole').value = (linkedDoc && linkedDoc.role) || '';
+  $('eDocPhone').value = (linkedDoc && linkedDoc.phone) || '';
+  $('eDocShare').value = (linkedDoc && linkedDoc.share_percent !== null && linkedDoc.share_percent !== undefined)
+    ? linkedDoc.share_percent : '';
+  $('eDocHours').value = (linkedDoc && linkedDoc.weekly_hours !== null && linkedDoc.weekly_hours !== undefined)
+    ? linkedDoc.weekly_hours : '';
+  $('eDocNotes').value = (linkedDoc && linkedDoc.notes) || '';
+  _setEmpDocColor((linkedDoc && linkedDoc.color) || _pickRandomDoctorColor());
 
   // PIN hint: editing, leave empty to keep current
   $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
@@ -572,6 +685,35 @@ async function saveEmployee() {
     // existing emp.doctor_id is preserved unless the role changes.
     var pin = ($('ePin').value || '').trim();
     var pinConfirm = ($('ePinConfirm').value || '').trim();
+
+    // ── Phase 6 Q: read doctor-specific clinical fields ──
+    // We always read them — even when role='secretary' — to keep the code
+    // path uniform. They are only USED below when the resolved post-save
+    // role is 'doctor'. Empty strings normalize to null so the DB stays
+    // clean (no '' rows for share_percent / weekly_hours).
+    var docRoleField = ($('eDocRole').value || '').trim() || null;
+    var docPhoneField = ($('eDocPhone').value || '').trim() || null;
+    var docShareRaw = $('eDocShare').value;
+    var docShareField = (docShareRaw === '' || docShareRaw === null) ? null : parseFloat(docShareRaw);
+    var docHoursRaw = $('eDocHours').value;
+    var docHoursField = (docHoursRaw === '' || docHoursRaw === null) ? null : parseFloat(docHoursRaw);
+    var docNotesField = ($('eDocNotes').value || '').trim() || null;
+    var docColorField = ($('eDocColor').value || _empPickedColor || '#63b3ed');
+    // Sanitize the color one more time defensively (in case the hidden
+    // input was tampered with via devtools).
+    if (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex) {
+      docColorField = window.SyDentColorPicker.sanitizeHex(docColorField);
+    }
+    // Validate share_percent / weekly_hours ranges (numeric inputs already
+    // enforce min/max in HTML but a determined user can bypass them).
+    if (docShareField !== null && (isNaN(docShareField) || docShareField < 0 || docShareField > 100)) {
+      showMsg('modalMsg', 'نسبة الطبيب يجب أن تكون بين 0 و 100', true);
+      return;
+    }
+    if (docHoursField !== null && (isNaN(docHoursField) || docHoursField < 0)) {
+      showMsg('modalMsg', 'ساعات العمل يجب أن تكون رقماً موجباً', true);
+      return;
+    }
 
     // Validation
     if (!name) {
@@ -713,20 +855,27 @@ async function saveEmployee() {
 
       // Case 1: Auto-create a new clinic_doctors row when this employee
       // transitions into (or starts as) a doctor with no existing link.
+      // Phase 6 Q: extended with the full clinical field set captured from
+      // the modal. Color falls back to a palette pick if the user didn't
+      // pick one (defensive — the swatch always has a value).
       var needsAutoCreate = (!editingId && role === 'doctor') ||
                             (editingId && pendingRoleSwitch === 'secretary→doctor');
       if (needsAutoCreate && employeeIdForDoctorOps) {
-        var newDocColor = _pickRandomDoctorColor();
+        var newDocColor = docColorField || _pickRandomDoctorColor();
         var insDoc = await window.sb.from('clinic_doctors').insert({
           owner_id: currentUser.id,
           name: name,
-          role: 'طبيب أسنان',
+          role: docRoleField || 'طبيب أسنان',
+          phone: docPhoneField,
+          share_percent: docShareField,
+          weekly_hours: docHoursField,
+          notes: docNotesField,
           color: newDocColor,
           is_owner: false,
           is_active: true
         }).select().single();
         if (insDoc.error) {
-          console.warn('Phase 6 P: clinic_doctors auto-create failed:', insDoc.error);
+          console.warn('Phase 6 Q: clinic_doctors auto-create failed:', insDoc.error);
           showToast('⚠️ تم حفظ الموظف، لكن إنشاء بطاقة الطبيب فشل — راجع صفحة الأطباء', true);
         } else if (insDoc.data) {
           // Link the new clinic_doctors row back to the employee
@@ -735,34 +884,62 @@ async function saveEmployee() {
             .eq('id', employeeIdForDoctorOps)
             .eq('owner_id', currentUser.id);
           if (linkRes.error) {
-            console.warn('Phase 6 P: employee doctor_id link failed:', linkRes.error);
+            console.warn('Phase 6 Q: employee doctor_id link failed:', linkRes.error);
           }
           if (window.logAudit) {
             window.logAudit('doctor.create', {
               entityId: insDoc.data.id,
               description: 'إنشاء تلقائي لبطاقة طبيب: ' + name + ' (من إضافة موظف)',
-              newValue: { name: name, color: newDocColor, auto: true }
+              newValue: {
+                name: name, role: docRoleField, phone: docPhoneField,
+                share_percent: docShareField, weekly_hours: docHoursField,
+                color: newDocColor, auto: true
+              }
             });
           }
         }
       }
 
-      // Case 2: Sync clinic_doctors.name when editing a still-doctor employee
-      // whose name changed.
+      // Case 2: Sync the FULL clinic_doctors row when editing a still-doctor
+      // employee. Phase 6 Q: previously only synced .name; now writes every
+      // clinical field captured from the modal, so the Owner can use this
+      // single dialog to manage all doctor attributes. We sync unconditionally
+      // (no diff check) because the values came from the form and a noop UPDATE
+      // is cheaper than computing per-field diffs. The audit log captures the
+      // old vs new snapshot so changes remain traceable.
       if (editingId && origEmp && origEmp.role === 'doctor' && role === 'doctor' &&
-          origEmp.doctor_id && origEmp.name !== name) {
+          origEmp.doctor_id) {
+        var origDoctor = doctors.find(function(d){ return d.id === origEmp.doctor_id; }) || {};
         var syncRes = await window.sb.from('clinic_doctors')
-          .update({ name: name })
+          .update({
+            name: name,
+            role: docRoleField,
+            phone: docPhoneField,
+            share_percent: docShareField,
+            weekly_hours: docHoursField,
+            notes: docNotesField,
+            color: docColorField,
+            updated_at: new Date().toISOString()
+          })
           .eq('id', origEmp.doctor_id)
           .eq('owner_id', currentUser.id);
         if (syncRes.error) {
-          console.warn('Phase 6 P: clinic_doctors name sync failed:', syncRes.error);
+          console.warn('Phase 6 Q: clinic_doctors full sync failed:', syncRes.error);
+          showToast('⚠️ تم حفظ الموظف، لكن مزامنة بيانات الطبيب فشلت', true);
         } else if (window.logAudit) {
           window.logAudit('doctor.edit', {
             entityId: origEmp.doctor_id,
-            description: 'مزامنة اسم الطبيب من تعديل الموظف: ' + origEmp.name + ' → ' + name,
-            oldValue: { name: origEmp.name },
-            newValue: { name: name }
+            description: 'تعديل بيانات الطبيب من شاشة الموظفين: ' + name,
+            oldValue: {
+              name: origDoctor.name, role: origDoctor.role,
+              phone: origDoctor.phone, share_percent: origDoctor.share_percent,
+              weekly_hours: origDoctor.weekly_hours, color: origDoctor.color
+            },
+            newValue: {
+              name: name, role: docRoleField,
+              phone: docPhoneField, share_percent: docShareField,
+              weekly_hours: docHoursField, color: docColorField
+            }
           });
         }
       }
@@ -1065,6 +1242,49 @@ async function removeAllLockPins() {
 
   await loadData();
   renderList();
+
+  // ── Phase 6 Q: Deep-link handler ──
+  // Allows other pages (doctors.html) to send the Owner straight into a
+  // specific employee action without an extra click. Supported params:
+  //   • ?action=add-doctor    → opens the add modal with role pre-selected
+  //                             as 'doctor' (so the clinical fields appear
+  //                             immediately).
+  //   • ?action=edit&id=<UUID> → opens the edit modal for the given
+  //                              employee row. Silently no-ops if the id
+  //                              isn't found (defensive against stale links).
+  // We strip the query string after acting so a page refresh doesn't
+  // re-trigger the same modal.
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var action = params.get('action');
+    if (action === 'add-doctor') {
+      openAddModal();
+      // Pre-select 'doctor' role and toggle the clinical fields visible
+      var roleSel = document.getElementById('eRole');
+      if (roleSel) {
+        roleSel.value = 'doctor';
+        onRoleChange();
+      }
+      // Clean the URL so refresh doesn't re-open the modal
+      history.replaceState({}, '', 'employees.html');
+    } else if (action === 'edit') {
+      var id = params.get('id');
+      if (id) {
+        // Verify the id exists in our loaded set before opening
+        var found = employees.find(function(e){ return e.id === id; });
+        if (found) {
+          openEditModal(id);
+        } else {
+          showToast('⚠️ لم يتم العثور على الموظف — قد يكون محذوفاً', true);
+        }
+      }
+      history.replaceState({}, '', 'employees.html');
+    }
+  } catch (e) {
+    // Deep-link is a UX nicety, not critical — swallow any URL parse
+    // errors so the rest of the page works normally.
+    console.warn('Phase 6 Q: deep-link handler failed:', e);
+  }
 })();
 
 // Pull-to-refresh handler (called by sidebar.js on mobile pull)
