@@ -4053,8 +4053,13 @@ function buildTooth(num, surfaceMap, isUpper) {
       rx -= padL; ry -= padT;
       rw += padL + padR; rh += padT + padB;
     }
+    // rx/ry: rounded corners (2px) soften the rectangular look where the
+    // surface fill sits inside the crown silhouette (clip-path can't help
+    // there). Industry charting standards (Pabau, Quizlet) describe surface
+    // fills as a "shaded patch" rather than a sharp rectangle, and rounded
+    // edges read more naturally as a restoration rather than a UI element.
     return '<rect class="crown-surface" data-tooth="' + num + '" data-surface="' + fillKey + '" '
-        + 'x="' + rx + '" y="' + ry + '" width="' + rw + '" height="' + rh + '" '
+        + 'x="' + rx + '" y="' + ry + '" width="' + rw + '" height="' + rh + '" rx="2" ry="2" '
         + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
         + 'clip-path="url(#cc' + gid + ')"></rect>';
   }
