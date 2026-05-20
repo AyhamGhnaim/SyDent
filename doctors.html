@@ -12,8 +12,8 @@
 <title>أطباء العيادة — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260520k2-1"></script>
-<script src="sidebar.js?v=20260520k2-1"></script>
+<script src="supabase-init.js?v=20260520k2-2"></script>
+<script src="sidebar.js?v=20260520k2-2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -147,14 +147,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 
-/* Color picker */
-.color-grid{display:grid;grid-template-columns:repeat(8, 1fr);gap:6px;}
-.color-swatch{
-  width:100%;aspect-ratio:1;border-radius:8px;cursor:pointer;
-  border:2px solid transparent;transition:all .15s;
-}
-.color-swatch:hover{transform:scale(1.1);}
-.color-swatch.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--green);}
+/* Phase 6 K2.2: legacy 16-color palette CSS removed. Color selection now
+   goes through the shared SyDentColorPicker (defined in supabase-init.js)
+   via a single swatch button — same UX on iOS, Windows, and Android. */
 
 /* Toast */
 .toast{
@@ -234,7 +229,20 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label>اللون المميّز (يظهر في كشف الحساب)</label>
-        <div class="color-grid" id="colorGrid"></div>
+        <!-- Phase 6 K2.2: replaced the fixed 16-color grid with the shared
+             SyDentColorPicker (defined in supabase-init.js). The native HTML5
+             color picker varies wildly across OS (tiny RGB-only on Windows
+             Chrome/Brave vs. the full Grid/Spectrum/Sliders panel on iOS),
+             so we emulate the iOS experience everywhere via our shared
+             component. Hidden #dColor preserves the get/set API used by
+             saveDoctor() and editDoctor() — they read pickedColor unchanged. -->
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="hidden" id="dColor" value="#2ee89e">
+          <button type="button" id="dColorSwatch" onclick="openDocColorPicker()"
+                  aria-label="اختيار اللون"
+                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
+          <span style="font-size:12px;color:var(--text-muted);">اختر أي لون — يظهر بجانب اسم الطبيب</span>
+        </div>
       </div>
 
       <div class="form-row">
@@ -270,10 +278,40 @@ var doctors = [];
 var editingId = null;
 var pickedColor = '#2ee89e';
 
-var COLORS = [
-  '#2ee89e','#63b3ed','#a78bfa','#f5c842','#fb923c','#ef5350','#06b6d4','#84cc16',
-  '#ec4899','#14b8a6','#f97316','#8b5cf6','#22d3ee','#eab308','#f87171','#a3e635'
-];
+// Phase 6 K2.2: keeps the hidden #dColor input, the visible swatch button,
+// and the legacy pickedColor variable all in sync. Every call site (openAdd,
+// editDoctor, the picker callback) goes through this single helper so the
+// three are guaranteed never to drift apart. pickedColor is preserved so
+// saveDoctor()'s existing reads keep working without any changes.
+function _setDocColor(hex) {
+  var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
+    ? window.SyDentColorPicker.sanitizeHex(hex)
+    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : '#2ee89e');
+  pickedColor = safe;
+  var inp = document.getElementById('dColor');
+  if (inp) inp.value = safe;
+  var sw = document.getElementById('dColorSwatch');
+  if (sw) sw.style.background = safe;
+}
+
+// Phase 6 K2.2: opens the shared custom color picker. Called from the swatch
+// button's onclick. The picker handles all platform differences — same UI
+// on iOS, Windows, Android, etc.
+function openDocColorPicker() {
+  if (!window.SyDentColorPicker) {
+    // Defensive fallback: if supabase-init.js failed to load the picker
+    // block, let the user type a hex value manually (extremely rare).
+    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', pickedColor);
+    if (typed) _setDocColor(typed);
+    return;
+  }
+  window.SyDentColorPicker.open(pickedColor, function(newHex) {
+    _setDocColor(newHex);
+  });
+}
+
+// Back-compat alias: legacy code that called pickColor(c) keeps working.
+function pickColor(c) { _setDocColor(c); }
 
 function showToast(msg) {
   var t = document.getElementById('toast');
@@ -292,18 +330,6 @@ function initials(name) {
   var parts = String(name).trim().split(/\s+/);
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
   return (parts[0].charAt(0) + parts[parts.length-1].charAt(0)).toUpperCase();
-}
-
-function renderColorGrid() {
-  var grid = document.getElementById('colorGrid');
-  grid.innerHTML = COLORS.map(function(c){
-    return '<div class="color-swatch ' + (c === pickedColor ? 'selected' : '') + '" style="background:' + c + '" onclick="pickColor(\'' + c + '\')"></div>';
-  }).join('');
-}
-
-function pickColor(c) {
-  pickedColor = c;
-  renderColorGrid();
 }
 
 async function loadDoctors() {
@@ -438,7 +464,7 @@ function openAddModal() {
   document.getElementById('dShare').value = '';
   document.getElementById('dHours').value = '';
   document.getElementById('dNotes').value = '';
-  pickColor('#63b3ed');
+  _setDocColor('#63b3ed');
   document.getElementById('docModal').classList.add('show');
   setTimeout(function(){ document.getElementById('dName').focus(); }, 100);
 }
@@ -454,7 +480,7 @@ function editDoctor(id) {
   document.getElementById('dShare').value = (d.share_percent !== null && d.share_percent !== undefined) ? d.share_percent : '';
   document.getElementById('dHours').value = d.weekly_hours || '';
   document.getElementById('dNotes').value = d.notes || '';
-  pickColor(d.color || '#2ee89e');
+  _setDocColor(d.color || '#2ee89e');
   document.getElementById('docModal').classList.add('show');
 }
 
@@ -625,7 +651,6 @@ document.addEventListener('click', function(e){
 
 (async function init() {
   initSidebar('doctors');
-  renderColorGrid();
 
   // Auth check (consistent with other pages)
   var user = await window.sbRequireAuth();

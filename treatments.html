@@ -12,8 +12,8 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260520k2-1"></script>
-<script src="sidebar.js?v=20260520k2-1"></script>
+<script src="supabase-init.js?v=20260520k2-2"></script>
+<script src="sidebar.js?v=20260520k2-2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -155,7 +155,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
 
 /* Phase 6 N: legacy palette CSS (.color-picker / .color-opt) removed.
-   Color selection now uses native <input type="color"> — see modal markup. */
+   Phase 6 K2.2: native <input type="color"> replaced by the shared
+   SyDentColorPicker (in supabase-init.js) — same UX on iOS/Windows/Android.
+   See modal markup for the swatch button + hidden input pattern. */
 
 /* target-part picker */
 .target-opt{
@@ -505,12 +507,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label>اللون</label>
-        <!-- Phase 6 N: native color picker replaces the fixed 26-color palette.
-             Mirrors the operatory modal pattern in settings.html. Stroke is
-             derived from the fill (30% darker) via _darkenHex() — see JS. -->
+        <!-- Phase 6 K2.2: replaced the native <input type="color"> with a
+             swatch button that opens the shared SyDentColorPicker (defined
+             in supabase-init.js). The native HTML5 picker varies wildly
+             across OS (tiny RGB-only on Windows Chrome/Brave vs. the full
+             Grid/Spectrum/Sliders panel on iOS), so we emulate the iOS
+             experience everywhere via our shared component. Hidden
+             #fTreatmentColor preserves the get/set .value API used by the
+             rest of the file — pickedFill/pickedStroke flow unchanged. -->
         <div style="display:flex;align-items:center;gap:10px;">
-          <input type="color" id="fTreatmentColor" value="#2ee89e"
-                 style="width:50px;height:40px;padding:2px;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:transparent;">
+          <input type="hidden" id="fTreatmentColor" value="#2ee89e">
+          <button type="button" id="fTreatmentColorSwatch" onclick="openTreatColorPicker()"
+                  aria-label="اختيار اللون"
+                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
           <span style="font-size:12px;color:var(--text-muted);">اختر أي لون — يُعرض على مخطط الأسنان</span>
         </div>
       </div>
@@ -1364,13 +1373,23 @@ function _darkenHex(hex, pct) {
 }
 
 function pickColor(fill, stroke) {
-  pickedFill = fill;
+  // Phase 6 K2.2: pickColor is now the single source of truth that keeps
+  // pickedFill, pickedStroke, the hidden #fTreatmentColor input, AND the
+  // visible #fTreatmentColorSwatch button all in sync. Every call site
+  // (openAdd default, editTreatment, duplicateTreatment, picker callback)
+  // funnels through here so the four never drift apart.
+  var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
+    ? window.SyDentColorPicker.sanitizeHex(fill)
+    : (/^#[0-9A-Fa-f]{6}$/.test(fill || '') ? fill : '#2ee89e');
+  pickedFill = safe;
   // If a stroke is passed (editing an existing treatment with a stored
   // stroke from the legacy palette), preserve it for visual continuity.
-  // Otherwise derive it from the fill.
-  pickedStroke = stroke || _darkenHex(fill, 30);
+  // Otherwise derive it from the fill (30% darker).
+  pickedStroke = stroke || _darkenHex(safe, 30);
   var input = document.getElementById('fTreatmentColor');
-  if (input) input.value = fill;
+  if (input) input.value = safe;
+  var sw = document.getElementById('fTreatmentColorSwatch');
+  if (sw) sw.style.background = safe;
 }
 
 function updatePreview() {
@@ -1380,13 +1399,26 @@ function updatePreview() {
   p.textContent         = '';
 }
 
-// wire up native color input — always re-derive stroke on user pick,
-// so the user gets a coherent outline whatever colour they choose.
-document.getElementById('fTreatmentColor').addEventListener('input', function(e){
-  var fill = e.target.value;
-  pickColor(fill, _darkenHex(fill, 30));
-  updatePreview();
-});
+// Phase 6 K2.2: opens the shared custom color picker. Called from the swatch
+// button's onclick. The picker handles all platform differences — same UI
+// on iOS, Windows, Android, etc. The stroke is always re-derived from the
+// fill so the user gets a coherent outline whatever colour they choose.
+function openTreatColorPicker() {
+  if (!window.SyDentColorPicker) {
+    // Defensive fallback: if supabase-init.js failed to load the picker
+    // block, let the user type a hex value manually (extremely rare).
+    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', pickedFill);
+    if (typed) {
+      pickColor(typed, _darkenHex(typed, 30));
+      updatePreview();
+    }
+    return;
+  }
+  window.SyDentColorPicker.open(pickedFill, function(newHex) {
+    pickColor(newHex, _darkenHex(newHex, 30));
+    updatePreview();
+  });
+}
 
 // wire up target-part picker
 document.querySelectorAll('.target-opt').forEach(function(o){
