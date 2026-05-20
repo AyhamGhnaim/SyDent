@@ -4379,15 +4379,24 @@ function showToast(msg) {
       if (typeof setView === 'function') setView('list');
       // Delay a tick so the page has finished its initial paint before the
       // modal pops up — matches the wa/editAppt patterns above.
-      setTimeout(function(){
-        openModal();
-        // Wait one more frame for openModal() to populate the template picker,
-        // then programmatically pick the template. .value = ... does NOT fire
-        // onchange (qaeda #22), so we explicitly call onApptTypePicked() to run
-        // the full template-apply pipeline (duration, treatment, provider,
-        // operatory, notes, lab hint banner).
-        if (tplExists) {
-          setTimeout(function(){
+      // CRITICAL: openModal() is async (it awaits populateApptTypes,
+      // populateApptProviderPicker, loadPatientNames). If we call it without
+      // awaiting, the inner setTimeout fires BEFORE the pickers are populated
+      // → t.default_treatment_id finds no match in TREATMENTS (still loading),
+      // and t.default_provider_id finds no <option> in fProvider (still
+      // empty). The lab-hint banner renders because it only needs the
+      // template object, but treatment/duration/provider silently no-op.
+      // The fix is `await openModal()` so the full template-apply pipeline
+      // sees a fully populated form.
+      setTimeout(async function(){
+        try {
+          await openModal();
+          // openModal has finished — all selects are populated. Now we can
+          // safely apply the template. .value = ... does NOT fire onchange
+          // (qaeda #22), so we explicitly call onApptTypePicked() to run the
+          // full template-apply pipeline (duration, treatment, provider,
+          // operatory, notes, lab hint banner).
+          if (tplExists) {
             var sel = document.getElementById('fApptTypePicker');
             if (sel) {
               sel.value = newWithTemplateId;
@@ -4406,7 +4415,12 @@ function showToast(msg) {
             // immediately — that's the only thing the template can't fill.
             var pf = document.getElementById('fPatient');
             if (pf) pf.focus();
-          }, 80);
+          }
+        } catch (e) {
+          // The outer try/catch can't catch exceptions from this async
+          // callback (different microtask). Catch locally and warn so any
+          // unexpected failure is debuggable without breaking the page.
+          console.warn('deep-link newWithTemplate:', e);
         }
       }, 200);
       var url3 = new URL(window.location.href);
