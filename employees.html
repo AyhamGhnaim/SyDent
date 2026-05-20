@@ -410,8 +410,33 @@ function roleLabel(r) {
 function roleIcon(r) {
   return r === 'owner' ? '👑' : (r === 'doctor' ? '👨‍⚕️' : '👩‍💼');
 }
-function avatarColor(r) {
-  return r === 'owner' ? '#2ee89e' : (r === 'doctor' ? '#63b3ed' : '#ffa726');
+
+// Phase 6 T: avatarColor() now accepts the full employee row (not just role).
+// For doctors, we resolve the linked clinic_doctors.color so each doctor card
+// shows their custom hue — matching the visual identity already shown on
+// doctors.html. Falls back to the legacy per-role default when:
+//   • the employee is owner or secretary (roles share a single team color)
+//   • a doctor employee has no linked clinic_doctors row (legacy orphan)
+//   • the linked doctor exists but has no color set
+// Backward compat: callers that still pass a role string (instead of an
+// object) get the legacy behavior. This keeps any code outside renderList
+// from breaking silently.
+function avatarColor(empOrRole) {
+  // Accept either a string (role) or a full employee object
+  var role, emp;
+  if (typeof empOrRole === 'string') {
+    role = empOrRole; emp = null;
+  } else {
+    emp = empOrRole || {}; role = emp.role;
+  }
+  if (role === 'owner') return '#2ee89e';
+  if (role === 'secretary') return '#ffa726';
+  // role === 'doctor' → try the linked clinic_doctors.color first
+  if (emp && emp.doctor_id && typeof doctors !== 'undefined') {
+    var linked = doctors.find(function(d){ return d.id === emp.doctor_id; });
+    if (linked && linked.color) return linked.color;
+  }
+  return '#63b3ed';
 }
 
 // Phase 6 P: returns a color for an auto-created clinic_doctors row. Picks
@@ -537,7 +562,9 @@ function renderList() {
 
   var html = '<div class="emp-grid">';
   sorted.forEach(function(e){
-    var color = avatarColor(e.role);
+    // Phase 6 T: pass the full employee row so avatarColor() can resolve
+    // a doctor's custom color from the linked clinic_doctors record.
+    var color = avatarColor(e);
     var inactive = e.is_active === false;
     var pinSet = !!e.pin_hash;
     var roleBadgeClass = 'role-' + e.role;
