@@ -4037,18 +4037,21 @@ function buildTooth(num, surfaceMap, isUpper) {
         padT = OVERSHOOT;
         padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'L') {
-        // Lingual: overshoot DOWN toward the cervical line, plus a small
-        // lateral pad to hug the curving corners
+        // Lingual: overshoot DOWN toward the cervical line. Horizontally
+        // INSET by 4px on each side so the lingual patch reads as a compact
+        // rounded patch in the middle column rather than reaching all the
+        // way to the M/D strip boundaries. Keeps L and B visually consistent
+        // (same horizontal extent) per live-test feedback.
         padB = OVERSHOOT;
-        padL = OVERSHOOT; padR = OVERSHOOT;
+        padL = -4; padR = -4;
       } else if (fillKey === 'B') {
-        // Buccal/labial: the middle facial body. The inner rect is naturally
-        // narrower than the crown at its equator (where the crown bulges out),
-        // so a lateral overshoot is essential — without it the colored area
-        // looks like a small inner rectangle floating on the crown.
-        // M/D strips are drawn AFTER B and will cleanly overlay any bleed
-        // when those surfaces also carry colours.
-        padL = OVERSHOOT; padR = OVERSHOOT;
+        // Buccal/labial: the middle facial body. Horizontally INSET by 4px
+        // on each side so the colored area reads as a compact rounded patch
+        // in the centre — not a strip that touches the M/D zones. This
+        // matches the clinical reality of a buccal restoration (a small spot
+        // on the facial surface, not full surface coverage) and leaves a
+        // small breathing gap before the side strips.
+        padL = -4; padR = -4;
       }
       rx -= padL; ry -= padT;
       rw += padL + padR; rh += padT + padB;
