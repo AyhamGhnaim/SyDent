@@ -154,16 +154,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-cancel-m{padding:9px 22px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;}
 
-/* color picker */
-.color-picker{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
-.color-opt{
-  width:36px;height:36px;border-radius:9px;cursor:pointer;
-  border:3px solid transparent;transition:all .15s;
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;font-weight:800;color:#0a1628;
-}
-.color-opt:hover{transform:scale(1.1);}
-.color-opt.selected{border-color:var(--text);box-shadow:0 0 0 2px var(--bg);}
+/* Phase 6 N: legacy palette CSS (.color-picker / .color-opt) removed.
+   Color selection now uses native <input type="color"> — see modal markup. */
 
 /* target-part picker */
 .target-opt{
@@ -513,38 +505,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label>اللون</label>
-        <div class="color-picker" id="colorPicker">
-          <!-- أخضر / فيروزي -->
-          <div class="color-opt" data-fill="#2ee89e" data-stroke="#1fba7e" style="background:#2ee89e;color:#0a1628;">A</div>
-          <div class="color-opt" data-fill="#10b981" data-stroke="#0a8362" style="background:#10b981;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#84cc16" data-stroke="#5a9410" style="background:#84cc16;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#06b6d4" data-stroke="#0a809a" style="background:#06b6d4;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#14b8a6" data-stroke="#0a8478" style="background:#14b8a6;color:#fff;">A</div>
-          <!-- أزرق -->
-          <div class="color-opt" data-fill="#63b3ed" data-stroke="#2b7ab5" style="background:#63b3ed;color:#0a1628;">A</div>
-          <div class="color-opt" data-fill="#3b82f6" data-stroke="#1e5cc4" style="background:#3b82f6;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#0ea5e9" data-stroke="#0a7bb0" style="background:#0ea5e9;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#6366f1" data-stroke="#4047b8" style="background:#6366f1;color:#fff;">A</div>
-          <!-- بنفسجي / زهري -->
-          <div class="color-opt" data-fill="#a78bfa" data-stroke="#7c5cbf" style="background:#a78bfa;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#8b5cf6" data-stroke="#6336c4" style="background:#8b5cf6;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#d946ef" data-stroke="#9b25b0" style="background:#d946ef;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#ec4899" data-stroke="#a51a6e" style="background:#ec4899;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#f472b6" data-stroke="#b8458a" style="background:#f472b6;color:#fff;">A</div>
-          <!-- أحمر / برتقالي -->
-          <div class="color-opt" data-fill="#ef5350" data-stroke="#c62828" style="background:#ef5350;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#dc2626" data-stroke="#991b1b" style="background:#dc2626;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#fb923c" data-stroke="#c2691f" style="background:#fb923c;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#f97316" data-stroke="#b8500a" style="background:#f97316;color:#fff;">A</div>
-          <!-- أصفر / ذهبي / بني -->
-          <div class="color-opt" data-fill="#f5c842" data-stroke="#c9962a" style="background:#f5c842;color:#0a1628;">A</div>
-          <div class="color-opt" data-fill="#eab308" data-stroke="#a78305" style="background:#eab308;color:#0a1628;">A</div>
-          <div class="color-opt" data-fill="#ca8a04" data-stroke="#8a5a02" style="background:#ca8a04;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#a16207" data-stroke="#6b3f04" style="background:#a16207;color:#fff;">A</div>
-          <!-- محايد -->
-          <div class="color-opt" data-fill="#a3a3a3" data-stroke="#6b6b6b" style="background:#a3a3a3;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#64748b" data-stroke="#3f4a59" style="background:#64748b;color:#fff;">A</div>
-          <div class="color-opt" data-fill="#475569" data-stroke="#2d3744" style="background:#475569;color:#fff;">A</div>
+        <!-- Phase 6 N: native color picker replaces the fixed 26-color palette.
+             Mirrors the operatory modal pattern in settings.html. Stroke is
+             derived from the fill (30% darker) via _darkenHex() — see JS. -->
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="color" id="fTreatmentColor" value="#2ee89e"
+                 style="width:50px;height:40px;padding:2px;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:transparent;">
+          <span style="font-size:12px;color:var(--text-muted);">اختر أي لون — يُعرض على مخطط الأسنان</span>
         </div>
       </div>
 
@@ -1376,15 +1343,34 @@ function _isLaymanColMissing(err) {
   return /layman_name/i.test(msg) && /(does not exist|42703|PGRST204|PGRST205|schema cache)/i.test(msg);
 }
 
+// Phase 6 N: derive a stroke colour from any fill by darkening 30%.
+// This replaces the manual data-stroke pairs from the old fixed palette —
+// the native color input only returns a single value, so we generate the
+// outline programmatically to keep tooth-chart rendering consistent.
+function _darkenHex(hex, pct) {
+  var h = String(hex||'').replace('#','');
+  if (h.length !== 6) return hex;
+  var r = parseInt(h.substr(0,2),16);
+  var g = parseInt(h.substr(2,2),16);
+  var b = parseInt(h.substr(4,2),16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return hex;
+  var f = 1 - (Math.max(0, Math.min(100, pct)) / 100);
+  r = Math.max(0, Math.round(r * f));
+  g = Math.max(0, Math.round(g * f));
+  b = Math.max(0, Math.round(b * f));
+  return '#' + [r,g,b].map(function(n){
+    var s = n.toString(16); return s.length===1 ? '0'+s : s;
+  }).join('');
+}
+
 function pickColor(fill, stroke) {
   pickedFill = fill;
-  pickedStroke = stroke;
-  var opts = document.querySelectorAll('.color-opt');
-  for (var i=0; i<opts.length; i++) {
-    var o = opts[i];
-    if (o.getAttribute('data-fill') === fill) o.classList.add('selected');
-    else o.classList.remove('selected');
-  }
+  // If a stroke is passed (editing an existing treatment with a stored
+  // stroke from the legacy palette), preserve it for visual continuity.
+  // Otherwise derive it from the fill.
+  pickedStroke = stroke || _darkenHex(fill, 30);
+  var input = document.getElementById('fTreatmentColor');
+  if (input) input.value = fill;
 }
 
 function updatePreview() {
@@ -1394,12 +1380,12 @@ function updatePreview() {
   p.textContent         = '';
 }
 
-// wire up color picker
-document.querySelectorAll('.color-opt').forEach(function(o){
-  o.addEventListener('click', function(){
-    pickColor(o.getAttribute('data-fill'), o.getAttribute('data-stroke'));
-    updatePreview();
-  });
+// wire up native color input — always re-derive stroke on user pick,
+// so the user gets a coherent outline whatever colour they choose.
+document.getElementById('fTreatmentColor').addEventListener('input', function(e){
+  var fill = e.target.value;
+  pickColor(fill, _darkenHex(fill, 30));
+  updatePreview();
 });
 
 // wire up target-part picker
