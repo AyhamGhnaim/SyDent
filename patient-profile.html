@@ -7715,7 +7715,15 @@ async function loadPatientAuditLog() {
       // Defensive labels for consistency.
       'appointment_type.create': '🎨 إضافة قالب موعد',
       'appointment_type.edit': '🎨 تعديل قالب موعد',
-      'appointment_type.delete': '🎨 حذف قالب موعد'
+      'appointment_type.delete': '🎨 حذف قالب موعد',
+      // Phase 7.1: expenses are clinic-wide (no patient_id). Defensive
+      // labels kept for consistency with the central audit-log page.
+      'expense.create': '💰 إضافة مصروف',
+      'expense.edit': '💰 تعديل مصروف',
+      'expense.delete': '💰 حذف مصروف',
+      'expense_category.create': '🏷️ إضافة تصنيف مصاريف',
+      'expense_category.edit': '🏷️ تعديل تصنيف مصاريف',
+      'expense_category.delete': '🏷️ حذف تصنيف مصاريف'
     };
     var roleLabels = { owner: 'المالك', doctor: 'طبيب', secretary: 'سكرتيرة' };
 

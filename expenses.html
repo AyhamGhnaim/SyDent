@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<!-- Phase 6 K-display: cache-busting headers to ensure browser revalidates
+     on each navigation. inline JS otherwise gets served from GitHub Pages
+     CDN until the manifest changes. See golden rule #21. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>SyDent — المصاريف</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --green-dim: rgba(46,232,158,0.12);
+  --red:       #ef5350;
+  --yellow:    #f5c842;
+  --blue:      #63b3ed;
+  --orange:    #ffa726;
+  --gray:      #a3a3a3;
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --radius:    12px;
+  --sidebar:   240px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+}
+
+.main {
+  flex: 1;
+  margin-right: var(--sb-width, 240px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-title { font-size: 20px; font-weight: 700; flex: 1; }
+.topbar-title span { color: var(--green); }
+
+.btn-add {
+  background: var(--green);
+  color: #0a1628;
+  border: none; border-radius: 10px;
+  padding: 10px 20px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  transition: opacity .2s, transform .15s;
+  white-space: nowrap;
+}
+.btn-add:hover { opacity: .88; transform: translateY(-1px); }
+.btn-add.outline {
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+
+.content { padding: 28px; flex: 1; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 6px; margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 11px 22px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text2);
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.active {
+  color: var(--green);
+  border-bottom-color: var(--green);
+}
+
+/* Stats */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.stat-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.stat-icon.b { background: rgba(99,179,237,0.15); }
+.stat-icon.g { background: rgba(46,232,158,0.15); }
+.stat-icon.y { background: rgba(245,200,66,0.15); }
+.stat-icon.o { background: rgba(255,167,38,0.15); }
+.stat-icon.r { background: rgba(239,83,80,0.15); }
+.stat-num { font-size: 20px; font-weight: 800; line-height: 1.1; }
+.stat-lbl { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+/* Section */
+.section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.section-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
+.section-title {
+  font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.count-badge {
+  background: var(--green-dim);
+  color: var(--green);
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+
+/* Filters */
+.filters {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-label {
+  font-size: 12px;
+  color: var(--text2);
+  margin-left: 4px;
+}
+.filter-chip {
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  font-family: 'Cairo', sans-serif; font-size: 12px;
+  cursor: pointer; transition: all .15s;
+  white-space: nowrap;
+}
+.filter-chip:hover, .filter-chip.active {
+  background: var(--green-dim);
+  border-color: var(--green);
+  color: var(--green);
+}
+.date-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px;
+  outline: none;
+}
+.date-input:focus { border-color: var(--green); }
+
+/* Table */
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 12px 16px;
+  text-align: right;
+  font-size: 12px; font-weight: 600;
+  color: var(--text2);
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(46,232,158,0.04); }
+tbody td {
+  padding: 12px 16px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.amount {
+  font-weight: 700;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+.amount.big {
+  font-size: 16px;
+}
+
+.act-btn {
+  padding: 5px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text2);
+  font-family: 'Cairo', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  margin-left: 3px;
+  white-space: nowrap;
+}
+.act-btn:hover { border-color: var(--green); color: var(--green); }
+.act-btn.del { color: var(--text2); }
+.act-btn.del:hover { border-color: var(--red); color: var(--red); background: rgba(239,83,80,.08); }
+
+/* Empty state */
+.empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text2);
+}
+.empty-icon { font-size: 48px; opacity: .4; margin-bottom: 12px; }
+.empty-msg { font-size: 14px; line-height: 1.6; }
+
+/* Categories grid */
+.cats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 20px;
+}
+.cat-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color .2s;
+}
+.cat-card:hover { border-color: var(--green); }
+.cat-card.inactive { opacity: 0.5; }
+.cat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cat-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.cat-info { flex: 1; min-width: 0; }
+.cat-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cat-stats {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 2px;
+}
+.cat-actions {
+  display: flex;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--bg2);
+  border: 1.5px solid rgba(46,232,158,0.25);
+  border-radius: 14px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(46,232,158,0.35) transparent;
+}
+.modal-box::-webkit-scrollbar { width: 8px; height: 8px; }
+.modal-box::-webkit-scrollbar-track { background: transparent; }
+.modal-box::-webkit-scrollbar-thumb {
+  background: rgba(46,232,158,0.35);
+  border-radius: 4px;
+  border: 2px solid var(--bg2);
+}
+.modal-box::-webkit-scrollbar-thumb:hover { background: rgba(46,232,158,0.55); }
+
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  background: var(--bg2);
+  z-index: 2;
+}
+.modal-head h3 {
+  font-size: 17px; font-weight: 800;
+  color: var(--green);
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { color: var(--red); }
+.modal-body { padding: 20px 22px; }
+
+.form-group { margin-bottom: 16px; }
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s;
+}
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus { border-color: var(--green); }
+.form-group textarea { resize: vertical; min-height: 70px; }
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.form-row .form-group { margin-bottom: 0; }
+.hint {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+.msg {
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 14px;
+  display: none;
+}
+.msg.show { display: block; }
+.msg.err { background: rgba(239,83,80,0.1); color: var(--red); border: 1px solid rgba(239,83,80,0.3); }
+.msg.ok  { background: rgba(46,232,158,0.1); color: var(--green); border: 1px solid rgba(46,232,158,0.3); }
+
+.modal-foot {
+  display: flex;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+}
+.btn-primary {
+  background: var(--green);
+  color: #0a1628;
+  flex: 1;
+}
+.btn-primary:hover { opacity: .88; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+}
+.btn-outline:hover { border-color: var(--green); color: var(--green); }
+
+/* Color picker swatch */
+.color-swatch {
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: transform .15s;
+}
+.color-swatch:hover { transform: scale(1.08); }
+
+/* Icon picker grid (categories modal) */
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.icon-opt {
+  width: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.icon-opt:hover { background: var(--bg3); }
+.icon-opt.selected {
+  background: var(--green-dim);
+  border-color: var(--green);
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: var(--green);
+  color: #0a1628;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 2000;
+  transition: transform .3s cubic-bezier(.25,.46,.45,.94);
+  pointer-events: none;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--red); color: #fff; }
+
+@media (max-width: 720px) {
+  .main { margin-right: 0; }
+  .topbar { padding: 12px 16px; }
+  .topbar-title { font-size: 16px; }
+  .content { padding: 16px; }
+  .stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .form-row { grid-template-columns: 1fr; }
+  .table-scroll thead { display: none; }
+  .table-scroll tbody, .table-scroll tr, .table-scroll td { display: block; width: 100%; }
+  .table-scroll tr {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 8px 12px;
+    padding: 10px;
+  }
+  .table-scroll td {
+    padding: 5px 0;
+    border: none;
+    font-size: 13px;
+  }
+  .table-scroll td::before {
+    content: attr(data-label);
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 2px;
+  }
+  .cats-grid { grid-template-columns: 1fr; padding: 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="main">
+
+  <div class="topbar">
+    <div class="topbar-title">المصاريف <span>/ المحاسبة</span></div>
+    <button class="btn-add" onclick="openExpenseModal()">+ مصروف جديد</button>
+  </div>
+
+  <div class="content">
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" id="tabBtnList" onclick="switchTab('list')">📋 المصاريف</button>
+      <button class="tab" id="tabBtnCats" onclick="switchTab('cats')">🏷️ التصنيفات</button>
+    </div>
+
+    <!-- Tab: List -->
+    <div id="tabList">
+
+      <!-- Stats -->
+      <div class="stats-strip">
+        <div class="stat-card">
+          <div class="stat-icon b">📅</div>
+          <div>
+            <div class="stat-num" id="statToday">0</div>
+            <div class="stat-lbl">مصاريف اليوم</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon g">📊</div>
+          <div>
+            <div class="stat-num" id="statWeek">0</div>
+            <div class="stat-lbl">هذا الأسبوع</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon y">📈</div>
+          <div>
+            <div class="stat-num" id="statMonth">0</div>
+            <div class="stat-lbl">هذا الشهر</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon o">🗓️</div>
+          <div>
+            <div class="stat-num" id="statYear">0</div>
+            <div class="stat-lbl">هذه السنة</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters + Table -->
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <span>قائمة المصاريف</span>
+            <span class="count-badge" id="listCount">0</span>
+          </div>
+        </div>
+
+        <div class="filters">
+          <span class="filter-label">التصنيف:</span>
+          <div id="catFilters" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+
+        <div class="filters">
+          <span class="filter-label">من:</span>
+          <input type="date" class="date-input" id="dateFrom" onchange="applyFilters()">
+          <span class="filter-label">إلى:</span>
+          <input type="date" class="date-input" id="dateTo" onchange="applyFilters()">
+          <button class="filter-chip" onclick="clearDateFilter()">إعادة ضبط</button>
+        </div>
+
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>التاريخ</th>
+                <th>التصنيف</th>
+                <th>الوصف</th>
+                <th>المورّد</th>
+                <th>المبلغ</th>
+                <th>طريقة الدفع</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="expList"></tbody>
+          </table>
+          <div id="emptyState" class="empty" style="display:none;">
+            <div class="empty-icon">💸</div>
+            <div class="empty-msg">لا توجد مصاريف مسجّلة بعد.<br>اضغط <b>+ مصروف جديد</b> لإضافة أول مصروف.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Categories -->
+    <div id="tabCats" style="display:none;">
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">
+            <span>التصنيفات</span>
+            <span class="count-badge" id="catsCount">0</span>
+          </div>
+          <button class="btn-add outline" onclick="openCatModal()" style="padding:8px 16px;font-size:13px;">+ تصنيف جديد</button>
+        </div>
+        <div id="catsGrid" class="cats-grid"></div>
+        <div id="catsEmpty" class="empty" style="display:none;">
+          <div class="empty-icon">🏷️</div>
+          <div class="empty-msg">لا توجد تصنيفات بعد.<br>اضغط <b>+ تصنيف جديد</b> لإضافة أول تصنيف.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Expense -->
+<div class="modal-overlay" id="expModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="expModalTitle">+ مصروف جديد</h3>
+      <button class="modal-close" onclick="closeExpModal()" aria-label="إغلاق">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="msg" id="expMsg"></div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>التاريخ *</label>
+          <input type="date" id="eDate">
+        </div>
+        <div class="form-group">
+          <label>المبلغ (ل.س) *</label>
+          <input type="number" id="eAmount" min="0" step="1000" placeholder="مثلاً: 50000">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>التصنيف *</label>
+        <select id="eCategory"></select>
+        <div class="hint">إذا لم يكن التصنيف موجوداً، أضفه من تبويب "التصنيفات".</div>
+      </div>
+
+      <div class="form-group">
+        <label>الوصف</label>
+        <input type="text" id="eDescription" placeholder="مثلاً: شراء كومبوزيت 3M">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>المورّد / المتجر</label>
+          <input type="text" id="eVendor" placeholder="مثلاً: المركز الطبي">
+        </div>
+        <div class="form-group">
+          <label>طريقة الدفع</label>
+          <select id="ePaymentMethod">
+            <option value="cash">💵 نقد</option>
+            <option value="bank">🏦 تحويل بنكي</option>
+            <option value="check">📝 شيك</option>
+            <option value="other">آخر</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>ملاحظات (اختياري)</label>
+        <textarea id="eNotes" placeholder="أي تفاصيل إضافية..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeExpModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveExpense()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Category -->
+<div class="modal-overlay" id="catModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="catModalTitle">+ تصنيف جديد</h3>
+      <button class="modal-close" onclick="closeCatModal()" aria-label="إغلاق">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="msg" id="catMsg"></div>
+
+      <div class="form-group">
+        <label>اسم التصنيف *</label>
+        <input type="text" id="cName" placeholder="مثلاً: مواد سنية" maxlength="50">
+      </div>
+
+      <div class="form-group">
+        <label>الأيقونة</label>
+        <div class="icon-grid" id="iconGrid"></div>
+        <div class="hint">اختر أيقونة من الشبكة، أو اتركها كما هي.</div>
+      </div>
+
+      <div class="form-group">
+        <label>اللون المميّز</label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="hidden" id="cColor" value="#63b3ed">
+          <button type="button" class="color-swatch" id="cColorSwatch" onclick="openCatColorPicker()" aria-label="اختيار اللون"></button>
+          <span style="color:var(--text2);font-size:12px;">يُستخدم في تقارير المحاسبة لتمييز التصنيف</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeCatModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveCategory()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="supabase-init.js?v=20260520k2-2"></script>
+<script src="sidebar.js?v=20260520k2-2"></script>
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+var currentUser = null;
+var categories = [];   // expense_categories rows
+var expenses = [];     // expenses rows
+var editingExpId = null;
+var editingCatId = null;
+var filterCatId = 'all';  // 'all' or category id
+var filterDateFrom = '';
+var filterDateTo = '';
+
+// ─── Default categories (bootstrapped on first run) ───────────────────────
+// These appear automatically the first time the Owner opens expenses.html in
+// a freshly-installed clinic. The Owner can rename, recolor, deactivate or
+// delete any of them afterwards — they're seeds, not built-ins. is_system
+// flag isn't used since the Owner has full control over their categories.
+var DEFAULT_CATEGORIES = [
+  { name: 'مواد سنية', icon: '🦷', color: '#63b3ed', sort_order: 1 },
+  { name: 'أدوات ومعدّات', icon: '🔧', color: '#ffa726', sort_order: 2 },
+  { name: 'إيجار وخدمات', icon: '🏢', color: '#f5c842', sort_order: 3 },
+  { name: 'كهرباء وماء', icon: '💡', color: '#fbbf24', sort_order: 4 },
+  { name: 'صيانة', icon: '🛠️', color: '#a78bfa', sort_order: 5 },
+  { name: 'تنظيف وتعقيم', icon: '🧼', color: '#34d399', sort_order: 6 },
+  { name: 'تسويق', icon: '📢', color: '#f472b6', sort_order: 7 },
+  { name: 'مواصلات وضيافة', icon: '🚗', color: '#60a5fa', sort_order: 8 },
+  { name: 'مصاريف عامة', icon: '📋', color: '#a3a3a3', sort_order: 9 }
+];
+
+// Curated icon set for the category picker. Doesn't need to be exhaustive —
+// the Owner can paste any emoji into the name field if they want a fancy
+// icon (we keep the icon column separate for future structured display).
+var ICON_OPTIONS = [
+  '🦷','🔧','🏢','💡','🛠️','🧼','📢','🚗',
+  '📋','💼','🧪','💊','🛒','🍕','📱','💻',
+  '🪑','🎓','📚','🎁','🏥','⚡','💰','🔌',
+  '📦','🗂️','🔑','🎨','🚿','🧴','🪥','💧'
+];
+
+// ─── DOM utility ───────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function showToast(msg, isError) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' err' : '');
+  setTimeout(function(){ t.className = 'toast'; }, 2500);
+}
+
+function showMsg(id, txt, isError) {
+  var el = $(id);
+  if (!el) return;
+  el.textContent = txt;
+  el.className = 'msg show ' + (isError ? 'err' : 'ok');
+}
+function clearMsg(id) {
+  var el = $(id);
+  if (!el) return;
+  el.className = 'msg';
+  el.textContent = '';
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtAmount(n) {
+  if (n === null || n === undefined) return '0';
+  return Number(n).toLocaleString('ar-EG');
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  // d is YYYY-MM-DD; render as Arabic-locale short date
+  try {
+    var dt = new Date(d + 'T00:00:00');
+    return dt.toLocaleDateString('ar-EG', { year:'numeric', month:'short', day:'numeric' });
+  } catch(e) { return d; }
+}
+
+function todayISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth()+1).padStart(2,'0') + '-' +
+         String(d.getDate()).padStart(2,'0');
+}
+
+// ─── Auth bootstrap ────────────────────────────────────────────────────────
+async function init() {
+  try {
+    var u = await window.sbGetUser();
+    if (!u) { window.location.href = 'auth.html'; return; }
+    currentUser = u;
+
+    // Page guard: only Owner can access expense management. Doctor + Secretary
+    // are blocked since this affects accounting integrity. Aligns with the
+    // sidebar BLOCKED config in sidebar.js (Phase 4 lock model).
+    if (window.SyDentLock && window.SyDentLock.guardPage) {
+      if (!window.SyDentLock.guardPage(['owner'])) return;
+    }
+
+    await loadCategories();
+    await maybeBootstrapDefaults();
+    await loadExpenses();
+    renderCategoryFilters();
+    renderExpenses();
+    renderCategories();
+    populateCategoryDropdown();
+    renderIconGrid();
+    $('eDate').value = todayISO();
+  } catch (e) {
+    console.error('init failed:', e);
+    showToast('⚠️ خطأ في تحميل الصفحة', true);
+  }
+}
+
+// Bootstrap default categories on first run (zero existing rows).
+// Defensive: a partial bootstrap (some rows inserted before a failure) won't
+// re-trigger because the count check sees existing rows. The Owner can
+// manually add the missing defaults from the Categories tab.
+async function maybeBootstrapDefaults() {
+  if (categories.length > 0) return;
+  console.log('[expenses] bootstrapping default categories…');
+  var rows = DEFAULT_CATEGORIES.map(function(c) {
+    return {
+      owner_id: currentUser.id,
+      name: c.name,
+      icon: c.icon,
+      color: c.color,
+      sort_order: c.sort_order
+    };
+  });
+  var res = await window.sb.from('expense_categories').insert(rows).select();
+  if (res.error) {
+    console.warn('[expenses] bootstrap failed:', res.error);
+    // Don't throw — the Owner can add categories manually. Show a soft hint
+    // only if the table itself is missing (migration not yet applied).
+    if (/relation .* does not exist|PGRST205|42P01/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+      showToast('⚠️ شغّل Migration 16 في Supabase أولاً', true);
+    }
+    return;
+  }
+  categories = res.data || [];
+  console.log('[expenses] bootstrapped', categories.length, 'default categories');
+}
+
+async function loadCategories() {
+  var res = await window.sb.from('expense_categories')
+    .select('*')
+    .eq('owner_id', currentUser.id)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
+  if (res.error) {
+    if (/relation .* does not exist|PGRST205|42P01/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+      categories = [];
+      return;
+    }
+    console.warn('loadCategories:', res.error);
+    return;
+  }
+  categories = res.data || [];
+}
+
+async function loadExpenses() {
+  var res = await window.sb.from('expenses')
+    .select('*')
+    .eq('owner_id', currentUser.id)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (res.error) {
+    if (/relation .* does not exist|PGRST205|42P01/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+      expenses = [];
+      return;
+    }
+    console.warn('loadExpenses:', res.error);
+    return;
+  }
+  expenses = res.data || [];
+}
+
+// ─── Tabs ──────────────────────────────────────────────────────────────────
+function switchTab(which) {
+  $('tabBtnList').classList.toggle('active', which === 'list');
+  $('tabBtnCats').classList.toggle('active', which === 'cats');
+  $('tabList').style.display = which === 'list' ? '' : 'none';
+  $('tabCats').style.display = which === 'cats' ? '' : 'none';
+}
+
+// ─── Filters ───────────────────────────────────────────────────────────────
+function renderCategoryFilters() {
+  var wrap = $('catFilters');
+  wrap.innerHTML = '';
+  // Defensive reset: if the currently-filtered category was deactivated or
+  // deleted, snap back to 'all' so the user doesn't see a confusing empty
+  // table. This handles the cross-tab edit case where the Owner toggles a
+  // category off while a filter on it is active.
+  if (filterCatId !== 'all') {
+    var stillExists = categories.some(function(c){
+      return c.id === filterCatId && c.is_active !== false;
+    });
+    if (!stillExists) filterCatId = 'all';
+  }
+  // "All" pill
+  var all = document.createElement('button');
+  all.className = 'filter-chip' + (filterCatId === 'all' ? ' active' : '');
+  all.textContent = '📊 الكل';
+  all.onclick = function(){ filterCatId = 'all'; applyFilters(); };
+  wrap.appendChild(all);
+  // One pill per active category
+  categories.filter(function(c){ return c.is_active !== false; }).forEach(function(c){
+    var btn = document.createElement('button');
+    btn.className = 'filter-chip' + (filterCatId === c.id ? ' active' : '');
+    btn.textContent = (c.icon || '📋') + ' ' + c.name;
+    btn.onclick = function(){ filterCatId = c.id; applyFilters(); };
+    wrap.appendChild(btn);
+  });
+}
+
+function applyFilters() {
+  filterDateFrom = $('dateFrom').value || '';
+  filterDateTo = $('dateTo').value || '';
+  renderCategoryFilters();
+  renderExpenses();
+}
+
+function clearDateFilter() {
+  $('dateFrom').value = '';
+  $('dateTo').value = '';
+  filterDateFrom = '';
+  filterDateTo = '';
+  renderExpenses();
+}
+
+function getFilteredExpenses() {
+  return expenses.filter(function(e) {
+    if (filterCatId !== 'all' && e.category_id !== filterCatId) return false;
+    if (filterDateFrom && e.date < filterDateFrom) return false;
+    if (filterDateTo && e.date > filterDateTo) return false;
+    return true;
+  });
+}
+
+// ─── Stats ─────────────────────────────────────────────────────────────────
+function computeStats() {
+  var today = todayISO();
+  var d = new Date();
+  var weekAgo = new Date(d.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+  var yearStart = new Date(d.getFullYear(), 0, 1);
+
+  function toISO(date) {
+    return date.getFullYear() + '-' +
+           String(date.getMonth()+1).padStart(2,'0') + '-' +
+           String(date.getDate()).padStart(2,'0');
+  }
+  var weekISO = toISO(weekAgo);
+  var monthISO = toISO(monthStart);
+  var yearISO = toISO(yearStart);
+
+  var sums = { today: 0, week: 0, month: 0, year: 0 };
+  expenses.forEach(function(e) {
+    var amt = Number(e.amount) || 0;
+    if (e.date === today) sums.today += amt;
+    if (e.date >= weekISO) sums.week += amt;
+    if (e.date >= monthISO) sums.month += amt;
+    if (e.date >= yearISO) sums.year += amt;
+  });
+  $('statToday').textContent = fmtAmount(sums.today);
+  $('statWeek').textContent = fmtAmount(sums.week);
+  $('statMonth').textContent = fmtAmount(sums.month);
+  $('statYear').textContent = fmtAmount(sums.year);
+}
+
+// ─── Render: expenses table ────────────────────────────────────────────────
+function renderExpenses() {
+  computeStats();
+  var filtered = getFilteredExpenses();
+  var tbody = $('expList');
+  var empty = $('emptyState');
+  $('listCount').textContent = filtered.length;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  var html = '';
+  filtered.forEach(function(e) {
+    var cat = e.category_id ? categories.find(function(c){ return c.id === e.category_id; }) : null;
+    var catHtml = cat
+      ? '<span class="cat-chip" style="background:' + escapeHtml(cat.color || '#a3a3a3') + '22;color:' + escapeHtml(cat.color || '#a3a3a3') + ';border:1px solid ' + escapeHtml(cat.color || '#a3a3a3') + '44;">' + escapeHtml(cat.icon || '📋') + ' ' + escapeHtml(cat.name) + '</span>'
+      : '<span class="cat-chip" style="background:#a3a3a322;color:#a3a3a3;border:1px solid #a3a3a344;">— غير مصنّف</span>';
+    var pm = paymentMethodLabel(e.payment_method);
+    html +=
+      '<tr>' +
+        '<td data-label="التاريخ">' + escapeHtml(fmtDate(e.date)) + '</td>' +
+        '<td data-label="التصنيف">' + catHtml + '</td>' +
+        '<td data-label="الوصف">' + escapeHtml(e.description || '—') + '</td>' +
+        '<td data-label="المورّد">' + escapeHtml(e.vendor || '—') + '</td>' +
+        '<td data-label="المبلغ"><span class="amount">' + fmtAmount(e.amount) + ' ل.س</span></td>' +
+        '<td data-label="طريقة الدفع">' + pm + '</td>' +
+        '<td data-label="إجراءات">' +
+          '<button class="act-btn" onclick="editExpense(\'' + e.id + '\')">✏️ تعديل</button>' +
+          '<button class="act-btn del" onclick="deleteExpense(\'' + e.id + '\')">🗑️ حذف</button>' +
+        '</td>' +
+      '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function paymentMethodLabel(m) {
+  if (m === 'cash') return '💵 نقد';
+  if (m === 'bank') return '🏦 بنكي';
+  if (m === 'check') return '📝 شيك';
+  if (m === 'other') return 'آخر';
+  return '—';
+}
+
+// ─── Render: categories grid ───────────────────────────────────────────────
+function renderCategories() {
+  var grid = $('catsGrid');
+  var empty = $('catsEmpty');
+  $('catsCount').textContent = categories.length;
+  if (categories.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  var html = '';
+  categories.forEach(function(c) {
+    var usageCount = expenses.filter(function(e){ return e.category_id === c.id; }).length;
+    var totalAmt = expenses.filter(function(e){ return e.category_id === c.id; })
+                            .reduce(function(s, e){ return s + (Number(e.amount) || 0); }, 0);
+    var inactiveCls = c.is_active === false ? ' inactive' : '';
+    var color = c.color || '#a3a3a3';
+    html +=
+      '<div class="cat-card' + inactiveCls + '">' +
+        '<div class="cat-head">' +
+          '<div class="cat-icon" style="background:' + escapeHtml(color) + '22;">' + escapeHtml(c.icon || '📋') + '</div>' +
+          '<div class="cat-info">' +
+            '<div class="cat-name">' + escapeHtml(c.name) + '</div>' +
+            '<div class="cat-stats">' + usageCount + ' مصروف • مجموع ' + fmtAmount(totalAmt) + ' ل.س</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="cat-actions">' +
+          '<button class="act-btn" onclick="editCategory(\'' + c.id + '\')">✏️ تعديل</button>' +
+          (c.is_active === false
+            ? '<button class="act-btn" onclick="toggleCategoryActive(\'' + c.id + '\', true)" style="color:var(--green);">↻ تفعيل</button>'
+            : '<button class="act-btn" onclick="toggleCategoryActive(\'' + c.id + '\', false)" style="color:var(--orange);">⏸ تعطيل</button>') +
+          '<button class="act-btn del" onclick="deleteCategory(\'' + c.id + '\')">🗑️ حذف</button>' +
+        '</div>' +
+      '</div>';
+  });
+  grid.innerHTML = html;
+}
+
+function populateCategoryDropdown() {
+  var sel = $('eCategory');
+  if (!sel) return;
+  sel.innerHTML = '';
+  // Only active categories appear in the expense modal — inactive ones still
+  // appear in historical rows (preserved via FK) but can't be assigned to
+  // new expenses. Owner can re-activate from the Categories tab.
+  categories.filter(function(c){ return c.is_active !== false; }).forEach(function(c) {
+    var opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = (c.icon || '📋') + ' ' + c.name;
+    sel.appendChild(opt);
+  });
+  if (sel.options.length === 0) {
+    var opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— لا توجد تصنيفات (أضف من تبويب التصنيفات) —';
+    sel.appendChild(opt);
+  }
+}
+
+// ─── Icon picker for category modal ───────────────────────────────────────
+var pickedIcon = '📋';
+function renderIconGrid() {
+  var grid = $('iconGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  ICON_OPTIONS.forEach(function(emoji) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-opt' + (emoji === pickedIcon ? ' selected' : '');
+    btn.textContent = emoji;
+    btn.onclick = function() {
+      pickedIcon = emoji;
+      // Update selection ring
+      Array.prototype.forEach.call(grid.children, function(c) {
+        c.classList.toggle('selected', c.textContent === emoji);
+      });
+    };
+    grid.appendChild(btn);
+  });
+}
+
+// ─── Color picker (uses SyDentColorPicker from supabase-init.js) ──────────
+var pickedColor = '#63b3ed';
+function _setCatColor(hex) {
+  if (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex) {
+    hex = window.SyDentColorPicker.sanitizeHex(hex);
+  }
+  pickedColor = hex;
+  $('cColor').value = hex;
+  var sw = $('cColorSwatch');
+  if (sw) sw.style.background = hex;
+}
+function openCatColorPicker() {
+  if (!window.SyDentColorPicker || !window.SyDentColorPicker.open) {
+    showToast('⚠️ منتقي الألوان غير متاح', true);
+    return;
+  }
+  window.SyDentColorPicker.open(pickedColor, function(hex) {
+    if (hex) _setCatColor(hex);
+  });
+}
+
+// ─── Expense modal ─────────────────────────────────────────────────────────
+function openExpenseModal() {
+  editingExpId = null;
+  $('expModalTitle').textContent = '+ مصروف جديد';
+  $('eDate').value = todayISO();
+  $('eAmount').value = '';
+  $('eDescription').value = '';
+  $('eVendor').value = '';
+  $('ePaymentMethod').value = 'cash';
+  $('eNotes').value = '';
+  // Default category: first active one, or empty if none
+  var firstActive = categories.find(function(c){ return c.is_active !== false; });
+  if (firstActive && $('eCategory').options.length > 0) {
+    $('eCategory').value = firstActive.id;
+  }
+  clearMsg('expMsg');
+  $('expModal').classList.add('show');
+  setTimeout(function(){ $('eAmount').focus(); }, 80);
+}
+
+function editExpense(id) {
+  var e = expenses.find(function(x){ return x.id === id; });
+  if (!e) { showToast('⚠️ المصروف غير موجود', true); return; }
+  editingExpId = id;
+  $('expModalTitle').textContent = '✏️ تعديل مصروف';
+  $('eDate').value = e.date || todayISO();
+  $('eAmount').value = e.amount || '';
+  $('eDescription').value = e.description || '';
+  $('eVendor').value = e.vendor || '';
+  $('ePaymentMethod').value = e.payment_method || 'cash';
+  $('eNotes').value = e.notes || '';
+  if (e.category_id) {
+    $('eCategory').value = e.category_id;
+  }
+  clearMsg('expMsg');
+  $('expModal').classList.add('show');
+}
+
+function closeExpModal() {
+  $('expModal').classList.remove('show');
+  editingExpId = null;
+}
+
+async function saveExpense() {
+  clearMsg('expMsg');
+  var date = $('eDate').value;
+  var amountRaw = $('eAmount').value;
+  var amount = amountRaw === '' ? null : parseInt(amountRaw, 10);
+  var categoryId = $('eCategory').value || null;
+  var description = ($('eDescription').value || '').trim() || null;
+  var vendor = ($('eVendor').value || '').trim() || null;
+  var paymentMethod = $('ePaymentMethod').value || 'cash';
+  var notes = ($('eNotes').value || '').trim() || null;
+
+  // Validation
+  if (!date) { showMsg('expMsg', 'التاريخ مطلوب', true); return; }
+  if (amount === null || isNaN(amount) || amount < 0) {
+    showMsg('expMsg', 'المبلغ يجب أن يكون رقماً موجباً', true);
+    return;
+  }
+  if (!categoryId) {
+    showMsg('expMsg', 'التصنيف مطلوب — أضف تصنيفاً من تبويب التصنيفات أولاً', true);
+    return;
+  }
+
+  var row = {
+    owner_id: currentUser.id,
+    date: date,
+    category_id: categoryId,
+    amount: amount,
+    description: description,
+    vendor: vendor,
+    payment_method: paymentMethod,
+    notes: notes
+  };
+
+  var res;
+  if (editingExpId) {
+    res = await window.sb.from('expenses')
+      .update(row)
+      .eq('id', editingExpId)
+      .eq('owner_id', currentUser.id)
+      .select().single();
+  } else {
+    res = await window.sb.from('expenses')
+      .insert(row)
+      .select().single();
+  }
+
+  if (res.error) {
+    console.error('saveExpense:', res.error);
+    showMsg('expMsg', 'فشل الحفظ: ' + (res.error.message || 'خطأ غير معروف'), true);
+    return;
+  }
+
+  // Audit log: fire-and-forget. action_types registered in supabase-init.js
+  // alert rules + audit-log.html label map. See Phase 5 audit registry.
+  if (window.logAudit) {
+    var catName = '';
+    var cat = categories.find(function(c){ return c.id === categoryId; });
+    if (cat) catName = cat.name;
+    window.logAudit(editingExpId ? 'expense.edit' : 'expense.create', {
+      entityId: res.data.id,
+      description: (editingExpId ? 'تعديل' : 'إضافة') + ' مصروف: ' +
+                   (description || catName || 'بدون وصف') +
+                   ' — ' + fmtAmount(amount) + ' ل.س',
+      newValue: { date: date, amount: amount, category: catName, vendor: vendor }
+    });
+  }
+
+  showToast(editingExpId ? '✓ تم التعديل' : '✓ تمت الإضافة');
+  closeExpModal();
+  await loadExpenses();
+  renderExpenses();
+  renderCategories();  // usage counts refresh
+}
+
+async function deleteExpense(id) {
+  var e = expenses.find(function(x){ return x.id === id; });
+  if (!e) return;
+  var msg = 'حذف مصروف بقيمة ' + fmtAmount(e.amount) + ' ل.س؟\n\n' +
+            'هذا الإجراء لا يمكن التراجع عنه.';
+  if (!confirm(msg)) return;
+  var res = await window.sb.from('expenses')
+    .delete()
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (res.error) {
+    showToast('⚠️ فشل الحذف: ' + (res.error.message || ''), true);
+    return;
+  }
+  if (window.logAudit) {
+    window.logAudit('expense.delete', {
+      entityId: id,
+      description: 'حذف مصروف بقيمة ' + fmtAmount(e.amount) + ' ل.س',
+      oldValue: { date: e.date, amount: e.amount, description: e.description, vendor: e.vendor }
+    });
+  }
+  showToast('✓ تم الحذف');
+  await loadExpenses();
+  renderExpenses();
+  renderCategories();
+}
+
+// ─── Category modal ────────────────────────────────────────────────────────
+function openCatModal() {
+  editingCatId = null;
+  $('catModalTitle').textContent = '+ تصنيف جديد';
+  $('cName').value = '';
+  pickedIcon = '📋';
+  _setCatColor('#63b3ed');
+  renderIconGrid();
+  clearMsg('catMsg');
+  $('catModal').classList.add('show');
+  setTimeout(function(){ $('cName').focus(); }, 80);
+}
+
+function editCategory(id) {
+  var c = categories.find(function(x){ return x.id === id; });
+  if (!c) { showToast('⚠️ التصنيف غير موجود', true); return; }
+  editingCatId = id;
+  $('catModalTitle').textContent = '✏️ تعديل تصنيف';
+  $('cName').value = c.name || '';
+  pickedIcon = c.icon || '📋';
+  _setCatColor(c.color || '#63b3ed');
+  renderIconGrid();
+  clearMsg('catMsg');
+  $('catModal').classList.add('show');
+}
+
+function closeCatModal() {
+  $('catModal').classList.remove('show');
+  editingCatId = null;
+}
+
+async function saveCategory() {
+  clearMsg('catMsg');
+  var name = ($('cName').value || '').trim();
+  if (!name) { showMsg('catMsg', 'الاسم مطلوب', true); return; }
+  if (name.length > 50) { showMsg('catMsg', 'الاسم طويل جداً (50 حرف كحد أقصى)', true); return; }
+
+  // Duplicate name check (case-insensitive, same Owner). Allow editing the
+  // current row even if name matches itself.
+  var dup = categories.find(function(c) {
+    return c.id !== editingCatId &&
+           (c.name || '').trim().toLowerCase() === name.toLowerCase();
+  });
+  if (dup) {
+    showMsg('catMsg', 'يوجد تصنيف بنفس الاسم بالفعل', true);
+    return;
+  }
+
+  var row = {
+    owner_id: currentUser.id,
+    name: name,
+    icon: pickedIcon,
+    color: pickedColor
+  };
+  // sort_order: append at the end for new rows; preserve for edits.
+  if (!editingCatId) {
+    var maxOrder = categories.reduce(function(m, c){ return Math.max(m, c.sort_order || 0); }, 0);
+    row.sort_order = maxOrder + 1;
+  }
+
+  var res;
+  if (editingCatId) {
+    res = await window.sb.from('expense_categories')
+      .update(row)
+      .eq('id', editingCatId)
+      .eq('owner_id', currentUser.id)
+      .select().single();
+  } else {
+    res = await window.sb.from('expense_categories')
+      .insert(row)
+      .select().single();
+  }
+
+  if (res.error) {
+    console.error('saveCategory:', res.error);
+    showMsg('catMsg', 'فشل الحفظ: ' + (res.error.message || ''), true);
+    return;
+  }
+
+  if (window.logAudit) {
+    window.logAudit(editingCatId ? 'expense_category.edit' : 'expense_category.create', {
+      entityId: res.data.id,
+      description: (editingCatId ? 'تعديل' : 'إضافة') + ' تصنيف مصاريف: ' + name,
+      newValue: { name: name, icon: pickedIcon, color: pickedColor }
+    });
+  }
+
+  showToast(editingCatId ? '✓ تم التعديل' : '✓ تمت الإضافة');
+  closeCatModal();
+  await loadCategories();
+  renderCategories();
+  renderCategoryFilters();
+  populateCategoryDropdown();
+}
+
+async function toggleCategoryActive(id, makeActive) {
+  var c = categories.find(function(x){ return x.id === id; });
+  if (!c) return;
+  var res = await window.sb.from('expense_categories')
+    .update({ is_active: makeActive })
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (res.error) {
+    showToast('⚠️ فشل: ' + (res.error.message || ''), true);
+    return;
+  }
+  if (window.logAudit) {
+    window.logAudit('expense_category.edit', {
+      entityId: id,
+      description: (makeActive ? 'تفعيل' : 'تعطيل') + ' تصنيف: ' + c.name,
+      oldValue: { is_active: !makeActive },
+      newValue: { is_active: makeActive }
+    });
+  }
+  showToast(makeActive ? '✓ تم التفعيل' : '✓ تم التعطيل');
+  await loadCategories();
+  renderCategories();
+  renderCategoryFilters();
+  populateCategoryDropdown();
+}
+
+async function deleteCategory(id) {
+  var c = categories.find(function(x){ return x.id === id; });
+  if (!c) return;
+  var usage = expenses.filter(function(e){ return e.category_id === id; }).length;
+  var msg;
+  if (usage > 0) {
+    msg = 'هذا التصنيف مستخدم في ' + usage + ' مصروف.\n\n' +
+          'عند الحذف، المصاريف الـ ' + usage + ' ستصبح "غير مصنّفة" لكن لن تُحذف.\n\n' +
+          'هل تريد المتابعة؟ (يمكنك بدلاً من ذلك تعطيل التصنيف).';
+  } else {
+    msg = 'حذف التصنيف "' + c.name + '"؟';
+  }
+  if (!confirm(msg)) return;
+
+  var res = await window.sb.from('expense_categories')
+    .delete()
+    .eq('id', id)
+    .eq('owner_id', currentUser.id);
+  if (res.error) {
+    showToast('⚠️ فشل الحذف: ' + (res.error.message || ''), true);
+    return;
+  }
+  if (window.logAudit) {
+    window.logAudit('expense_category.delete', {
+      entityId: id,
+      description: 'حذف تصنيف مصاريف: ' + c.name + (usage > 0 ? ' (' + usage + ' مصروف أصبح غير مصنّف)' : ''),
+      oldValue: { name: c.name, icon: c.icon, color: c.color }
+    });
+  }
+  showToast('✓ تم الحذف');
+  if (filterCatId === id) filterCatId = 'all';
+  await loadCategories();
+  await loadExpenses();  // category_id became null for affected expenses
+  renderCategories();
+  renderCategoryFilters();
+  renderExpenses();
+  populateCategoryDropdown();
+}
+
+// ─── Click-outside to close modals ─────────────────────────────────────────
+window.addEventListener('click', function(ev) {
+  if (ev.target === $('expModal')) closeExpModal();
+  if (ev.target === $('catModal')) closeCatModal();
+});
+
+// ─── Bootstrap ─────────────────────────────────────────────────────────────
+init();
+</script>
+
+</body>
+</html>

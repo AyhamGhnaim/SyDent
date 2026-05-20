@@ -413,6 +413,8 @@ var ACTION_TYPES_BY_PREFIX = {
   doctor:      ['doctor.create', 'doctor.edit', 'doctor.delete'],
   employee:    ['employee.create', 'employee.edit', 'employee.toggle_active', 'employee.delete'],
   operatory:   ['operatory.create', 'operatory.edit', 'operatory.delete'],
+  expense:     ['expense.create', 'expense.edit', 'expense.delete'],
+  expense_category: ['expense_category.create', 'expense_category.edit', 'expense_category.delete'],
   settings:    ['settings.change_pin', 'settings.archive_audit'],
   lock:        ['lock.role_switch', 'lock.pin_clear']
 };
@@ -458,6 +460,7 @@ function actionTypeLabel(t) {
   var entityMap = {
     patient:'مريض', appointment:'موعد', appointment_type:'قالب موعد', session:'جلسة', payment:'دفعة',
     lab:'مخبر', doctor:'طبيب', employee:'موظف', operatory:'غرفة',
+    expense:'مصروف', expense_category:'تصنيف مصاريف',
     settings:'إعدادات', lock:'قفل'
   };
   var opMap = {
