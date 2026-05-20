@@ -4133,10 +4133,11 @@ async function submitAppt(e) {
         delete strippedOpIns.dismissed_at;
         delete strippedOpIns.confirmation_status;
       }
-      // If the Gap 8 retry would also be needed (very unlikely but possible),
-      // strip appointment_type_id too — Gap 8 is much older so this is just
-      // defensive.
-      if (strippedOpIns.appointment_type_id === null) delete strippedOpIns.appointment_type_id;
+      // Note: appointment_type_id is intentionally kept here. If Gap 8 isn't
+      // applied either, the INSERT will fail and the Gap 8 retry path
+      // (which runs BEFORE Phase 6 K's path) would have already stripped it.
+      // The unusual case of Phase 6 K-only failure means appointment_type_id
+      // is valid, so we don't strip it.
       ins = await window.sb.from('appointments').insert(strippedOpIns).select().single();
     }
     if (ins.error) {
