@@ -908,10 +908,12 @@ textarea { resize: vertical; min-height: 72px; }
         <!-- Phase 6 K (Migration 12): operatory picker. Hidden by default —
              JS shows it only when at least one active operatory exists OR
              we're editing an appointment that's already linked to one
-             (incl. an inactive operatory, so the user can clear/change). -->
+             (incl. an inactive operatory, so the user can clear/change).
+             K-bug-fix: onchange auto-syncs the provider picker to the
+             operatory's default_provider_id (Option B — always replace). -->
         <div class="form-group" id="fOperatoryGroup" style="display:none;">
           <label>🏥 الغرفة</label>
-          <select id="fOperatory">
+          <select id="fOperatory" onchange="onOperatoryChange()">
             <option value="">— بدون تخصيص —</option>
           </select>
         </div>
@@ -3095,6 +3097,39 @@ function populateOperatoryPicker(preselectId) {
   group.style.display = shouldShow ? 'block' : 'none';
 
   sel.value = preselectId || '';
+}
+
+// Phase 6 K bug-fix: when the user picks an operatory from the dropdown,
+// auto-sync the provider picker to the operatory's default_provider_id.
+// Behavior choice (Option B — always replace): the user picked the chair
+// deliberately, so the chair's default doctor wins over whatever was in
+// the provider picker before. This mirrors how applyTemplate handles the
+// template > operatory provider chain.
+//
+// Safety guards:
+//   • Empty operatory ("— بدون تخصيص —") → leave provider untouched
+//     (user is clearing the chair, not declaring a doctor preference)
+//   • Operatory has no default_provider_id → leave provider untouched
+//   • Provider option not in dropdown (deactivated/missing) → no-op
+//     (the picker shouldn't suddenly point to a doctor it can't render)
+function onOperatoryChange() {
+  var opSel = document.getElementById('fOperatory');
+  var provSel = document.getElementById('fProvider');
+  if (!opSel || !provSel) return;
+  var opId = opSel.value;
+  if (!opId) return;  // cleared — keep current provider
+  // Look up the chosen operatory in the full list (active or ghost).
+  var op = null;
+  for (var i = 0; i < OPERATORIES_ALL.length; i++) {
+    if (OPERATORIES_ALL[i].id === opId) { op = OPERATORIES_ALL[i]; break; }
+  }
+  if (!op || !op.default_provider_id) return;  // no default doctor
+  // Verify the target provider exists as an <option> before assignment.
+  var hasOpt = false;
+  for (var j = 0; j < provSel.options.length; j++) {
+    if (provSel.options[j].value === op.default_provider_id) { hasOpt = true; break; }
+  }
+  if (hasOpt) provSel.value = op.default_provider_id;
 }
 
 /* Render attached procedures + the dropdown of planned procedures available to attach. */
