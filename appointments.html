@@ -236,6 +236,157 @@ body {
 }
 .slot-empty { min-height: 64px; }
 
+/* ─── Phase 6 K3: Day view by Chair (Operatory columns grid) ─────────────────
+   The chair view replaces the timeline list with a 2D grid: time on the
+   Y axis, operatory columns on the X axis. Each appointment is positioned
+   absolutely inside its operatory column so we can size by duration.
+   The whole thing scrolls horizontally on narrow viewports.
+
+   View toggle button styling lives in the header. The grid is a flexbox
+   of (time-column + N operatory columns). Each column uses position:relative
+   to anchor absolute appointment blocks against. Time-row heights are CSS
+   custom properties so we can tweak in one place (--k3-row-height = 60px
+   for the MVP — 30-minute slots × 60px = 1440px for an 8am-8pm day, which
+   is the natural scroll height on a typical desktop). */
+
+.k3-view-toggle {
+  display: inline-flex; gap: 4px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  margin-right: auto;  /* push to start of header in RTL */
+}
+.k3-view-toggle button {
+  background: transparent; color: var(--text2);
+  border: none; padding: 6px 12px; border-radius: 6px;
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.k3-view-toggle button.active {
+  background: var(--accent, #2ee89e);
+  color: #0a1628;
+}
+
+.k3-chair-grid {
+  /* The grid root — sets row height for absolutely-positioned children */
+  --k3-row-height: 60px;        /* one 30-min slot = 60px tall */
+  --k3-time-col-width: 64px;    /* matches existing .slot-time width */
+  --k3-min-col-width: 180px;    /* each chair column ≥ this wide */
+  position: relative;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;             /* horizontal scroll for many chairs */
+  overflow-y: visible;
+}
+.k3-chair-grid-inner {
+  display: flex;
+  min-width: 100%;
+}
+.k3-time-col {
+  width: var(--k3-time-col-width);
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-left: 1px solid var(--border);
+  position: sticky; right: 0;   /* in RTL, sticky-right = leading edge */
+  z-index: 2;
+}
+.k3-chair-col {
+  flex: 1 1 var(--k3-min-col-width);
+  min-width: var(--k3-min-col-width);
+  position: relative;
+  border-left: 1px solid var(--border);
+}
+.k3-chair-col:last-child { border-left: none; }
+.k3-col-header {
+  height: 44px;
+  padding: 8px 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
+  position: sticky; top: 0; z-index: 1;
+}
+.k3-col-header-swatch {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.k3-col-header.k3-col-unassigned {
+  background: rgba(141,160,189,0.12);
+  color: var(--text2);
+}
+.k3-time-cell {
+  height: var(--k3-row-height);
+  padding: 6px 8px;
+  font-size: 11px; font-weight: 700; color: var(--text2);
+  text-align: center;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.k3-slot-cell {
+  height: var(--k3-row-height);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background-color .12s;
+}
+/* Drag-target highlight — applied via JS on dragover */
+.k3-slot-cell.k3-drag-over {
+  background: rgba(46,232,158,0.18);
+  outline: 1px dashed rgba(46,232,158,0.6);
+  outline-offset: -1px;
+}
+.k3-appt {
+  position: absolute;
+  /* left/top/height set inline per appointment */
+  right: 6px; left: 6px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-right: 3px solid;
+  font-size: 12px;
+  overflow: hidden;
+  user-select: none;
+  transition: transform .12s, box-shadow .12s;
+}
+.k3-appt:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.k3-appt.k3-dragging {
+  opacity: 0.5;
+}
+.k3-appt-name {
+  font-weight: 700; font-size: 12px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.k3-appt-meta {
+  font-size: 10px; color: var(--text2); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.k3-appt-conflict {
+  outline: 2px solid #ef5350;
+  outline-offset: -2px;
+}
+.k3-conflict-badge {
+  display: inline-block;
+  background: rgba(239,83,80,0.25); color: #ef5350;
+  border: 1px solid #ef535080;
+  padding: 1px 6px; border-radius: 8px;
+  font-size: 10px; font-weight: 700;
+  margin-right: 4px;
+}
+.k3-empty-state {
+  padding: 60px 20px; text-align: center; color: var(--text2);
+}
+
+/* Mobile: chair view is hidden under 700px since stacked columns become
+   unreadable. Users on phones fall back to the list view automatically
+   via JS (the toggle button hides itself on small viewports). */
+@media (max-width: 700px) {
+  .k3-view-toggle { display: none; }
+  .k3-chair-grid { display: none; }
+}
+
 .appt-block {
   border-radius: 8px;
   padding: 8px 12px;
@@ -807,8 +958,18 @@ textarea { resize: vertical; min-height: 72px; }
           <div class="day-title" id="dayTitle">—</div>
           <div class="day-subtitle" id="daySubtitle"></div>
         </div>
+        <!-- Phase 6 K3: toggle between list and chair (operatory columns)
+             views. Hidden by JS when no operatories exist or only one
+             exists (chair view is meaningless then) or on mobile. The
+             selected mode persists in localStorage per device. -->
+        <div class="k3-view-toggle" id="k3ViewToggle" style="display:none;">
+          <button type="button" id="k3BtnList"  onclick="setDayViewMode('list')"  class="active">📋 قائمة</button>
+          <button type="button" id="k3BtnChair" onclick="setDayViewMode('chair')">🪑 حسب الكرسي</button>
+        </div>
       </div>
       <div class="timeline" id="timeline"></div>
+      <!-- Phase 6 K3 chair grid — rendered only when mode='chair'. -->
+      <div class="k3-chair-grid" id="k3ChairGrid" style="display:none;"></div>
     </div>
 
     <!-- List View -->
@@ -2723,7 +2884,14 @@ function _renderApptTypeLabHint(t) {
 // ─── Render ──────────────────────────────────────────
 function render() {
   if (view==='month') renderMonth();
-  else if (view==='day') renderDay();
+  else if (view==='day') {
+    renderDay();
+    // Phase 6 K3: refresh toggle visibility (operatories may have changed)
+    // and apply the persisted view mode. _applyK3ViewMode handles both
+    // showing the right element and triggering renderDayByChair when needed.
+    _refreshK3ToggleVisibility();
+    _applyK3ViewMode(getDayViewMode());
+  }
   else renderList();
 }
 
@@ -2841,6 +3009,423 @@ function renderDay() {
   }
   document.getElementById('timeline').innerHTML = html;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 6 K3: Day view by Chair (Operatory columns)
+// ───────────────────────────────────────────────────────────────────────────
+// The chair view is an alternate Day rendering: time on Y, operatories on X.
+// Users toggle between '📋 قائمة' (the original list-style timeline) and
+// '🪑 حسب الكرسي' (this chair grid) via the buttons in the day header.
+//
+// The mode persists in localStorage (per device) — common UX for view-mode
+// preferences. Defaults to 'list' on first use. The toggle hides itself when
+// the chair view wouldn't add value (no operatories, only one operatory,
+// mobile viewport).
+//
+// Drag-and-drop: HTML5 drag API. Each appointment block is draggable; each
+// 30-min slot cell is a drop target. On drop, we update operatory_id and/or
+// time in the appointments table and reload.
+// ═══════════════════════════════════════════════════════════════════════════
+
+var K3_VIEW_MODE_KEY = 'sydent_day_view_mode';   // 'list' | 'chair'
+var K3_ROW_MINUTES = 30;                          // each row = 30 min
+var K3_ROW_HEIGHT_PX = 60;                        // matches --k3-row-height
+var K3_DEFAULT_START_HOUR = 8;                    // 8 am
+var K3_DEFAULT_END_HOUR = 20;                     // 8 pm
+
+function getDayViewMode() {
+  try {
+    var m = localStorage.getItem(K3_VIEW_MODE_KEY);
+    return (m === 'chair') ? 'chair' : 'list';
+  } catch (e) { return 'list'; }
+}
+
+function setDayViewMode(mode) {
+  var safe = (mode === 'chair') ? 'chair' : 'list';
+  try { localStorage.setItem(K3_VIEW_MODE_KEY, safe); } catch (e) {}
+  _applyK3ViewMode(safe);
+}
+
+// Wires the visible state of the timeline / chair grid + toggle buttons to
+// match the requested mode. Called from setDayViewMode and from renderDay
+// (whenever the day is re-rendered).
+function _applyK3ViewMode(mode) {
+  var listBtn  = document.getElementById('k3BtnList');
+  var chairBtn = document.getElementById('k3BtnChair');
+  var timelineEl = document.getElementById('timeline');
+  var chairEl   = document.getElementById('k3ChairGrid');
+  // Mobile guard: chair view is hidden by CSS @media under 700px. If we let
+  // the timeline hide while the chair grid is also CSS-hidden, the user
+  // sees a blank Day view. Force list mode on small viewports — the user's
+  // saved preference is preserved in localStorage so it returns on desktop.
+  if (window.innerWidth && window.innerWidth < 700) mode = 'list';
+  if (listBtn)  listBtn.classList.toggle('active', mode === 'list');
+  if (chairBtn) chairBtn.classList.toggle('active', mode === 'chair');
+  if (mode === 'chair') {
+    if (timelineEl) timelineEl.style.display = 'none';
+    if (chairEl)    chairEl.style.display = '';
+    renderDayByChair();
+  } else {
+    if (timelineEl) timelineEl.style.display = '';
+    if (chairEl)    chairEl.style.display = 'none';
+    // renderDay() has already painted #timeline; nothing else to do.
+  }
+}
+
+// Decides whether the toggle button block should be visible. Rules:
+//   • Hidden if operatories table is missing (pre-migration).
+//   • Hidden if there are <2 active operatories (chair view = list view).
+//   • Always hidden on mobile (CSS handles that via @media).
+function _refreshK3ToggleVisibility() {
+  var toggleEl = document.getElementById('k3ViewToggle');
+  if (!toggleEl) return;
+  var nOps = (OPERATORIES && OPERATORIES.length) ? OPERATORIES.length : 0;
+  var show = !_operatoriesMissingFlag && nOps >= 2;
+  toggleEl.style.display = show ? '' : 'none';
+  if (!show) {
+    // Force list mode if chair view is no longer available — prevents the
+    // chair grid from rendering as an orphan on the next day switch.
+    var mode = getDayViewMode();
+    if (mode === 'chair') _applyK3ViewMode('list');
+  }
+}
+
+// Parse "HH:MM" → minutes since midnight. Robust to undefined/null.
+function _k3ParseTime(t) {
+  if (!t || typeof t !== 'string') return NaN;
+  var parts = t.split(':');
+  if (parts.length < 2) return NaN;
+  var h = parseInt(parts[0], 10);
+  var m = parseInt(parts[1], 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
+  return h * 60 + m;
+}
+
+// minutes → "HH:MM" zero-padded.
+function _k3FormatTime(mins) {
+  var h = Math.floor(mins / 60);
+  var m = mins % 60;
+  return (h < 10 ? '0' + h : '' + h) + ':' + (m < 10 ? '0' + m : '' + m);
+}
+
+// Compute the [startMin, endMin] range to show on screen. Expand the default
+// 8 am-8 pm window if any appointment falls outside. Always snap to whole hours.
+function _k3ComputeRange(dayEvts) {
+  var startMin = K3_DEFAULT_START_HOUR * 60;
+  var endMin   = K3_DEFAULT_END_HOUR * 60;
+  dayEvts.forEach(function(e){
+    var t = _k3ParseTime(e.time);
+    if (!Number.isFinite(t)) return;
+    var dur = parseInt(e.duration, 10);
+    if (!Number.isFinite(dur) || dur <= 0) dur = 30;
+    var apptEnd = t + dur;
+    if (t < startMin) startMin = Math.floor(t / 60) * 60;
+    if (apptEnd > endMin) endMin = Math.ceil(apptEnd / 60) * 60;
+  });
+  return { startMin: startMin, endMin: endMin };
+}
+
+// Main chair-view renderer. Called whenever the chair grid needs a repaint
+// (day change, appointment edit/move, mode switch into chair).
+function renderDayByChair() {
+  var gridEl = document.getElementById('k3ChairGrid');
+  if (!gridEl) return;
+  var ds = dateStr(selectedDate);
+  var dayEvts = apptsByDate(ds);
+
+  // Empty-day state.
+  if (!dayEvts.length) {
+    gridEl.innerHTML = '<div class="k3-empty-state"><div style="font-size:48px;margin-bottom:12px;">📅</div><div>لا توجد مواعيد لهذا اليوم</div></div>';
+    return;
+  }
+
+  // Build the list of columns: active operatories (sorted) + "بدون تخصيص"
+  // (always shown, per Ayham's K3 decision). Defensive: if OPERATORIES is
+  // unavailable, fall back to just the unassigned column so the day is still
+  // visible — better than an empty grid.
+  var cols = [];
+  (OPERATORIES || []).forEach(function(op){
+    cols.push({
+      type: 'operatory',
+      id: op.id,
+      name: op.name || '[غرفة]',
+      color: (op.color && /^#[0-9A-Fa-f]{6}$/.test(op.color)) ? op.color : '#8da0bd'
+    });
+  });
+  cols.push({
+    type: 'unassigned',
+    id: null,
+    name: 'بدون تخصيص',
+    color: '#8da0bd'
+  });
+
+  // Compute visible time range.
+  var range = _k3ComputeRange(dayEvts);
+  var totalMins = range.endMin - range.startMin;
+  var rowCount = Math.ceil(totalMins / K3_ROW_MINUTES);
+
+  // ── Build HTML ─────────────────────────────────────────────────────────
+  var html = '<div class="k3-chair-grid-inner">';
+
+  // Time column (leading edge — uses position:sticky in RTL).
+  html += '<div class="k3-time-col">';
+  html += '<div class="k3-col-header" style="justify-content:center;color:var(--text2);">⏰</div>';
+  for (var r = 0; r < rowCount; r++) {
+    var slotMin = range.startMin + r * K3_ROW_MINUTES;
+    html += '<div class="k3-time-cell">' + escapeHtml(_k3FormatTime(slotMin)) + '</div>';
+  }
+  html += '</div>';
+
+  // Chair columns.
+  cols.forEach(function(col, colIdx){
+    var unassignedCls = (col.type === 'unassigned') ? ' k3-col-unassigned' : '';
+    var headerLabel = escapeHtml(col.name);
+    var swatchHtml = (col.type === 'operatory')
+      ? '<span class="k3-col-header-swatch" style="background:' + escapeHtml(col.color) + ';"></span>'
+      : '<span style="font-size:13px;">⚪</span>';
+    html += '<div class="k3-chair-col" data-col-idx="' + colIdx + '"';
+    if (col.type === 'operatory') html += ' data-operatory-id="' + escapeHtml(col.id) + '"';
+    html += '>';
+    html += '<div class="k3-col-header' + unassignedCls + '">' + swatchHtml + headerLabel + '</div>';
+    // Empty slot cells (drop targets) — one per 30-min row.
+    for (var r2 = 0; r2 < rowCount; r2++) {
+      var slotMin2 = range.startMin + r2 * K3_ROW_MINUTES;
+      html += '<div class="k3-slot-cell" data-slot-min="' + slotMin2 + '"'
+            + ' ondragover="onK3SlotDragOver(event, this)"'
+            + ' ondragleave="onK3SlotDragLeave(event, this)"'
+            + ' ondrop="onK3SlotDrop(event, this)"></div>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+  gridEl.innerHTML = html;
+
+  // ── Place appointments absolutely inside their columns ─────────────────
+  // Per-column conflict detection: track all appointments in each column,
+  // sorted by start time, then flag any pair that overlaps.
+  var apptsByCol = {};  // colIdx → [{appt, startMin, endMin}]
+  cols.forEach(function(_, idx){ apptsByCol[idx] = []; });
+
+  dayEvts.forEach(function(e){
+    var startMin = _k3ParseTime(e.time);
+    if (!Number.isFinite(startMin)) {
+      // Appointment with no time — skip (shouldn't reach here for a scheduled
+      // appt, but defensive). Could go into unassigned column with a sentinel.
+      return;
+    }
+    var dur = parseInt(e.duration, 10);
+    if (!Number.isFinite(dur) || dur <= 0) dur = 30;
+    var endMin = startMin + dur;
+
+    // Pick column: operatory match by id, else "unassigned".
+    var targetIdx = cols.length - 1;  // default = unassigned (last column)
+    if (e.operatory_id) {
+      for (var ci = 0; ci < cols.length; ci++) {
+        if (cols[ci].type === 'operatory' && cols[ci].id === e.operatory_id) {
+          targetIdx = ci;
+          break;
+        }
+      }
+      // If operatory_id was set but no match (deleted operatory), fall through
+      // to unassigned. Visually identical to a no-operatory appt.
+    }
+    apptsByCol[targetIdx].push({ appt: e, startMin: startMin, endMin: endMin });
+  });
+
+  // Detect conflicts inside each column.
+  var conflictIds = {};
+  Object.keys(apptsByCol).forEach(function(idxKey){
+    var arr = apptsByCol[idxKey].slice().sort(function(a,b){ return a.startMin - b.startMin; });
+    for (var i = 0; i < arr.length; i++) {
+      for (var j = i + 1; j < arr.length; j++) {
+        if (arr[j].startMin < arr[i].endMin) {
+          // overlap
+          conflictIds[arr[i].appt.id] = true;
+          conflictIds[arr[j].appt.id] = true;
+        } else {
+          break;  // sorted by start → no later one can overlap arr[i]
+        }
+      }
+    }
+  });
+
+  // Append the appointment blocks. We do this in JS (not in the initial
+  // innerHTML) because we set inline top/height per-appt and attach drag
+  // listeners that need real DOM refs.
+  Object.keys(apptsByCol).forEach(function(idxKey){
+    var colIdx = parseInt(idxKey, 10);
+    var colEl = gridEl.querySelector('.k3-chair-col[data-col-idx="' + colIdx + '"]');
+    if (!colEl) return;
+    apptsByCol[idxKey].forEach(function(item){
+      var e = item.appt;
+      var topPx = ((item.startMin - range.startMin) / K3_ROW_MINUTES) * K3_ROW_HEIGHT_PX
+                + 44;  // 44 = header height
+      var heightPx = Math.max(
+        24,  // minimum readable
+        ((item.endMin - item.startMin) / K3_ROW_MINUTES) * K3_ROW_HEIGHT_PX - 4
+      );
+      var bc = getApptColor(e);
+      var bgA = (typeof hexA === 'function') ? hexA(bc.fill, 0.18) : (bc.fill + '2e');
+      var block = document.createElement('div');
+      block.className = 'k3-appt' + (conflictIds[e.id] ? ' k3-appt-conflict' : '');
+      block.draggable = true;
+      block.dataset.apptId = e.id;
+      block.style.top = topPx + 'px';
+      block.style.height = heightPx + 'px';
+      block.style.background = bgA;
+      block.style.borderRightColor = bc.fill;
+      var conflictBadge = conflictIds[e.id]
+        ? '<span class="k3-conflict-badge">⚠️ تعارض</span>'
+        : '';
+      var safeName = escapeHtml(e.patient_name || '—');
+      var safeType = escapeHtml(e.type || '—');
+      var timeStr = (e.time || '').slice(0, 5);
+      var dur = parseInt(e.duration, 10) || 30;
+      block.innerHTML = ''
+        + '<div class="k3-appt-name">' + conflictBadge + safeName + '</div>'
+        + '<div class="k3-appt-meta">' + escapeHtml(timeStr) + ' • ' + dur + 'د • ' + safeType + '</div>';
+      // Click → open edit modal. Drag is separate (HTML5 drag never fires
+      // a click after drag, so the two don't conflict).
+      block.addEventListener('click', function(){ editAppt(e.id); });
+      // Drag events.
+      block.addEventListener('dragstart', onK3ApptDragStart);
+      block.addEventListener('dragend',   onK3ApptDragEnd);
+      colEl.appendChild(block);
+    });
+  });
+}
+
+// Drag state. We use a module-scope var instead of dataTransfer payload only,
+// so we have synchronous access to the dragged appointment in dragover (which
+// needs to decide whether to highlight the target — but more importantly, so
+// we can read the duration when computing the drop's new end time).
+var _k3DragApptId = null;
+
+function onK3ApptDragStart(ev) {
+  var el = ev.currentTarget || ev.target;
+  if (!el || !el.dataset || !el.dataset.apptId) return;
+  _k3DragApptId = el.dataset.apptId;
+  el.classList.add('k3-dragging');
+  // Setting dataTransfer is required for Firefox to actually fire the drop.
+  try {
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', _k3DragApptId);
+  } catch (e) { /* some browsers throw on setData — non-fatal */ }
+}
+
+function onK3ApptDragEnd(ev) {
+  var el = ev.currentTarget || ev.target;
+  if (el && el.classList) el.classList.remove('k3-dragging');
+  // Clear any stuck drag-over highlights (some browsers skip dragleave on drop).
+  var stuck = document.querySelectorAll('.k3-drag-over');
+  for (var i = 0; i < stuck.length; i++) stuck[i].classList.remove('k3-drag-over');
+  _k3DragApptId = null;
+}
+
+function onK3SlotDragOver(ev, cellEl) {
+  if (!_k3DragApptId) return;  // not our drag
+  ev.preventDefault();          // required to allow drop
+  try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
+  if (cellEl && cellEl.classList) cellEl.classList.add('k3-drag-over');
+}
+
+function onK3SlotDragLeave(ev, cellEl) {
+  if (cellEl && cellEl.classList) cellEl.classList.remove('k3-drag-over');
+}
+
+async function onK3SlotDrop(ev, cellEl) {
+  ev.preventDefault();
+  if (cellEl && cellEl.classList) cellEl.classList.remove('k3-drag-over');
+  var apptId = _k3DragApptId;
+  if (!apptId) return;
+
+  // Read target operatory + target start time from the cell's parent column.
+  var colEl = cellEl.closest('.k3-chair-col');
+  if (!colEl) return;
+  var newOperatoryId = colEl.dataset.operatoryId || null;  // null = unassigned column
+  var newSlotMin = parseInt(cellEl.dataset.slotMin, 10);
+  if (!Number.isFinite(newSlotMin)) return;
+  var newTime = _k3FormatTime(newSlotMin);  // "HH:MM"
+
+  // Defensive: refuse to move inactive-doctor's appointments per the global
+  // pattern used elsewhere on this page.
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن نقل المواعيد');
+    return;
+  }
+
+  // Find the dragged appointment in our local state.
+  var appt = appointments.find(function(a){ return a.id === apptId; });
+  if (!appt) {
+    showToast('⚠️ الموعد غير موجود — أعد التحميل');
+    return;
+  }
+
+  // Decide if anything actually changed. Both operatory_id and time can
+  // change independently; if both are identical to current state, treat as
+  // a no-op (user just dropped onto the same slot — common when releasing).
+  var oldOp = appt.operatory_id || null;
+  var oldTime = (appt.time || '').slice(0, 5);
+  var sameOp = (oldOp === newOperatoryId);
+  var sameTime = (oldTime === newTime);
+  if (sameOp && sameTime) return;
+
+  // Build the update payload — only what changed, to keep audit clean.
+  var patch = {};
+  if (!sameOp)   patch.operatory_id = newOperatoryId;
+  if (!sameTime) patch.time = newTime + ':00';   // DB stores HH:MM:SS
+
+  try {
+    var res = await window.sb.from('appointments')
+      .update(patch)
+      .eq('id', apptId)
+      .eq('doctor_id', currentUser.id);  // RLS belt-and-braces
+    if (res.error) {
+      console.warn('K3 drop update:', res.error);
+      showToast('❌ فشل نقل الموعد: ' + (res.error.message || ''));
+      return;
+    }
+  } catch (e) {
+    console.warn('K3 drop exception:', e);
+    showToast('❌ فشل نقل الموعد');
+    return;
+  }
+
+  // Audit log — best-effort, never blocks the user.
+  if (window.logAudit) {
+    var oldOpName = '';
+    var newOpName = '';
+    (OPERATORIES_ALL || []).forEach(function(o){
+      if (o.id === oldOp) oldOpName = o.name || '';
+      if (o.id === newOperatoryId) newOpName = o.name || '';
+    });
+    window.logAudit('appointment.edit', {
+      entityId: apptId,
+      patientId: appt.patient_id || null,
+      patientName: appt.patient_name || null,
+      description: 'نقل عبر سحب وإفلات في عرض الكراسي',
+      oldValue: {
+        operatory_id: oldOp,
+        operatory_name: oldOpName,
+        time: appt.time || null
+      },
+      newValue: {
+        operatory_id: newOperatoryId,
+        operatory_name: newOpName,
+        time: patch.time || appt.time || null
+      }
+    });
+  }
+
+  showToast('✅ تم نقل الموعد');
+  // Reload + repaint. Cheaper than mutating local state because there's only
+  // one DB row in flight; the full reload also catches any concurrent edits
+  // from another tab.
+  await loadAppointments();
+  render();
+}
+
 
 function renderList() {
   document.getElementById('calMonth').textContent = MONTHS_AR[currentDate.getMonth()]+' '+currentDate.getFullYear();
