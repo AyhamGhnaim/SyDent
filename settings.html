@@ -662,7 +662,18 @@ textarea::placeholder { color: var(--text2); }
     <div class="form-group">
       <label>لون مميّز</label>
       <div style="display:flex;align-items:center;gap:10px;">
-        <input type="color" id="fOpColor" value="#2ee89e" style="width:50px;height:40px;padding:2px;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:transparent;">
+        <!-- Phase 6 K2.1: replaced <input type="color"> with a custom swatch
+             button. The native picker varies wildly by OS (tiny RGB-only on
+             Windows Chrome/Brave vs. the full panel on iOS). Our shared
+             SyDentColorPicker (defined in supabase-init.js) emulates the iOS
+             Grid/Spectrum/Sliders experience everywhere. The hidden input
+             below preserves the existing get/set API (.value) so all the
+             code in saveOperatory / openOperatoryModal / editOperatory keeps
+             working without any changes. -->
+        <input type="hidden" id="fOpColor" value="#2ee89e">
+        <button type="button" id="fOpColorSwatch" onclick="openOpColorPicker()"
+                aria-label="اختيار اللون"
+                style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
         <span style="font-size:12px;color:var(--text-muted);">يُستخدم لاحقاً في عرض جدول الغرف</span>
       </div>
     </div>
@@ -1948,12 +1959,42 @@ function openOperatoryModal() {
   _editingOperatoryId = null;
   document.getElementById('operatoryModalTitle').textContent = 'إضافة غرفة جديدة';
   document.getElementById('fOpName').value = '';
-  document.getElementById('fOpColor').value = '#2ee89e';
+  _setOpColor('#2ee89e');
   populateOperatoryProviderSelect();
   document.getElementById('fOpDefaultProvider').value = '';
   document.getElementById('fOpActive').checked = true;
   document.getElementById('operatoryModal').classList.add('open');
   setTimeout(function() { document.getElementById('fOpName').focus(); }, 50);
+}
+
+// Phase 6 K2.1: keeps the hidden #fOpColor input and the visible swatch
+// button in sync. All call sites (open/edit/picker callback) go through
+// this single helper so the two are guaranteed to never drift apart.
+function _setOpColor(hex) {
+  var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
+    ? window.SyDentColorPicker.sanitizeHex(hex)
+    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : '#2ee89e');
+  document.getElementById('fOpColor').value = safe;
+  var sw = document.getElementById('fOpColorSwatch');
+  if (sw) sw.style.background = safe;
+}
+
+// Phase 6 K2.1: opens the shared custom color picker. Called from the swatch
+// button's onclick. The picker takes care of all platform differences —
+// same UI on iOS, Windows, Android, etc.
+function openOpColorPicker() {
+  if (!window.SyDentColorPicker) {
+    // Defensive: if supabase-init.js failed to load the picker block, fall
+    // back to letting the user type a hex value manually (extremely rare).
+    var current = document.getElementById('fOpColor').value || '#2ee89e';
+    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', current);
+    if (typed) _setOpColor(typed);
+    return;
+  }
+  var currentHex = document.getElementById('fOpColor').value || '#2ee89e';
+  window.SyDentColorPicker.open(currentHex, function(newHex) {
+    _setOpColor(newHex);
+  });
 }
 
 // Opens the operatory modal in EDIT mode. Uses the same ghost-option pattern
@@ -1964,7 +2005,7 @@ function editOperatory(id) {
   _editingOperatoryId = id;
   document.getElementById('operatoryModalTitle').textContent = 'تعديل غرفة';
   document.getElementById('fOpName').value = o.name || '';
-  document.getElementById('fOpColor').value = o.color || '#2ee89e';
+  _setOpColor(o.color || '#2ee89e');
   populateOperatoryProviderSelect();
   var provSel = document.getElementById('fOpDefaultProvider');
   if (o.default_provider_id) {

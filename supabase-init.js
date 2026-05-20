@@ -1535,3 +1535,559 @@
   // Fire-and-forget init (safe even if some pages don't want the button — guardPage runs first)
   autoInit();
 })();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 6 K2.1 — SyDentColorPicker (shared color picker component)
+// ═══════════════════════════════════════════════════════════════════════════
+// A cross-platform color picker that replaces <input type="color">. The native
+// HTML5 picker varies wildly by OS (tiny RGB-only on Windows Chrome/Brave vs.
+// the gorgeous Grid/Spectrum/Sliders panel on iOS Safari). This component
+// emulates the iOS panel everywhere — same tabs, same look, same behavior.
+//
+// Public API:
+//   window.SyDentColorPicker.open(currentHex, callback)
+//     • currentHex: '#RRGGBB' (sanitized; falls back to #2ee89e on bad input)
+//     • callback(newHex):    called with the confirmed color, or NOT called if
+//                            the user cancels
+//   window.SyDentColorPicker.injectDOM()  // idempotent; called automatically
+//
+// The picker DOM is injected once per page on first .open() call (lazy).
+// Self-contained: CSS-in-JS, no external dependencies, no separate file.
+// ═══════════════════════════════════════════════════════════════════════════
+(function() {
+  'use strict';
+
+  // ── Sanitization helpers ────────────────────────────────────────────────
+  function sanitizeHex(h) {
+    if (!h) return '#2ee89e';
+    var s = String(h).trim();
+    if (s.charAt(0) !== '#') s = '#' + s;
+    if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
+      // Expand short form #abc → #aabbcc
+      s = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
+    }
+    return /^#[0-9A-Fa-f]{6}$/.test(s) ? s.toLowerCase() : '#2ee89e';
+  }
+  function hexToRgb(hex) {
+    var h = sanitizeHex(hex).slice(1);
+    return {
+      r: parseInt(h.substr(0, 2), 16),
+      g: parseInt(h.substr(2, 2), 16),
+      b: parseInt(h.substr(4, 2), 16)
+    };
+  }
+  function rgbToHex(r, g, b) {
+    function c(v) {
+      v = Math.max(0, Math.min(255, Math.round(v)));
+      var s = v.toString(16);
+      return s.length === 1 ? '0' + s : s;
+    }
+    return '#' + c(r) + c(g) + c(b);
+  }
+  // HSV ↔ RGB (used by Spectrum tab)
+  function hsvToRgb(h, s, v) {
+    h = ((h % 360) + 360) % 360;
+    s = Math.max(0, Math.min(1, s));
+    v = Math.max(0, Math.min(1, v));
+    var c = v * s;
+    var hp = h / 60;
+    var x = c * (1 - Math.abs(hp % 2 - 1));
+    var r1 = 0, g1 = 0, b1 = 0;
+    if (hp < 1) { r1 = c; g1 = x; }
+    else if (hp < 2) { r1 = x; g1 = c; }
+    else if (hp < 3) { g1 = c; b1 = x; }
+    else if (hp < 4) { g1 = x; b1 = c; }
+    else if (hp < 5) { r1 = x; b1 = c; }
+    else { r1 = c; b1 = x; }
+    var m = v - c;
+    return { r: (r1 + m) * 255, g: (g1 + m) * 255, b: (b1 + m) * 255 };
+  }
+  function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var d = max - min;
+    var h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    return { h: h, s: max === 0 ? 0 : d / max, v: max };
+  }
+
+  // ── State (per-open invocation) ─────────────────────────────────────────
+  var _isInjected = false;
+  var _currentHex = '#2ee89e';
+  var _onConfirm = null;
+  var _activeTab = 'grid'; // 'grid' | 'spectrum' | 'sliders'
+  var _spectrumState = { h: 150, s: 0.8, v: 0.9 }; // synced from hex on open
+
+  // ── Grid palette: 11 rows × 11 cols = 121 swatches ──────────────────────
+  // Row 0 = grayscale ramp. Rows 1-10 = (hue, saturation/lightness) ramp.
+  function buildGridSwatches() {
+    var out = [];
+    // Grayscale row
+    for (var i = 0; i < 11; i++) {
+      var v = 255 - Math.round(i * 25.5);
+      out.push(rgbToHex(v, v, v));
+    }
+    // Color rows: hue varies by column, saturation/lightness varies by row
+    var hues = [0, 20, 40, 60, 100, 160, 200, 240, 280, 320, 350];
+    var levels = [
+      { s: 0.85, v: 0.30 },
+      { s: 0.85, v: 0.45 },
+      { s: 0.90, v: 0.60 },
+      { s: 0.95, v: 0.75 },
+      { s: 1.00, v: 0.95 }, // most saturated bright
+      { s: 0.70, v: 1.00 },
+      { s: 0.50, v: 1.00 },
+      { s: 0.35, v: 1.00 },
+      { s: 0.22, v: 1.00 },
+      { s: 0.12, v: 1.00 }
+    ];
+    for (var r = 0; r < levels.length; r++) {
+      for (var c = 0; c < hues.length; c++) {
+        var rgb = hsvToRgb(hues[c], levels[r].s, levels[r].v);
+        out.push(rgbToHex(rgb.r, rgb.g, rgb.b));
+      }
+    }
+    return out;
+  }
+  var _gridSwatches = null; // lazy
+
+  // ── DOM injection (once per page) ───────────────────────────────────────
+  function injectDOM() {
+    if (_isInjected) return;
+    _isInjected = true;
+
+    // Inject CSS
+    var style = document.createElement('style');
+    style.id = 'sydent-color-picker-styles';
+    style.textContent = [
+      '#sydentCpOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);',
+      '  display:none;align-items:flex-end;justify-content:center;z-index:10050;',
+      '  -webkit-tap-highlight-color:transparent;}',
+      '#sydentCpOverlay.open{display:flex;}',
+      '#sydentCpOverlay .cp-sheet{background:var(--bg2,#0f1f35);',
+      '  border:1px solid var(--border,#1e3556);border-radius:18px 18px 0 0;',
+      '  width:100%;max-width:520px;max-height:88vh;overflow-y:auto;',
+      '  padding:16px 18px 22px;direction:rtl;font-family:"Cairo",sans-serif;',
+      '  color:var(--text,#e7eef9);box-shadow:0 -8px 32px rgba(0,0,0,0.5);}',
+      '@media(min-width:640px){#sydentCpOverlay{align-items:center;}',
+      '  #sydentCpOverlay .cp-sheet{border-radius:18px;margin:auto;}}',
+      '#sydentCpOverlay .cp-header{display:flex;align-items:center;',
+      '  justify-content:space-between;margin-bottom:14px;}',
+      '#sydentCpOverlay .cp-title{font-weight:800;font-size:16px;}',
+      '#sydentCpOverlay .cp-close{width:32px;height:32px;border-radius:50%;',
+      '  background:rgba(255,255,255,0.08);border:none;color:var(--text);',
+      '  font-size:18px;cursor:pointer;display:flex;align-items:center;',
+      '  justify-content:center;line-height:1;}',
+      '#sydentCpOverlay .cp-close:hover{background:rgba(255,255,255,0.14);}',
+      '#sydentCpOverlay .cp-tabs{display:flex;background:rgba(255,255,255,0.04);',
+      '  border-radius:10px;padding:3px;margin-bottom:14px;}',
+      '#sydentCpOverlay .cp-tab{flex:1;padding:8px 12px;text-align:center;',
+      '  font-size:13px;font-weight:700;cursor:pointer;border-radius:8px;',
+      '  color:var(--text2,#8da0bd);transition:all .15s;border:none;',
+      '  background:transparent;font-family:inherit;}',
+      '#sydentCpOverlay .cp-tab.active{background:rgba(255,255,255,0.10);',
+      '  color:var(--text);}',
+      '#sydentCpOverlay .cp-panel{display:none;}',
+      '#sydentCpOverlay .cp-panel.active{display:block;}',
+      // Grid tab
+      '#sydentCpOverlay .cp-grid{display:grid;grid-template-columns:repeat(11,1fr);',
+      '  gap:4px;}',
+      '#sydentCpOverlay .cp-swatch{aspect-ratio:1;border-radius:6px;cursor:pointer;',
+      '  border:2px solid transparent;transition:transform .1s;}',
+      '#sydentCpOverlay .cp-swatch:hover{transform:scale(1.12);}',
+      '#sydentCpOverlay .cp-swatch.selected{border-color:#fff;',
+      '  box-shadow:0 0 0 2px var(--bg2,#0f1f35),0 0 0 4px var(--green,#2ee89e);}',
+      // Spectrum tab
+      '#sydentCpOverlay .cp-spectrum{position:relative;width:100%;aspect-ratio:1.6;',
+      '  border-radius:12px;overflow:hidden;cursor:crosshair;',
+      '  touch-action:none;user-select:none;}',
+      '#sydentCpOverlay .cp-spectrum-canvas{width:100%;height:100%;display:block;}',
+      '#sydentCpOverlay .cp-spectrum-dot{position:absolute;width:18px;height:18px;',
+      '  border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.4),',
+      '  0 2px 6px rgba(0,0,0,0.4);transform:translate(-50%,-50%);pointer-events:none;}',
+      // Sliders tab
+      '#sydentCpOverlay .cp-slider-row{margin-bottom:14px;}',
+      '#sydentCpOverlay .cp-slider-label{display:flex;justify-content:space-between;',
+      '  align-items:center;font-size:11px;font-weight:800;letter-spacing:0.5px;',
+      '  color:var(--text2,#8da0bd);margin-bottom:6px;}',
+      '#sydentCpOverlay .cp-slider-value{background:rgba(255,255,255,0.06);',
+      '  padding:3px 10px;border-radius:6px;font-size:13px;color:var(--text);',
+      '  min-width:42px;text-align:center;font-weight:700;}',
+      '#sydentCpOverlay .cp-slider{width:100%;height:32px;border-radius:16px;',
+      '  appearance:none;-webkit-appearance:none;outline:none;cursor:pointer;}',
+      '#sydentCpOverlay .cp-slider::-webkit-slider-thumb{appearance:none;',
+      '  -webkit-appearance:none;width:24px;height:24px;border-radius:50%;',
+      '  background:#fff;border:3px solid rgba(0,0,0,0.15);cursor:pointer;',
+      '  box-shadow:0 2px 6px rgba(0,0,0,0.3);}',
+      '#sydentCpOverlay .cp-slider::-moz-range-thumb{width:24px;height:24px;',
+      '  border-radius:50%;background:#fff;border:3px solid rgba(0,0,0,0.15);',
+      '  cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);}',
+      // Footer (preview + hex + buttons)
+      '#sydentCpOverlay .cp-footer{margin-top:18px;padding-top:14px;',
+      '  border-top:1px solid var(--border,#1e3556);}',
+      '#sydentCpOverlay .cp-preview-row{display:flex;align-items:center;gap:12px;',
+      '  margin-bottom:14px;}',
+      '#sydentCpOverlay .cp-preview-swatch{width:54px;height:54px;border-radius:12px;',
+      '  border:2px solid rgba(255,255,255,0.15);flex-shrink:0;}',
+      '#sydentCpOverlay .cp-hex-wrap{flex:1;}',
+      '#sydentCpOverlay .cp-hex-label{font-size:11px;font-weight:700;',
+      '  color:var(--text2);margin-bottom:4px;letter-spacing:0.5px;}',
+      '#sydentCpOverlay .cp-hex-input{width:100%;background:rgba(255,255,255,0.06);',
+      '  border:1px solid var(--border);border-radius:8px;padding:8px 12px;',
+      '  color:var(--text);font-family:"Courier New",monospace;font-size:14px;',
+      '  font-weight:700;text-transform:uppercase;letter-spacing:1px;',
+      '  direction:ltr;text-align:left;}',
+      '#sydentCpOverlay .cp-hex-input:focus{outline:none;border-color:var(--green);}',
+      '#sydentCpOverlay .cp-actions{display:flex;gap:10px;}',
+      '#sydentCpOverlay .cp-btn{flex:1;padding:11px;border-radius:10px;border:none;',
+      '  font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;',
+      '  transition:opacity .15s;}',
+      '#sydentCpOverlay .cp-btn:hover{opacity:0.85;}',
+      '#sydentCpOverlay .cp-btn-cancel{background:rgba(255,255,255,0.08);',
+      '  color:var(--text2);}',
+      '#sydentCpOverlay .cp-btn-confirm{background:var(--green,#2ee89e);',
+      '  color:#0a1628;}'
+    ].join('\n');
+    document.head.appendChild(style);
+
+    // Inject HTML
+    var overlay = document.createElement('div');
+    overlay.id = 'sydentCpOverlay';
+    overlay.innerHTML = [
+      '<div class="cp-sheet" role="dialog" aria-modal="true" aria-labelledby="sydentCpTitle">',
+      '  <div class="cp-header">',
+      '    <div class="cp-title" id="sydentCpTitle">اختيار اللون</div>',
+      '    <button type="button" class="cp-close" aria-label="إغلاق" id="sydentCpClose">×</button>',
+      '  </div>',
+      '  <div class="cp-tabs">',
+      '    <button type="button" class="cp-tab active" data-tab="grid">شبكة</button>',
+      '    <button type="button" class="cp-tab" data-tab="spectrum">طيف</button>',
+      '    <button type="button" class="cp-tab" data-tab="sliders">شرائح</button>',
+      '  </div>',
+      '  <div class="cp-panel active" data-panel="grid">',
+      '    <div class="cp-grid" id="sydentCpGrid"></div>',
+      '  </div>',
+      '  <div class="cp-panel" data-panel="spectrum">',
+      '    <div class="cp-spectrum" id="sydentCpSpectrum">',
+      '      <canvas class="cp-spectrum-canvas" id="sydentCpSpectrumCanvas" width="320" height="200"></canvas>',
+      '      <div class="cp-spectrum-dot" id="sydentCpSpectrumDot"></div>',
+      '    </div>',
+      '  </div>',
+      '  <div class="cp-panel" data-panel="sliders">',
+      '    <div class="cp-slider-row">',
+      '      <div class="cp-slider-label"><span>RED</span><span class="cp-slider-value" id="sydentCpRedVal">0</span></div>',
+      '      <input type="range" class="cp-slider" id="sydentCpRed" min="0" max="255" value="0" aria-label="Red">',
+      '    </div>',
+      '    <div class="cp-slider-row">',
+      '      <div class="cp-slider-label"><span>GREEN</span><span class="cp-slider-value" id="sydentCpGreenVal">0</span></div>',
+      '      <input type="range" class="cp-slider" id="sydentCpGreen" min="0" max="255" value="0" aria-label="Green">',
+      '    </div>',
+      '    <div class="cp-slider-row">',
+      '      <div class="cp-slider-label"><span>BLUE</span><span class="cp-slider-value" id="sydentCpBlueVal">0</span></div>',
+      '      <input type="range" class="cp-slider" id="sydentCpBlue" min="0" max="255" value="0" aria-label="Blue">',
+      '    </div>',
+      '  </div>',
+      '  <div class="cp-footer">',
+      '    <div class="cp-preview-row">',
+      '      <div class="cp-preview-swatch" id="sydentCpPreview"></div>',
+      '      <div class="cp-hex-wrap">',
+      '        <div class="cp-hex-label">sRGB Hex Colour #</div>',
+      '        <input type="text" class="cp-hex-input" id="sydentCpHex" maxlength="7" autocomplete="off" spellcheck="false">',
+      '      </div>',
+      '    </div>',
+      '    <div class="cp-actions">',
+      '      <button type="button" class="cp-btn cp-btn-cancel" id="sydentCpCancel">إلغاء</button>',
+      '      <button type="button" class="cp-btn cp-btn-confirm" id="sydentCpConfirm">✓ اختيار</button>',
+      '    </div>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    document.body.appendChild(overlay);
+
+    // Wire up events
+    document.getElementById('sydentCpClose').addEventListener('click', close);
+    document.getElementById('sydentCpCancel').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) close();
+    });
+    document.getElementById('sydentCpConfirm').addEventListener('click', confirm);
+
+    // Tab switching
+    var tabs = overlay.querySelectorAll('.cp-tab');
+    for (var ti = 0; ti < tabs.length; ti++) {
+      tabs[ti].addEventListener('click', function(e) {
+        switchTab(e.currentTarget.getAttribute('data-tab'));
+      });
+    }
+
+    // Sliders
+    var rEl = document.getElementById('sydentCpRed');
+    var gEl = document.getElementById('sydentCpGreen');
+    var bEl = document.getElementById('sydentCpBlue');
+    function onSliderInput() {
+      var r = parseInt(rEl.value, 10);
+      var g = parseInt(gEl.value, 10);
+      var b = parseInt(bEl.value, 10);
+      _currentHex = rgbToHex(r, g, b);
+      _spectrumState = rgbToHsv(r, g, b);
+      // Avoid recursive feedback: sync UI without triggering input events
+      syncSlidersUI();
+      syncHexInput();
+      syncPreview();
+      syncGridSelection();
+      drawSpectrumDot(); // dot only; canvas doesn't need redraw on slider change
+    }
+    rEl.addEventListener('input', onSliderInput);
+    gEl.addEventListener('input', onSliderInput);
+    bEl.addEventListener('input', onSliderInput);
+
+    // Hex input
+    var hexEl = document.getElementById('sydentCpHex');
+    hexEl.addEventListener('input', function() {
+      var v = hexEl.value.trim();
+      // Allow user to type without # — auto-add it
+      if (v.length > 0 && v.charAt(0) !== '#') v = '#' + v;
+      if (/^#[0-9A-Fa-f]{6}$/.test(v)) {
+        _currentHex = v.toLowerCase();
+        var rgb = hexToRgb(_currentHex);
+        _spectrumState = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        syncSlidersUI();
+        syncPreview();
+        syncGridSelection();
+        drawSpectrumDot();
+      }
+    });
+    hexEl.addEventListener('blur', function() {
+      // On blur, normalize the field to the current sanitized value
+      hexEl.value = _currentHex.toUpperCase();
+    });
+
+    // Spectrum interaction (mouse + touch)
+    var spectrumEl = document.getElementById('sydentCpSpectrum');
+    function spectrumPick(clientX, clientY) {
+      var rect = spectrumEl.getBoundingClientRect();
+      var x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      var y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+      var h = (x / rect.width) * 360;
+      // y maps to (saturation, value) in a perceptually pleasant way:
+      //   top → white-ish (s low, v high)
+      //   middle → fully saturated
+      //   bottom → dark
+      var ny = y / rect.height; // 0..1
+      var s, v;
+      if (ny < 0.5) {
+        // Top half: s goes 0 → 1, v stays 1
+        s = ny * 2;
+        v = 1;
+      } else {
+        // Bottom half: s stays 1, v goes 1 → 0
+        s = 1;
+        v = 1 - (ny - 0.5) * 2;
+      }
+      _spectrumState = { h: h, s: s, v: v };
+      var rgb = hsvToRgb(h, s, v);
+      _currentHex = rgbToHex(rgb.r, rgb.g, rgb.b);
+      syncSlidersUI();
+      syncHexInput();
+      syncPreview();
+      syncGridSelection();
+      drawSpectrumDot();
+    }
+    var _dragging = false;
+    spectrumEl.addEventListener('mousedown', function(e) {
+      _dragging = true; spectrumPick(e.clientX, e.clientY);
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (_dragging) spectrumPick(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseup', function() { _dragging = false; });
+    spectrumEl.addEventListener('touchstart', function(e) {
+      if (e.touches.length) {
+        e.preventDefault();
+        spectrumPick(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: false });
+    spectrumEl.addEventListener('touchmove', function(e) {
+      if (e.touches.length) {
+        e.preventDefault();
+        spectrumPick(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: false });
+
+    // Render grid swatches (lazy build once)
+    if (!_gridSwatches) _gridSwatches = buildGridSwatches();
+    var gridEl = document.getElementById('sydentCpGrid');
+    var html = '';
+    for (var i = 0; i < _gridSwatches.length; i++) {
+      var c = _gridSwatches[i];
+      html += '<div class="cp-swatch" data-color="' + c + '" style="background:' + c + ';" role="button" aria-label="' + c + '"></div>';
+    }
+    gridEl.innerHTML = html;
+    // Delegated click handler
+    gridEl.addEventListener('click', function(e) {
+      var t = e.target;
+      if (t && t.classList && t.classList.contains('cp-swatch')) {
+        var col = t.getAttribute('data-color');
+        if (col) {
+          _currentHex = col;
+          var rgb = hexToRgb(col);
+          _spectrumState = rgbToHsv(rgb.r, rgb.g, rgb.b);
+          syncSlidersUI();
+          syncHexInput();
+          syncPreview();
+          syncGridSelection();
+          drawSpectrumDot();
+        }
+      }
+    });
+
+    // Render spectrum canvas once (it's static — only the dot moves)
+    drawSpectrumCanvas();
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────
+  function drawSpectrumCanvas() {
+    var canvas = document.getElementById('sydentCpSpectrumCanvas');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+    // Horizontal hue gradient (left → right: 0 → 360)
+    var img = ctx.createImageData(W, H);
+    for (var y = 0; y < H; y++) {
+      var ny = y / H;
+      var s, v;
+      if (ny < 0.5) { s = ny * 2; v = 1; }
+      else { s = 1; v = 1 - (ny - 0.5) * 2; }
+      for (var x = 0; x < W; x++) {
+        var h = (x / W) * 360;
+        var rgb = hsvToRgb(h, s, v);
+        var idx = (y * W + x) * 4;
+        img.data[idx]     = rgb.r;
+        img.data[idx + 1] = rgb.g;
+        img.data[idx + 2] = rgb.b;
+        img.data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+  function drawSpectrumDot() {
+    var dot = document.getElementById('sydentCpSpectrumDot');
+    if (!dot) return;
+    // Convert HSV state to (x%, y%)
+    var x = (_spectrumState.h / 360) * 100;
+    var s = _spectrumState.s, v = _spectrumState.v;
+    var ny;
+    if (v >= 1 - 1e-6) {
+      // On top half: s ∈ [0,1] → ny ∈ [0, 0.5]
+      ny = s * 0.5;
+    } else {
+      // On bottom half: v ∈ [0,1] → ny ∈ [1, 0.5]
+      ny = 0.5 + (1 - v) * 0.5;
+    }
+    dot.style.left = x + '%';
+    dot.style.top = (ny * 100) + '%';
+  }
+  function syncSlidersUI() {
+    var rgb = hexToRgb(_currentHex);
+    document.getElementById('sydentCpRed').value = rgb.r;
+    document.getElementById('sydentCpGreen').value = rgb.g;
+    document.getElementById('sydentCpBlue').value = rgb.b;
+    document.getElementById('sydentCpRedVal').textContent = rgb.r;
+    document.getElementById('sydentCpGreenVal').textContent = rgb.g;
+    document.getElementById('sydentCpBlueVal').textContent = rgb.b;
+    // Color the slider tracks so they look like the iOS gradient sliders
+    var rTrack = 'linear-gradient(to right, ' + rgbToHex(0, rgb.g, rgb.b) + ', ' + rgbToHex(255, rgb.g, rgb.b) + ')';
+    var gTrack = 'linear-gradient(to right, ' + rgbToHex(rgb.r, 0, rgb.b) + ', ' + rgbToHex(rgb.r, 255, rgb.b) + ')';
+    var bTrack = 'linear-gradient(to right, ' + rgbToHex(rgb.r, rgb.g, 0) + ', ' + rgbToHex(rgb.r, rgb.g, 255) + ')';
+    document.getElementById('sydentCpRed').style.background = rTrack;
+    document.getElementById('sydentCpGreen').style.background = gTrack;
+    document.getElementById('sydentCpBlue').style.background = bTrack;
+  }
+  function syncHexInput() {
+    var el = document.getElementById('sydentCpHex');
+    // Only update if not focused (so user typing isn't disturbed)
+    if (document.activeElement !== el) el.value = _currentHex.toUpperCase();
+  }
+  function syncPreview() {
+    document.getElementById('sydentCpPreview').style.background = _currentHex;
+  }
+  function syncGridSelection() {
+    var grid = document.getElementById('sydentCpGrid');
+    if (!grid) return;
+    var swatches = grid.querySelectorAll('.cp-swatch');
+    for (var i = 0; i < swatches.length; i++) {
+      var c = swatches[i].getAttribute('data-color');
+      if (c && c.toLowerCase() === _currentHex.toLowerCase()) {
+        swatches[i].classList.add('selected');
+      } else {
+        swatches[i].classList.remove('selected');
+      }
+    }
+  }
+  function switchTab(name) {
+    _activeTab = name;
+    var tabs = document.querySelectorAll('#sydentCpOverlay .cp-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      if (tabs[i].getAttribute('data-tab') === name) tabs[i].classList.add('active');
+      else tabs[i].classList.remove('active');
+    }
+    var panels = document.querySelectorAll('#sydentCpOverlay .cp-panel');
+    for (var j = 0; j < panels.length; j++) {
+      if (panels[j].getAttribute('data-panel') === name) panels[j].classList.add('active');
+      else panels[j].classList.remove('active');
+    }
+    // Sync the active panel UI to current state
+    if (name === 'spectrum') drawSpectrumDot();
+    if (name === 'sliders') syncSlidersUI();
+  }
+
+  // ── Public API ──────────────────────────────────────────────────────────
+  function open(currentHex, callback) {
+    injectDOM();
+    _currentHex = sanitizeHex(currentHex);
+    _onConfirm = typeof callback === 'function' ? callback : null;
+    var rgb = hexToRgb(_currentHex);
+    _spectrumState = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    // Sync all panels to incoming hex
+    syncSlidersUI();
+    syncHexInput();
+    syncPreview();
+    syncGridSelection();
+    drawSpectrumDot();
+    switchTab('grid');
+    document.getElementById('sydentCpOverlay').classList.add('open');
+    // Defer focus so the overlay finishes painting first
+    setTimeout(function() {
+      var hexInput = document.getElementById('sydentCpHex');
+      if (hexInput) hexInput.value = _currentHex.toUpperCase();
+    }, 30);
+  }
+  function close() {
+    var overlay = document.getElementById('sydentCpOverlay');
+    if (overlay) overlay.classList.remove('open');
+    _onConfirm = null; // user cancelled — drop the callback
+  }
+  function confirm() {
+    var cb = _onConfirm;
+    var hex = _currentHex;
+    close();
+    // Fire the callback AFTER closing so any UI updates the consumer triggers
+    // (e.g. updating a swatch) don't compete with the overlay closing animation.
+    if (cb) {
+      try { cb(hex); } catch (e) { console.error('SyDentColorPicker callback error:', e); }
+    }
+  }
+
+  window.SyDentColorPicker = {
+    open: open,
+    injectDOM: injectDOM,
+    // Expose helpers in case consumers need them
+    sanitizeHex: sanitizeHex
+  };
+})();
