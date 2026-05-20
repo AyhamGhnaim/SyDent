@@ -928,7 +928,12 @@ async function loadDashQuickTemplates(uid) {
     }
     var safeId = encodeURIComponent(t.id);
     var safeName = _dashEscapeHtml(t.name || '');
-    var durLabel = (t.default_duration_min ? ' • ' + t.default_duration_min + 'د' : '');
+    // Coerce to integer for XSS safety + display correctness. parseInt with
+    // radix=10 prevents '08' → 0 surprises, and Number.isFinite rejects
+    // NaN/Infinity/null cleanly. If the column ever returns a non-numeric
+    // value, we silently omit the duration suffix rather than render junk.
+    var durNum = parseInt(t.default_duration_min, 10);
+    var durLabel = (Number.isFinite(durNum) && durNum > 0) ? ' • ' + durNum + 'د' : '';
     html += '<a href="appointments.html?newWithTemplate=' + safeId + '" '
          +  'title="فتح موعد جديد بقالب: ' + safeName + '" '
          +  'style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;'
