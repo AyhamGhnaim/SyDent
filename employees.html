@@ -713,6 +713,9 @@ function parseEmpRoleValue(v) {
   var parts = String(v || '').split(':');
   var role = parts[0] || 'secretary';
   var pt = parts[1] || (role === 'doctor' ? 'doctor' : null);
+  // Normalize sentinel 'none' to null so callers don't see a non-null value
+  // for non-clinical providers (secretary). The DB column allows NULL anyway.
+  if (pt === 'none') pt = null;
   return { role: role, providerType: pt };
 }
 
@@ -1579,10 +1582,13 @@ async function removeAllLockPins() {
     var action = params.get('action');
     if (action === 'add-doctor') {
       openAddModal();
-      // Pre-select 'doctor' role and toggle the clinical fields visible
+      // Phase 6 W: Use composite role value 'doctor:doctor' (default doctor
+      // sub-type). The unified dropdown's options no longer accept the bare
+      // 'doctor' value — that would render no selection. onRoleChange parses
+      // the composite to set role + provider_type appropriately.
       var roleSel = document.getElementById('eRole');
       if (roleSel) {
-        roleSel.value = 'doctor';
+        roleSel.value = 'doctor:doctor';
         onRoleChange();
       }
       // Clean the URL so refresh doesn't re-open the modal
