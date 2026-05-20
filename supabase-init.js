@@ -1559,8 +1559,12 @@
 
   // ── Sanitization helpers ────────────────────────────────────────────────
   function sanitizeHex(h) {
+    // Only accept strings — numbers/objects/etc. fall back to default. This
+    // protects against accidental sanitizeHex(123) returning '#112233' due to
+    // the short-form expansion path.
+    if (typeof h !== 'string') return '#2ee89e';
     if (!h) return '#2ee89e';
-    var s = String(h).trim();
+    var s = h.trim();
     if (s.charAt(0) !== '#') s = '#' + s;
     if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
       // Expand short form #abc → #aabbcc
