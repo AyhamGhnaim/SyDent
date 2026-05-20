@@ -818,10 +818,6 @@ async function loadDashOperatoriesCache(uid) {
         color:  (o.color && /^#[0-9A-Fa-f]{6}$/.test(o.color)) ? o.color : '#8da0bd'
       };
     });
-    // Tiny diagnostic: if we saved at least one operatory, log a one-line
-    // confirmation so it's easy to verify in the console that the cache
-    // wired up correctly. Removed once Phase 6 K is rolled out broadly.
-    if (rows.length) console.log('[Phase 6 K] Dashboard cached ' + rows.length + ' operatories.');
   } catch (e) {
     console.warn('Dashboard operatory cache exception:', e);
   }
@@ -949,7 +945,6 @@ async function loadDashQuickTemplates(uid) {
   }
   chipsEl.innerHTML = html;
   cardEl.style.display = '';
-  console.log('[Phase 6 L extras] Dashboard cached ' + tpls.length + ' quick templates.');
 }
 
 // Stage definitions for the dashboard. Excludes 'confirmed_at' on purpose —
