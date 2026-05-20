@@ -199,8 +199,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       كل طبيب يمكن أن يكون له <b>سعر خاص لكل علاج</b> (يُضبط من صفحة العلاجات).
       <br><br>
       <span style="color:var(--yellow);"><b>⚠️ ملاحظة:</b></span>
-      لمنع جهاز موظف من تسجيل البيانات، استخدم زر "تعطيل الحساب" من
-      <a href="employees.html" style="color:var(--green);text-decoration:underline;">صفحة الموظفين</a>.
+      <b>الإضافة والحذف والتعديل</b> صارت من <a href="employees.html" style="color:var(--green);text-decoration:underline;">صفحة الموظفين</a> —
+      كل موظف بدور "طبيب" يظهر هنا تلقائياً ببطاقة كاملة.
+      <br>
+      لمنع جهاز موظف من تسجيل البيانات، استخدم زر "تعطيل الحساب" من نفس الصفحة.
     </div>
   </div>
 
@@ -428,13 +430,28 @@ function renderList() {
     var phonePart = d.phone ? ('<b>الهاتف:</b> ' + escapeHtml(d.phone)) : '';
     var metaItems = [sharePart, hoursPart, phonePart].filter(function(x){ return x; }).join(' &nbsp;•&nbsp; ');
 
-    var delBtn = d.is_owner
-      ? '<button title="لا يمكن حذف صاحب العيادة" disabled style="opacity:.4;cursor:not-allowed;">🔒 محمي</button>'
-      : '<button class="btn-del" onclick="deleteDoctor(\'' + d.id + '\')">🗑️ حذف</button>';
-    // "Make owner" button — only show on non-owner cards (to transfer ownership)
-    var ownerBtn = d.is_owner
-      ? ''
-      : '<button class="btn-make-owner" onclick="makeOwner(\'' + d.id + '\')">⭐ تعيين كصاحب العيادة</button>';
+    // ── Phase 6 R: doctors.html is now read-mostly for the doctor module ──
+    // Removed actions (still available via the unified employees.html flow):
+    //   • Delete button   → Doctor deletion is initiated from employees.html
+    //                       (Phase 6 P deleteEmployee flow). Following the
+    //                       OpenDental philosophy ("Providers cannot be
+    //                       deleted, only hidden"), employees.html performs
+    //                       a soft-deactivation that preserves historical
+    //                       FKs in sessions / appointments.
+    //   • Make-owner btn  → Ownership is fixed by the auth account (auth.uid())
+    //                       and managed automatically: doctors.html bootstraps
+    //                       the owner-doctor on first visit (is_owner=true),
+    //                       and an auto-heal promotes the first active doctor
+    //                       if no is_owner=true row exists. No UI handoff
+    //                       needed — OpenDental treats ownership transfers as
+    //                       a formal off-app process too.
+    // Kept actions:
+    //   • Edit button  → routes via goEditDoctor() (owner-doctor goes through
+    //                    the local modal; others deep-link to employees.html)
+    //   • Link button  → toggles user_id ↔ currentUser.id for the 3-tier
+    //                    provider default resolution. Still useful when the
+    //                    Owner runs the clinic together with hired doctors.
+
     // "Link to my account" button — toggles user_id between current user and null
     var linkBtn = (d.user_id === currentUser.id)
       ? '<button class="btn-unlink" onclick="unlinkFromUser(\'' + d.id + '\')" title="فك ربط هذا الطبيب من حسابك">🔓 فك الربط</button>'
@@ -454,8 +471,6 @@ function renderList() {
       + '<div class="doc-actions">'
       + '<button class="btn-edit" onclick="goEditDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
       + linkBtn
-      + ownerBtn
-      + delBtn
       + '</div></div></div>';
   });
   html += '</div>';
@@ -602,56 +617,23 @@ async function saveDoctor() {
   await loadDoctors();
 }
 
-async function deleteDoctor(id) {
-  var d = doctors.find(function(x){ return x.id === id; });
-  if (!d) return;
-  if (d.is_owner) { showToast('🔒 لا يمكن حذف صاحب العيادة'); return; }
-  if (!confirm('حذف الطبيب "' + d.name + '"؟\n\nملاحظة: الجلسات المرتبطة به ستبقى محفوظة لكنها ستفقد ارتباطها بالطبيب.')) return;
-
-  var { error } = await window.sb.from('clinic_doctors').delete().eq('id', id);
-  if (error) { showToast('⚠️ فشل الحذف: ' + error.message); return; }
-  // Phase 5: audit log
-  if (window.logAudit) {
-    window.logAudit('doctor.delete', {
-      entityId: id,
-      description: 'حذف الطبيب: ' + d.name,
-      oldValue: { name: d.name, role: d.role, share_percent: d.share_percent }
-    });
-  }
-  showToast('🗑️ تم الحذف');
-  await loadDoctors();
-}
-
-// Transfer "صاحب العيادة" ownership to another doctor
-// Only one doctor can be owner at a time → unset previous, set new
-async function makeOwner(id) {
-  var d = doctors.find(function(x){ return x.id === id; });
-  if (!d) return;
-  var currentOwner = doctors.find(function(x){ return x.is_owner; });
-  var msg = currentOwner
-    ? 'تعيين "' + d.name + '" كصاحب العيادة بدلاً من "' + currentOwner.name + '"؟\n\nصاحب العيادة هو الافتراضي في كل الجلسات الجديدة وفي تقارير المستحقات.'
-    : 'تعيين "' + d.name + '" كصاحب العيادة؟\n\nصاحب العيادة هو الافتراضي في كل الجلسات الجديدة وفي تقارير المستحقات.';
-  if (!confirm(msg)) return;
-
-  // Step 1: unset current owner (if any) — only if it's a different doctor
-  if (currentOwner && currentOwner.id !== id) {
-    var r1 = await window.sb.from('clinic_doctors')
-      .update({ is_owner: false, updated_at: new Date().toISOString() })
-      .eq('id', currentOwner.id)
-      .eq('owner_id', currentUser.id);
-    if (r1.error) { showToast('⚠️ فشل تحديث المالك السابق: ' + r1.error.message); return; }
-  }
-
-  // Step 2: set new owner
-  var r2 = await window.sb.from('clinic_doctors')
-    .update({ is_owner: true, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .eq('owner_id', currentUser.id);
-  if (r2.error) { showToast('⚠️ فشل تعيين المالك الجديد: ' + r2.error.message); return; }
-
-  showToast('⭐ تم تعيين "' + d.name + '" كصاحب العيادة');
-  await loadDoctors();
-}
+// ─────────────────────────────────────────────────────────────
+// Phase 6 R: deleteDoctor() and makeOwner() removed.
+//
+// • deleteDoctor: Replaced by the unified soft-deactivation in employees.html
+//   (deleteEmployee → confirm modal → clinic_doctors.is_active=false).
+//   Matches OpenDental philosophy: "Providers cannot be deleted, only hidden"
+//   to preserve historical FKs in sessions / appointments / payments.
+//
+// • makeOwner: Removed because ownership is bound to the auth account
+//   (currentUser.id) and managed automatically: the owner-doctor is
+//   bootstrapped on first visit (line ~364), and auto-heal promotes the
+//   first active doctor if no is_owner=true row exists (line ~389).
+//   OpenDental also treats ownership transfers as a formal off-app process.
+//
+// The doctor.delete action_type remains registered in audit-log.html for
+// backward compatibility with historical audit records (pre-Phase-6-R).
+// ─────────────────────────────────────────────────────────────
 
 // Link a doctor to the current user's account.
 // OpenDental-style: user_id ↔ provider mapping. The linked doctor becomes the
