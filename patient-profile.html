@@ -4037,18 +4037,20 @@ function buildTooth(num, surfaceMap, isUpper) {
         padT = OVERSHOOT;
         padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'L') {
-        // Lingual: overshoot DOWN toward the cervical line. Horizontally
-        // the rect extends from midL to midR (the inner edges of the M/D
-        // strips) — no gap, no overlap. This produces the contiguous grid
-        // look seen in CareStack/OpenDental odontograms: M/B/D/L meet
-        // edge-to-edge so the crown reads as a unified surface map.
+        // Lingual: overshoot DOWN toward the cervical line, plus LATERAL
+        // overshoot equal to OVERSHOOT so the lingual fill spans from
+        // crown-edge to crown-edge — no visible 'gap' where the M/D strips
+        // sit (those zones are transparent click areas when not colored).
+        // When M/D ARE colored, they are drawn LAST and cleanly overlay
+        // this bleed, restoring the per-surface meaning.
         padB = OVERSHOOT;
-        padL = 0; padR = 0;
+        padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'B') {
-        // Buccal/labial: the middle facial body. Same horizontal extent
-        // as L (midL → midR) so B and L are visually symmetrical in the
-        // middle column and meet the M/D strips edge-to-edge with no gap.
-        padL = 0; padR = 0;
+        // Buccal/labial: same horizontal logic as L — lateral overshoot
+        // so the colored body reaches the crown silhouette on both sides,
+        // covering the M/D strip area when those surfaces are uncolored.
+        // M/D drawn last will cleanly overlay any bleed when colored.
+        padL = OVERSHOOT; padR = OVERSHOOT;
       }
       rx -= padL; ry -= padT;
       rw += padL + padR; rh += padT + padB;
