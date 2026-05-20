@@ -265,11 +265,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
 
       <div class="form-group" id="doctorLinkGroup" style="display:none;">
-        <label>اربط بطبيب موجود (اختياري)</label>
-        <select id="eDoctorId">
-          <option value="">— لا ربط —</option>
-        </select>
-        <div class="hint">إذا اخترت طبيباً، الجلسات التي يسجلها هذا الموظف ستُنسب لذلك الطبيب في التقارير.</div>
+        <!-- Phase 6 P: This field is intentionally hidden. The previous manual
+             link between an employee and an existing clinic_doctors record has
+             been replaced by an automatic flow: when an employee is created
+             with role='doctor', a matching clinic_doctors row is created
+             automatically in saveEmployee(). The hidden element is preserved
+             to keep onRoleChange() and the legacy form layout untouched. -->
       </div>
 
       <div class="form-group">
@@ -364,6 +365,25 @@ function roleIcon(r) {
 }
 function avatarColor(r) {
   return r === 'owner' ? '#2ee89e' : (r === 'doctor' ? '#63b3ed' : '#ffa726');
+}
+
+// Phase 6 P: returns a color for an auto-created clinic_doctors row. Picks
+// from a curated palette of distinct, theme-friendly hues, avoiding any color
+// already used by existing active doctors when possible. If all colors are
+// taken, falls back to a random choice from the palette.
+function _pickRandomDoctorColor() {
+  var palette = [
+    '#63b3ed', '#f5a623', '#a78bfa', '#f06292',
+    '#4dd0e1', '#ffb74d', '#81c784', '#ff8a65',
+    '#9575cd', '#4fc3f7', '#dce775', '#e57373'
+  ];
+  var used = {};
+  doctors.forEach(function(d){
+    if (d && d.is_active !== false && d.color) used[String(d.color).toLowerCase()] = true;
+  });
+  var available = palette.filter(function(c){ return !used[c.toLowerCase()]; });
+  var pool = available.length > 0 ? available : palette;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 function initials(name) {
   var parts = String(name || '').trim().split(/\s+/);
@@ -484,8 +504,9 @@ function renderList() {
 
 // ── Add/Edit Modal ──
 function onRoleChange() {
-  var role = $('eRole').value;
-  $('doctorLinkGroup').style.display = (role === 'doctor') ? '' : 'none';
+  // Phase 6 P: The doctor link group is permanently hidden — role-based
+  // doctor linkage is now fully automatic. Function retained as a stable
+  // hook in case future UI elements need to react to role changes.
 }
 
 function openAddModal() {
@@ -493,26 +514,13 @@ function openAddModal() {
   $('modalTitle').textContent = '＋ إضافة موظف';
   $('eName').value = '';
   $('eRole').value = 'secretary';
-  $('eDoctorId').value = '';
   $('ePin').value = '';
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Populate doctor link dropdown: only doctors NOT already linked to an employee
-  var linkedDoctorIds = employees
-    .filter(function(e){ return e.doctor_id; })
-    .map(function(e){ return e.doctor_id; });
-
-  var sel = $('eDoctorId');
-  sel.innerHTML = '<option value="">— لا ربط —</option>';
-  doctors.forEach(function(d){
-    if (linkedDoctorIds.indexOf(d.id) >= 0) return; // skip already linked
-    if (d.is_owner) return; // owner-doctor is reserved for the owner employee
-    var opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name;
-    sel.appendChild(opt);
-  });
+  // Phase 6 P: Doctor linking is now automatic. When the user picks role='doctor'
+  // and saves, saveEmployee() creates a matching clinic_doctors row and links
+  // it via doctor_id automatically. No manual linking UI required.
 
   onRoleChange();
   $('empModal').classList.add('show');
@@ -532,22 +540,9 @@ function openEditModal(id) {
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  // Populate doctor link dropdown (include this employee's current link)
-  var linkedDoctorIds = employees
-    .filter(function(e){ return e.doctor_id && e.id !== id; })
-    .map(function(e){ return e.doctor_id; });
-
-  var sel = $('eDoctorId');
-  sel.innerHTML = '<option value="">— لا ربط —</option>';
-  doctors.forEach(function(d){
-    if (linkedDoctorIds.indexOf(d.id) >= 0) return;
-    if (d.is_owner) return;
-    var opt = document.createElement('option');
-    opt.value = d.id;
-    opt.textContent = d.name;
-    sel.appendChild(opt);
-  });
-  $('eDoctorId').value = emp.doctor_id || '';
+  // Phase 6 P: Doctor linking is now automatic. The employee's current
+  // doctor_id link (if any) is preserved unchanged through saveEmployee()
+  // unless the role itself changes. No manual picker UI needed.
 
   // PIN hint: editing, leave empty to keep current
   $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
@@ -572,7 +567,9 @@ async function saveEmployee() {
   try {
     var name = ($('eName').value || '').trim();
     var role = $('eRole').value;
-    var doctorId = role === 'doctor' ? ($('eDoctorId').value || null) : null;
+    // Phase 6 P: doctorId is no longer set from a manual picker. For new
+    // employees, it stays null until auto-create runs below. For edits, the
+    // existing emp.doctor_id is preserved unless the role changes.
     var pin = ($('ePin').value || '').trim();
     var pinConfirm = ($('ePinConfirm').value || '').trim();
 
@@ -617,6 +614,53 @@ async function saveEmployee() {
       pinHash = await hashPin(pin);
     }
 
+    // ── Phase 6 P: Determine the doctor_id this employee should have ──
+    // Logic:
+    //  • If editing AND role is unchanged → preserve existing emp.doctor_id
+    //  • If editing AND role changed doctor→secretary → null out doctor_id
+    //    AND optionally deactivate the linked clinic_doctors row (asks user)
+    //  • If editing AND role changed secretary→doctor → auto-create a new
+    //    clinic_doctors row (handled AFTER the employee update succeeds)
+    //  • If creating new employee with role=doctor → auto-create a new
+    //    clinic_doctors row (handled AFTER the employee insert succeeds)
+    //  • If creating new employee with role=secretary → null
+    var origEmp = editingId ? employees.find(function(e){ return e.id === editingId; }) : null;
+    var doctorId = null;
+    var pendingRoleSwitch = null;   // 'doctor→secretary' | 'secretary→doctor' | null
+    var pendingDeactivateDoctorId = null;  // clinic_doctors.id to deactivate
+
+    if (editingId && origEmp) {
+      if (origEmp.role === role) {
+        // Role unchanged → preserve link
+        doctorId = origEmp.doctor_id || null;
+      } else if (origEmp.role === 'doctor' && role === 'secretary') {
+        pendingRoleSwitch = 'doctor→secretary';
+        // Ask the Owner whether to deactivate the doctor card too
+        if (origEmp.doctor_id) {
+          var doctorCard = doctors.find(function(d){ return d.id === origEmp.doctor_id; });
+          var cardActive = doctorCard ? (doctorCard.is_active !== false) : false;
+          if (cardActive) {
+            var deactivateMsg =
+              '🩺 د. ' + (origEmp.name) + ' مرتبط ببطاقة طبيب نشطة.\n\n' +
+              'بعد تغيير دوره إلى سكرتيرة، هل تريد إلغاء تنشيط بطاقة الطبيب أيضاً؟\n\n' +
+              '• السجلات التاريخية ستبقى محفوظة في كل الأحوال\n' +
+              '• إذا اخترت "موافق" — البطاقة في صفحة الأطباء ستصبح غير نشطة\n' +
+              '• إذا اخترت "إلغاء" — البطاقة تبقى نشطة لكن غير مربوطة بهذا الموظف';
+            if (confirm(deactivateMsg)) {
+              pendingDeactivateDoctorId = origEmp.doctor_id;
+            }
+          }
+        }
+        doctorId = null;  // un-link regardless
+      } else if (origEmp.role === 'secretary' && role === 'doctor') {
+        pendingRoleSwitch = 'secretary→doctor';
+        doctorId = null;  // will be filled by auto-create below
+      }
+    } else if (!editingId && role === 'doctor') {
+      // New doctor employee — auto-create flow runs below
+      doctorId = null;
+    }
+
     var row = {
       owner_id: currentUser.id,
       name: name,
@@ -631,7 +675,6 @@ async function saveEmployee() {
       res = await window.sb.from('clinic_employees')
         .update(row).eq('id', editingId).eq('owner_id', currentUser.id);
       if (!res.error) {
-        var origEmp = employees.find(function(e){ return e.id === editingId; });
         await window.logAudit('employee.edit', {
           entityId: editingId,
           description: 'تعديل بيانات الموظف: ' + name,
@@ -662,6 +705,91 @@ async function saveEmployee() {
       return;
     }
 
+    // ── Phase 6 P: Post-save side effects on clinic_doctors ──
+    // These are best-effort: if any fail, we toast a warning but still report
+    // the employee save as successful (the employee row is the source of truth).
+    try {
+      var employeeIdForDoctorOps = editingId || (res.data && res.data.id);
+
+      // Case 1: Auto-create a new clinic_doctors row when this employee
+      // transitions into (or starts as) a doctor with no existing link.
+      var needsAutoCreate = (!editingId && role === 'doctor') ||
+                            (editingId && pendingRoleSwitch === 'secretary→doctor');
+      if (needsAutoCreate && employeeIdForDoctorOps) {
+        var newDocColor = _pickRandomDoctorColor();
+        var insDoc = await window.sb.from('clinic_doctors').insert({
+          owner_id: currentUser.id,
+          name: name,
+          role: 'طبيب أسنان',
+          color: newDocColor,
+          is_owner: false,
+          is_active: true
+        }).select().single();
+        if (insDoc.error) {
+          console.warn('Phase 6 P: clinic_doctors auto-create failed:', insDoc.error);
+          showToast('⚠️ تم حفظ الموظف، لكن إنشاء بطاقة الطبيب فشل — راجع صفحة الأطباء', true);
+        } else if (insDoc.data) {
+          // Link the new clinic_doctors row back to the employee
+          var linkRes = await window.sb.from('clinic_employees')
+            .update({ doctor_id: insDoc.data.id })
+            .eq('id', employeeIdForDoctorOps)
+            .eq('owner_id', currentUser.id);
+          if (linkRes.error) {
+            console.warn('Phase 6 P: employee doctor_id link failed:', linkRes.error);
+          }
+          if (window.logAudit) {
+            window.logAudit('doctor.create', {
+              entityId: insDoc.data.id,
+              description: 'إنشاء تلقائي لبطاقة طبيب: ' + name + ' (من إضافة موظف)',
+              newValue: { name: name, color: newDocColor, auto: true }
+            });
+          }
+        }
+      }
+
+      // Case 2: Sync clinic_doctors.name when editing a still-doctor employee
+      // whose name changed.
+      if (editingId && origEmp && origEmp.role === 'doctor' && role === 'doctor' &&
+          origEmp.doctor_id && origEmp.name !== name) {
+        var syncRes = await window.sb.from('clinic_doctors')
+          .update({ name: name })
+          .eq('id', origEmp.doctor_id)
+          .eq('owner_id', currentUser.id);
+        if (syncRes.error) {
+          console.warn('Phase 6 P: clinic_doctors name sync failed:', syncRes.error);
+        } else if (window.logAudit) {
+          window.logAudit('doctor.edit', {
+            entityId: origEmp.doctor_id,
+            description: 'مزامنة اسم الطبيب من تعديل الموظف: ' + origEmp.name + ' → ' + name,
+            oldValue: { name: origEmp.name },
+            newValue: { name: name }
+          });
+        }
+      }
+
+      // Case 3: Deactivate the linked clinic_doctors row when role changes
+      // doctor→secretary AND the Owner confirmed the deactivation prompt.
+      if (pendingDeactivateDoctorId) {
+        var deactRes = await window.sb.from('clinic_doctors')
+          .update({ is_active: false })
+          .eq('id', pendingDeactivateDoctorId)
+          .eq('owner_id', currentUser.id);
+        if (deactRes.error) {
+          console.warn('Phase 6 P: clinic_doctors deactivate failed:', deactRes.error);
+          showToast('⚠️ لم نتمكّن من إلغاء تنشيط بطاقة الطبيب', true);
+        } else if (window.logAudit) {
+          window.logAudit('doctor.edit', {
+            entityId: pendingDeactivateDoctorId,
+            description: 'إلغاء تنشيط بطاقة الطبيب بعد تغيير دور الموظف لسكرتيرة',
+            oldValue: { is_active: true },
+            newValue: { is_active: false, reason: 'role_changed_to_secretary' }
+          });
+        }
+      }
+    } catch (sideErr) {
+      console.warn('Phase 6 P: post-save doctor side effects raised:', sideErr);
+    }
+
     showToast(editingId ? '✓ تم التعديل' : '✓ تمت الإضافة');
     closeModal();
     await loadData();
@@ -685,6 +813,26 @@ async function deleteEmployee(id) {
             'تنبيه: السجلات التاريخية لهذا الموظف ستبقى في سجل النشاطات مع اسمه، لكن لن يقدر يدخل البرنامج بعد الحذف.';
   if (!confirm(msg)) return;
 
+  // Phase 6 P: If this employee is a doctor linked to an active clinic_doctors
+  // card, ask the Owner whether to deactivate the card too. We never hard-delete
+  // the card — past sessions/appointments still FK to it.
+  var alsoDeactivateDoctorId = null;
+  if (emp.role === 'doctor' && emp.doctor_id) {
+    var doctorCard = doctors.find(function(d){ return d.id === emp.doctor_id; });
+    var cardActive = doctorCard ? (doctorCard.is_active !== false) : false;
+    if (cardActive) {
+      var docMsg =
+        '🩺 د. ' + emp.name + ' مرتبط ببطاقة طبيب نشطة في صفحة الأطباء.\n\n' +
+        'هل تريد إلغاء تنشيط بطاقة الطبيب أيضاً؟\n\n' +
+        '• السجلات التاريخية (جلسات/مواعيد/دفعات) ستبقى محفوظة\n' +
+        '• البطاقة لن تختفي — ستصبح فقط غير نشطة في القوائم الجديدة\n' +
+        '• يمكن إعادة تفعيلها لاحقاً من صفحة الأطباء';
+      if (confirm(docMsg)) {
+        alsoDeactivateDoctorId = emp.doctor_id;
+      }
+    }
+  }
+
   var res = await window.sb.from('clinic_employees')
     .delete().eq('id', id).eq('owner_id', currentUser.id);
 
@@ -699,6 +847,29 @@ async function deleteEmployee(id) {
     description: 'حذف الموظف: ' + emp.name,
     oldValue: { name: emp.name, role: emp.role, doctor_id: emp.doctor_id }
   });
+
+  // Phase 6 P: Soft-deactivate linked clinic_doctors row (best-effort).
+  if (alsoDeactivateDoctorId) {
+    try {
+      var deactRes = await window.sb.from('clinic_doctors')
+        .update({ is_active: false })
+        .eq('id', alsoDeactivateDoctorId)
+        .eq('owner_id', currentUser.id);
+      if (deactRes.error) {
+        console.warn('Phase 6 P: linked clinic_doctors deactivate failed:', deactRes.error);
+        showToast('⚠️ تم حذف الموظف، لكن لم نتمكّن من إلغاء تنشيط بطاقة الطبيب', true);
+      } else if (window.logAudit) {
+        window.logAudit('doctor.edit', {
+          entityId: alsoDeactivateDoctorId,
+          description: 'إلغاء تنشيط بطاقة الطبيب بعد حذف الموظف: ' + emp.name,
+          oldValue: { is_active: true },
+          newValue: { is_active: false, reason: 'employee_deleted' }
+        });
+      }
+    } catch (e) {
+      console.warn('Phase 6 P: linked clinic_doctors deactivate raised:', e);
+    }
+  }
 
   showToast('✓ تم الحذف');
   await loadData();
