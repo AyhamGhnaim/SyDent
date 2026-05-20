@@ -4038,20 +4038,17 @@ function buildTooth(num, surfaceMap, isUpper) {
         padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'L') {
         // Lingual: overshoot DOWN toward the cervical line. Horizontally
-        // INSET by 4px on each side so the lingual patch reads as a compact
-        // rounded patch in the middle column rather than reaching all the
-        // way to the M/D strip boundaries. Keeps L and B visually consistent
-        // (same horizontal extent) per live-test feedback.
+        // the rect extends from midL to midR (the inner edges of the M/D
+        // strips) — no gap, no overlap. This produces the contiguous grid
+        // look seen in CareStack/OpenDental odontograms: M/B/D/L meet
+        // edge-to-edge so the crown reads as a unified surface map.
         padB = OVERSHOOT;
-        padL = -4; padR = -4;
+        padL = 0; padR = 0;
       } else if (fillKey === 'B') {
-        // Buccal/labial: the middle facial body. Horizontally INSET by 4px
-        // on each side so the colored area reads as a compact rounded patch
-        // in the centre — not a strip that touches the M/D zones. This
-        // matches the clinical reality of a buccal restoration (a small spot
-        // on the facial surface, not full surface coverage) and leaves a
-        // small breathing gap before the side strips.
-        padL = -4; padR = -4;
+        // Buccal/labial: the middle facial body. Same horizontal extent
+        // as L (midL → midR) so B and L are visually symmetrical in the
+        // middle column and meet the M/D strips edge-to-edge with no gap.
+        padL = 0; padR = 0;
       }
       rx -= padL; ry -= padT;
       rw += padL + padR; rh += padT + padB;
