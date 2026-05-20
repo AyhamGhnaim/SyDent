@@ -1447,6 +1447,26 @@ function resolvePatientPhoneForAppt(appt) {
   return null;
 }
 
+// Resolve a patient id to a name via the local cache. Used by the audit log
+// calls in submitAppt/deleteAppt to record a stable patient_name_snapshot
+// in case the patient row is later renamed or deleted.
+//
+// Bug fix: this helper was referenced from Phase 5 audit code but never
+// defined in appointments.html — only in labs.html. The missing reference
+// threw ReferenceError mid-flow inside submitAppt/deleteAppt, which:
+//   • aborts the function before btn.disabled = false runs at the end,
+//     so the save button stays disabled with "جارٍ الحفظ…" text
+//   • aborts before reaching subsequent audit blocks, so audit gaps appear
+//   • leaves any UI side effects (toast/render) in an awkward half-state
+// Combined effect: the user observes "the modal stays stuck, the page is
+// frozen, nothing works until F5". Defining the helper resolves all three
+// audit callsites + restores normal end-of-function cleanup.
+function getPatientName(id) {
+  if (!id) return '';
+  var p = patientsCache[id];
+  return (p && p.name) ? p.name : '';
+}
+
 // Returns { kind: 'sent'|'pending'|'urgent', label, title } for a future
 // appointment that has a phone-equipped patient, or null when no badge applies.
 function classifyReminderForAppt(appt) {
