@@ -489,11 +489,13 @@
       var user = await window.sbGetUser();
       if (!user) return [];
       // Phase 7.4: filter on has_system_access=true so HR-only employees
-      // don't pollute the role picker.
+      // don't pollute the role picker. Owners ALWAYS appear regardless of
+      // the flag (defense-in-depth: prevents accidental lockout if an UPDATE
+      // somehow flips an owner's access to false — Rule #16).
       var res = await window.sb.from('clinic_employees')
         .select('id, name, role, doctor_id, pin_hash, is_active, has_system_access')
         .eq('owner_id', user.id)
-        .eq('has_system_access', true)
+        .or('has_system_access.eq.true,role.eq.owner')
         .order('role', { ascending: true })
         .order('name', { ascending: true });
       // Pre-Migration-21 fallback: if has_system_access column doesn't

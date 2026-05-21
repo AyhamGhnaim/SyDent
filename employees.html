@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260521p74"></script>
-<script src="sidebar.js?v=20260520k2-2"></script>
+<script src="sidebar.js?v=20260521p74"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1125,8 +1125,15 @@ function openEditModal(id) {
     onSystemAccessChange();
   }
 
-  // PIN hint: editing, leave empty to keep current
-  $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
+  // Phase 7.4: pinHint message varies based on whether emp ALREADY has a PIN.
+  //   • Has PIN     → "اتركه فارغاً للإبقاء على رقم السر الحالي" (skip if blank)
+  //   • No PIN yet  → "أدخل رقم سر لتمكين الدخول" (must enter to enable login)
+  // This avoids misleading the Owner about a non-existent PIN.
+  if (emp.pin_hash) {
+    $('pinHint').textContent = 'اتركه فارغاً للإبقاء على رقم السر الحالي.';
+  } else {
+    $('pinHint').textContent = 'هذا الموظف لم يضبط رقم سر بعد. أدخل رقم سر إذا كنت تريد تمكين دخوله.';
+  }
 
   onRoleChange();
   $('empModal').classList.add('show');
@@ -1471,8 +1478,12 @@ async function saveEmployee() {
         await window.logAudit('employee.edit', {
           entityId: editingId,
           description: 'تعديل بيانات الموظف: ' + name,
-          oldValue: origEmp ? { name: origEmp.name, role: origEmp.role, doctor_id: origEmp.doctor_id } : null,
+          oldValue: origEmp ? { name: origEmp.name, role: origEmp.role, doctor_id: origEmp.doctor_id,
+                                has_system_access: origEmp.has_system_access,
+                                had_pin: !!origEmp.pin_hash } : null,
           newValue: { name: name, role: role, doctor_id: doctorId, pin_changed: !!pinHash,
+                      pin_cleared: clearPin,
+                      has_system_access: hasSystemAccess,
                       phone: docPhoneField, monthly_salary: docMonthlySalaryField,
                       share_percent: docShareField, weekly_hours: docHoursField,
                       provider_type: docProviderTypeField,
@@ -1489,8 +1500,10 @@ async function saveEmployee() {
       if (!res.error && res.data) {
         await window.logAudit('employee.create', {
           entityId: res.data.id,
-          description: 'إضافة موظف جديد: ' + name + ' (' + roleLabel(role) + ')',
+          description: 'إضافة موظف جديد: ' + name + ' (' + roleLabel(role) + ')' +
+                       (hasSystemAccess ? ' — مع وصول للنظام' : ' — لتتبع راتب فقط'),
           newValue: { name: name, role: role, doctor_id: doctorId,
+                      has_system_access: hasSystemAccess,
                       phone: docPhoneField, monthly_salary: docMonthlySalaryField,
                       share_percent: docShareField, weekly_hours: docHoursField,
                       provider_type: docProviderTypeField,
@@ -2074,9 +2087,13 @@ async function removeAllLockPins() {
       if (window.SyDentLock.applyRole) window.SyDentLock.applyRole('owner', null, null);
     }
 
-    // 4. Audit log (security-relevant event)
+    // 4. Audit log (security-relevant event).
+    // Phase 7.4 note: this clears pin_hash but leaves has_system_access
+    // intact — so existing users still appear in the picker if the Owner
+    // re-enables a PIN later. The existing 'PIN not yet set' warning in
+    // supabase-init.js handles the in-between state gracefully.
     await window.logAudit('lock.pin_clear', {
-      description: 'تعطيل قفل العيادة (حذف كل أرقام السر)',
+      description: 'تعطيل قفل العيادة (حذف كل أرقام السر — قائمة الموظفين تبقى)',
       oldValue: { pin_was_set: true }
     });
 
