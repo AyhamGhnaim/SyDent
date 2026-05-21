@@ -557,7 +557,7 @@ tbody td {
 </head>
 <body>
 
-<div class="main">
+<div class="main" id="sbMainContent">
 
   <div class="topbar">
     <div class="topbar-title">المصاريف <span>/ المحاسبة</span></div>
@@ -864,6 +864,14 @@ function todayISO() {
 
 // ─── Auth bootstrap ────────────────────────────────────────────────────────
 async function init() {
+  // Phase 7.1 hotfix: initSidebar() was missing — without it the sidebar
+  // never injects on this page. Every other page calls initSidebar(activeId)
+  // at the top of its bootstrap; expenses.html was created without that
+  // call so the page rendered without navigation. Call it BEFORE the auth
+  // check so the sidebar shell appears even if auth has a transient delay.
+  if (typeof initSidebar === 'function') {
+    initSidebar('expenses');
+  }
   try {
     var u = await window.sbGetUser();
     if (!u) { window.location.href = 'auth.html'; return; }
