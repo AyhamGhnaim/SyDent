@@ -1,0 +1,1548 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<!-- Phase 7.5 — cache-busting headers (rule #21). Inline JS heavy page;
+     GitHub Pages CDN can otherwise serve stale revisions until manifest
+     changes. Hard-refresh once after deploy then it's fine. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>SyDent — المحاسبة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --green-dim: rgba(46,232,158,0.12);
+  --red:       #ef5350;
+  --red-dim:   rgba(239,83,80,0.12);
+  --yellow:    #f5c842;
+  --yellow-dim:rgba(245,200,66,0.12);
+  --blue:      #63b3ed;
+  --blue-dim:  rgba(99,179,237,0.12);
+  --orange:    #ffa726;
+  --purple:    #a78bfa;
+  --text:      #e7eef9;
+  --text2:     #8da0bd;
+  --text3:     #5d748f;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Cairo', sans-serif; }
+body { min-height: 100vh; }
+
+.main {
+  margin-right: var(--sb-width, 240px);
+  min-height: 100vh;
+  padding: 24px 28px;
+  transition: margin-right 0.25s ease;
+}
+@media (max-width: 820px) {
+  .main { margin-right: 0; padding: 16px 14px; }
+}
+
+/* ─── Header ─── */
+.page-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 18px;
+}
+.page-header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+.page-subtitle { color: var(--text2); font-size: 13px; margin-top: 4px; }
+
+/* ─── Filter bar ─── */
+.filter-bar {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: end;
+}
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 12px; color: var(--text2); font-weight: 500; }
+.field input[type="date"] {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 10px; border-radius: 8px;
+  font-family: 'Cairo', sans-serif; font-size: 13px;
+  color-scheme: dark;
+}
+.field input:focus { outline: 1px solid var(--green); }
+
+.quick-btns { display: flex; gap: 6px; }
+.qb {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 12px; border-radius: 8px;
+  font-family: 'Cairo', sans-serif; font-size: 13px; cursor: pointer;
+  transition: all 0.15s;
+}
+.qb:hover { background: var(--green-dim); border-color: var(--green); }
+.qb.active { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+.btn-apply {
+  background: var(--green); color: #001a0d; border: 0;
+  padding: 8px 18px; border-radius: 8px; cursor: pointer;
+  font-family: 'Cairo', sans-serif; font-weight: 600; font-size: 13px;
+}
+.btn-apply:hover { filter: brightness(1.1); }
+
+/* ─── Summary cards ─── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+.card .label {
+  font-size: 12px; color: var(--text2); font-weight: 500;
+  display: flex; align-items: center; gap: 6px;
+}
+.card .value {
+  font-size: 22px; font-weight: 700; margin-top: 8px;
+  letter-spacing: -0.3px;
+}
+.card .sub {
+  font-size: 11px; color: var(--text3); margin-top: 4px;
+}
+.card.green .value { color: var(--green); }
+.card.red .value { color: var(--red); }
+.card.yellow .value { color: var(--yellow); }
+.card.blue .value { color: var(--blue); }
+.card.dim .value { color: var(--text); }
+
+/* ─── Section ─── */
+.section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+.section h2 {
+  margin: 0 0 14px 0; font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.section h2 .count {
+  background: var(--bg3); color: var(--text2);
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  font-weight: 500;
+}
+
+/* ─── Warning banner ─── */
+.warn-banner {
+  background: var(--yellow-dim);
+  border: 1px solid rgba(245,200,66,0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--yellow);
+  font-size: 12px;
+  margin-bottom: 14px;
+  display: flex; align-items: flex-start; gap: 8px;
+  line-height: 1.6;
+}
+.warn-banner .ico { font-size: 16px; flex-shrink: 0; }
+.warn-banner b { color: var(--yellow); }
+
+/* ─── Expense breakdown rows ─── */
+.exp-row {
+  display: grid;
+  grid-template-columns: 24px 1fr 110px 60px;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.exp-row:last-child { border-bottom: 0; }
+.exp-row .ico { font-size: 18px; text-align: center; }
+.exp-row .name {
+  font-size: 13px; display: flex; align-items: center; gap: 6px;
+}
+.exp-row .name .warn-chip {
+  background: var(--yellow-dim);
+  color: var(--yellow);
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(245,200,66,0.3);
+}
+.exp-row .amt {
+  font-size: 13px; text-align: left; font-variant-numeric: tabular-nums;
+}
+.exp-row .pct {
+  font-size: 12px; color: var(--text2); text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.exp-row .bar-track {
+  grid-column: 2 / 5;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.exp-row .bar-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.exp-total {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.exp-total .lbl { font-weight: 600; font-size: 14px; }
+.exp-total .val { font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; }
+
+/* ─── Provider table ─── */
+.tbl-wrap { overflow-x: auto; }
+table.providers {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+  min-width: 700px;
+}
+table.providers th, table.providers td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  text-align: right;
+}
+table.providers th {
+  color: var(--text2); font-weight: 600; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+table.providers td.num {
+  font-variant-numeric: tabular-nums; text-align: left;
+}
+table.providers tr:hover td { background: rgba(255,255,255,0.02); }
+.prov-name {
+  display: flex; align-items: center; gap: 8px;
+}
+.prov-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.prov-name .badge {
+  font-size: 10px; padding: 2px 6px;
+  background: var(--bg3); color: var(--text2);
+  border-radius: 6px;
+}
+.net-pos { color: var(--green); font-weight: 600; }
+.net-neg { color: var(--red); font-weight: 600; }
+
+/* ─── Empty state ─── */
+.empty {
+  text-align: center; padding: 40px 20px; color: var(--text2);
+}
+.empty .icon { font-size: 36px; margin-bottom: 10px; }
+.empty .ttl { font-size: 15px; margin-bottom: 6px; color: var(--text); }
+.empty .sub { font-size: 12px; }
+
+/* ─── Loading ─── */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px 20px;
+  color: var(--text2);
+  font-size: 13px;
+}
+.loading .spinner {
+  width: 18px; height: 18px; border: 2px solid var(--border);
+  border-top-color: var(--green); border-radius: 50%;
+  animation: spin 0.6s linear infinite; margin-left: 8px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Debug panel (hidden by default) ─── */
+.debug-panel {
+  position: fixed; bottom: 12px; left: 12px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  font-size: 11px; color: var(--text2);
+  max-width: 380px; z-index: 999;
+  font-family: 'Courier New', monospace;
+  display: none;
+}
+.debug-panel.show { display: block; }
+.debug-panel h4 { margin: 0 0 6px 0; font-size: 12px; color: var(--text); font-family: 'Cairo', sans-serif; }
+.debug-panel .row { display: flex; justify-content: space-between; padding: 2px 0; gap: 10px; }
+.debug-panel .pass { color: var(--green); }
+.debug-panel .fail { color: var(--red); font-weight: 700; }
+.debug-panel .close {
+  position: absolute; top: 4px; right: 6px; cursor: pointer; color: var(--text3);
+  background: transparent; border: 0; font-size: 14px;
+}
+
+/* ─── Toast ─── */
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--bg3); border: 1px solid var(--green);
+  color: var(--text); padding: 10px 18px; border-radius: 10px;
+  font-size: 13px; opacity: 0; transition: opacity 0.2s;
+  pointer-events: none; z-index: 1000;
+}
+.toast.show { opacity: 1; }
+.toast.err { border-color: var(--red); }
+
+@media (max-width: 640px) {
+  .summary-grid { grid-template-columns: 1fr 1fr; }
+  .card .value { font-size: 18px; }
+  .filter-bar { flex-direction: column; align-items: stretch; }
+  .quick-btns { flex-wrap: wrap; }
+}
+</style>
+<script src="supabase-init.js?v=20260521p75"></script>
+<script src="sidebar.js?v=20260521p75"></script>
+</head>
+<body>
+
+<div class="main" id="sbMainContent">
+
+  <div class="page-header">
+    <div>
+      <h1>📊 المحاسبة</h1>
+      <div class="page-subtitle">نظرة شاملة على الأرباح والخسائر — نظام cash basis (محاسبة نقدية)</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="field">
+      <label for="fromDate">من تاريخ</label>
+      <input type="date" id="fromDate">
+    </div>
+    <div class="field">
+      <label for="toDate">إلى تاريخ</label>
+      <input type="date" id="toDate">
+    </div>
+    <div class="quick-btns">
+      <button class="qb" id="qbMonth" type="button">📅 الشهر الحالي</button>
+      <button class="qb" id="qbLast" type="button">📅 الشهر السابق</button>
+      <button class="qb" id="qbQuarter" type="button">📊 آخر 3 شهور</button>
+      <button class="qb" id="qbYear" type="button">🗓️ السنة الحالية</button>
+    </div>
+    <button class="btn-apply" id="btnApply" type="button">تطبيق</button>
+  </div>
+
+  <!-- Body (loading / content) -->
+  <div id="body">
+    <div class="loading">
+      <div class="spinner"></div>
+      جاري تحميل البيانات...
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Debug panel (toggled via Ctrl+Shift+D) -->
+<div class="debug-panel" id="debugPanel">
+  <button class="close" id="debugClose" type="button">✕</button>
+  <h4>🔬 Identity Tests</h4>
+  <div id="debugBody"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// SyDent — Phase 7.5 Accounting Dashboard (P&L)
+//
+// Architecture:
+//   - Read-only page. Zero mutations to DB.
+//   - Cash basis (revenue counted when received, not when earned).
+//   - Owner-only via 3-layer defense (sidebar BLOCKED + guardPage + role check).
+//   - Aggregates from 6 sources:
+//       1. ledger_sessions   → production (completed only, by date)
+//       2. payment_splits    → revenue allocated to production (preferred)
+//       3. ledger_payments   → revenue fallback for pre-Migration-3 legacy
+//       4. expenses          → operational expenses (Phase 7.1)
+//       5. provider_payouts  → doctor + employee compensation (Phase 7.2)
+//       6. lab_orders        → lab costs (by date_sent, status != rejected)
+//
+// Anti-double-counting:
+//   - payouts NEVER appear in expenses table by convention (default categories
+//     don't include salaries). Warning chip on any category containing
+//     راتب/موظف/طبيب/حصة triggers visual flag.
+//   - lab_orders.cost is separate from expenses.amount; no overlap possible.
+//   - payment_splits superset of ledger_payments — for any payment_id present
+//     in splits, we count splits; for the rest, fall back to raw payments.
+//
+// Identity tests (Ctrl+Shift+D to view):
+//   A. Revenue conservation:   Σ per-provider collection = total revenue
+//   B. Production conservation: Σ per-provider production = total production
+//   C. Expense sum:            expenses + payouts + labs   = total expenses
+//   D. Net profit:             revenue - expenses          = net (exact)
+//   E. Lab dedup:              Σ per-provider lab          ≤ total labs
+// ═══════════════════════════════════════════════════════════════════════════
+
+var currentUser = null;
+var doctors = [];           // clinic_doctors rows
+var expenseCategories = []; // expense_categories rows
+var allEmployees = [];      // clinic_employees rows (for payout employee_id resolution)
+
+// In-period datasets (refreshed each filter apply)
+var sessions       = [];
+var payments       = [];
+var paymentSplits  = [];
+var expenses       = [];
+var payouts        = [];
+var labOrders      = [];
+
+// Computed identities (for debug panel)
+var lastIdentities = null;
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fmtSY(n) {
+  if (n === null || n === undefined || isNaN(n)) return '0 ل.س';
+  return Math.round(Number(n)).toLocaleString('en-US') + ' ل.س';
+}
+
+function fmtPct(n, decimals) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  var d = (decimals === undefined) ? 1 : decimals;
+  return Number(n).toFixed(d) + '%';
+}
+
+function todayISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth()+1).padStart(2,'0') + '-' +
+         String(d.getDate()).padStart(2,'0');
+}
+
+function isoDate(year, monthZeroBased, day) {
+  // Build an ISO YYYY-MM-DD string without timezone surprises.
+  // Use this instead of new Date(...).toISOString() which can shift dates
+  // across UTC boundaries depending on local timezone.
+  var m = String(monthZeroBased + 1).padStart(2, '0');
+  var d = String(day).padStart(2, '0');
+  return year + '-' + m + '-' + d;
+}
+
+function showToast(msg, isError) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' err' : '');
+  setTimeout(function(){ t.className = 'toast'; }, 2500);
+}
+
+// Graceful "migration missing" detector — same pattern used in expenses.html,
+// payouts.html, etc. Lets the page degrade rather than crash on a fresh DB.
+function isMigrationMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /relation .* does not exist|42P01|PGRST205|42703|23514/i.test(msg);
+}
+
+// ─── Auth bootstrap ────────────────────────────────────────────────────────
+async function init() {
+  // Rule #24: initSidebar BEFORE auth check so sidebar shell appears even
+  // during a transient auth delay.
+  if (typeof initSidebar === 'function') {
+    initSidebar('accounting');
+  }
+
+  try {
+    var u = await window.sbGetUser();
+    if (!u) { window.location.href = 'auth.html'; return; }
+    currentUser = u;
+
+    // Page guard: Owner-only. Defense in depth (rule #16):
+    //   1. Sidebar BLOCKED hides the link for non-owners.
+    //   2. SyDentLock.guardPage replaces body with blocked screen.
+    //   3. Manual role check as final safety net if SyDentLock fails to load.
+    if (window.SyDentLock && window.SyDentLock.guardPage) {
+      if (!window.SyDentLock.guardPage(['owner'])) return;
+    }
+    var role = (window.SyDentLock && window.SyDentLock.getRole)
+             ? window.SyDentLock.getRole()
+             : 'owner';
+    if (role !== 'owner') {
+      console.warn('[accounting] non-owner role:', role, '— redirecting');
+      window.location.href = 'index.html';
+      return;
+    }
+
+    // Load reference data (doctors + categories + employees) once.
+    await Promise.all([
+      loadDoctors(),
+      loadExpenseCategories(),
+      loadEmployees()
+    ]);
+
+    // Default range: current month (first of month → today).
+    var now = new Date();
+    var firstOfMonth = isoDate(now.getFullYear(), now.getMonth(), 1);
+    $('fromDate').value = firstOfMonth;
+    $('toDate').value = todayISO();
+    setActiveQuickButton('qbMonth');
+
+    // Wire up filter controls
+    $('btnApply').addEventListener('click', applyFilter);
+    $('qbMonth').addEventListener('click',   function(){ setMonthRange();   applyFilter(); });
+    $('qbLast').addEventListener('click',    function(){ setLastMonthRange(); applyFilter(); });
+    $('qbQuarter').addEventListener('click', function(){ setQuarterRange(); applyFilter(); });
+    $('qbYear').addEventListener('click',    function(){ setYearRange();    applyFilter(); });
+    $('fromDate').addEventListener('change', clearActiveQuickButton);
+    $('toDate').addEventListener('change',   clearActiveQuickButton);
+
+    // Debug panel toggle
+    document.addEventListener('keydown', function(e){
+      if (e.ctrlKey && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        toggleDebugPanel();
+      }
+    });
+    $('debugClose').addEventListener('click', function(){
+      $('debugPanel').classList.remove('show');
+    });
+
+    // Audit log: fire-and-forget. report.view_accounting is a new action_type
+    // registered in supabase-init.js VALID_ACTION_PREFIXES.
+    if (window.logAudit) {
+      window.logAudit('report.view_accounting', {
+        description: 'فتح صفحة المحاسبة'
+      }).catch(function(){});
+    }
+
+    // Initial load
+    await applyFilter();
+
+  } catch (e) {
+    console.error('[accounting] init error:', e);
+    $('body').innerHTML = '<div class="empty"><div class="icon">⚠️</div><div class="ttl">حدث خطأ</div><div class="sub">' + escapeHtml(e.message || 'غير معروف') + '</div></div>';
+  }
+}
+
+// ─── Reference data loaders ────────────────────────────────────────────────
+async function loadDoctors() {
+  var res = await window.sb.from('clinic_doctors')
+    .select('*')
+    .eq('owner_id', currentUser.id)
+    .order('is_owner', { ascending: false })
+    .order('created_at', { ascending: true });
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { doctors = []; return; }
+    console.warn('loadDoctors:', res.error);
+    doctors = [];
+    return;
+  }
+  doctors = res.data || [];
+}
+
+async function loadExpenseCategories() {
+  var res = await window.sb.from('expense_categories')
+    .select('*')
+    .eq('owner_id', currentUser.id);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { expenseCategories = []; return; }
+    console.warn('loadExpenseCategories:', res.error);
+    expenseCategories = [];
+    return;
+  }
+  expenseCategories = res.data || [];
+}
+
+async function loadEmployees() {
+  var res = await window.sb.from('clinic_employees')
+    .select('id, name, role')
+    .eq('owner_id', currentUser.id);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { allEmployees = []; return; }
+    console.warn('loadEmployees:', res.error);
+    allEmployees = [];
+    return;
+  }
+  allEmployees = res.data || [];
+}
+
+// ─── Quick range buttons ───────────────────────────────────────────────────
+function setMonthRange() {
+  var now = new Date();
+  $('fromDate').value = isoDate(now.getFullYear(), now.getMonth(), 1);
+  $('toDate').value = todayISO();
+  setActiveQuickButton('qbMonth');
+}
+
+function setLastMonthRange() {
+  var now = new Date();
+  var firstThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  var lastMonthEnd = new Date(firstThisMonth.getTime() - 86400000);
+  var lastMonthStart = new Date(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), 1);
+  $('fromDate').value = isoDate(lastMonthStart.getFullYear(), lastMonthStart.getMonth(), 1);
+  $('toDate').value = isoDate(lastMonthEnd.getFullYear(), lastMonthEnd.getMonth(), lastMonthEnd.getDate());
+  setActiveQuickButton('qbLast');
+}
+
+function setQuarterRange() {
+  // Last 3 months: today - 90 days → today
+  var now = new Date();
+  var start = new Date(now.getTime() - 90 * 86400000);
+  $('fromDate').value = isoDate(start.getFullYear(), start.getMonth(), start.getDate());
+  $('toDate').value = todayISO();
+  setActiveQuickButton('qbQuarter');
+}
+
+function setYearRange() {
+  var now = new Date();
+  $('fromDate').value = isoDate(now.getFullYear(), 0, 1);
+  $('toDate').value = todayISO();
+  setActiveQuickButton('qbYear');
+}
+
+function setActiveQuickButton(id) {
+  ['qbMonth','qbLast','qbQuarter','qbYear'].forEach(function(b){
+    $(b).classList.toggle('active', b === id);
+  });
+}
+function clearActiveQuickButton() {
+  ['qbMonth','qbLast','qbQuarter','qbYear'].forEach(function(b){
+    $(b).classList.remove('active');
+  });
+}
+
+// ─── Main filter apply ─────────────────────────────────────────────────────
+// Concurrency guard: when the Owner clicks Apply (or a quick-range button)
+// repeatedly while a load is in flight, ignore subsequent calls. This avoids
+// a race where the older async call's render() overwrites the newer one's
+// loading state with stale data.
+var _applyInFlight = false;
+async function applyFilter() {
+  if (_applyInFlight) return;
+  var from = $('fromDate').value;
+  var to   = $('toDate').value;
+  if (!from || !to) {
+    showToast('الرجاء تحديد الفترة', true);
+    return;
+  }
+  if (from > to) {
+    showToast('"من تاريخ" يجب أن يكون قبل "إلى تاريخ"', true);
+    return;
+  }
+
+  _applyInFlight = true;
+  $('btnApply').disabled = true;
+  $('body').innerHTML = '<div class="loading"><div class="spinner"></div>جاري تحميل البيانات...</div>';
+
+  try {
+    await loadAllInRange(from, to);
+    render(from, to);
+  } catch (e) {
+    console.error('[accounting] applyFilter error:', e);
+    $('body').innerHTML = '<div class="empty"><div class="icon">⚠️</div><div class="ttl">فشل تحميل البيانات</div><div class="sub">' + escapeHtml(e.message || 'غير معروف') + '</div></div>';
+  } finally {
+    _applyInFlight = false;
+    $('btnApply').disabled = false;
+  }
+}
+
+// ─── Data layer ────────────────────────────────────────────────────────────
+async function loadAllInRange(from, to) {
+  // 6 parallel queries. Each tolerates migration-missing gracefully so a
+  // freshly-installed clinic still gets a usable (mostly-empty) report.
+  var results = await Promise.all([
+    loadSessions(from, to),
+    loadPayments(from, to),
+    loadExpenses(from, to),
+    loadPayouts(from, to),
+    loadLabOrders(from, to)
+  ]);
+
+  // After payments load, fetch their splits.
+  await loadPaymentSplits(from, to);
+}
+
+async function loadSessions(from, to) {
+  // ledger_sessions: production. Filter by date (the procedure date) and
+  // status='completed'. Planned sessions are excluded — they're not real
+  // production yet (parity with OpenDental Total Prod definition).
+  var res = await window.sb.from('ledger_sessions')
+    .select('id, patient_id, provider_id, tooth_num, cost, date, status')
+    .eq('doctor_id', currentUser.id)
+    .eq('status', 'completed')
+    .gte('date', from)
+    .lte('date', to);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { sessions = []; return; }
+    console.warn('loadSessions:', res.error);
+    sessions = [];
+    return;
+  }
+  sessions = res.data || [];
+}
+
+async function loadPayments(from, to) {
+  // ledger_payments: collected cash by patient. The amount is the gross
+  // payment; splits attribute it to specific sessions/providers.
+  var res = await window.sb.from('ledger_payments')
+    .select('id, patient_id, amount, date')
+    .eq('doctor_id', currentUser.id)
+    .gte('date', from)
+    .lte('date', to);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { payments = []; return; }
+    console.warn('loadPayments:', res.error);
+    payments = [];
+    return;
+  }
+  payments = res.data || [];
+}
+
+async function loadPaymentSplits(from, to) {
+  // payment_splits: per-session/per-provider allocation of each payment.
+  //
+  // We filter by payment_id (the in-range payments we just loaded) rather
+  // than by payment_date. Two reasons:
+  //   1. payment_date can be NULL on legacy splits (when payment.date was
+  //      empty at split-creation time) — PostgREST .gte/.lte exclude NULLs,
+  //      so a payment-date filter would silently drop those rows.
+  //   2. Filtering by payment_id is exact: every split's parent payment is
+  //      already in our `payments` array (loaded by date), so this covers
+  //      every split we care about for the period.
+  //
+  // Pre-Migration-3 fallback: empty array (raw payments serve as the source).
+  paymentSplits = [];
+  if (!payments.length) return;
+  try {
+    var paymentIds = payments.map(function(p){ return p.id; });
+    var res = await window.sb.from('payment_splits')
+      .select('payment_id, session_id, provider_id, amount, is_unearned, payment_date')
+      .eq('doctor_id', currentUser.id)
+      .in('payment_id', paymentIds);
+    if (res.error) {
+      var msg = (res.error.message || '').toLowerCase();
+      var missing = res.error.code === '42P01' || res.error.code === 'PGRST205' ||
+                    msg.indexOf('payment_splits') !== -1;
+      if (!missing) console.warn('loadPaymentSplits:', res.error);
+      return;
+    }
+    paymentSplits = res.data || [];
+  } catch(e) {
+    console.warn('loadPaymentSplits threw:', e);
+  }
+}
+
+async function loadExpenses(from, to) {
+  var res = await window.sb.from('expenses')
+    .select('id, date, category_id, amount, description, vendor')
+    .eq('owner_id', currentUser.id)
+    .gte('date', from)
+    .lte('date', to);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { expenses = []; return; }
+    console.warn('loadExpenses:', res.error);
+    expenses = [];
+    return;
+  }
+  expenses = res.data || [];
+}
+
+async function loadPayouts(from, to) {
+  // provider_payouts: filter by paid_at (the date the money actually left
+  // the clinic, regardless of which period the payout covered). This is
+  // cash-basis correct: a payout "covering April" but paid on May 5 hits
+  // May's books.
+  //
+  // Try Migration 18 schema (employee_id), fall back to Migration 17, then
+  // pre-Migration-17 minimal columns.
+  var res = await window.sb.from('provider_payouts')
+    .select('id, provider_id, employee_id, paid_at, amount, payment_method')
+    .eq('owner_id', currentUser.id)
+    .gte('paid_at', from)
+    .lte('paid_at', to);
+
+  if (res.error && /42703|employee_id/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('provider_payouts')
+      .select('id, provider_id, paid_at, amount, payment_method')
+      .eq('owner_id', currentUser.id)
+      .gte('paid_at', from)
+      .lte('paid_at', to);
+  }
+  if (res.error && /42703|payment_method/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('provider_payouts')
+      .select('id, provider_id, paid_at, amount')
+      .eq('owner_id', currentUser.id)
+      .gte('paid_at', from)
+      .lte('paid_at', to);
+  }
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { payouts = []; return; }
+    console.warn('loadPayouts:', res.error);
+    payouts = [];
+    return;
+  }
+  payouts = res.data || [];
+}
+
+async function loadLabOrders(from, to) {
+  // lab_orders: cost is incurred at date_sent (cash-basis: outflow happens
+  // when the work is commissioned, not when delivered). status='rejected'
+  // means the order was cancelled before the lab worked on it — exclude.
+  //
+  // Note: lab_orders uses doctor_id (legacy ownership column), same pattern
+  // as labs.html and provider-reports.html.
+  var res = await window.sb.from('lab_orders')
+    .select('id, patient_id, tooth_num, cost, status, date_sent')
+    .eq('doctor_id', currentUser.id)
+    .gte('date_sent', from)
+    .lte('date_sent', to);
+  if (res.error) {
+    if (isMigrationMissing(res.error)) { labOrders = []; return; }
+    console.warn('loadLabOrders:', res.error);
+    labOrders = [];
+    return;
+  }
+  labOrders = (res.data || []).filter(function(lo){ return lo.status !== 'rejected'; });
+}
+
+// ─── Computation layer (Equations 1-7 from spec) ───────────────────────────
+
+// EQUATION 1: Revenue (cash collected, excluding unearned).
+// EQUATION 2: Production (completed work).
+// EQUATION 3: Collection rate.
+function computeSummary() {
+  // 1a. Splits-based revenue (preferred). is_unearned splits are prepayments
+  // and don't count as earned revenue.
+  var splitsRevenue = 0;
+  var unearnedTotal = 0;
+  var splitPaymentIds = {};
+  for (var i = 0; i < paymentSplits.length; i++) {
+    var sp = paymentSplits[i];
+    splitPaymentIds[sp.payment_id] = true;
+    if (sp.is_unearned) {
+      unearnedTotal += Number(sp.amount) || 0;
+    } else {
+      splitsRevenue += Number(sp.amount) || 0;
+    }
+  }
+
+  // 1b. Legacy payments (no splits). Sum the raw amount.
+  var legacyRevenue = 0;
+  for (var j = 0; j < payments.length; j++) {
+    var p = payments[j];
+    if (!splitPaymentIds[p.id]) {
+      legacyRevenue += Number(p.amount) || 0;
+    }
+  }
+
+  var revenue = splitsRevenue + legacyRevenue;
+
+  // 2. Production
+  var production = 0;
+  for (var k = 0; k < sessions.length; k++) {
+    production += Number(sessions[k].cost) || 0;
+  }
+
+  // 3. Collection rate (with division-by-zero guard)
+  var collectionRate = (production > 0) ? (revenue / production) * 100 : null;
+
+  return {
+    revenue: revenue,
+    splitsRevenue: splitsRevenue,
+    legacyRevenue: legacyRevenue,
+    unearnedTotal: unearnedTotal,
+    production: production,
+    collectionRate: collectionRate
+  };
+}
+
+// EQUATION 4: Total expenses.
+function computeExpenseTotals() {
+  var expensesTotal = 0;
+  for (var i = 0; i < expenses.length; i++) {
+    expensesTotal += Number(expenses[i].amount) || 0;
+  }
+  var payoutsTotal = 0;
+  for (var j = 0; j < payouts.length; j++) {
+    payoutsTotal += Number(payouts[j].amount) || 0;
+  }
+  var labsTotal = 0;
+  for (var k = 0; k < labOrders.length; k++) {
+    labsTotal += Number(labOrders[k].cost) || 0;
+  }
+  return {
+    expensesTotal: expensesTotal,
+    payoutsTotal: payoutsTotal,
+    labsTotal: labsTotal,
+    totalExpenses: expensesTotal + payoutsTotal + labsTotal
+  };
+}
+
+// EQUATION 5 + 6: Net profit + per-category breakdown.
+function computeExpenseBreakdown(totals) {
+  // Group by category_id for the expenses table portion. Combine with two
+  // synthetic categories: "رواتب وحصص" (payouts) and "تكاليف المخابر" (labs).
+  var byCategory = {};
+  for (var i = 0; i < expenses.length; i++) {
+    var e = expenses[i];
+    var cid = e.category_id || '_uncat';
+    if (!byCategory[cid]) byCategory[cid] = 0;
+    byCategory[cid] += Number(e.amount) || 0;
+  }
+
+  // Heuristic detector for suspected double-counted salary expenses (rule:
+  // employee salaries SHOULD go in provider_payouts, not expenses). If an
+  // expense category name hints at "salary/wages/employee/doctor", flag it.
+  var SALARY_HINT_RE = /راتب|رواتب|أجر|أجور|اجر|اجور|موظف|موظفين|طبيب|أطباء|اطباء|حصة|حصص|تعويض/i;
+
+  var rows = [];
+
+  // Synthetic: payouts (always shown if > 0)
+  if (totals.payoutsTotal > 0) {
+    rows.push({
+      key: '_payouts',
+      icon: '💼',
+      name: 'رواتب وحصص الأطباء والموظفين',
+      color: '#a78bfa',
+      amount: totals.payoutsTotal,
+      isSynthetic: true,
+      warnDup: false
+    });
+  }
+
+  // Synthetic: labs
+  if (totals.labsTotal > 0) {
+    rows.push({
+      key: '_labs',
+      icon: '🥽',
+      name: 'تكاليف المخابر',
+      color: '#63b3ed',
+      amount: totals.labsTotal,
+      isSynthetic: true,
+      warnDup: false
+    });
+  }
+
+  // expense_categories rows
+  Object.keys(byCategory).forEach(function(cid){
+    var amt = byCategory[cid];
+    if (amt <= 0) return;
+    var cat = (cid === '_uncat') ? null : expenseCategories.find(function(c){ return c.id === cid; });
+    var name = cat ? cat.name : 'بدون تصنيف';
+    rows.push({
+      key: 'cat_' + cid,
+      icon: cat ? (cat.icon || '📋') : '📋',
+      name: name,
+      color: cat ? (cat.color || '#a3a3a3') : '#a3a3a3',
+      amount: amt,
+      isSynthetic: false,
+      // Warn if name hints at salary — likely double-counted with payouts.
+      warnDup: SALARY_HINT_RE.test(name)
+    });
+  });
+
+  // Sort descending by amount
+  rows.sort(function(a, b){ return b.amount - a.amount; });
+
+  // Add percentages (guard against zero total)
+  var total = totals.totalExpenses;
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].pct = (total > 0) ? (rows[i].amount / total) * 100 : 0;
+  }
+
+  return rows;
+}
+
+// EQUATION 7: Per-provider performance.
+//
+// Re-uses the same allocation logic as provider-reports.html for consistency.
+// For each clinic_doctor:
+//   - production_p = Σ sessions.cost where provider_id matches
+//   - labCost_p    = Σ matching lab_orders.cost (de-duped via shared set)
+//   - collection_p = Σ payment_splits.amount where provider_id matches
+//                     + proportional fallback for legacy payments
+//   - paidOut_p    = Σ provider_payouts.amount where provider_id matches
+//   - clinicNet_p  = collection_p - labCost_p - paidOut_p
+//
+// Note: provSessions can include sessions on inactive doctors (historical
+// data). That's correct — we want full P&L visibility.
+function computeProviderPerformance() {
+  var rows = [];
+  var sharedMatchedSet = {};
+
+  // Lookup helpers
+  var paymentIdsWithSplits = {};
+  for (var i = 0; i < paymentSplits.length; i++) {
+    paymentIdsWithSplits[paymentSplits[i].payment_id] = true;
+  }
+  var legacyPayments = payments.filter(function(p){ return !paymentIdsWithSplits[p.id]; });
+
+  // Build per-patient totals for legacy proportional allocation
+  var byPatientTotals = {};
+  for (var j = 0; j < sessions.length; j++) {
+    var s = sessions[j];
+    if (!byPatientTotals[s.patient_id]) byPatientTotals[s.patient_id] = { total: 0 };
+    byPatientTotals[s.patient_id].total += Number(s.cost) || 0;
+  }
+  var legacyPaymentsByPatient = {};
+  legacyPayments.forEach(function(p){
+    legacyPaymentsByPatient[p.patient_id] =
+      (legacyPaymentsByPatient[p.patient_id] || 0) + (Number(p.amount) || 0);
+  });
+
+  // Audit-critical: identify legacy payments whose patient has NO sessions
+  // in the period. These can't be proportionally allocated to any provider,
+  // so they must flow into _unassigned to preserve Test A (revenue
+  // conservation). Without this, Σ per-provider collection < total revenue.
+  var orphanLegacyRevenue = 0;
+  Object.keys(legacyPaymentsByPatient).forEach(function(pid){
+    if (!byPatientTotals[pid] || byPatientTotals[pid].total <= 0) {
+      orphanLegacyRevenue += legacyPaymentsByPatient[pid];
+    }
+  });
+
+  // Iterate providers (only those present in sessions, splits, OR payouts to
+  // keep the table relevant — empty rows would clutter). Then add _unassigned.
+  //
+  // Including splits provider_ids handles the edge case where an old split
+  // references a doctor whose clinic_doctors row was later deleted (FK is
+  // ON DELETE SET NULL) or whose only activity in this period is on
+  // somebody else's session via a manual split allocation. Without this,
+  // those amounts would silently fail to attribute and break Test A.
+  var providerIdsInData = {};
+  sessions.forEach(function(s){ if (s.provider_id) providerIdsInData[s.provider_id] = true; });
+  payouts.forEach(function(p){ if (p.provider_id) providerIdsInData[p.provider_id] = true; });
+  paymentSplits.forEach(function(sp){
+    if (sp.provider_id && !sp.is_unearned) providerIdsInData[sp.provider_id] = true;
+  });
+
+  // Track which provider_ids are matched by a doctor row. Splits referencing
+  // a provider_id with no current clinic_doctors row contribute to a special
+  // "محذوف" bucket so Test A still passes.
+  var knownDoctorIds = {};
+  doctors.forEach(function(doc){ knownDoctorIds[doc.id] = true; });
+
+  doctors.forEach(function(doc){
+    if (!providerIdsInData[doc.id]) return;
+    rows.push(computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
+                                     legacyPaymentsByPatient, paymentIdsWithSplits));
+  });
+
+  // Orphan provider_ids from splits/sessions/payouts where the doctor row
+  // has been deleted. Aggregate as one synthetic "deleted doctor" bucket.
+  var orphanCollection = 0;
+  var orphanProduction = 0;
+  var orphanPaidOut    = 0;
+  var orphanLabCost    = 0;
+  var orphanSessionCount = 0;
+  Object.keys(providerIdsInData).forEach(function(pid){
+    if (knownDoctorIds[pid]) return;
+    // Sessions
+    sessions.forEach(function(s){
+      if (s.provider_id !== pid) return;
+      orphanProduction += Number(s.cost) || 0;
+      orphanSessionCount++;
+      // Match labs for this orphan session (de-duped via sharedMatchedSet
+      // so a lab already attributed to a known doctor isn't double-counted).
+      if (!s.tooth_num) return;
+      var sessionDate = s.date ? new Date(s.date) : null;
+      var windowDays = 90;
+      labOrders.forEach(function(lo){
+        if (sharedMatchedSet[lo.id]) return;
+        if (lo.patient_id !== s.patient_id) return;
+        if (lo.tooth_num === null || lo.tooth_num === undefined) return;
+        if (String(lo.tooth_num) !== String(s.tooth_num)) return;
+        if (sessionDate && lo.date_sent) {
+          var loDate = new Date(lo.date_sent);
+          if (!isNaN(sessionDate.getTime()) && !isNaN(loDate.getTime())) {
+            var diffDays = Math.abs((sessionDate - loDate) / 86400000);
+            if (diffDays > windowDays) return;
+          }
+        }
+        sharedMatchedSet[lo.id] = true;
+        orphanLabCost += Number(lo.cost) || 0;
+      });
+    });
+    // Splits
+    paymentSplits.forEach(function(sp){
+      if (sp.is_unearned) return;
+      if (sp.provider_id === pid) orphanCollection += Number(sp.amount) || 0;
+    });
+    // Payouts
+    payouts.forEach(function(p){
+      if (p.provider_id === pid) orphanPaidOut += Number(p.amount) || 0;
+    });
+  });
+  if (orphanCollection > 0 || orphanProduction > 0 || orphanPaidOut > 0) {
+    rows.push({
+      id: '_deleted_doctors',
+      name: 'أطباء محذوفون',
+      color: '#5d748f',
+      isOwner: false,
+      isActive: false,
+      isUnassigned: false,
+      isDeleted: true,
+      sessionCount: orphanSessionCount,
+      production: orphanProduction,
+      labCost: orphanLabCost,
+      collection: orphanCollection,
+      paidOut: orphanPaidOut,
+      clinicNet: orphanCollection - orphanLabCost - orphanPaidOut
+    });
+  }
+
+  // _unassigned bucket — shown whenever there's something to report under it:
+  //   - sessions without provider_id (orphan sessions), OR
+  //   - splits with null provider_id (rare but possible after data edits), OR
+  //   - orphan legacy payments (patient has no in-range sessions).
+  var hasUnassignedSessions = sessions.some(function(s){ return !s.provider_id; });
+  var hasUnassignedSplits = paymentSplits.some(function(sp){
+    return !sp.is_unearned && !sp.provider_id;
+  });
+  if (hasUnassignedSessions || hasUnassignedSplits || orphanLegacyRevenue > 0) {
+    var unassignedRow = computeOneProviderRow(
+      { id: '_unassigned', name: 'غير محدد', color: '#5d748f', is_owner: false },
+      sharedMatchedSet, byPatientTotals, legacyPaymentsByPatient, paymentIdsWithSplits
+    );
+    // Add orphan legacy revenue (patients with payments but no in-range sessions).
+    unassignedRow.collection += orphanLegacyRevenue;
+    rows.push(unassignedRow);
+  }
+
+  return rows;
+}
+
+function computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
+                                legacyPaymentsByPatient, paymentIdsWithSplits) {
+  var provId = doc.id;
+  var isUnassigned = (provId === '_unassigned');
+
+  // Sessions for this provider
+  var provSessions = sessions.filter(function(s){
+    return isUnassigned ? !s.provider_id : s.provider_id === provId;
+  });
+  var production = 0;
+  for (var i = 0; i < provSessions.length; i++) {
+    production += Number(provSessions[i].cost) || 0;
+  }
+
+  // Lab cost (de-duped via shared set)
+  var labCost = 0;
+  provSessions.forEach(function(s){
+    if (!s.tooth_num) return;
+    var sessionDate = s.date ? new Date(s.date) : null;
+    var windowDays = 90;
+    labOrders.forEach(function(lo){
+      if (sharedMatchedSet[lo.id]) return;
+      if (lo.patient_id !== s.patient_id) return;
+      if (lo.tooth_num === null || lo.tooth_num === undefined) return;
+      if (String(lo.tooth_num) !== String(s.tooth_num)) return;
+      if (sessionDate && lo.date_sent) {
+        var loDate = new Date(lo.date_sent);
+        if (!isNaN(sessionDate.getTime()) && !isNaN(loDate.getTime())) {
+          var diffDays = Math.abs((sessionDate - loDate) / 86400000);
+          if (diffDays > windowDays) return;
+        }
+      }
+      sharedMatchedSet[lo.id] = true;
+      labCost += Number(lo.cost) || 0;
+    });
+  });
+
+  // Collection (exact via splits + proportional fallback for legacy)
+  var collection = 0;
+  for (var k = 0; k < paymentSplits.length; k++) {
+    var sp = paymentSplits[k];
+    if (sp.is_unearned) continue;
+    var matchesProv = isUnassigned ? !sp.provider_id : (sp.provider_id === provId);
+    if (matchesProv) collection += Number(sp.amount) || 0;
+  }
+  // Legacy proportional
+  Object.keys(byPatientTotals).forEach(function(pid){
+    var patTotals = byPatientTotals[pid];
+    if (patTotals.total <= 0) return;
+    // Compute provider share of this patient's production
+    var provTotal = 0;
+    sessions.forEach(function(s){
+      if (s.patient_id !== pid) return;
+      if (isUnassigned ? !s.provider_id : s.provider_id === provId) {
+        provTotal += Number(s.cost) || 0;
+      }
+    });
+    if (provTotal <= 0) return;
+    var ratio = provTotal / patTotals.total;
+    collection += (legacyPaymentsByPatient[pid] || 0) * ratio;
+  });
+
+  // Payouts (only those with provider_id matching — employee_id payouts are
+  // separate and shown in totals, not per-provider).
+  var paidOut = 0;
+  if (!isUnassigned) {
+    for (var m = 0; m < payouts.length; m++) {
+      if (payouts[m].provider_id === provId) {
+        paidOut += Number(payouts[m].amount) || 0;
+      }
+    }
+  }
+
+  // Clinic net from this provider's activity:
+  //   what they collected - lab they consumed - what we paid them.
+  var clinicNet = collection - labCost - paidOut;
+
+  return {
+    id: provId,
+    name: doc.name || '—',
+    color: doc.color || '#5d748f',
+    isOwner: !!doc.is_owner,
+    isActive: doc.is_active !== false,
+    isUnassigned: isUnassigned,
+    sessionCount: provSessions.length,
+    production: production,
+    labCost: labCost,
+    collection: collection,
+    paidOut: paidOut,
+    clinicNet: clinicNet
+  };
+}
+
+// Identity tests — run after each render to verify accounting integrity.
+// Stored in lastIdentities; viewable via Ctrl+Shift+D debug panel.
+function runIdentityTests(summary, totals, providerRows) {
+  var results = [];
+
+  // Test A: Revenue conservation.
+  //   Σ per-provider collection should equal total revenue (within rounding).
+  //   Tolerance: 1 ل.س for cumulative integer rounding.
+  var sumProvCollection = 0;
+  providerRows.forEach(function(r){ sumProvCollection += r.collection; });
+  var diffA = Math.abs(sumProvCollection - summary.revenue);
+  results.push({
+    name: 'A. Revenue conservation',
+    pass: diffA < 1,
+    detail: 'Σ providers: ' + Math.round(sumProvCollection) +
+            ' vs total: ' + Math.round(summary.revenue) +
+            ' (Δ=' + Math.round(diffA) + ')'
+  });
+
+  // Test B: Production conservation.
+  var sumProvProduction = 0;
+  providerRows.forEach(function(r){ sumProvProduction += r.production; });
+  var diffB = Math.abs(sumProvProduction - summary.production);
+  results.push({
+    name: 'B. Production conservation',
+    pass: diffB < 1,
+    detail: 'Σ providers: ' + Math.round(sumProvProduction) +
+            ' vs total: ' + Math.round(summary.production) +
+            ' (Δ=' + Math.round(diffB) + ')'
+  });
+
+  // Test C: Expense sum identity.
+  var sumC = totals.expensesTotal + totals.payoutsTotal + totals.labsTotal;
+  var diffC = Math.abs(sumC - totals.totalExpenses);
+  results.push({
+    name: 'C. Expense sum',
+    pass: diffC < 1,
+    detail: 'exp+pay+lab: ' + Math.round(sumC) +
+            ' vs total: ' + Math.round(totals.totalExpenses)
+  });
+
+  // Test D: Net profit identity.
+  var netCheck = summary.revenue - totals.totalExpenses;
+  results.push({
+    name: 'D. Net profit identity',
+    pass: true,
+    detail: 'rev - exp = ' + Math.round(netCheck)
+  });
+
+  // Test E: Lab de-duplication.
+  var sumProvLab = 0;
+  providerRows.forEach(function(r){ sumProvLab += r.labCost; });
+  results.push({
+    name: 'E. Lab dedup',
+    pass: sumProvLab <= totals.labsTotal + 0.01,
+    detail: 'Σ providers: ' + Math.round(sumProvLab) +
+            ' ≤ total: ' + Math.round(totals.labsTotal)
+  });
+
+  return results;
+}
+
+// ─── Rendering ─────────────────────────────────────────────────────────────
+function render(from, to) {
+  var summary = computeSummary();
+  var totals  = computeExpenseTotals();
+  var breakdown = computeExpenseBreakdown(totals);
+  var providerRows = computeProviderPerformance();
+
+  var netProfit = summary.revenue - totals.totalExpenses;
+  var profitMargin = (summary.revenue > 0) ? (netProfit / summary.revenue) * 100 : null;
+
+  // Run identity tests for debug panel
+  lastIdentities = runIdentityTests(summary, totals, providerRows);
+
+  // Build HTML
+  var html = '';
+  html += renderSummaryCards(summary, totals, netProfit, profitMargin);
+  html += renderExpenseSection(breakdown, totals);
+  html += renderProviderSection(providerRows);
+  html += renderUnearnedSection(summary);
+
+  $('body').innerHTML = html;
+
+  // Animate bars
+  setTimeout(function(){
+    document.querySelectorAll('.bar-fill').forEach(function(el){
+      var w = el.getAttribute('data-w');
+      if (w) el.style.width = w + '%';
+    });
+  }, 20);
+
+  // Update debug panel if open
+  refreshDebugPanel();
+}
+
+function renderSummaryCards(s, t, netProfit, profitMargin) {
+  var netClass = netProfit >= 0 ? 'green' : 'red';
+  var marginClass = (profitMargin === null) ? 'dim' : (profitMargin >= 0 ? 'green' : 'red');
+  var collectionRateStr = (s.collectionRate === null) ? '—' : fmtPct(s.collectionRate);
+
+  return '' +
+    '<div class="summary-grid">' +
+      // Revenue (cash collected, allocated)
+      '<div class="card green">' +
+        '<div class="label">💰 الإيرادات المحصّلة</div>' +
+        '<div class="value">' + fmtSY(s.revenue) + '</div>' +
+        '<div class="sub">مدفوعات مُخصّصة للإنتاج (cash basis)</div>' +
+      '</div>' +
+      // Production
+      '<div class="card blue">' +
+        '<div class="label">💎 الإنتاج المنجز</div>' +
+        '<div class="value">' + fmtSY(s.production) + '</div>' +
+        '<div class="sub">الجلسات المكتملة في الفترة</div>' +
+      '</div>' +
+      // Collection rate
+      '<div class="card yellow">' +
+        '<div class="label">📊 معدّل التحصيل</div>' +
+        '<div class="value">' + collectionRateStr + '</div>' +
+        '<div class="sub">' + (s.collectionRate === null ? 'لا يوجد إنتاج' : 'الإيراد ÷ الإنتاج') + '</div>' +
+      '</div>' +
+      // Total expenses
+      '<div class="card red">' +
+        '<div class="label">💸 المصروفات الإجمالية</div>' +
+        '<div class="value">' + fmtSY(t.totalExpenses) + '</div>' +
+        '<div class="sub">مصاريف + مدفوعات + مخابر</div>' +
+      '</div>' +
+      // Net profit
+      '<div class="card ' + netClass + '">' +
+        '<div class="label">' + (netProfit >= 0 ? '🟢 صافي الربح' : '🔴 صافي الخسارة') + '</div>' +
+        '<div class="value">' + fmtSY(Math.abs(netProfit)) + '</div>' +
+        '<div class="sub">الإيرادات − المصروفات</div>' +
+      '</div>' +
+      // Profit margin
+      '<div class="card ' + marginClass + '">' +
+        '<div class="label">📐 هامش الربح</div>' +
+        '<div class="value">' + (profitMargin === null ? '—' : fmtPct(profitMargin)) + '</div>' +
+        '<div class="sub">' + (profitMargin === null ? 'لا يوجد إيراد' : 'الصافي ÷ الإيراد') + '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderExpenseSection(breakdown, totals) {
+  if (!breakdown.length) {
+    return '' +
+      '<div class="section">' +
+        '<h2>📋 تفصيل المصروفات</h2>' +
+        '<div class="empty">' +
+          '<div class="icon">📭</div>' +
+          '<div class="ttl">لا توجد مصروفات في هذه الفترة</div>' +
+          '<div class="sub">جرّب فترة أوسع أو سجّل مصاريف من صفحة المصاريف</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Detect if any salary-hint category was found
+  var hasWarnDup = breakdown.some(function(r){ return r.warnDup; });
+
+  var rowsHtml = breakdown.map(function(r){
+    var warnChip = r.warnDup
+      ? '<span class="warn-chip" title="قد يكون مكرراً مع المدفوعات">⚠️ تحقق</span>'
+      : '';
+    var widthPct = Math.max(0, Math.min(100, r.pct));
+    return '' +
+      '<div class="exp-row">' +
+        '<div class="ico">' + escapeHtml(r.icon) + '</div>' +
+        '<div class="name">' + escapeHtml(r.name) + warnChip + '</div>' +
+        '<div class="amt">' + fmtSY(r.amount) + '</div>' +
+        '<div class="pct">' + fmtPct(r.pct) + '</div>' +
+        '<div class="bar-track">' +
+          '<div class="bar-fill" data-w="' + widthPct.toFixed(2) + '" style="width:0%;background:' + escapeHtml(r.color) + ';"></div>' +
+        '</div>' +
+      '</div>';
+  }).join('');
+
+  var warnBanner = hasWarnDup
+    ? '<div class="warn-banner">' +
+        '<span class="ico">⚠️</span>' +
+        '<span><b>تنبيه محاسبي:</b> إحدى تصنيفات المصاريف اسمها يوحي بالرواتب أو الحصص. ' +
+        'للحفاظ على دقّة الحسابات، يجب أن تُسجّل رواتب الأطباء والموظفين في صفحة <b>المدفوعات</b> فقط ' +
+        'وليس في المصاريف (لتجنب الازدواج في المحاسبة).</span>' +
+      '</div>'
+    : '';
+
+  return '' +
+    '<div class="section">' +
+      '<h2>📋 تفصيل المصروفات <span class="count">' + breakdown.length + ' تصنيف</span></h2>' +
+      warnBanner +
+      rowsHtml +
+      '<div class="exp-total">' +
+        '<div class="lbl">المجموع</div>' +
+        '<div class="val">' + fmtSY(totals.totalExpenses) + '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderProviderSection(rows) {
+  if (!rows.length) {
+    return '' +
+      '<div class="section">' +
+        '<h2>👨‍⚕️ الأداء حسب الطبيب</h2>' +
+        '<div class="empty">' +
+          '<div class="icon">📭</div>' +
+          '<div class="ttl">لا يوجد نشاط للأطباء في هذه الفترة</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Sort by collection descending
+  rows.sort(function(a, b){ return b.collection - a.collection; });
+
+  // Compute non-clinical payouts (employee_id-only, no provider_id) for the
+  // explanatory note. These are sums shown in the totals/breakdown but not
+  // in the per-doctor rows.
+  var nonClinicalPayouts = 0;
+  for (var i = 0; i < payouts.length; i++) {
+    if (!payouts[i].provider_id) {
+      nonClinicalPayouts += Number(payouts[i].amount) || 0;
+    }
+  }
+
+  var rowsHtml = rows.map(function(r){
+    var netClass = r.clinicNet >= 0 ? 'net-pos' : 'net-neg';
+    var dotStyle = 'background:' + escapeHtml(r.color);
+    var ownerBadge = r.isOwner ? '<span class="badge">المالك</span>' : '';
+    var inactiveBadge = !r.isActive && !r.isDeleted && !r.isUnassigned
+      ? '<span class="badge" style="color:#ef5350;border-color:rgba(239,83,80,0.3);">معطّل</span>'
+      : '';
+    var unassignedBadge = r.isUnassigned ? '<span class="badge">غير محدد</span>' : '';
+    var deletedBadge = r.isDeleted
+      ? '<span class="badge" style="color:#ef5350;border-color:rgba(239,83,80,0.3);">محذوف</span>'
+      : '';
+
+    return '' +
+      '<tr>' +
+        '<td>' +
+          '<div class="prov-name">' +
+            '<div class="prov-dot" style="' + dotStyle + '"></div>' +
+            '<span>' + escapeHtml(r.name) + '</span>' +
+            ownerBadge + inactiveBadge + unassignedBadge + deletedBadge +
+          '</div>' +
+        '</td>' +
+        '<td class="num">' + r.sessionCount + '</td>' +
+        '<td class="num">' + fmtSY(r.production) + '</td>' +
+        '<td class="num">' + fmtSY(r.collection) + '</td>' +
+        '<td class="num">' + fmtSY(r.labCost) + '</td>' +
+        '<td class="num">' + fmtSY(r.paidOut) + '</td>' +
+        '<td class="num ' + netClass + '">' +
+          (r.clinicNet >= 0 ? '' : '−') + fmtSY(Math.abs(r.clinicNet)) +
+        '</td>' +
+      '</tr>';
+  }).join('');
+
+  return '' +
+    '<div class="section">' +
+      '<h2>👨‍⚕️ الأداء حسب الطبيب <span class="count">' + rows.length + ' طبيب</span></h2>' +
+      '<div class="tbl-wrap">' +
+      '<table class="providers">' +
+        '<thead><tr>' +
+          '<th>الطبيب</th>' +
+          '<th style="text-align:left;">الجلسات</th>' +
+          '<th style="text-align:left;">الإنتاج</th>' +
+          '<th style="text-align:left;">المحصّل</th>' +
+          '<th style="text-align:left;">المخبر</th>' +
+          '<th style="text-align:left;">المدفوع له</th>' +
+          '<th style="text-align:left;">صافي العيادة</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rowsHtml + '</tbody>' +
+      '</table>' +
+      '</div>' +
+      '<div style="margin-top:12px;font-size:11px;color:var(--text2);line-height:1.6;">' +
+        '<b>صافي العيادة</b> = ما حصّلته العيادة من إنتاج هذا الطبيب − تكلفة المخبر المرتبطة بإنتاجه − ما دُفع له. ' +
+        'القيمة الموجبة تعني ربح العيادة بعد تعويض الطبيب؛ السالبة تعني الطبيب قُبض منه أكثر مما تحصّل من إنتاجه (طبيعي عندما يكون الإنتاج لم يُحصَّل بعد).' +
+        (nonClinicalPayouts > 0
+          ? '<br><br>📝 <b>ملاحظة:</b> هذا الجدول يعرض الأطباء فقط. الرواتب المدفوعة للموظفين غير السريريين (سكرتيرة، مساعدين) ' +
+            'ضمن هذه الفترة (' + fmtSY(nonClinicalPayouts) + ') ' +
+            'مُدرَجة في "المصروفات الإجمالية" وتظهر تحت "رواتب وحصص الأطباء والموظفين" في تفصيل المصروفات.'
+          : '') +
+      '</div>' +
+    '</div>';
+}
+
+function renderUnearnedSection(s) {
+  if (s.unearnedTotal <= 0) return '';
+  return '' +
+    '<div class="section" style="border-color:rgba(245,200,66,0.3);">' +
+      '<h2 style="color:var(--yellow);">💳 رصيد مدفوعات مقدّمة (غير مُكتسَب)</h2>' +
+      '<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">' +
+        '<div style="font-size:24px;font-weight:700;color:var(--yellow);">' + fmtSY(s.unearnedTotal) + '</div>' +
+        '<div style="font-size:12px;color:var(--text2);line-height:1.6;flex:1;min-width:200px;">' +
+          'مدفوعات استلمتها العيادة في هذه الفترة لكن لم تُخصَّص لإنتاج بعد ' +
+          '(prepayments / credits). محاسبياً هذه التزام على العيادة، وليست إيراداً. ' +
+          'تظهر هنا للشفافية ولا تدخل في صافي الربح.' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ─── Debug panel ───────────────────────────────────────────────────────────
+function toggleDebugPanel() {
+  var p = $('debugPanel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) refreshDebugPanel();
+}
+
+function refreshDebugPanel() {
+  if (!$('debugPanel').classList.contains('show')) return;
+  if (!lastIdentities) return;
+  var html = '';
+  lastIdentities.forEach(function(t){
+    var cls = t.pass ? 'pass' : 'fail';
+    var icon = t.pass ? '✓' : '✗';
+    html += '<div class="row"><span class="' + cls + '">' + icon + ' ' + escapeHtml(t.name) + '</span></div>';
+    html += '<div class="row" style="font-size:10px;color:var(--text3);padding-right:14px;">' + escapeHtml(t.detail) + '</div>';
+  });
+  $('debugBody').innerHTML = html;
+}
+
+// ─── Boot ──────────────────────────────────────────────────────────────────
+init();
+</script>
+
+</body>
+</html>

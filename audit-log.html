@@ -13,8 +13,8 @@
 <title>سجل النشاطات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260521p74"></script>
-<script src="sidebar.js?v=20260521p74"></script>
+<script src="supabase-init.js?v=20260521p75"></script>
+<script src="sidebar.js?v=20260521p75"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -417,7 +417,8 @@ var ACTION_TYPES_BY_PREFIX = {
   expense_category: ['expense_category.create', 'expense_category.edit', 'expense_category.delete'],
   payout:      ['payout.create', 'payout.edit', 'payout.delete'],
   settings:    ['settings.change_pin', 'settings.archive_audit'],
-  lock:        ['lock.role_switch', 'lock.pin_clear']
+  lock:        ['lock.role_switch', 'lock.pin_clear'],
+  report:      ['report.view_accounting']
 };
 
 // ── Helpers ──
@@ -463,14 +464,16 @@ function actionTypeLabel(t) {
     lab:'مخبر', doctor:'طبيب', employee:'موظف', operatory:'غرفة',
     expense:'مصروف', expense_category:'تصنيف مصاريف',
     payout:'دفعة موظف',
-    settings:'إعدادات', lock:'قفل'
+    settings:'إعدادات', lock:'قفل',
+    report:'تقرير'
   };
   var opMap = {
     create:'إضافة', edit:'تعديل', delete:'حذف',
     status_change:'تغيير حالة', toggle_active:'تبديل حالة',
     bulk_complete:'إكمال جماعي', edit_splits:'تعديل توزيع',
     archive_audit:'أرشفة سجل', change_pin:'تغيير PIN',
-    role_switch:'تبديل دور', pin_clear:'حذف PIN'
+    role_switch:'تبديل دور', pin_clear:'حذف PIN',
+    view_accounting:'فتح المحاسبة'
   };
   return (opMap[op] || op) + ' ' + (entityMap[entity] || entity);
 }
