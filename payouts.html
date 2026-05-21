@@ -547,7 +547,7 @@ body {
 
       <div class="field">
         <label>المبلغ (ل.س) <span style="color:var(--red);">*</span></label>
-        <input type="number" id="fldAmount" min="0" step="1000" placeholder="0" oninput="onAmountInput()">
+        <input type="number" id="fldAmount" min="0" step="1000" placeholder="0">
         <div class="field-hint suggest" id="hintSuggest" onclick="applySuggestion()" style="display:none;"></div>
       </div>
 
@@ -716,10 +716,13 @@ async function init() {
       if (!window.SyDentLock.guardPage(['owner'])) return;
     }
 
-    // Initialize date range filter to current month (default useful view)
-    var d = new Date();
-    var firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-    $('filterFrom').value = firstOfMonth.toISOString().slice(0,10);
+    // Initialize date range filter to current month (default useful view).
+    // Use local date components (NOT toISOString which is UTC and would
+    // shift the day for users east of UTC during early-morning hours).
+    var nowLocal = new Date();
+    var fomY = nowLocal.getFullYear();
+    var fomM = String(nowLocal.getMonth() + 1).padStart(2, '0');
+    $('filterFrom').value = fomY + '-' + fomM + '-01';
     $('filterTo').value = todayISO();
 
     await loadAll();
@@ -971,9 +974,13 @@ function setMethodFilter(m) {
 // RENDER — Stats
 // ═══════════════════════════════════════════════════════════════════════════
 function renderStats() {
+  // Use local date components (NOT toISOString which is UTC and could
+  // shift the period boundary by a day for users east of UTC).
   var now = new Date();
-  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  var yearStart  = new Date(now.getFullYear(), 0, 1).toISOString().slice(0,10);
+  var y = now.getFullYear();
+  var m = String(now.getMonth() + 1).padStart(2, '0');
+  var monthStart = y + '-' + m + '-01';
+  var yearStart  = y + '-01-01';
 
   var monthTotal = 0, monthCount = 0;
   var yearTotal = 0, yearCount = 0;
@@ -1016,7 +1023,12 @@ function renderPayouts() {
   // Apply filters
   var filtered = payouts.filter(function(po){
     if (employeeFilter !== 'all' && po.provider_id !== employeeFilter) return false;
-    if (methodFilter !== 'all' && po.payment_method !== methodFilter) return false;
+    if (methodFilter !== 'all') {
+      // null payment_method (legacy rows from provider-reports modal) treated
+      // as 'other' for filter purposes — they belong to the 'unclassified' bucket.
+      var poMethod = po.payment_method || 'other';
+      if (poMethod !== methodFilter) return false;
+    }
     var paidDate = (po.paid_at || po.created_at || '').slice(0,10);
     if (fromDate && paidDate < fromDate) return false;
     if (toDate && paidDate > toDate) return false;
@@ -1302,10 +1314,11 @@ function onBreakdownChange() {
 }
 
 function onAmountInput() {
-  // If breakdown section is closed and user is typing amount manually,
-  // we don't touch breakdown. If breakdown is open, the breakdown drives
-  // the amount; we don't auto-redistribute backwards from amount (avoids
-  // surprising the user).
+  // Intentionally left blank.
+  // Behavior: when breakdown is closed, the user types amount freely.
+  // When breakdown is open, the breakdown fields drive the amount via
+  // onBreakdownChange(); typing amount manually then does not redistribute
+  // backwards (avoids surprising users). Kept as a hook for future logic.
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1329,16 +1342,24 @@ async function savePayout() {
   if (from > to)            { showToast('⚠️ تاريخ البداية بعد النهاية', true); return; }
   if (!amount || amount<=0) { showToast('⚠️ أدخل مبلغاً صحيحاً', true); return; }
 
-  // Build payload. paid_at: combine date with current time so chronological
-  // order within a day is preserved (server-side default would be now()).
+  // Build payload. paid_at: combine date with current time (local) AND
+  // include the timezone offset so Postgres doesn't interpret as UTC and
+  // shift the displayed day for users in non-UTC zones (Syria = UTC+3).
+  // Without an offset, "2026-05-21T14:30:00" would be stored as UTC and
+  // could display as the wrong day for late-night entries.
   var paidAtIso = null;
   if (paidAt) {
-    // Append current time so the timestamp is meaningful
     var now = new Date();
     var hh = String(now.getHours()).padStart(2, '0');
     var mm = String(now.getMinutes()).padStart(2, '0');
     var ss = String(now.getSeconds()).padStart(2, '0');
-    paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss;
+    // Compute local timezone offset in ±HH:MM format
+    var tzMin = -now.getTimezoneOffset();          // positive east of UTC
+    var tzSign = tzMin >= 0 ? '+' : '-';
+    var tzAbs = Math.abs(tzMin);
+    var tzH = String(Math.floor(tzAbs / 60)).padStart(2, '0');
+    var tzM = String(tzAbs % 60).padStart(2, '0');
+    paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss + tzSign + tzH + ':' + tzM;
   }
 
   var payload = {
