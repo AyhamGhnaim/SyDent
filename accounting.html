@@ -309,6 +309,12 @@ table.providers tr:hover td { background: rgba(255,255,255,0.02); }
   .quick-btns { flex-wrap: wrap; }
 }
 </style>
+<!-- CRITICAL: Supabase CDN MUST load BEFORE supabase-init.js. The init
+     script accesses window.supabase synchronously to expose sbGetUser and
+     window.sb on the global. If the CDN loads later (e.g. at end of body),
+     init() will throw "sbGetUser is not a function". This 3-line block
+     matches the exact pattern used in expenses.html, payouts.html, etc. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260521p75"></script>
 <script src="sidebar.js?v=20260521p75"></script>
 </head>
@@ -361,7 +367,6 @@ table.providers tr:hover td { background: rgba(255,255,255,0.02); }
   <div id="debugBody"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 // SyDent — Phase 7.5 Accounting Dashboard (P&L)
