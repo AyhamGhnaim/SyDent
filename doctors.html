@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Phase 7.2 v2 (Rule #21): Disable HTTP caching for this page.
+     The inline JS contains the link-based provider filter — stale cached
+     copies served by GitHub Pages CDN would defeat the filter entirely.
+     These meta tags force the browser to revalidate on every load. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,8 +20,8 @@
 <title>أطباء العيادة — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260520k2-2"></script>
-<script src="sidebar.js?v=20260520k2-2"></script>
+<script src="supabase-init.js?v=20260521p72-v2"></script>
+<script src="sidebar.js?v=20260521p72-v2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -357,20 +364,67 @@ async function loadDoctors() {
     return;
   }
 
-  // ── Phase 7.2 Architectural Refactor ──
-  // doctors.html shows ONLY clinical practitioners — those who treat patients.
-  // Non-clinical staff (secretary + other) live in employees.html.
-  // We filter client-side (rather than in the query) because:
-  //   1) provider_type may be NULL on legacy rows (pre-Migration 13) → defaults to clinical
-  //   2) Allows us to keep the same fetch + cache the full list if ever needed
-  //   3) Future toggle (e.g., "show all staff" admin view) would just remove the filter
-  // Clinical provider types: doctor, hygienist, assistant.
-  // Non-clinical (excluded): secretary, other.
+  // ── Phase 7.2 v2 Architectural Refactor — Link-based filter ──
+  //
+  // Source of truth: clinic_employees.role (not clinic_doctors.provider_type).
+  //
+  // Mental model (per Owner's stated requirement):
+  //   "صفحة الأطباء = الأطباء المسجلين كموظفين بدور 'doctor'"
+  //   doctors.html shows ONLY clinic_doctors rows that are either:
+  //     (a) is_owner = true (always visible — owner is supreme), OR
+  //     (b) linked via clinic_employees.doctor_id with role='doctor' and is_active=true
+  //
+  // Why this beats the old provider_type filter (Phase 7.2 v1):
+  //   1) Self-healing: orphan clinic_doctors rows (Phase 6 X residue, retry
+  //      fallbacks, manual SQL edits) automatically disappear from the UI.
+  //   2) Aligns with Migration 19 (DB-level trigger that rejects non-clinical
+  //      writes to clinic_doctors) — defense-in-depth.
+  //   3) clinic_employees becomes the single source of truth for HR identity,
+  //      matching payouts.html unified-entry architecture.
+  //   4) Robust against legacy data where provider_type may be NULL or wrong
+  //      (e.g., 'assistant' fallback from Phase 6 X retry logic).
+  //
+  // Graceful fallback: if the clinic_employees query fails (RLS / network /
+  // missing column), we revert to the old provider_type filter so the page
+  // keeps working in degraded mode rather than showing an empty list.
   var allRows = data || [];
-  doctors = allRows.filter(function(d){
-    var pt = d.provider_type || 'doctor';   // NULL = legacy = doctor (clinical)
-    return pt !== 'secretary' && pt !== 'other';
-  });
+
+  var linkedDoctorIds = new Set();
+  var empQueryFailed = false;
+  try {
+    var empRes = await window.sb.from('clinic_employees')
+      .select('doctor_id, role')
+      .eq('owner_id', currentUser.id)
+      .eq('is_active', true)
+      .eq('role', 'doctor')
+      .not('doctor_id', 'is', null);
+
+    if (empRes && empRes.error) {
+      empQueryFailed = true;
+      console.warn('Phase 7.2 v2: clinic_employees query failed, using provider_type fallback:', empRes.error);
+    } else if (empRes && Array.isArray(empRes.data)) {
+      empRes.data.forEach(function(e){
+        if (e && e.doctor_id) linkedDoctorIds.add(e.doctor_id);
+      });
+    }
+  } catch (empCatch) {
+    empQueryFailed = true;
+    console.warn('Phase 7.2 v2: clinic_employees query threw, using provider_type fallback:', empCatch);
+  }
+
+  if (empQueryFailed) {
+    // Degraded mode: keep the old behavior so the owner is not locked out.
+    doctors = allRows.filter(function(d){
+      var pt = d.provider_type || 'doctor';
+      return pt !== 'secretary' && pt !== 'other';
+    });
+  } else {
+    // Primary path: link-based filter (self-healing).
+    doctors = allRows.filter(function(d){
+      if (d.is_owner) return true;                  // owner: always shown
+      return linkedDoctorIds.has(d.id);              // others: must be a linked doctor employee
+    });
+  }
 
   // Auto-create the owner-doctor record on first visit (legacy upgrade path).
   // Uses data from the legacy 'doctors' table if available, otherwise sensible defaults.
@@ -400,8 +454,14 @@ async function loadDoctors() {
     // Auto-heal: if no doctor has is_owner=true, promote the first one with
     // user_id=currentUser.id (or the very first as final fallback).
     // This handles legacy data where doctors were added before is_owner was tracked.
+    //
+    // Phase 7.2 v2 hardening: if the link-based filter wiped EVERY row (e.g.,
+    // legacy clinic has no clinic_employees yet, every clinic_doctors row is
+    // an orphan), `doctors` is empty here even though allRows isn't. In that
+    // case we cannot promote anyone — fall through and let renderList() show
+    // the empty state. Without this guard, candidate is undefined → crash.
     var hasOwner = doctors.some(function(d){ return d.is_owner; });
-    if (!hasOwner) {
+    if (!hasOwner && doctors.length > 0) {
       var candidate = doctors.find(function(d){ return d.user_id === currentUser.id; })
                    || doctors[0];
       var healRes = await window.sb.from('clinic_doctors')
