@@ -1723,6 +1723,29 @@ async function savePayout() {
       .insert(payload).select().single();
   }
 
+  // Pre-Migration-18 fallback: if INSERT fails because employee_id column
+  // doesn't exist, retry without it. This only matters for non-clinical staff;
+  // for clinical staff (provider_id set, employee_id null), the insert would
+  // succeed anyway because PostgREST drops null-valued columns from the body.
+  if (res.error && /42703|employee_id/i.test(
+      (res.error.message || '') + ' ' + (res.error.code || ''))) {
+    if (resolvedEmployeeId && !resolvedProviderId) {
+      // Non-clinical save on unmigrated DB — can't save without Migration 18
+      showToast('⚠️ شغّل Migration 18 في Supabase لحفظ دفعات الموظفين غير-السريريين', true);
+      return;
+    }
+    // Clinical save: strip employee_id and retry
+    var noEmp = Object.assign({}, payload);
+    delete noEmp.employee_id;
+    if (editingId) {
+      res = await window.sb.from('provider_payouts')
+        .update(noEmp).eq('id', editingId).select().single();
+    } else {
+      res = await window.sb.from('provider_payouts')
+        .insert(noEmp).select().single();
+    }
+  }
+
   // Pre-Migration-17 fallback: strip new columns and retry
   if (res.error && /42703|payment_method|breakdown_/i.test(
       (res.error.message || '') + ' ' + (res.error.code || ''))) {
