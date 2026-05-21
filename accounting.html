@@ -95,6 +95,7 @@ body { min-height: 100vh; }
   font-family: 'Cairo', sans-serif; font-weight: 600; font-size: 13px;
 }
 .btn-apply:hover { filter: brightness(1.1); }
+.btn-apply:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 
 /* ─── Summary cards ─── */
 .summary-grid {
@@ -461,6 +462,53 @@ function isMigrationMissing(err) {
   return /relation .* does not exist|42P01|PGRST205|42703|23514/i.test(msg);
 }
 
+// Build an "inclusive end-of-day" filter value for TIMESTAMPTZ columns.
+// `paid_at` (provider_payouts) and `date_sent` (lab_orders) are TIMESTAMPTZ,
+// so a naive `.lte('paid_at', '2026-05-21')` matches only the instant
+// '2026-05-21 00:00:00 UTC' — any payout entered later in the day (e.g.
+// 14:30) is silently EXCLUDED. We append T23:59:59.999Z to make the filter
+// cover the full calendar day in UTC.
+//
+// IMPORTANT — timezone caveat: the Owner picks dates in *local* time, but
+// the column stores UTC. For Syria (UTC+3), early-morning entries on day
+// D (e.g. 02:00 local) translate to D-1 in UTC. To avoid losing such
+// rows, we widen the filter window by ±1 day in UTC and then apply a
+// strict local-date filter client-side via inLocalRange().
+//
+// For DATE columns (ledger_sessions.date, ledger_payments.date,
+// expenses.date) none of this is needed — they're date-only.
+function widenStartUtc(isoDay) {
+  if (!isoDay || !/^\d{4}-\d{2}-\d{2}$/.test(isoDay)) return isoDay;
+  // Take from-day minus 1 day in UTC as the lower bound — covers any
+  // local-timezone offset up to ±24h.
+  var d = new Date(isoDay + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString();
+}
+function widenEndUtc(isoDay) {
+  if (!isoDay || !/^\d{4}-\d{2}-\d{2}$/.test(isoDay)) return isoDay;
+  var d = new Date(isoDay + 'T23:59:59.999Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
+// Client-side filter: keep rows whose timestamp, when displayed in LOCAL
+// time, falls on a calendar day between `from` and `to` (inclusive). The
+// DB query overshoots by ±1 day to be timezone-safe; this trims back to
+// exactly the dates the Owner asked for. Returns true if the row should
+// be kept.
+function inLocalRange(timestamptz, from, to) {
+  if (!timestamptz) return false;
+  var d = new Date(timestamptz);
+  if (isNaN(d.getTime())) return false;
+  // Compose the local-date string YYYY-MM-DD for comparison.
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  var localDay = y + '-' + m + '-' + day;
+  return localDay >= from && localDay <= to;
+}
+
 // ─── Auth bootstrap ────────────────────────────────────────────────────────
 async function init() {
   // Rule #24: initSidebar BEFORE auth check so sidebar shell appears even
@@ -665,9 +713,10 @@ async function applyFilter() {
 
 // ─── Data layer ────────────────────────────────────────────────────────────
 async function loadAllInRange(from, to) {
-  // 6 parallel queries. Each tolerates migration-missing gracefully so a
-  // freshly-installed clinic still gets a usable (mostly-empty) report.
-  var results = await Promise.all([
+  // 5 parallel queries, then payment_splits sequentially (it depends on
+  // the payments array). Each tolerates migration-missing gracefully so
+  // a freshly-installed clinic still gets a usable (mostly-empty) report.
+  await Promise.all([
     loadSessions(from, to),
     loadPayments(from, to),
     loadExpenses(from, to),
@@ -675,7 +724,7 @@ async function loadAllInRange(from, to) {
     loadLabOrders(from, to)
   ]);
 
-  // After payments load, fetch their splits.
+  // After payments load, fetch their splits (filtered by payment_id).
   await loadPaymentSplits(from, to);
 }
 
@@ -770,27 +819,34 @@ async function loadPayouts(from, to) {
   // cash-basis correct: a payout "covering April" but paid on May 5 hits
   // May's books.
   //
+  // paid_at is TIMESTAMPTZ — query a widened UTC window (±1 day around the
+  // Owner-picked dates) to be timezone-safe, then trim client-side using
+  // local-date matching via inLocalRange(). A payout entered at 02:00 local
+  // on 21/05 in Syria is stored as ~23:00 UTC on 20/05 — naively filtering
+  // by UTC would drop it from a "21/05 → 21/05" query.
+  //
   // Try Migration 18 schema (employee_id), fall back to Migration 17, then
   // pre-Migration-17 minimal columns.
+  var lo = widenStartUtc(from), hi = widenEndUtc(to);
   var res = await window.sb.from('provider_payouts')
     .select('id, provider_id, employee_id, paid_at, amount, payment_method')
     .eq('owner_id', currentUser.id)
-    .gte('paid_at', from)
-    .lte('paid_at', to);
+    .gte('paid_at', lo)
+    .lte('paid_at', hi);
 
   if (res.error && /42703|employee_id/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
     res = await window.sb.from('provider_payouts')
       .select('id, provider_id, paid_at, amount, payment_method')
       .eq('owner_id', currentUser.id)
-      .gte('paid_at', from)
-      .lte('paid_at', to);
+      .gte('paid_at', lo)
+      .lte('paid_at', hi);
   }
   if (res.error && /42703|payment_method/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
     res = await window.sb.from('provider_payouts')
       .select('id, provider_id, paid_at, amount')
       .eq('owner_id', currentUser.id)
-      .gte('paid_at', from)
-      .lte('paid_at', to);
+      .gte('paid_at', lo)
+      .lte('paid_at', hi);
   }
   if (res.error) {
     if (isMigrationMissing(res.error)) { payouts = []; return; }
@@ -798,7 +854,10 @@ async function loadPayouts(from, to) {
     payouts = [];
     return;
   }
-  payouts = res.data || [];
+  // Strict local-date trim — drops any rows that fell into the ±1 day buffer.
+  payouts = (res.data || []).filter(function(p){
+    return inLocalRange(p.paid_at, from, to);
+  });
 }
 
 async function loadLabOrders(from, to) {
@@ -806,20 +865,27 @@ async function loadLabOrders(from, to) {
   // when the work is commissioned, not when delivered). status='rejected'
   // means the order was cancelled before the lab worked on it — exclude.
   //
+  // date_sent is TIMESTAMPTZ — same timezone-safe pattern as loadPayouts.
+  //
   // Note: lab_orders uses doctor_id (legacy ownership column), same pattern
   // as labs.html and provider-reports.html.
+  var lo = widenStartUtc(from), hi = widenEndUtc(to);
   var res = await window.sb.from('lab_orders')
     .select('id, patient_id, tooth_num, cost, status, date_sent')
     .eq('doctor_id', currentUser.id)
-    .gte('date_sent', from)
-    .lte('date_sent', to);
+    .gte('date_sent', lo)
+    .lte('date_sent', hi);
   if (res.error) {
     if (isMigrationMissing(res.error)) { labOrders = []; return; }
     console.warn('loadLabOrders:', res.error);
     labOrders = [];
     return;
   }
-  labOrders = (res.data || []).filter(function(lo){ return lo.status !== 'rejected'; });
+  // Strict local-date trim + exclude rejected.
+  labOrders = (res.data || []).filter(function(loRow){
+    if (loRow.status === 'rejected') return false;
+    return inLocalRange(loRow.date_sent, from, to);
+  });
 }
 
 // ─── Computation layer (Equations 1-7 from spec) ───────────────────────────
@@ -1047,6 +1113,14 @@ function computeProviderPerformance() {
 
   // Orphan provider_ids from splits/sessions/payouts where the doctor row
   // has been deleted. Aggregate as one synthetic "deleted doctor" bucket.
+  //
+  // Conservation note: this bucket must absorb three streams to preserve
+  // Test A:
+  //   1. Splits attributed directly to orphan provider_ids.
+  //   2. Legacy-payment proportional share for any orphan sessions
+  //      (without this, the legacy proportional only fires for known
+  //      doctors and 'tax' the orphan share into a black hole).
+  //   3. Direct payouts logged against orphan provider_ids.
   var orphanCollection = 0;
   var orphanProduction = 0;
   var orphanPaidOut    = 0;
@@ -1080,12 +1154,29 @@ function computeProviderPerformance() {
         orphanLabCost += Number(lo.cost) || 0;
       });
     });
-    // Splits
+    // Splits — direct attribution to orphan provider_id.
     paymentSplits.forEach(function(sp){
       if (sp.is_unearned) return;
       if (sp.provider_id === pid) orphanCollection += Number(sp.amount) || 0;
     });
-    // Payouts
+    // Legacy proportional — for each in-range patient with sessions on this
+    // orphan provider, route the orphan's share of legacy (split-less)
+    // payments into the bucket. Without this, the known-doctor proportional
+    // loop only divides the legacy payment among known providers and the
+    // deleted doctor's share quietly vanishes, breaking Test A.
+    Object.keys(byPatientTotals).forEach(function(patId){
+      var patTotal = byPatientTotals[patId].total;
+      if (patTotal <= 0) return;
+      var orphanProvTotal = 0;
+      sessions.forEach(function(s){
+        if (s.patient_id !== patId) return;
+        if (s.provider_id === pid) orphanProvTotal += Number(s.cost) || 0;
+      });
+      if (orphanProvTotal <= 0) return;
+      var ratio = orphanProvTotal / patTotal;
+      orphanCollection += (legacyPaymentsByPatient[patId] || 0) * ratio;
+    });
+    // Payouts — direct attribution.
     payouts.forEach(function(p){
       if (p.provider_id === pid) orphanPaidOut += Number(p.amount) || 0;
     });
@@ -1224,21 +1315,26 @@ function computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
 
 // Identity tests — run after each render to verify accounting integrity.
 // Stored in lastIdentities; viewable via Ctrl+Shift+D debug panel.
+//
+// Tolerance: 0.01 ل.س is too tight when legacy proportional allocation
+// involves many patients (each contributes a floating-point ratio).
+// We use 1 ل.س cumulative tolerance — generous for FP error, strict
+// enough to catch real bugs (which would diff by hundreds or more).
 function runIdentityTests(summary, totals, providerRows) {
   var results = [];
+  var TOLERANCE = 1; // ل.س
 
   // Test A: Revenue conservation.
-  //   Σ per-provider collection should equal total revenue (within rounding).
-  //   Tolerance: 1 ل.س for cumulative integer rounding.
+  //   Σ per-provider collection should equal total revenue.
   var sumProvCollection = 0;
   providerRows.forEach(function(r){ sumProvCollection += r.collection; });
   var diffA = Math.abs(sumProvCollection - summary.revenue);
   results.push({
     name: 'A. Revenue conservation',
-    pass: diffA < 1,
+    pass: diffA < TOLERANCE,
     detail: 'Σ providers: ' + Math.round(sumProvCollection) +
             ' vs total: ' + Math.round(summary.revenue) +
-            ' (Δ=' + Math.round(diffA) + ')'
+            ' (Δ=' + diffA.toFixed(2) + ')'
   });
 
   // Test B: Production conservation.
@@ -1247,23 +1343,23 @@ function runIdentityTests(summary, totals, providerRows) {
   var diffB = Math.abs(sumProvProduction - summary.production);
   results.push({
     name: 'B. Production conservation',
-    pass: diffB < 1,
+    pass: diffB < TOLERANCE,
     detail: 'Σ providers: ' + Math.round(sumProvProduction) +
             ' vs total: ' + Math.round(summary.production) +
-            ' (Δ=' + Math.round(diffB) + ')'
+            ' (Δ=' + diffB.toFixed(2) + ')'
   });
 
-  // Test C: Expense sum identity.
+  // Test C: Expense sum identity (no FP risk, additive integers).
   var sumC = totals.expensesTotal + totals.payoutsTotal + totals.labsTotal;
   var diffC = Math.abs(sumC - totals.totalExpenses);
   results.push({
     name: 'C. Expense sum',
-    pass: diffC < 1,
+    pass: diffC < TOLERANCE,
     detail: 'exp+pay+lab: ' + Math.round(sumC) +
             ' vs total: ' + Math.round(totals.totalExpenses)
   });
 
-  // Test D: Net profit identity.
+  // Test D: Net profit identity (always exact by construction).
   var netCheck = summary.revenue - totals.totalExpenses;
   results.push({
     name: 'D. Net profit identity',
@@ -1272,11 +1368,13 @@ function runIdentityTests(summary, totals, providerRows) {
   });
 
   // Test E: Lab de-duplication.
+  //   Σ per-provider labCost ≤ total labsTotal. The inequality can be strict
+  //   when labs exist for periods/patients with no in-range session match.
   var sumProvLab = 0;
   providerRows.forEach(function(r){ sumProvLab += r.labCost; });
   results.push({
     name: 'E. Lab dedup',
-    pass: sumProvLab <= totals.labsTotal + 0.01,
+    pass: sumProvLab <= totals.labsTotal + TOLERANCE,
     detail: 'Σ providers: ' + Math.round(sumProvLab) +
             ' ≤ total: ' + Math.round(totals.labsTotal)
   });
@@ -1495,6 +1593,7 @@ function renderProviderSection(rows) {
       '<div style="margin-top:12px;font-size:11px;color:var(--text2);line-height:1.6;">' +
         '<b>صافي العيادة</b> = ما حصّلته العيادة من إنتاج هذا الطبيب − تكلفة المخبر المرتبطة بإنتاجه − ما دُفع له. ' +
         'القيمة الموجبة تعني ربح العيادة بعد تعويض الطبيب؛ السالبة تعني الطبيب قُبض منه أكثر مما تحصّل من إنتاجه (طبيعي عندما يكون الإنتاج لم يُحصَّل بعد).' +
+        '<br><br>📐 <b>عن المخبر:</b> تكلفة المخبر هنا تُحسب فقط لطلبات المخابر المرسلة في نفس الفترة والمرتبطة بجلسات هذا الطبيب (نافذة ±90 يوم). قد يقل المجموع عن إجمالي تكاليف المخابر في "تفصيل المصروفات" لأن بعض الطلبات قد تكون مرسلة لمرضى بدون جلسات في الفترة أو لجلسات خارج النطاق — وهذا صحيح محاسبياً.' +
         (nonClinicalPayouts > 0
           ? '<br><br>📝 <b>ملاحظة:</b> هذا الجدول يعرض الأطباء فقط. الرواتب المدفوعة للموظفين غير السريريين (سكرتيرة، مساعدين) ' +
             'ضمن هذه الفترة (' + fmtSY(nonClinicalPayouts) + ') ' +
