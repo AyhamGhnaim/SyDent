@@ -151,7 +151,7 @@ const navItems = [
   { icon: '💉', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
   { icon: '👥', label: 'الموظفون',     href: 'employees.html', id: 'employees' },
-  { icon: '💳', label: 'المدفوعات',   href: '#',             id: 'payments'  },
+  { icon: '💳', label: 'المدفوعات',   href: 'payouts.html',  id: 'payouts'   },
   { icon: '💰', label: 'المصاريف',    href: 'expenses.html', id: 'expenses'  },
   { icon: '🥽', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },
@@ -172,8 +172,8 @@ function buildHTML(activeId) {
   var role = (window.SyDentLock && window.SyDentLock.getRole) ? window.SyDentLock.getRole() : 'owner';
   var BLOCKED = {
     owner:     [],
-    doctor:    ['treatments', 'doctors', 'employees', 'settings', 'audit-log', 'expenses'],
-    secretary: ['treatments', 'doctors', 'employees', 'settings', 'provider-reports', 'audit-log', 'expenses']
+    doctor:    ['treatments', 'doctors', 'employees', 'settings', 'audit-log', 'expenses', 'payouts'],
+    secretary: ['treatments', 'doctors', 'employees', 'settings', 'provider-reports', 'audit-log', 'expenses', 'payouts']
   };
   var blocked = BLOCKED[role] || [];
 

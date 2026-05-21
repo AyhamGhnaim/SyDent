@@ -415,6 +415,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
     </div>
     <div class="modal-foot">
+      <button class="btn btn-outline" onclick="goToFullPayoutsPage()" style="margin-left:auto;">📋 الصفحة الكاملة</button>
       <button class="btn btn-outline" onclick="closeModal('payoutModal')">إلغاء</button>
       <button class="btn btn-primary" onclick="savePayout()">💾 حفظ الدفعة</button>
     </div>
@@ -1303,11 +1304,39 @@ async function savePayout() {
   document.getElementById('payoutAmount').value = '';
   document.getElementById('payoutNotes').value = '';
   showToast('✅ تم تسجيل الدفعة');
+
+  // Phase 7.2: audit log fires from both provider-reports (quick path)
+  // and payouts.html (full path). Same action_type, same registry.
+  try {
+    if (window.logAudit) {
+      var doc = doctors.find(function(x){ return x.id === provId; });
+      var docName = doc ? doc.name : '—';
+      window.logAudit('payout.create', {
+        entity_type: 'payout',
+        entity_id: res.data ? res.data.id : null,
+        description: 'دفعة لـ ' + docName + ' (' + fmtSY(payload.amount) + ')',
+        new_value: {
+          provider_id: provId,
+          provider_name: docName,
+          period_start: payload.period_start,
+          period_end: payload.period_end,
+          amount: payload.amount
+        }
+      });
+    }
+  } catch (e) { console.warn('audit log failed:', e); }
+
   render();  // Refresh provider cards to show paid amount
 }
 
 async function deletePayout(id) {
   if (!confirm('حذف هذه الدفعة؟')) return;
+  // Snapshot for audit BEFORE delete
+  var snapshot = payouts.find(function(po){ return po.id === id; });
+  var snapDoc  = snapshot ? doctors.find(function(x){ return x.id === snapshot.provider_id; }) : null;
+  var snapName = snapDoc ? snapDoc.name : '—';
+  var snapAmt  = snapshot ? Number(snapshot.amount) || 0 : 0;
+
   var res = await window.sb.from('provider_payouts').delete().eq('id', id);
   if (res.error) { showToast('⚠️ فشل الحذف: ' + res.error.message); return; }
   payouts = payouts.filter(function(po){ return po.id !== id; });
@@ -1315,7 +1344,35 @@ async function deletePayout(id) {
   var provId = document.getElementById('payoutProviderId').value;
   renderPayoutHistory(provId);
   showToast('🗑️ تم الحذف');
+
+  // Audit log (fire-and-forget; snapshot from BEFORE the delete)
+  try {
+    if (window.logAudit) {
+      window.logAudit('payout.delete', {
+        entity_type: 'payout',
+        entity_id: id,
+        description: 'حذف دفعة لـ ' + snapName + ' (' + fmtSY(snapAmt) + ')',
+        old_value: snapshot || null
+      });
+    }
+  } catch (e) { console.warn('audit log failed:', e); }
+
   render();
+}
+
+// Phase 7.2: redirect to the dedicated payouts page for full breakdown,
+// payment-method tracking, and richer filters. provider-reports keeps the
+// quick-add modal for in-context speed; the dedicated page is the single
+// source of truth for history + audit display.
+function goToFullPayoutsPage() {
+  var provId = document.getElementById('payoutProviderId').value;
+  var from = document.getElementById('payoutFrom').value;
+  var to   = document.getElementById('payoutTo').value;
+  var qs = [];
+  if (provId) qs.push('provider=' + encodeURIComponent(provId));
+  if (from)   qs.push('from=' + encodeURIComponent(from));
+  if (to)     qs.push('to=' + encodeURIComponent(to));
+  window.location.href = 'payouts.html' + (qs.length ? '?' + qs.join('&') : '');
 }
 
 // ─── Filter changes ───

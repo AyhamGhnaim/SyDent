@@ -1378,8 +1378,10 @@
 
   // Valid action_type prefixes (used for validation, not enforcement)
   var VALID_ACTION_PREFIXES = [
-    'patient.', 'appointment.', 'session.', 'payment.',
-    'lab.', 'doctor.', 'employee.', 'settings.', 'lock.'
+    'patient.', 'appointment.', 'appointment_type.', 'session.', 'payment.',
+    'lab.', 'doctor.', 'employee.', 'operatory.',
+    'expense.', 'expense_category.', 'payout.',
+    'settings.', 'lock.'
   ];
 
   async function logAudit(actionType, opts) {

@@ -415,6 +415,7 @@ var ACTION_TYPES_BY_PREFIX = {
   operatory:   ['operatory.create', 'operatory.edit', 'operatory.delete'],
   expense:     ['expense.create', 'expense.edit', 'expense.delete'],
   expense_category: ['expense_category.create', 'expense_category.edit', 'expense_category.delete'],
+  payout:      ['payout.create', 'payout.edit', 'payout.delete'],
   settings:    ['settings.change_pin', 'settings.archive_audit'],
   lock:        ['lock.role_switch', 'lock.pin_clear']
 };
@@ -461,6 +462,7 @@ function actionTypeLabel(t) {
     patient:'مريض', appointment:'موعد', appointment_type:'قالب موعد', session:'جلسة', payment:'دفعة',
     lab:'مخبر', doctor:'طبيب', employee:'موظف', operatory:'غرفة',
     expense:'مصروف', expense_category:'تصنيف مصاريف',
+    payout:'دفعة موظف',
     settings:'إعدادات', lock:'قفل'
   };
   var opMap = {

@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<!-- Phase 7.2: cache-busting headers (قاعدة #21). -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>SyDent — المدفوعات</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --green-dim: rgba(46,232,158,0.12);
+  --red:       #ef5350;
+  --yellow:    #f5c842;
+  --blue:      #63b3ed;
+  --orange:    #ffa726;
+  --gray:      #a3a3a3;
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --radius:    12px;
+  --sidebar:   240px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+}
+
+.main {
+  flex: 1;
+  margin-right: var(--sb-width, 240px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-width: 0;
+}
+
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-title { font-size: 20px; font-weight: 700; flex: 1; }
+.topbar-title span { color: var(--green); }
+
+.btn-add {
+  background: var(--green);
+  color: #0a1628;
+  border: none; border-radius: 10px;
+  padding: 10px 20px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  transition: opacity .2s, transform .15s;
+  white-space: nowrap;
+}
+.btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.content { padding: 24px 28px; max-width: 1400px; }
+
+/* ─── Stats strip ──────────────────────────────────────────────────────── */
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 3px;
+  background: var(--green);
+}
+.stat-card.alt::before { background: var(--blue); }
+.stat-card.alt2::before { background: var(--yellow); }
+.stat-card.alt3::before { background: var(--orange); }
+.stat-label { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 5px; }
+.stat-value { font-size: 22px; font-weight: 700; color: var(--green); }
+.stat-card.alt .stat-value { color: var(--blue); }
+.stat-card.alt2 .stat-value { color: var(--yellow); }
+.stat-card.alt3 .stat-value { color: var(--orange); }
+.stat-sub { font-size: 11px; color: var(--text2); }
+
+/* ─── Filters ──────────────────────────────────────────────────────────── */
+.filters {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+.filter-row {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.filter-row:last-child { margin-bottom: 0; }
+.filter-label {
+  font-size: 12px; color: var(--text2); font-weight: 600;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px; font-weight: 600;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+  white-space: nowrap;
+}
+.chip:hover { background: rgba(46,232,158,0.08); }
+.chip.active { background: var(--green); color: #0a1628; border-color: var(--green); }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+.date-range {
+  display: flex; gap: 8px; align-items: center;
+}
+.date-range input[type="date"] {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px;
+  min-width: 130px;
+}
+
+/* ─── Table ────────────────────────────────────────────────────────────── */
+.payouts-table {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.table-head, .table-row {
+  display: grid;
+  grid-template-columns: 110px 180px 180px 130px 110px 80px;
+  gap: 10px; padding: 12px 16px; align-items: center;
+}
+.table-head {
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text2);
+}
+.table-row {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.table-row:hover { background: rgba(46,232,158,0.04); }
+.table-row:last-child { border-bottom: none; }
+.cell-amt { font-weight: 700; color: var(--green); }
+.cell-employee { display: flex; align-items: center; gap: 8px; }
+.dot-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cell-method {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 12px;
+  background: var(--bg3); font-size: 11px; font-weight: 600;
+}
+.cell-method.cash { color: var(--green); }
+.cell-method.bank { color: var(--blue); }
+.cell-method.check { color: var(--yellow); }
+.cell-method.other { color: var(--gray); }
+.cell-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.icon-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: rgba(46,232,158,0.08); border-color: var(--green); }
+.icon-btn.danger:hover { background: rgba(239,83,80,0.12); border-color: var(--red); color: var(--red); }
+
+/* Expandable breakdown row */
+.breakdown-row {
+  grid-column: 1 / -1;
+  padding: 8px 16px 12px;
+  background: rgba(46,232,158,0.04);
+  border-top: 1px dashed var(--border);
+  font-size: 12px; color: var(--text2);
+  display: none;
+}
+.breakdown-row.show { display: block; }
+.breakdown-row .bd-item {
+  display: inline-block;
+  background: var(--bg3);
+  padding: 4px 10px;
+  border-radius: 8px;
+  margin: 0 6px 4px 0;
+}
+.breakdown-row .bd-item b { color: var(--green); }
+
+.empty-state {
+  text-align: center; padding: 40px 20px; color: var(--text2);
+}
+.empty-state .ico { font-size: 40px; margin-bottom: 12px; }
+.empty-state .title { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.empty-state .sub { font-size: 13px; }
+
+/* ─── Modal ────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 200; padding: 16px;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%; max-width: 520px;
+  max-height: 90vh; overflow-y: auto;
+}
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  background: transparent; border: none; color: var(--text2);
+  cursor: pointer; font-size: 22px; line-height: 1;
+}
+.modal-body { padding: 18px 20px; }
+.field { margin-bottom: 14px; }
+.field label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text2); margin-bottom: 6px;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+}
+.field input[readonly] {
+  background: rgba(46,232,158,0.06);
+  color: var(--green);
+  font-weight: 700;
+  cursor: default;
+}
+.field textarea { resize: vertical; min-height: 60px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-hint { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.field-hint.suggest { color: var(--green); font-weight: 600; cursor: pointer; }
+.field-hint.suggest:hover { text-decoration: underline; }
+
+.method-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.method-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Cairo', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1; min-width: 80px;
+  text-align: center;
+  transition: all 0.15s;
+}
+.method-chip:hover { background: rgba(46,232,158,0.08); }
+.method-chip.active { background: var(--green); color: #0a1628; border-color: var(--green); }
+
+/* Breakdown section (collapsible) */
+.breakdown-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.breakdown-toggle {
+  background: var(--bg3);
+  padding: 10px 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600;
+  user-select: none;
+}
+.breakdown-toggle:hover { background: rgba(46,232,158,0.06); }
+.breakdown-toggle .arrow { transition: transform 0.2s; }
+.breakdown-section.open .breakdown-toggle .arrow { transform: rotate(180deg); }
+.breakdown-body {
+  padding: 14px;
+  display: none;
+}
+.breakdown-section.open .breakdown-body { display: block; }
+.breakdown-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;
+}
+.bd-total {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px;
+}
+.bd-total b { color: var(--green); font-size: 15px; }
+
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn {
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text);
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--green);
+  color: #0a1628;
+  border-color: var(--green);
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.danger { color: var(--red); }
+.btn.danger:hover { background: rgba(239,83,80,0.12); border-color: var(--red); }
+
+.inactive-toggle {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12px; color: var(--text2);
+  margin-top: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.inactive-toggle input { width: auto; }
+
+/* ─── Toast ────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--bg2);
+  color: var(--text);
+  border: 1px solid var(--green);
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  z-index: 300;
+  max-width: 380px;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.err { border-color: var(--red); color: var(--red); }
+
+/* ─── Responsive ───────────────────────────────────────────────────────── */
+@media (max-width: 980px) {
+  .stats-strip { grid-template-columns: repeat(2, 1fr); }
+  .table-head, .table-row {
+    grid-template-columns: 90px 1fr 1fr 110px 90px 70px;
+    font-size: 12px;
+  }
+  .field-row { grid-template-columns: 1fr; }
+  .breakdown-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .main { margin-right: 0 !important; }
+  .content { padding: 16px 14px; }
+  .topbar { padding: 14px 16px; }
+  .topbar-title { font-size: 16px; }
+  .btn-add { padding: 8px 14px; font-size: 12px; }
+  .stats-strip { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { padding: 12px 14px; }
+  .stat-value { font-size: 18px; }
+  .payouts-table { overflow-x: auto; }
+  .table-head, .table-row {
+    min-width: 640px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="main" id="sbMainContent">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="topbar-title">
+      💳 <span>المدفوعات</span>
+    </div>
+    <button class="btn-add" onclick="openModal()">
+      ✚ دفعة جديدة
+    </button>
+  </div>
+
+  <div class="content">
+
+    <!-- Stats strip -->
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-label">📅 هذا الشهر</div>
+        <div class="stat-value" id="statMonth">0 ل.س</div>
+        <div class="stat-sub" id="statMonthCount">0 دفعة</div>
+      </div>
+      <div class="stat-card alt">
+        <div class="stat-label">📊 هذه السنة</div>
+        <div class="stat-value" id="statYear">0 ل.س</div>
+        <div class="stat-sub" id="statYearCount">0 دفعة</div>
+      </div>
+      <div class="stat-card alt2">
+        <div class="stat-label">💰 الإجمالي</div>
+        <div class="stat-value" id="statTotal">0 ل.س</div>
+        <div class="stat-sub" id="statTotalCount">0 دفعة</div>
+      </div>
+      <div class="stat-card alt3">
+        <div class="stat-label">👥 الموظفون النشطون</div>
+        <div class="stat-value" id="statEmployees">0</div>
+        <div class="stat-sub">يستلمون دفعات</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="filter-row">
+        <span class="filter-label">الموظف:</span>
+        <div class="chips" id="employeeFilters"></div>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">الطريقة:</span>
+        <div class="chips" id="methodFilters">
+          <div class="chip active" data-method="all" onclick="setMethodFilter('all')">الكل</div>
+          <div class="chip" data-method="cash" onclick="setMethodFilter('cash')">💵 نقد</div>
+          <div class="chip" data-method="bank" onclick="setMethodFilter('bank')">🏦 بنك</div>
+          <div class="chip" data-method="check" onclick="setMethodFilter('check')">📋 شيك</div>
+          <div class="chip" data-method="other" onclick="setMethodFilter('other')">📌 أخر</div>
+        </div>
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">الفترة:</span>
+        <div class="date-range">
+          <input type="date" id="filterFrom" onchange="renderPayouts()">
+          <span style="color:var(--text2);">←</span>
+          <input type="date" id="filterTo" onchange="renderPayouts()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Payouts table -->
+    <div class="payouts-table">
+      <div class="table-head">
+        <div>تاريخ الدفع</div>
+        <div>الموظف</div>
+        <div>الفترة المغطّاة</div>
+        <div>المبلغ</div>
+        <div>الطريقة</div>
+        <div></div>
+      </div>
+      <div id="payoutsList"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────────────── -->
+<!-- Modal — Add/Edit Payout                                                  -->
+<!-- ──────────────────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">دفعة جديدة</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <input type="hidden" id="editingId">
+
+      <div class="field">
+        <label>الموظف <span style="color:var(--red);">*</span></label>
+        <select id="fldProvider" onchange="onProviderChange()"></select>
+        <label class="inactive-toggle">
+          <input type="checkbox" id="fldShowInactive" onchange="populateProviderDropdown()">
+          إظهار المعطّلين
+        </label>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>الفترة من <span style="color:var(--red);">*</span></label>
+          <input type="date" id="fldPeriodStart" onchange="onPeriodChange()">
+        </div>
+        <div class="field">
+          <label>الفترة إلى <span style="color:var(--red);">*</span></label>
+          <input type="date" id="fldPeriodEnd" onchange="onPeriodChange()">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>تاريخ الدفع</label>
+        <input type="date" id="fldPaidAt">
+        <div class="field-hint">افتراضي: اليوم</div>
+      </div>
+
+      <div class="field">
+        <label>المبلغ (ل.س) <span style="color:var(--red);">*</span></label>
+        <input type="number" id="fldAmount" min="0" step="1000" placeholder="0" oninput="onAmountInput()">
+        <div class="field-hint suggest" id="hintSuggest" onclick="applySuggestion()" style="display:none;"></div>
+      </div>
+
+      <div class="field">
+        <label>طريقة الدفع</label>
+        <div class="method-chips" id="methodChipsModal">
+          <div class="method-chip" data-method="cash" onclick="setModalMethod('cash')">💵 نقد</div>
+          <div class="method-chip" data-method="bank" onclick="setModalMethod('bank')">🏦 بنك</div>
+          <div class="method-chip" data-method="check" onclick="setModalMethod('check')">📋 شيك</div>
+          <div class="method-chip" data-method="other" onclick="setModalMethod('other')">📌 أخر</div>
+        </div>
+      </div>
+
+      <!-- Breakdown (collapsible) -->
+      <div class="breakdown-section" id="breakdownSection">
+        <div class="breakdown-toggle" onclick="toggleBreakdown()">
+          <span>📊 تفصيل الدفعة (اختياري)</span>
+          <span class="arrow">▼</span>
+        </div>
+        <div class="breakdown-body">
+          <div class="breakdown-grid">
+            <div class="field">
+              <label>راتب أساسي</label>
+              <input type="number" id="fldSalary" min="0" step="1000" placeholder="0" oninput="onBreakdownChange()">
+            </div>
+            <div class="field">
+              <label>نسبة إنتاج</label>
+              <input type="number" id="fldShare" min="0" step="1000" placeholder="0" oninput="onBreakdownChange()">
+            </div>
+            <div class="field">
+              <label>مكافأة</label>
+              <input type="number" id="fldBonus" min="0" step="1000" placeholder="0" oninput="onBreakdownChange()">
+            </div>
+          </div>
+          <div class="bd-total">
+            <span>المجموع (يحلّ محل المبلغ):</span>
+            <b id="bdTotal">0 ل.س</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>ملاحظات</label>
+        <textarea id="fldNotes" placeholder="مثلاً: راتب شهر مايو، أو دفعة جزئية..."></textarea>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none;">🗑️ حذف</button>
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+      <button class="btn primary" onclick="savePayout()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="supabase-init.js?v=20260521p"></script>
+<script src="sidebar.js?v=20260521p"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 7.2 — Payouts page
+// ═══════════════════════════════════════════════════════════════════════════
+// Single source of truth for clinic payouts (Owner pays employees/doctors).
+// Reads provider_payouts table. Smart suggestion calculated client-side from
+// sessions + payment_splits (no DB views; قاعدة #7).
+// ───────────────────────────────────────────────────────────────────────────
+
+var currentUser = null;
+var payouts     = [];     // provider_payouts rows
+var doctors     = [];     // clinic_doctors rows (all, active + inactive)
+var sessions    = [];     // ledger_sessions for production calculation
+
+var employeeFilter = 'all';  // 'all' or provider_id
+var methodFilter   = 'all';  // 'all' | 'cash' | 'bank' | 'check' | 'other'
+var modalMethod    = null;   // 'cash' | 'bank' | 'check' | 'other' | null
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function fmtSY(n) {
+  if (n === null || n === undefined || isNaN(n)) return '0 ل.س';
+  return Math.round(Number(n)).toLocaleString('en-US') + ' ل.س';
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+function fmtDateShort(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.getDate() + '/' + (d.getMonth()+1) + '/' + d.getFullYear();
+}
+function todayISO() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth()+1).padStart(2,'0') + '-' +
+         String(d.getDate()).padStart(2,'0');
+}
+function showToast(msg, isErr) {
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isErr ? ' err' : '');
+  setTimeout(function(){ t.className = isErr ? 'err' : ''; }, 2400);
+}
+
+// Detect migration-missing errors (قاعدة #2)
+function isMigrationMissing(err) {
+  if (!err) return false;
+  var msg = (err.message || '') + ' ' + (err.code || '');
+  return /relation .* does not exist|42P01|PGRST205|42703|23514/i.test(msg);
+}
+
+// Method label + emoji
+function methodLabel(m) {
+  if (m === 'cash')  return '💵 نقد';
+  if (m === 'bank')  return '🏦 بنك';
+  if (m === 'check') return '📋 شيك';
+  if (m === 'other') return '📌 أخر';
+  return '— —';
+}
+
+// Provider type label (mirrors employees.html for consistency)
+function providerTypeLabel(pt) {
+  if (pt === 'doctor')    return '🦷 طبيب';
+  if (pt === 'hygienist') return '🩺 متدرب';
+  if (pt === 'assistant') return '🤝 مساعدة';
+  if (pt === 'secretary') return '👩‍💼 سكرتيرة';
+  if (pt === 'other')     return '👥 أخر';
+  return '🦷 طبيب';  // legacy default
+}
+
+// Compensation badge for dropdown
+function compensationLabel(cm) {
+  if (cm === 'salary')     return 'راتب';
+  if (cm === 'percentage') return 'نسبة';
+  if (cm === 'hybrid')     return 'راتب+نسبة';
+  if (cm === 'none')       return 'بدون';
+  return 'نسبة';  // legacy default
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTH BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════════════════
+async function init() {
+  // قاعدة #24 #4: initSidebar BEFORE auth check (sidebar shell first)
+  if (typeof initSidebar === 'function') {
+    initSidebar('payouts');
+  }
+  try {
+    var u = await window.sbGetUser();
+    if (!u) { window.location.href = 'auth.html'; return; }
+    currentUser = u;
+
+    // Page guard: Owner-only (mirrors expenses.html + provider-reports)
+    if (window.SyDentLock && window.SyDentLock.guardPage) {
+      if (!window.SyDentLock.guardPage(['owner'])) return;
+    }
+
+    // Initialize date range filter to current month (default useful view)
+    var d = new Date();
+    var firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    $('filterFrom').value = firstOfMonth.toISOString().slice(0,10);
+    $('filterTo').value = todayISO();
+
+    await loadAll();
+
+    // Apply prefill from query string (?provider=xxx&from=...&to=...)
+    // Used when redirected from provider-reports.html "💳 New payout" button.
+    applyQueryPrefill();
+
+    renderEmployeeFilters();
+    renderStats();
+    renderPayouts();
+  } catch (e) {
+    console.error('init failed:', e);
+    showToast('⚠️ خطأ في تحميل الصفحة', true);
+  }
+}
+
+// Load all required data in parallel for speed
+async function loadAll() {
+  await Promise.all([
+    loadDoctors(),
+    loadPayouts(),
+    loadSessions()
+  ]);
+}
+
+async function loadDoctors() {
+  // Phase 6 V/W/X retry pattern — try widest select, fall back as columns drop
+  var res = await window.sb.from('clinic_doctors')
+    .select('id, name, color, is_active, is_owner, share_percent, provider_type, compensation_model, monthly_salary')
+    .eq('owner_id', currentUser.id)
+    .order('name');
+
+  if (res.error && /42703|monthly_salary/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_active, is_owner, share_percent, provider_type, compensation_model')
+      .eq('owner_id', currentUser.id)
+      .order('name');
+  }
+  if (res.error && /42703|provider_type|compensation_model/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('clinic_doctors')
+      .select('id, name, color, is_active, is_owner, share_percent')
+      .eq('owner_id', currentUser.id)
+      .order('name');
+  }
+
+  if (res.error) {
+    if (isMigrationMissing(res.error)) {
+      doctors = [];
+      return;
+    }
+    console.error('loadDoctors:', res.error);
+    doctors = [];
+    return;
+  }
+  doctors = res.data || [];
+}
+
+async function loadPayouts() {
+  // Phase 7.2 / Migration 17: try with new columns, fall back if missing
+  var res = await window.sb.from('provider_payouts')
+    .select('id, provider_id, period_start, period_end, paid_at, amount, notes, payment_method, breakdown_salary, breakdown_share, breakdown_bonus, created_at')
+    .eq('owner_id', currentUser.id)
+    .order('paid_at', { ascending: false });
+
+  if (res.error && /42703|payment_method|breakdown_/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('provider_payouts')
+      .select('id, provider_id, period_start, period_end, paid_at, amount, notes, created_at')
+      .eq('owner_id', currentUser.id)
+      .order('paid_at', { ascending: false });
+  }
+
+  if (res.error) {
+    if (isMigrationMissing(res.error)) {
+      showToast('⚠️ شغّل Migration 17 في Supabase', true);
+      payouts = [];
+      return;
+    }
+    console.error('loadPayouts:', res.error);
+    payouts = [];
+    return;
+  }
+  payouts = res.data || [];
+}
+
+async function loadSessions() {
+  // For smart-suggestion: production = sum of completed session costs in period.
+  // Per قاعدة #6 ledger_sessions uses doctor_id (legacy), so try that first
+  // and fall back to owner_id only if a future migration adds it.
+  var res = await window.sb.from('ledger_sessions')
+    .select('id, provider_id, cost, date, status')
+    .eq('doctor_id', currentUser.id);
+
+  // Future-proof: if a multi-tenant migration ever renames the column,
+  // retry with owner_id.
+  if (res.error && /42703|doctor_id/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+    res = await window.sb.from('ledger_sessions')
+      .select('id, provider_id, cost, date, status')
+      .eq('owner_id', currentUser.id);
+  }
+
+  if (res.error) {
+    console.warn('loadSessions:', res.error);
+    sessions = [];
+    return;
+  }
+  // Only completed sessions count toward production for share calculation
+  sessions = (res.data || []).filter(function(s){
+    return s.status === 'completed';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMART SUGGESTION
+// ═══════════════════════════════════════════════════════════════════════════
+// Calculates the suggested payout amount based on:
+//  - compensation_model='salary'     → monthly_salary × (days in period / 30)
+//  - compensation_model='percentage' → production × % − paid_in_period_so_far
+//  - compensation_model='hybrid'     → salary + percentage
+//  - compensation_model='none'       → 0 (manual entry expected)
+// ───────────────────────────────────────────────────────────────────────────
+function computeSuggestion(provider, periodStart, periodEnd) {
+  if (!provider || !periodStart || !periodEnd) return null;
+  var cm = provider.compensation_model || 'percentage';
+  if (cm === 'none') return { total: 0, salary: 0, share: 0, note: 'لا تعويض محدد' };
+
+  var startDate = new Date(periodStart);
+  var endDate   = new Date(periodEnd);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) return null;
+  if (startDate > endDate) return null;
+
+  // ─── Salary part ─────────────────────────────────────────────────────
+  // Pro-rate monthly_salary by the days covered in the period.
+  // 30-day baseline is standard for monthly payroll in MENA.
+  var salaryPart = 0;
+  if (cm === 'salary' || cm === 'hybrid') {
+    var monthlySal = Number(provider.monthly_salary) || 0;
+    if (monthlySal > 0) {
+      var daysInPeriod = Math.floor((endDate - startDate) / 86400000) + 1;
+      salaryPart = Math.round(monthlySal * daysInPeriod / 30);
+    }
+  }
+
+  // ─── Share part ──────────────────────────────────────────────────────
+  // production × share% − already-paid-in-period (avoids double-payment).
+  var sharePart = 0;
+  if (cm === 'percentage' || cm === 'hybrid') {
+    var sharePct = resolveSharePct(provider);
+
+    // Production: completed sessions for this provider within the period.
+    var production = 0;
+    sessions.forEach(function(s){
+      if (s.provider_id !== provider.id) return;
+      if (!s.date) return;
+      if (s.date < periodStart || s.date > periodEnd) return;
+      production += Number(s.cost) || 0;
+    });
+
+    var grossShare = production * sharePct / 100;
+
+    // Subtract payouts already made for overlapping periods to this provider
+    // (only the share portion when breakdown is present, otherwise the full amount).
+    // Used to avoid suggesting an amount they already received.
+    var alreadyPaid = 0;
+    payouts.forEach(function(po){
+      if (po.provider_id !== provider.id) return;
+      // Period overlap test: po overlaps [start, end]
+      if (po.period_end < periodStart || po.period_start > periodEnd) return;
+      // If breakdown present, count share-portion only; else count full amount.
+      var hasBreakdown = (Number(po.breakdown_salary) || 0)
+                       + (Number(po.breakdown_share) || 0)
+                       + (Number(po.breakdown_bonus) || 0) > 0;
+      if (hasBreakdown) {
+        alreadyPaid += Number(po.breakdown_share) || 0;
+      } else {
+        alreadyPaid += Number(po.amount) || 0;
+      }
+    });
+
+    sharePart = Math.max(0, Math.round(grossShare - alreadyPaid));
+  }
+
+  return {
+    total:  salaryPart + sharePart,
+    salary: salaryPart,
+    share:  sharePart,
+    note:   cm === 'salary' ? 'راتب شهري مقسّم على الفترة'
+          : cm === 'percentage' ? 'إنتاج × نسبة − ما تم دفعه'
+          : 'راتب + نسبة'
+  };
+}
+
+function resolveSharePct(provider) {
+  var raw = provider.share_percent;
+  if (raw === null || raw === undefined || raw === '') {
+    return provider.is_owner ? 100 : 0;
+  }
+  var n = Number(raw);
+  if (!isFinite(n)) return provider.is_owner ? 100 : 0;
+  return n;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER — Filters
+// ═══════════════════════════════════════════════════════════════════════════
+function renderEmployeeFilters() {
+  var el = $('employeeFilters');
+  var html = '<div class="chip ' + (employeeFilter === 'all' ? 'active' : '')
+           + '" data-id="all" onclick="setEmployeeFilter(\'all\')">الكل</div>';
+
+  // Only employees who actually received payouts get a chip — keeps the UI
+  // focused on what's relevant. Inactive doctors still appear if they have
+  // historical payouts.
+  var seen = {};
+  payouts.forEach(function(po){
+    if (!po.provider_id) return;
+    seen[po.provider_id] = true;
+  });
+
+  doctors.forEach(function(d){
+    if (!seen[d.id]) return;
+    var safeColor = (d.color && /^#[0-9a-f]{6}$/i.test(d.color)) ? d.color : '#2ee89e';
+    html += '<div class="chip ' + (employeeFilter === d.id ? 'active' : '')
+         + '" data-id="' + escapeHtml(d.id) + '" onclick="setEmployeeFilter(\'' + escapeHtml(d.id) + '\')">'
+         + '<span class="dot" style="background:' + safeColor + ';"></span>'
+         + escapeHtml(d.name)
+         + (d.is_active === false ? ' <span style="opacity:0.6;">(معطل)</span>' : '')
+         + '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function setEmployeeFilter(id) {
+  employeeFilter = id;
+  renderEmployeeFilters();
+  renderPayouts();
+}
+
+function setMethodFilter(m) {
+  methodFilter = m;
+  document.querySelectorAll('#methodFilters .chip').forEach(function(c){
+    c.classList.toggle('active', c.getAttribute('data-method') === m);
+  });
+  renderPayouts();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER — Stats
+// ═══════════════════════════════════════════════════════════════════════════
+function renderStats() {
+  var now = new Date();
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  var yearStart  = new Date(now.getFullYear(), 0, 1).toISOString().slice(0,10);
+
+  var monthTotal = 0, monthCount = 0;
+  var yearTotal = 0, yearCount = 0;
+  var grandTotal = 0;
+  var employeesWithPayouts = {};
+
+  payouts.forEach(function(po){
+    var amt = Number(po.amount) || 0;
+    grandTotal += amt;
+    if (po.provider_id) employeesWithPayouts[po.provider_id] = true;
+
+    var paidDate = (po.paid_at || po.created_at || '').slice(0,10);
+    if (paidDate >= yearStart) { yearTotal += amt; yearCount++; }
+    if (paidDate >= monthStart) { monthTotal += amt; monthCount++; }
+  });
+
+  $('statMonth').textContent = fmtSY(monthTotal);
+  $('statMonthCount').textContent = monthCount + ' دفعة';
+  $('statYear').textContent = fmtSY(yearTotal);
+  $('statYearCount').textContent = yearCount + ' دفعة';
+  $('statTotal').textContent = fmtSY(grandTotal);
+  $('statTotalCount').textContent = payouts.length + ' دفعة';
+
+  // Active employees who received any payout
+  var activeReceiving = 0;
+  doctors.forEach(function(d){
+    if (d.is_active !== false && employeesWithPayouts[d.id]) activeReceiving++;
+  });
+  $('statEmployees').textContent = activeReceiving;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDER — Payouts table
+// ═══════════════════════════════════════════════════════════════════════════
+function renderPayouts() {
+  var list = $('payoutsList');
+  var fromDate = $('filterFrom').value;
+  var toDate   = $('filterTo').value;
+
+  // Apply filters
+  var filtered = payouts.filter(function(po){
+    if (employeeFilter !== 'all' && po.provider_id !== employeeFilter) return false;
+    if (methodFilter !== 'all' && po.payment_method !== methodFilter) return false;
+    var paidDate = (po.paid_at || po.created_at || '').slice(0,10);
+    if (fromDate && paidDate < fromDate) return false;
+    if (toDate && paidDate > toDate) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state">'
+      + '<div class="ico">💳</div>'
+      + '<div class="title">لا توجد دفعات</div>'
+      + '<div class="sub">لم يتم تسجيل أي دفعة ضمن الفلاتر الحالية.</div>'
+      + '</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(function(po){
+    var doctor = doctors.find(function(d){ return d.id === po.provider_id; });
+    var docName = doctor ? doctor.name : '— محذوف —';
+    var docColor = (doctor && doctor.color && /^#[0-9a-f]{6}$/i.test(doctor.color))
+                 ? doctor.color : '#8a9ab5';
+    var inactiveBadge = (doctor && doctor.is_active === false)
+                      ? ' <span style="font-size:10px;opacity:0.7;">(معطل)</span>' : '';
+
+    var hasBreakdown = (Number(po.breakdown_salary) || 0)
+                     + (Number(po.breakdown_share) || 0)
+                     + (Number(po.breakdown_bonus) || 0) > 0;
+
+    var method = po.payment_method || 'other';
+    var methodClass = (po.payment_method && ['cash','bank','check','other'].indexOf(po.payment_method) >= 0)
+                    ? po.payment_method : 'other';
+
+    var row = '<div class="table-row" onclick="openEditModal(\'' + escapeHtml(po.id) + '\')">'
+      + '<div>' + escapeHtml(fmtDateShort(po.paid_at || po.created_at)) + '</div>'
+      + '<div class="cell-employee">'
+        + '<span class="dot-color" style="background:' + docColor + ';"></span>'
+        + '<span>' + escapeHtml(docName) + inactiveBadge + '</span>'
+      + '</div>'
+      + '<div style="font-size:12px;color:var(--text2);">'
+        + escapeHtml(fmtDateShort(po.period_start)) + ' ← ' + escapeHtml(fmtDateShort(po.period_end))
+      + '</div>'
+      + '<div class="cell-amt">' + escapeHtml(fmtSY(po.amount)) + '</div>'
+      + '<div><span class="cell-method ' + methodClass + '">'
+        + escapeHtml(po.payment_method ? methodLabel(po.payment_method) : '— —')
+      + '</span></div>'
+      + '<div class="cell-actions">'
+        + (hasBreakdown
+            ? '<button class="icon-btn" onclick="event.stopPropagation();toggleBreakdownRow(\'' + escapeHtml(po.id) + '\')" title="عرض التفصيل">📊</button>'
+            : '')
+      + '</div>'
+    + '</div>';
+
+    if (hasBreakdown) {
+      var bs = Number(po.breakdown_salary) || 0;
+      var bsh = Number(po.breakdown_share) || 0;
+      var bb = Number(po.breakdown_bonus) || 0;
+      row += '<div class="breakdown-row" id="bd-' + escapeHtml(po.id) + '">';
+      if (bs > 0)  row += '<span class="bd-item">راتب: <b>' + escapeHtml(fmtSY(bs)) + '</b></span>';
+      if (bsh > 0) row += '<span class="bd-item">نسبة: <b>' + escapeHtml(fmtSY(bsh)) + '</b></span>';
+      if (bb > 0)  row += '<span class="bd-item">مكافأة: <b>' + escapeHtml(fmtSY(bb)) + '</b></span>';
+      if (po.notes) row += '<div style="margin-top:6px;font-style:italic;">📝 ' + escapeHtml(po.notes) + '</div>';
+      row += '</div>';
+    }
+
+    return row;
+  }).join('');
+}
+
+function toggleBreakdownRow(id) {
+  var el = $('bd-' + id);
+  if (el) el.classList.toggle('show');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODAL — Add / Edit
+// ═══════════════════════════════════════════════════════════════════════════
+function openModal(prefillProviderId, prefillFrom, prefillTo) {
+  $('editingId').value = '';
+  $('modalTitle').textContent = 'دفعة جديدة';
+  $('deleteBtn').style.display = 'none';
+
+  $('fldShowInactive').checked = false;
+  populateProviderDropdown();
+
+  if (prefillProviderId) {
+    $('fldProvider').value = prefillProviderId;
+  }
+
+  $('fldPeriodStart').value = prefillFrom || $('filterFrom').value || '';
+  $('fldPeriodEnd').value   = prefillTo   || $('filterTo').value   || '';
+  $('fldPaidAt').value      = todayISO();
+  $('fldAmount').value      = '';
+  $('fldSalary').value      = '';
+  $('fldShare').value       = '';
+  $('fldBonus').value       = '';
+  $('fldNotes').value       = '';
+
+  modalMethod = null;
+  document.querySelectorAll('#methodChipsModal .method-chip').forEach(function(c){
+    c.classList.remove('active');
+  });
+
+  $('breakdownSection').classList.remove('open');
+
+  updateSuggestion();
+
+  $('modalOverlay').classList.add('show');
+}
+
+function openEditModal(id) {
+  var po = payouts.find(function(p){ return p.id === id; });
+  if (!po) { showToast('⚠️ الدفعة غير موجودة', true); return; }
+
+  $('editingId').value = id;
+  $('modalTitle').textContent = 'تعديل دفعة';
+  $('deleteBtn').style.display = '';
+
+  // If the edited payout's provider is inactive, force-show inactives
+  var doctor = doctors.find(function(d){ return d.id === po.provider_id; });
+  $('fldShowInactive').checked = !!(doctor && doctor.is_active === false);
+  populateProviderDropdown();
+
+  $('fldProvider').value    = po.provider_id || '';
+  $('fldPeriodStart').value = po.period_start || '';
+  $('fldPeriodEnd').value   = po.period_end || '';
+  $('fldPaidAt').value      = (po.paid_at || po.created_at || todayISO()).slice(0,10);
+  $('fldAmount').value      = po.amount || '';
+  $('fldSalary').value      = po.breakdown_salary || '';
+  $('fldShare').value       = po.breakdown_share || '';
+  $('fldBonus').value       = po.breakdown_bonus || '';
+  $('fldNotes').value       = po.notes || '';
+
+  modalMethod = po.payment_method || null;
+  document.querySelectorAll('#methodChipsModal .method-chip').forEach(function(c){
+    c.classList.toggle('active', c.getAttribute('data-method') === modalMethod);
+  });
+
+  var hasBreakdown = (Number(po.breakdown_salary) || 0)
+                   + (Number(po.breakdown_share) || 0)
+                   + (Number(po.breakdown_bonus) || 0) > 0;
+  $('breakdownSection').classList.toggle('open', hasBreakdown);
+  if (hasBreakdown) onBreakdownChange();
+
+  updateSuggestion();
+
+  $('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  $('modalOverlay').classList.remove('show');
+}
+
+function populateProviderDropdown() {
+  var sel = $('fldProvider');
+  var prev = sel.value;
+  var showInactive = $('fldShowInactive').checked;
+
+  var list = doctors.slice().sort(function(a,b){
+    // active first, then by name
+    var aAct = a.is_active !== false;
+    var bAct = b.is_active !== false;
+    if (aAct !== bAct) return aAct ? -1 : 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  var html = '<option value="">— اختر الموظف —</option>';
+  list.forEach(function(d){
+    if (d.is_active === false && !showInactive) return;
+    var inactive = (d.is_active === false) ? ' (معطل)' : '';
+    var pt = providerTypeLabel(d.provider_type);
+    var cm = compensationLabel(d.compensation_model);
+    html += '<option value="' + escapeHtml(d.id) + '">'
+         + escapeHtml(d.name) + ' — ' + pt + ' • ' + cm + inactive
+         + '</option>';
+  });
+  sel.innerHTML = html;
+  if (prev) sel.value = prev;
+}
+
+function onProviderChange() {
+  updateSuggestion();
+}
+
+function onPeriodChange() {
+  updateSuggestion();
+}
+
+// Update the suggestion hint based on current provider + period
+function updateSuggestion() {
+  var hint = $('hintSuggest');
+  var provId = $('fldProvider').value;
+  var from = $('fldPeriodStart').value;
+  var to   = $('fldPeriodEnd').value;
+
+  if (!provId || !from || !to) {
+    hint.style.display = 'none';
+    return;
+  }
+
+  var provider = doctors.find(function(d){ return d.id === provId; });
+  if (!provider) {
+    hint.style.display = 'none';
+    return;
+  }
+
+  var sug = computeSuggestion(provider, from, to);
+  if (!sug) { hint.style.display = 'none'; return; }
+
+  if (sug.total <= 0) {
+    hint.style.display = 'block';
+    hint.textContent = '💡 الاقتراح: 0 ل.س (' + sug.note + ')';
+    hint.dataset.amount = '0';
+    return;
+  }
+
+  hint.style.display = 'block';
+  hint.textContent = '💡 الاقتراح: ' + fmtSY(sug.total) + ' — اضغط لتطبيقه (' + sug.note + ')';
+  hint.dataset.amount = String(sug.total);
+  hint.dataset.salary = String(sug.salary);
+  hint.dataset.share = String(sug.share);
+}
+
+function applySuggestion() {
+  var hint = $('hintSuggest');
+  var amt = Number(hint.dataset.amount) || 0;
+  if (amt <= 0) return;
+
+  $('fldAmount').value = amt;
+  // Pre-fill breakdown if we have a meaningful split (salary + share both > 0)
+  var sal = Number(hint.dataset.salary) || 0;
+  var shr = Number(hint.dataset.share) || 0;
+  if (sal > 0 || shr > 0) {
+    $('fldSalary').value = sal > 0 ? sal : '';
+    $('fldShare').value  = shr > 0 ? shr : '';
+    $('fldBonus').value  = '';
+    // Auto-open the breakdown section if it gave a useful breakdown
+    if (sal > 0 && shr > 0) {
+      $('breakdownSection').classList.add('open');
+      onBreakdownChange();
+    }
+  }
+}
+
+function setModalMethod(m) {
+  modalMethod = m;
+  document.querySelectorAll('#methodChipsModal .method-chip').forEach(function(c){
+    c.classList.toggle('active', c.getAttribute('data-method') === m);
+  });
+}
+
+function toggleBreakdown() {
+  var sec = $('breakdownSection');
+  sec.classList.toggle('open');
+  if (sec.classList.contains('open')) {
+    onBreakdownChange();
+  } else {
+    // Closing: clear breakdown values so a simple-mode save doesn't carry
+    // stale breakdown numbers that would mismatch the user-edited amount.
+    // (QuickBooks/Xero behavior — collapse = "I changed my mind, simple total only")
+    $('fldSalary').value = '';
+    $('fldShare').value  = '';
+    $('fldBonus').value  = '';
+    $('bdTotal').textContent = fmtSY(0);
+    // Note: amount field is preserved so the user can edit it freely.
+  }
+}
+
+// QuickBooks/Xero-style behavior:
+//  - Open breakdown: amount field is computed (read-only-like, but kept
+//    enabled in case the user wants to clear it and start over).
+//  - When the user types a breakdown line, sum them into amount.
+// (قاعدة #18: unification — no warnings; UI guarantees consistency)
+function onBreakdownChange() {
+  var sal = Number($('fldSalary').value) || 0;
+  var shr = Number($('fldShare').value) || 0;
+  var bon = Number($('fldBonus').value) || 0;
+  var total = sal + shr + bon;
+  $('bdTotal').textContent = fmtSY(total);
+
+  if ($('breakdownSection').classList.contains('open')) {
+    // Sync amount to breakdown total when breakdown is the active source
+    $('fldAmount').value = total > 0 ? total : '';
+  }
+}
+
+function onAmountInput() {
+  // If breakdown section is closed and user is typing amount manually,
+  // we don't touch breakdown. If breakdown is open, the breakdown drives
+  // the amount; we don't auto-redistribute backwards from amount (avoids
+  // surprising the user).
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SAVE / DELETE
+// ═══════════════════════════════════════════════════════════════════════════
+async function savePayout() {
+  var editingId = $('editingId').value;
+  var provId    = $('fldProvider').value;
+  var from      = $('fldPeriodStart').value;
+  var to        = $('fldPeriodEnd').value;
+  var paidAt    = $('fldPaidAt').value;
+  var amount    = parseFloat($('fldAmount').value);
+  var notes     = $('fldNotes').value.trim();
+  var salary    = parseFloat($('fldSalary').value) || 0;
+  var share     = parseFloat($('fldShare').value) || 0;
+  var bonus     = parseFloat($('fldBonus').value) || 0;
+
+  // Validation
+  if (!provId)              { showToast('⚠️ اختر الموظف', true); return; }
+  if (!from || !to)         { showToast('⚠️ حدد فترة الدفعة', true); return; }
+  if (from > to)            { showToast('⚠️ تاريخ البداية بعد النهاية', true); return; }
+  if (!amount || amount<=0) { showToast('⚠️ أدخل مبلغاً صحيحاً', true); return; }
+
+  // Build payload. paid_at: combine date with current time so chronological
+  // order within a day is preserved (server-side default would be now()).
+  var paidAtIso = null;
+  if (paidAt) {
+    // Append current time so the timestamp is meaningful
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var ss = String(now.getSeconds()).padStart(2, '0');
+    paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss;
+  }
+
+  var payload = {
+    owner_id:     currentUser.id,
+    provider_id:  provId,
+    period_start: from,
+    period_end:   to,
+    paid_at:      paidAtIso,  // null → DB default now()
+    amount:       Math.round(amount),
+    notes:        notes || null,
+    payment_method: modalMethod || null,
+    breakdown_salary: Math.round(salary) || 0,
+    breakdown_share:  Math.round(share)  || 0,
+    breakdown_bonus:  Math.round(bonus)  || 0
+  };
+
+  // Remove null paid_at so the DB default kicks in
+  if (!payload.paid_at) delete payload.paid_at;
+
+  var res;
+  if (editingId) {
+    res = await window.sb.from('provider_payouts')
+      .update(payload).eq('id', editingId).select().single();
+  } else {
+    res = await window.sb.from('provider_payouts')
+      .insert(payload).select().single();
+  }
+
+  // Pre-Migration-17 fallback: strip new columns and retry
+  if (res.error && /42703|payment_method|breakdown_/i.test(
+      (res.error.message || '') + ' ' + (res.error.code || ''))) {
+    var legacy = {
+      owner_id:     payload.owner_id,
+      provider_id:  payload.provider_id,
+      period_start: payload.period_start,
+      period_end:   payload.period_end,
+      amount:       payload.amount,
+      notes:        payload.notes
+    };
+    if (payload.paid_at) legacy.paid_at = payload.paid_at;
+    if (editingId) {
+      res = await window.sb.from('provider_payouts')
+        .update(legacy).eq('id', editingId).select().single();
+    } else {
+      res = await window.sb.from('provider_payouts')
+        .insert(legacy).select().single();
+    }
+    if (!res.error) {
+      showToast('⚠️ شُغّل Migration 17 لحفظ الطريقة والتفصيل', true);
+    }
+  }
+
+  if (res.error) {
+    if (isMigrationMissing(res.error)) {
+      showToast('⚠️ شغّل Migration 17 في Supabase أولاً', true);
+    } else {
+      showToast('⚠️ فشل الحفظ: ' + res.error.message, true);
+    }
+    return;
+  }
+
+  // Audit log (fire-and-forget; قاعدة #11 single source of truth for payouts)
+  try {
+    if (window.logAudit) {
+      var doctor = doctors.find(function(d){ return d.id === provId; });
+      var docName = doctor ? doctor.name : '—';
+      var actionType = editingId ? 'payout.edit' : 'payout.create';
+      var description = (editingId ? 'تعديل دفعة لـ ' : 'دفعة لـ ') + docName
+                      + ' (' + fmtSY(payload.amount) + ')';
+      window.logAudit(actionType, {
+        entity_type: 'payout',
+        entity_id: res.data ? res.data.id : editingId,
+        description: description,
+        new_value: {
+          provider_id: provId,
+          provider_name: docName,
+          period_start: from,
+          period_end: to,
+          amount: payload.amount,
+          payment_method: payload.payment_method
+        }
+      });
+    }
+  } catch (e) { console.warn('audit log failed:', e); }
+
+  // Update local state + re-render
+  if (editingId) {
+    var idx = payouts.findIndex(function(p){ return p.id === editingId; });
+    if (idx >= 0 && res.data) payouts[idx] = res.data;
+  } else {
+    if (res.data) payouts.unshift(res.data);
+  }
+
+  closeModal();
+  renderEmployeeFilters();
+  renderStats();
+  renderPayouts();
+  showToast(editingId ? '✅ تم تحديث الدفعة' : '✅ تم تسجيل الدفعة');
+}
+
+async function deleteCurrent() {
+  var id = $('editingId').value;
+  if (!id) return;
+  if (!confirm('حذف هذه الدفعة؟ لا يمكن التراجع.')) return;
+
+  // Snapshot for audit BEFORE delete
+  var po = payouts.find(function(p){ return p.id === id; });
+  var doctor = po ? doctors.find(function(d){ return d.id === po.provider_id; }) : null;
+  var docName = doctor ? doctor.name : '—';
+  var amount = po ? Number(po.amount) || 0 : 0;
+
+  var res = await window.sb.from('provider_payouts').delete().eq('id', id);
+  if (res.error) {
+    showToast('⚠️ فشل الحذف: ' + res.error.message, true);
+    return;
+  }
+
+  // Audit
+  try {
+    if (window.logAudit) {
+      window.logAudit('payout.delete', {
+        entity_type: 'payout',
+        entity_id: id,
+        description: 'حذف دفعة لـ ' + docName + ' (' + fmtSY(amount) + ')',
+        old_value: po || null
+      });
+    }
+  } catch (e) { console.warn('audit log failed:', e); }
+
+  payouts = payouts.filter(function(p){ return p.id !== id; });
+  closeModal();
+  renderEmployeeFilters();
+  renderStats();
+  renderPayouts();
+  showToast('🗑️ تم الحذف');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUERY PREFILL (from provider-reports.html redirect)
+// ═══════════════════════════════════════════════════════════════════════════
+// provider-reports.html sends users here via:
+//   payouts.html?provider=<uuid>&from=<date>&to=<date>&action=new
+// When action=new is present, we auto-open the new-payout modal pre-filled.
+function applyQueryPrefill() {
+  var qs = new URLSearchParams(window.location.search);
+  var provId = qs.get('provider');
+  var from   = qs.get('from');
+  var to     = qs.get('to');
+  var action = qs.get('action');
+
+  if (action === 'new') {
+    // Defer to next tick so all loadXxx data is settled
+    setTimeout(function(){
+      openModal(provId || null, from || null, to || null);
+    }, 50);
+  } else if (provId) {
+    // Just filter to that provider
+    employeeFilter = provId;
+  }
+}
+
+// Close modal on outside click + Esc
+document.addEventListener('click', function(e){
+  if (e.target && e.target.id === 'modalOverlay') closeModal();
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') closeModal();
+});
+
+// Boot
+init();
+</script>
+
+</body>
+</html>

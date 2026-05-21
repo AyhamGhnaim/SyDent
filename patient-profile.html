@@ -7723,7 +7723,12 @@ async function loadPatientAuditLog() {
       'expense.delete': '💰 حذف مصروف',
       'expense_category.create': '🏷️ إضافة تصنيف مصاريف',
       'expense_category.edit': '🏷️ تعديل تصنيف مصاريف',
-      'expense_category.delete': '🏷️ حذف تصنيف مصاريف'
+      'expense_category.delete': '🏷️ حذف تصنيف مصاريف',
+      // Phase 7.2: payouts are clinic-wide (no patient_id). Defensive
+      // labels kept for consistency with the central audit-log page.
+      'payout.create': '💳 إضافة دفعة موظف',
+      'payout.edit': '💳 تعديل دفعة موظف',
+      'payout.delete': '💳 حذف دفعة موظف'
     };
     var roleLabels = { owner: 'المالك', doctor: 'طبيب', secretary: 'سكرتيرة' };
 
