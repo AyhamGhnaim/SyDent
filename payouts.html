@@ -772,45 +772,179 @@ async function loadAll() {
 }
 
 async function loadDoctors() {
-  // Multi-tenant: clinic_doctors uses owner_id (per قاعدة #6). Phase 6 V/W/X
-  // retry pattern — try widest select, fall back as columns drop.
-  var res = await window.sb.from('clinic_doctors')
+  // ── Phase 7.2 unified employee source (دمج clinic_employees + clinic_doctors) ──
+  // Live test (د. أيهم 21 May 2026) found that secretaries / employees without
+  // a matching clinic_doctors row were invisible in the payouts dropdown.
+  // The fix: read both tables and synthesize a unified list keyed by
+  // clinic_employees.id (the canonical 'who is this person' table per قاعدة #11).
+  // For employees that DO have a doctor_id link, we merge in compensation +
+  // share + monthly_salary fields. For employees that DON'T (legacy data or
+  // Phase 6 X bootstrap miss), we still show them — just with default
+  // compensation values (the suggestion will return 0; the Owner enters
+  // an amount manually).
+  //
+  // The unified row keeps the doctor_id as 'provider_id' for provider_payouts
+  // FK semantics. If no doctor_id exists, we fall back to using the employee
+  // id itself — but only if provider_payouts.provider_id allows that FK to
+  // clinic_employees too. Since our current schema FKs to clinic_doctors,
+  // employees without a doctor_id will need one auto-created on save.
+
+  // Step 1: load every active+inactive employee (this is the canonical list).
+  var empRes = await window.sb.from('clinic_employees')
+    .select('id, name, role, doctor_id, is_active, created_at')
+    .eq('owner_id', currentUser.id)
+    .order('role', { ascending: true })
+    .order('name', { ascending: true });
+
+  if (empRes.error) {
+    if (isMigrationMissing(empRes.error)) {
+      console.warn('[payouts] clinic_employees missing — falling back to doctors-only mode');
+    } else {
+      console.error('loadEmployees:', empRes.error);
+    }
+    // Continue to doctors-only fallback below
+  }
+  var employeesList = empRes.data || [];
+
+  // Step 2: load all clinic_doctors (with payroll fields).
+  // Use the same Phase 6 V/W/X retry pattern as before.
+  var docRes = await window.sb.from('clinic_doctors')
     .select('id, name, color, is_active, is_owner, share_percent, provider_type, compensation_model, monthly_salary')
     .eq('owner_id', currentUser.id)
     .order('name');
 
-  if (res.error && /42703|monthly_salary/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
-    res = await window.sb.from('clinic_doctors')
+  if (docRes.error && /42703|monthly_salary/i.test((docRes.error.message || '') + ' ' + (docRes.error.code || ''))) {
+    docRes = await window.sb.from('clinic_doctors')
       .select('id, name, color, is_active, is_owner, share_percent, provider_type, compensation_model')
       .eq('owner_id', currentUser.id)
       .order('name');
   }
-  if (res.error && /42703|provider_type|compensation_model/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
-    res = await window.sb.from('clinic_doctors')
+  if (docRes.error && /42703|provider_type|compensation_model/i.test((docRes.error.message || '') + ' ' + (docRes.error.code || ''))) {
+    docRes = await window.sb.from('clinic_doctors')
       .select('id, name, color, is_active, is_owner, share_percent')
       .eq('owner_id', currentUser.id)
       .order('name');
   }
 
-  if (res.error) {
-    if (isMigrationMissing(res.error)) {
+  if (docRes.error) {
+    if (isMigrationMissing(docRes.error)) {
       doctors = [];
       return;
     }
-    console.error('loadDoctors:', res.error);
+    console.error('loadDoctors:', docRes.error);
     doctors = [];
     return;
   }
-  doctors = res.data || [];
+  var doctorsRaw = docRes.data || [];
 
-  // DIAGNOSTIC: visible feedback if doctors load returned empty.
-  // Common causes: (1) user truly has no clinic_doctors rows,
-  // (2) owner_id mismatch (rare — would imply data created under
-  // a different auth user), (3) RLS policy blocks read.
-  if (doctors.length === 0) {
-    console.warn('[payouts] loadDoctors returned 0 rows for owner_id=' + currentUser.id);
+  // Step 3: build a doctor lookup by id for fast joining
+  var docById = {};
+  doctorsRaw.forEach(function(d){ docById[d.id] = d; });
+
+  // Step 4: synthesize the unified employee list.
+  //   • Every clinic_employees row becomes a payout target.
+  //   • If they have doctor_id → merge in clinic_doctors fields.
+  //   • If they don't → use defaults derived from clinic_employees.role.
+  //
+  // The .id of each unified row is the clinic_doctors.id when available
+  // (so provider_payouts.provider_id FK still resolves cleanly). For
+  // employees WITHOUT a doctor link, we mark them with _needsDoctorRow=true
+  // so saveLogic can auto-create the doctor row at save time.
+  var unified = [];
+
+  if (employeesList.length > 0) {
+    // Primary path: drive the list from clinic_employees (canonical truth).
+    employeesList.forEach(function(emp){
+      if (emp.doctor_id && docById[emp.doctor_id]) {
+        // Path A: employee has a linked doctor row — use it
+        var doc = docById[emp.doctor_id];
+        unified.push({
+          id: doc.id,                              // provider_id for payouts
+          employeeId: emp.id,                      // back-ref to clinic_employees
+          name: doc.name || emp.name,
+          color: doc.color,
+          is_active: doc.is_active !== false && emp.is_active !== false,
+          is_owner: doc.is_owner,
+          share_percent: doc.share_percent,
+          provider_type: doc.provider_type
+            || (emp.role === 'secretary' ? 'secretary' : 'doctor'),
+          compensation_model: doc.compensation_model
+            || (emp.role === 'secretary' ? 'salary' : 'percentage'),
+          monthly_salary: doc.monthly_salary,
+          _hasDoctorLink: true
+        });
+        // Mark this doc as consumed (so we don't double-add from doctorsRaw)
+        docById[emp.doctor_id]._consumed = true;
+      } else {
+        // Path B: employee without doctor_id — show with defaults so payouts
+        // can still be recorded against them. provider_id will be null in
+        // the saved row (the payouts.provider_id FK is ON DELETE SET NULL,
+        // so this is allowed at the DB level; the row is queryable + auditable).
+        unified.push({
+          id: emp.id,                              // employee id (no doctor row exists)
+          employeeId: emp.id,
+          name: emp.name,
+          color: null,
+          is_active: emp.is_active !== false,
+          is_owner: false,
+          share_percent: null,
+          provider_type: emp.role === 'secretary' ? 'secretary' : 'doctor',
+          compensation_model: emp.role === 'secretary' ? 'salary' : 'percentage',
+          monthly_salary: null,
+          _hasDoctorLink: false,
+          _needsDoctorRow: true                    // signal for save-time auto-create
+        });
+      }
+    });
+
+    // Also include any clinic_doctors rows that aren't linked from
+    // clinic_employees (legacy orphan rows). These can still receive payouts.
+    doctorsRaw.forEach(function(d){
+      if (d._consumed) return;
+      unified.push({
+        id: d.id,
+        employeeId: null,
+        name: d.name,
+        color: d.color,
+        is_active: d.is_active !== false,
+        is_owner: d.is_owner,
+        share_percent: d.share_percent,
+        provider_type: d.provider_type || 'doctor',
+        compensation_model: d.compensation_model || 'percentage',
+        monthly_salary: d.monthly_salary,
+        _hasDoctorLink: true,
+        _orphanDoctor: true                        // signal: no clinic_employees row
+      });
+    });
   } else {
-    console.log('[payouts] loaded ' + doctors.length + ' doctors');
+    // Fallback path: clinic_employees missing or empty — use clinic_doctors only
+    doctorsRaw.forEach(function(d){
+      unified.push({
+        id: d.id,
+        employeeId: null,
+        name: d.name,
+        color: d.color,
+        is_active: d.is_active !== false,
+        is_owner: d.is_owner,
+        share_percent: d.share_percent,
+        provider_type: d.provider_type || 'doctor',
+        compensation_model: d.compensation_model || 'percentage',
+        monthly_salary: d.monthly_salary,
+        _hasDoctorLink: true,
+        _orphanDoctor: true
+      });
+    });
+  }
+
+  doctors = unified;
+
+  // DIAGNOSTIC: visible feedback for the next live test.
+  if (doctors.length === 0) {
+    console.warn('[payouts] no employees loaded — empty clinic_employees AND clinic_doctors');
+  } else {
+    var withLink = doctors.filter(function(d){ return d._hasDoctorLink; }).length;
+    var noLink   = doctors.filter(function(d){ return d._needsDoctorRow; }).length;
+    console.log('[payouts] loaded ' + doctors.length + ' employees (' + withLink + ' with payroll data, ' + noLink + ' without)');
   }
 }
 
@@ -1079,11 +1213,31 @@ function renderPayouts() {
 
   list.innerHTML = filtered.map(function(po){
     var doctor = doctors.find(function(d){ return d.id === po.provider_id; });
-    var docName = doctor ? doctor.name : '— محذوف —';
-    var docColor = (doctor && doctor.color && /^#[0-9a-f]{6}$/i.test(doctor.color))
-                 ? doctor.color : '#8a9ab5';
-    var inactiveBadge = (doctor && doctor.is_active === false)
-                      ? ' <span style="font-size:10px;opacity:0.7;">(معطل)</span>' : '';
+    var docName, docColor, inactiveBadge;
+    var displayNotes = po.notes;
+
+    if (doctor) {
+      // Normal case: provider_id matches a known doctor/employee
+      docName = doctor.name;
+      docColor = (doctor.color && /^#[0-9a-f]{6}$/i.test(doctor.color))
+               ? doctor.color : '#8a9ab5';
+      inactiveBadge = (doctor.is_active === false)
+                    ? ' <span style="font-size:10px;opacity:0.7;">(معطل)</span>' : '';
+    } else if (po.provider_id === null && po.notes && /^\[([^\]]+)\]\s/.test(po.notes)) {
+      // Phase 7.2 Bug C: employee without clinic_doctors row.
+      // Saved with provider_id=null and notes prefixed with '[Name] '.
+      // Extract the name back out for display + strip from visible notes.
+      var match = po.notes.match(/^\[([^\]]+)\]\s*(.*)$/);
+      docName = match[1];
+      displayNotes = match[2] || null;
+      docColor = '#8a9ab5';   // neutral gray (no color stored for non-doctors)
+      inactiveBadge = '';
+    } else {
+      // Truly orphaned (provider_id pointed at a now-deleted doctor)
+      docName = '— محذوف —';
+      docColor = '#8a9ab5';
+      inactiveBadge = '';
+    }
 
     var hasBreakdown = (Number(po.breakdown_salary) || 0)
                      + (Number(po.breakdown_share) || 0)
@@ -1121,7 +1275,7 @@ function renderPayouts() {
       if (bs > 0)  row += '<span class="bd-item">راتب: <b>' + escapeHtml(fmtSY(bs)) + '</b></span>';
       if (bsh > 0) row += '<span class="bd-item">نسبة: <b>' + escapeHtml(fmtSY(bsh)) + '</b></span>';
       if (bb > 0)  row += '<span class="bd-item">مكافأة: <b>' + escapeHtml(fmtSY(bb)) + '</b></span>';
-      if (po.notes) row += '<div style="margin-top:6px;font-style:italic;">📝 ' + escapeHtml(po.notes) + '</div>';
+      if (displayNotes) row += '<div style="margin-top:6px;font-style:italic;">📝 ' + escapeHtml(displayNotes) + '</div>';
       row += '</div>';
     }
 
@@ -1178,12 +1332,31 @@ function openEditModal(id) {
   $('modalTitle').textContent = 'تعديل دفعة';
   $('deleteBtn').style.display = '';
 
+  // Phase 7.2 Bug C: handle payouts saved with provider_id=null + employee
+  // name encoded in the notes prefix.
+  var effectiveProvId = po.provider_id;
+  var cleanNotes = po.notes || '';
+  if (!effectiveProvId && cleanNotes && /^\[([^\]]+)\]\s/.test(cleanNotes)) {
+    var match = cleanNotes.match(/^\[([^\]]+)\]\s*(.*)$/);
+    var extractedName = match[1];
+    cleanNotes = match[2] || '';
+    // Match the employee by name in the unified list (prefer _needsDoctorRow)
+    var matchedEmp = doctors.find(function(d){
+      return d._needsDoctorRow && d.name === extractedName;
+    });
+    // Fall back: any unified entry with that name (covers renamed-but-now-linked)
+    if (!matchedEmp) {
+      matchedEmp = doctors.find(function(d){ return d.name === extractedName; });
+    }
+    if (matchedEmp) effectiveProvId = matchedEmp.id;
+  }
+
   // If the edited payout's provider is inactive, force-show inactives
-  var doctor = doctors.find(function(d){ return d.id === po.provider_id; });
+  var doctor = doctors.find(function(d){ return d.id === effectiveProvId; });
   $('fldShowInactive').checked = !!(doctor && doctor.is_active === false);
   populateProviderDropdown();
 
-  $('fldProvider').value    = po.provider_id || '';
+  $('fldProvider').value    = effectiveProvId || '';
   $('fldPeriodStart').value = po.period_start || '';
   $('fldPeriodEnd').value   = po.period_end || '';
   $('fldPaidAt').value      = (po.paid_at || po.created_at || todayISO()).slice(0,10);
@@ -1191,7 +1364,7 @@ function openEditModal(id) {
   $('fldSalary').value      = po.breakdown_salary || '';
   $('fldShare').value       = po.breakdown_share || '';
   $('fldBonus').value       = po.breakdown_bonus || '';
-  $('fldNotes').value       = po.notes || '';
+  $('fldNotes').value       = cleanNotes;
 
   modalMethod = po.payment_method || null;
   document.querySelectorAll('#methodChipsModal .method-chip').forEach(function(c){
@@ -1395,14 +1568,29 @@ async function savePayout() {
     paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss + tzSign + tzH + ':' + tzM;
   }
 
+  // Resolve the selected provider/employee from the unified list.
+  // If they have a clinic_doctors row, use its id as provider_id (FK target).
+  // If they don't (employee-only — Phase 6 X bootstrap miss), set provider_id
+  // to null and prefix the notes with the employee name for traceability.
+  // ON DELETE SET NULL on provider_payouts.provider_id makes null safe.
+  var selectedEntry = doctors.find(function(d){ return d.id === provId; });
+  var resolvedProviderId = provId;
+  var employeeNotePrefix = '';
+  if (selectedEntry && selectedEntry._needsDoctorRow) {
+    // This is an employee with no clinic_doctors row.
+    // Save with null provider_id + tag the name in notes.
+    resolvedProviderId = null;
+    employeeNotePrefix = '[' + selectedEntry.name + '] ';
+  }
+
   var payload = {
     owner_id:     currentUser.id,
-    provider_id:  provId,
+    provider_id:  resolvedProviderId,
     period_start: from,
     period_end:   to,
     paid_at:      paidAtIso,  // null → DB default now()
     amount:       Math.round(amount),
-    notes:        notes || null,
+    notes:        (employeeNotePrefix + (notes || '')).trim() || null,
     payment_method: modalMethod || null,
     breakdown_salary: Math.round(salary) || 0,
     breakdown_share:  Math.round(share)  || 0,
@@ -1457,8 +1645,10 @@ async function savePayout() {
   // Audit log (fire-and-forget; قاعدة #11 single source of truth for payouts)
   try {
     if (window.logAudit) {
-      var doctor = doctors.find(function(d){ return d.id === provId; });
-      var docName = doctor ? doctor.name : '—';
+      // selectedEntry is the unified employee/doctor record (set above).
+      // For employees without doctor link, resolvedProviderId is null,
+      // but the name is still in selectedEntry.name.
+      var docName = (selectedEntry && selectedEntry.name) || '—';
       var actionType = editingId ? 'payout.edit' : 'payout.create';
       var description = (editingId ? 'تعديل دفعة لـ ' : 'دفعة لـ ') + docName
                       + ' (' + fmtSY(payload.amount) + ')';
@@ -1467,8 +1657,9 @@ async function savePayout() {
         entity_id: res.data ? res.data.id : editingId,
         description: description,
         new_value: {
-          provider_id: provId,
+          provider_id: resolvedProviderId,    // matches DB (may be null)
           provider_name: docName,
+          employee_id: selectedEntry ? selectedEntry.employeeId : null,
           period_start: from,
           period_end: to,
           amount: payload.amount,
