@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SyDent">
 <meta name="theme-color" content="#0a1628">
+<!-- Phase 7.3 cache-bust: inline-JS changes need fresh HTML, not stale CDN copy -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="manifest" href="manifest.json">
 <title>الموظفون — SyDent</title>
@@ -635,11 +639,30 @@ async function hashPin(pin) {
 // ── Data layer ──
 async function loadData() {
   // Load employees
+  // Phase 7.3 (Migration 20): clinic_employees is now the canonical HR source
+  // for ALL employees (clinical + non-clinical). The 8 HR columns mirror what
+  // clinic_doctors stores for clinical staff, so non-clinical staff can also
+  // carry phone/color/salary/etc without needing a clinic_doctors row.
+  // Graceful fallback: if Migration 20 hasn't been applied yet, retry without
+  // the new columns (Rule #15 — soft-mode bootstrapping).
   var empRes = await window.sb.from('clinic_employees')
-    .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at')
+    .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at, ' +
+            'phone, color, notes, weekly_hours, monthly_salary, share_percent, ' +
+            'provider_type, compensation_model')
     .eq('owner_id', currentUser.id)
     .order('role', { ascending: true })
     .order('name', { ascending: true });
+
+  // Pre-Migration-20 fallback: drop the 8 new HR columns if any are missing.
+  if (empRes.error && /42703|phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model/i.test(
+        (empRes.error.message || '') + ' ' + (empRes.error.code || ''))) {
+    console.warn('Phase 7.3: Migration 20 not applied — retrying clinic_employees with legacy columns');
+    empRes = await window.sb.from('clinic_employees')
+      .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at')
+      .eq('owner_id', currentUser.id)
+      .order('role', { ascending: true })
+      .order('name', { ascending: true });
+  }
 
   if (empRes.error) {
     showToast('فشل تحميل قائمة الموظفين', true);
@@ -953,23 +976,38 @@ function openEditModal(id) {
   $('modalTitle').textContent = '✏️ تعديل: ' + emp.name;
   $('eName').value = emp.name;
 
+  // Phase 7.3 (Migration 20): clinic_employees is now canonical for all HR
+  // fields. Pre-fill reads from emp.* first, then falls back to linkedDoc.*
+  // for backward compatibility (rows that existed before Migration 20 still
+  // have their values in clinic_doctors). The fallback only kicks in when the
+  // canonical value is null/undefined — once the row is saved post-Phase-7.3,
+  // both copies stay in sync.
+  //
   // Phase 6 X: Pre-fill clinical/staff fields from the linked clinic_doctors
-  // row for ALL employees (not just doctors). Secretary + other employees now
-  // also have clinic_doctors rows where their salary/phone/color/hours live.
-  // Legacy data (pre-Phase-6-X secretaries with no clinic_doctors row) falls
-  // back to empty defaults so the form is still editable; saveEmployee will
-  // create the missing row on next save.
+  // row for ALL employees (not just doctors). Phase 7.2 reversed Phase 6 X
+  // — only clinical employees have linkedDoc now. Non-clinical employees
+  // (secretary/other) get their values exclusively from emp.* (canonical).
   var linkedDoc = emp.doctor_id
     ? doctors.find(function(d){ return d.id === emp.doctor_id; })
     : null;
 
-  // Phase 6 W + X: reconstruct the composite role:provider_type value.
-  //   doctor employee     → 'doctor:<sub-type>' (sub-type from linkedDoc)
+  // Helper: pick canonical (emp) value first, then linkedDoc fallback.
+  // Used for the 8 HR fields. Treats null + undefined + empty string as
+  // "no canonical value" so the linkedDoc copy can fill in.
+  function _coalesceHR(canonical, fallback) {
+    if (canonical !== null && canonical !== undefined && canonical !== '') return canonical;
+    if (fallback !== null && fallback !== undefined && fallback !== '') return fallback;
+    return null;
+  }
+
+  // Phase 6 W + X / Phase 7.3: reconstruct the composite role:provider_type
+  // value. Prefer emp.provider_type (canonical, Phase 7.3) over
+  // linkedDoc.provider_type (legacy mirror).
+  //   doctor employee     → 'doctor:<sub-type>'
   //   secretary employee  → 'secretary:<provider_type>' where provider_type
   //                          is 'secretary' (normal) or 'other' (catch-all)
-  //   Legacy 'secretary' rows without a linkedDoc default to 'secretary:secretary'
-  //   so the dropdown has a valid selection.
-  var providerType = (linkedDoc && linkedDoc.provider_type) ||
+  //   Legacy rows without provider_type default to a safe value per role.
+  var providerType = _coalesceHR(emp.provider_type, linkedDoc && linkedDoc.provider_type) ||
                      (emp.role === 'doctor' ? 'doctor' : 'secretary');
   var compositeValue;
   if (emp.role === 'doctor') {
@@ -988,22 +1026,29 @@ function openEditModal(id) {
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
 
-  $('eDocRole').value = (linkedDoc && linkedDoc.role) || '';
-  $('eDocPhone').value = (linkedDoc && linkedDoc.phone) || '';
-  // Mirror phone to the alt input used when specialty row is hidden.
-  if ($('eDocPhoneAlt')) $('eDocPhoneAlt').value = (linkedDoc && linkedDoc.phone) || '';
-  $('eDocShare').value = (linkedDoc && linkedDoc.share_percent !== null && linkedDoc.share_percent !== undefined)
-    ? linkedDoc.share_percent : '';
-  $('eDocHours').value = (linkedDoc && linkedDoc.weekly_hours !== null && linkedDoc.weekly_hours !== undefined)
-    ? linkedDoc.weekly_hours : '';
-  $('eDocNotes').value = (linkedDoc && linkedDoc.notes) || '';
-  _setEmpDocColor((linkedDoc && linkedDoc.color) || _pickRandomDoctorColor());
+  // Phase 7.3: HR field pre-fill — canonical (emp) first, then linkedDoc.
+  var hrRole       = _coalesceHR(linkedDoc && linkedDoc.role, null);  // 'role' label only on clinic_doctors
+  var hrPhone      = _coalesceHR(emp.phone,         linkedDoc && linkedDoc.phone);
+  var hrShare      = _coalesceHR(emp.share_percent, linkedDoc && linkedDoc.share_percent);
+  var hrHours      = _coalesceHR(emp.weekly_hours,  linkedDoc && linkedDoc.weekly_hours);
+  var hrNotes      = _coalesceHR(emp.notes,         linkedDoc && linkedDoc.notes);
+  var hrColor      = _coalesceHR(emp.color,         linkedDoc && linkedDoc.color);
+  var hrComp       = _coalesceHR(emp.compensation_model, linkedDoc && linkedDoc.compensation_model);
+  var hrSalary     = _coalesceHR(emp.monthly_salary, linkedDoc && linkedDoc.monthly_salary);
 
-  // Phase 6 W: Pre-fill compensation + monthly_salary from linked doctor.
-  $('eDocCompensation').value = (linkedDoc && linkedDoc.compensation_model) || 'salary';
+  $('eDocRole').value = hrRole || '';
+  $('eDocPhone').value = hrPhone || '';
+  // Mirror phone to the alt input used when specialty row is hidden.
+  if ($('eDocPhoneAlt')) $('eDocPhoneAlt').value = hrPhone || '';
+  $('eDocShare').value = (hrShare !== null) ? hrShare : '';
+  $('eDocHours').value = (hrHours !== null) ? hrHours : '';
+  $('eDocNotes').value = hrNotes || '';
+  _setEmpDocColor(hrColor || _pickRandomDoctorColor());
+
+  // Phase 6 W / Phase 7.3: Pre-fill compensation + monthly_salary.
+  $('eDocCompensation').value = hrComp || 'salary';
   if ($('eDocMonthlySalary')) {
-    $('eDocMonthlySalary').value = (linkedDoc && linkedDoc.monthly_salary !== null && linkedDoc.monthly_salary !== undefined)
-      ? linkedDoc.monthly_salary : '';
+    $('eDocMonthlySalary').value = (hrSalary !== null) ? hrSalary : '';
   }
 
   // PIN hint: editing, leave empty to keep current
@@ -1255,34 +1300,94 @@ async function saveEmployee() {
       doctorId = null;
     }
 
+    // ── Phase 7.3 (Migration 20): clinic_employees payload ──
+    // clinic_employees is now canonical for all 8 HR fields. The row payload
+    // includes them for every employee (clinical + non-clinical). For
+    // clinical employees a parallel UPDATE/INSERT into clinic_doctors keeps
+    // the mirror in sync (Cases 1+2 further below); for non-clinical the
+    // canonical row in clinic_employees is the only home of these values.
+    //
+    // Graceful fallback: if Migration 20 hasn't run yet, the DB will reject
+    // the extended payload with 42703 — we retry with the legacy-only fields
+    // so older clinics can still onboard (Rule #15).
     var row = {
       owner_id: currentUser.id,
       name: name,
       role: role,
       doctor_id: doctorId,
-      is_active: true
+      is_active: true,
+      // Phase 7.3: 8 canonical HR fields
+      phone: docPhoneField,
+      color: docColorField,
+      notes: docNotesField,
+      weekly_hours: docHoursField,
+      monthly_salary: docMonthlySalaryField,
+      share_percent: docShareField,
+      provider_type: docProviderTypeField,
+      compensation_model: docCompensationField
     };
     if (pinHash) row.pin_hash = pinHash;
+
+    // Helper: detect "Migration 20 not applied" error (any of the 8 new
+    // columns missing). Strips the HR fields and retries with legacy schema.
+    function _stripHRFields(payload) {
+      var legacy = Object.assign({}, payload);
+      delete legacy.phone;
+      delete legacy.color;
+      delete legacy.notes;
+      delete legacy.weekly_hours;
+      delete legacy.monthly_salary;
+      delete legacy.share_percent;
+      delete legacy.provider_type;
+      delete legacy.compensation_model;
+      return legacy;
+    }
+    function _isHRColumnMissing(err) {
+      if (!err) return false;
+      var m = (err.message || '') + ' ' + (err.code || '');
+      return /42703.*(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model)/i.test(m) ||
+             /(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model).*42703/i.test(m) ||
+             /42703/.test(m);
+    }
 
     var res;
     if (editingId) {
       res = await window.sb.from('clinic_employees')
         .update(row).eq('id', editingId).eq('owner_id', currentUser.id);
+      // Pre-Migration-20 fallback: retry without HR fields if they're missing
+      if (res.error && _isHRColumnMissing(res.error)) {
+        console.warn('Phase 7.3: Migration 20 not applied — retrying UPDATE without HR fields');
+        res = await window.sb.from('clinic_employees')
+          .update(_stripHRFields(row)).eq('id', editingId).eq('owner_id', currentUser.id);
+      }
       if (!res.error) {
         await window.logAudit('employee.edit', {
           entityId: editingId,
           description: 'تعديل بيانات الموظف: ' + name,
           oldValue: origEmp ? { name: origEmp.name, role: origEmp.role, doctor_id: origEmp.doctor_id } : null,
-          newValue: { name: name, role: role, doctor_id: doctorId, pin_changed: !!pinHash }
+          newValue: { name: name, role: role, doctor_id: doctorId, pin_changed: !!pinHash,
+                      phone: docPhoneField, monthly_salary: docMonthlySalaryField,
+                      share_percent: docShareField, weekly_hours: docHoursField,
+                      provider_type: docProviderTypeField,
+                      compensation_model: docCompensationField }
         });
       }
     } else {
       res = await window.sb.from('clinic_employees').insert(row).select().single();
+      // Pre-Migration-20 fallback: retry without HR fields if they're missing
+      if (res.error && _isHRColumnMissing(res.error)) {
+        console.warn('Phase 7.3: Migration 20 not applied — retrying INSERT without HR fields');
+        res = await window.sb.from('clinic_employees').insert(_stripHRFields(row)).select().single();
+      }
       if (!res.error && res.data) {
         await window.logAudit('employee.create', {
           entityId: res.data.id,
           description: 'إضافة موظف جديد: ' + name + ' (' + roleLabel(role) + ')',
-          newValue: { name: name, role: role, doctor_id: doctorId }
+          newValue: { name: name, role: role, doctor_id: doctorId,
+                      phone: docPhoneField, monthly_salary: docMonthlySalaryField,
+                      share_percent: docShareField, weekly_hours: docHoursField,
+                      provider_type: docProviderTypeField,
+                      compensation_model: docCompensationField }
         });
       }
     }
