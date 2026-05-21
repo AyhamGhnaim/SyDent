@@ -711,9 +711,30 @@ async function init() {
     if (!u) { window.location.href = 'auth.html'; return; }
     currentUser = u;
 
-    // Page guard: Owner-only (mirrors expenses.html + provider-reports)
+    // ── Page guard: Owner-only ──────────────────────────────────────
+    // Defense in depth (قاعدة #16): three layers protect this page.
+    //
+    //   1. Sidebar BLOCKED map hides the link for non-Owners.
+    //   2. window.SyDentLock.guardPage replaces the body with a blocked
+    //      screen if a Doctor/Secretary lands here directly.
+    //   3. Manual role check below as a final safety net — if the
+    //      SyDentLock module fails to load or the guard call throws,
+    //      this still hard-redirects to index.html.
+    //
+    // Phase 7.2 live test surfaced a case where Bug B (role-switch not
+    // refreshing the page) left payouts.html open under a Secretary
+    // session. The reload from supabase-init.js's role-switch handler
+    // should already protect this, but belt-and-suspenders is cheap.
     if (window.SyDentLock && window.SyDentLock.guardPage) {
       if (!window.SyDentLock.guardPage(['owner'])) return;
+    }
+    var role = (window.SyDentLock && window.SyDentLock.getRole)
+             ? window.SyDentLock.getRole()
+             : 'owner';
+    if (role !== 'owner') {
+      console.warn('[payouts] non-owner role detected:', role, '— redirecting to index');
+      window.location.href = 'index.html';
+      return;
     }
 
     // Initialize date range filter to current month (default useful view).
@@ -750,7 +771,8 @@ async function loadAll() {
 }
 
 async function loadDoctors() {
-  // Phase 6 V/W/X retry pattern — try widest select, fall back as columns drop
+  // Multi-tenant: clinic_doctors uses owner_id (per قاعدة #6). Phase 6 V/W/X
+  // retry pattern — try widest select, fall back as columns drop.
   var res = await window.sb.from('clinic_doctors')
     .select('id, name, color, is_active, is_owner, share_percent, provider_type, compensation_model, monthly_salary')
     .eq('owner_id', currentUser.id)
@@ -779,6 +801,16 @@ async function loadDoctors() {
     return;
   }
   doctors = res.data || [];
+
+  // DIAGNOSTIC: visible feedback if doctors load returned empty.
+  // Common causes: (1) user truly has no clinic_doctors rows,
+  // (2) owner_id mismatch (rare — would imply data created under
+  // a different auth user), (3) RLS policy blocks read.
+  if (doctors.length === 0) {
+    console.warn('[payouts] loadDoctors returned 0 rows for owner_id=' + currentUser.id);
+  } else {
+    console.log('[payouts] loaded ' + doctors.length + ' doctors');
+  }
 }
 
 async function loadPayouts() {

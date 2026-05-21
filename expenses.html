@@ -880,8 +880,22 @@ async function init() {
     // Page guard: only Owner can access expense management. Doctor + Secretary
     // are blocked since this affects accounting integrity. Aligns with the
     // sidebar BLOCKED config in sidebar.js (Phase 4 lock model).
+    //
+    // Defense in depth (قاعدة #16 + درس Phase 7.2 live test): three layers.
+    //   1. Sidebar BLOCKED hides the link.
+    //   2. SyDentLock.guardPage replaces body with blocked screen.
+    //   3. Manual role check below as a final safety net if the
+    //      SyDentLock module fails to load or its guard call throws.
     if (window.SyDentLock && window.SyDentLock.guardPage) {
       if (!window.SyDentLock.guardPage(['owner'])) return;
+    }
+    var role = (window.SyDentLock && window.SyDentLock.getRole)
+             ? window.SyDentLock.getRole()
+             : 'owner';
+    if (role !== 'owner') {
+      console.warn('[expenses] non-owner role detected:', role, '— redirecting to index');
+      window.location.href = 'index.html';
+      return;
     }
 
     await loadCategories();
