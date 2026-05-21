@@ -1224,13 +1224,13 @@ function renderPayouts() {
       inactiveBadge = (doctor.is_active === false)
                     ? ' <span style="font-size:10px;opacity:0.7;">(معطل)</span>' : '';
     } else if (po.provider_id === null && po.notes && /^\[([^\]]+)\]\s/.test(po.notes)) {
-      // Phase 7.2 Bug C: employee without clinic_doctors row.
-      // Saved with provider_id=null and notes prefixed with '[Name] '.
-      // Extract the name back out for display + strip from visible notes.
+      // Backward-compat: payouts saved before the auto-create fix may have
+      // null provider_id + '[Name] ' notes prefix. Extract the name back out.
+      // This branch handles legacy rows; new saves always have provider_id set.
       var match = po.notes.match(/^\[([^\]]+)\]\s*(.*)$/);
       docName = match[1];
       displayNotes = match[2] || null;
-      docColor = '#8a9ab5';   // neutral gray (no color stored for non-doctors)
+      docColor = '#8a9ab5';
       inactiveBadge = '';
     } else {
       // Truly orphaned (provider_id pointed at a now-deleted doctor)
@@ -1421,7 +1421,10 @@ function onPeriodChange() {
   updateSuggestion();
 }
 
-// Update the suggestion hint based on current provider + period
+// Update the suggestion hint based on current provider + period.
+// When suggestion = 0, give a diagnostic message explaining WHY so the Owner
+// knows whether to enter manually or first set monthly_salary/share_percent
+// in employees.html.
 function updateSuggestion() {
   var hint = $('hintSuggest');
   var provId = $('fldProvider').value;
@@ -1442,18 +1445,54 @@ function updateSuggestion() {
   var sug = computeSuggestion(provider, from, to);
   if (!sug) { hint.style.display = 'none'; return; }
 
-  if (sug.total <= 0) {
-    hint.style.display = 'block';
-    hint.textContent = '💡 الاقتراح: 0 ل.س (' + sug.note + ')';
-    hint.dataset.amount = '0';
+  hint.style.display = 'block';
+
+  if (sug.total > 0) {
+    // Happy path — suggestion ready, click to apply
+    hint.textContent = '💡 الاقتراح: ' + fmtSY(sug.total) + ' — اضغط لتطبيقه (' + sug.note + ')';
+    hint.dataset.amount = String(sug.total);
+    hint.dataset.salary = String(sug.salary);
+    hint.dataset.share = String(sug.share);
+    hint.style.cursor = 'pointer';
     return;
   }
 
-  hint.style.display = 'block';
-  hint.textContent = '💡 الاقتراح: ' + fmtSY(sug.total) + ' — اضغط لتطبيقه (' + sug.note + ')';
-  hint.dataset.amount = String(sug.total);
-  hint.dataset.salary = String(sug.salary);
-  hint.dataset.share = String(sug.share);
+  // Zero — diagnose why and tell the Owner what to do
+  hint.dataset.amount = '0';
+  hint.style.cursor = 'default';
+  var cm = provider.compensation_model || 'percentage';
+
+  if (cm === 'none') {
+    hint.textContent = 'ℹ️ هذا الموظف لا يخضع لحساب تلقائي — أدخل المبلغ يدوياً';
+  } else if (cm === 'salary') {
+    if (!provider.monthly_salary || Number(provider.monthly_salary) <= 0) {
+      hint.innerHTML = '⚠️ لم يُحدّد الراتب الشهري لـ ' + escapeHtml(provider.name)
+                     + ' — افتح <a href="employees.html" onclick="event.stopPropagation()" style="color:var(--green);text-decoration:underline;">صفحة الموظفون</a>'
+                     + ' وحدّد الراتب ليُحسب تلقائياً';
+    } else {
+      hint.textContent = '💡 الاقتراح: 0 ل.س (تم سداد كامل الفترة سابقاً)';
+    }
+  } else if (cm === 'percentage') {
+    var hasShare = provider.share_percent !== null && provider.share_percent !== '' && Number(provider.share_percent) > 0;
+    if (!hasShare) {
+      hint.innerHTML = '⚠️ لم تُحدّد نسبة الإنتاج لـ ' + escapeHtml(provider.name)
+                     + ' — افتح <a href="employees.html" onclick="event.stopPropagation()" style="color:var(--green);text-decoration:underline;">صفحة الموظفون</a>'
+                     + ' وحدّد النسبة';
+    } else {
+      hint.textContent = '💡 الاقتراح: 0 ل.س (لا يوجد إنتاج جديد في الفترة أو تم سداد ما يكفي)';
+    }
+  } else if (cm === 'hybrid') {
+    var missingSalary = !provider.monthly_salary || Number(provider.monthly_salary) <= 0;
+    var missingShare  = !provider.share_percent || Number(provider.share_percent) <= 0;
+    if (missingSalary || missingShare) {
+      hint.innerHTML = '⚠️ لم تكتمل بيانات الراتب أو النسبة — افتح '
+                     + '<a href="employees.html" onclick="event.stopPropagation()" style="color:var(--green);text-decoration:underline;">صفحة الموظفون</a>';
+    } else {
+      hint.textContent = '💡 الاقتراح: 0 ل.س (لا يوجد إنتاج وتم سداد كامل الفترة)';
+    }
+  } else {
+    hint.textContent = '💡 الاقتراح: 0 ل.س (' + sug.note + ')';
+  }
 }
 
 function applySuggestion() {
@@ -1568,19 +1607,82 @@ async function savePayout() {
     paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss + tzSign + tzH + ':' + tzM;
   }
 
-  // Resolve the selected provider/employee from the unified list.
-  // If they have a clinic_doctors row, use its id as provider_id (FK target).
-  // If they don't (employee-only — Phase 6 X bootstrap miss), set provider_id
-  // to null and prefix the notes with the employee name for traceability.
-  // ON DELETE SET NULL on provider_payouts.provider_id makes null safe.
+  // ── Resolve the selected provider ──────────────────────────────────
+  // The unified list has two cases:
+  //   A) selectedEntry._hasDoctorLink → id IS the clinic_doctors.id.
+  //      Just use it.
+  //   B) selectedEntry._needsDoctorRow → id is the clinic_employees.id.
+  //      provider_payouts.provider_id is NOT NULL, so we MUST create
+  //      a clinic_doctors row first, then link clinic_employees.doctor_id,
+  //      then use the new doctor.id for the payout. This is a Phase 6 X
+  //      'late bootstrap' — fixes the data so future payouts work the
+  //      normal way + the smart suggestion engine starts working for
+  //      this employee too.
   var selectedEntry = doctors.find(function(d){ return d.id === provId; });
+  if (!selectedEntry) { showToast('⚠️ الموظف غير موجود', true); return; }
+
   var resolvedProviderId = provId;
-  var employeeNotePrefix = '';
-  if (selectedEntry && selectedEntry._needsDoctorRow) {
-    // This is an employee with no clinic_doctors row.
-    // Save with null provider_id + tag the name in notes.
-    resolvedProviderId = null;
-    employeeNotePrefix = '[' + selectedEntry.name + '] ';
+
+  if (selectedEntry._needsDoctorRow) {
+    // Late-bootstrap path: create clinic_doctors row for this employee.
+    // Map clinic_employees.role + provider_type defaults from loadDoctors.
+    var newDocPayload = {
+      owner_id:           currentUser.id,
+      name:               selectedEntry.name,
+      role:               selectedEntry.provider_type === 'secretary' ? 'secretary' : 'doctor',
+      is_active:          true,
+      is_owner:           false,
+      provider_type:      selectedEntry.provider_type,
+      compensation_model: selectedEntry.compensation_model
+    };
+    var docCreateRes = await window.sb.from('clinic_doctors')
+      .insert(newDocPayload).select().single();
+
+    // Pre-Migration-13 fallback: drop provider_type + compensation_model
+    if (docCreateRes.error && /42703|provider_type|compensation_model/i.test(
+        (docCreateRes.error.message || '') + ' ' + (docCreateRes.error.code || ''))) {
+      var legacyDocPayload = {
+        owner_id:  currentUser.id,
+        name:      selectedEntry.name,
+        role:      newDocPayload.role,
+        is_active: true,
+        is_owner:  false
+      };
+      docCreateRes = await window.sb.from('clinic_doctors')
+        .insert(legacyDocPayload).select().single();
+    }
+
+    if (docCreateRes.error || !docCreateRes.data) {
+      showToast('⚠️ فشل إنشاء سجل الطبيب: ' + (docCreateRes.error && docCreateRes.error.message), true);
+      return;
+    }
+
+    var newDoctorId = docCreateRes.data.id;
+    resolvedProviderId = newDoctorId;
+
+    // Update clinic_employees.doctor_id to link them. Non-fatal — if this
+    // fails, the payout still saves; the employee link is just delayed.
+    if (selectedEntry.employeeId) {
+      try {
+        await window.sb.from('clinic_employees')
+          .update({ doctor_id: newDoctorId })
+          .eq('id', selectedEntry.employeeId);
+      } catch (e) {
+        console.warn('[payouts] failed to link clinic_employees.doctor_id:', e);
+      }
+    }
+
+    // Update local state so subsequent saves in the same session don't
+    // re-create the row. Mutate the unified entry in place.
+    selectedEntry._hasDoctorLink = true;
+    selectedEntry._needsDoctorRow = false;
+    selectedEntry.id = newDoctorId;       // update id so future find()s still work
+    selectedEntry.color = docCreateRes.data.color;
+    selectedEntry.share_percent = docCreateRes.data.share_percent;
+    selectedEntry.monthly_salary = docCreateRes.data.monthly_salary;
+    selectedEntry.is_owner = false;
+
+    console.log('[payouts] late-bootstrapped clinic_doctors for', selectedEntry.name, '→', newDoctorId);
   }
 
   var payload = {
@@ -1590,7 +1692,7 @@ async function savePayout() {
     period_end:   to,
     paid_at:      paidAtIso,  // null → DB default now()
     amount:       Math.round(amount),
-    notes:        (employeeNotePrefix + (notes || '')).trim() || null,
+    notes:        notes || null,
     payment_method: modalMethod || null,
     breakdown_salary: Math.round(salary) || 0,
     breakdown_share:  Math.round(share)  || 0,
