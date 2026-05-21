@@ -357,11 +357,27 @@ async function loadDoctors() {
     return;
   }
 
-  doctors = data || [];
+  // ── Phase 7.2 Architectural Refactor ──
+  // doctors.html shows ONLY clinical practitioners — those who treat patients.
+  // Non-clinical staff (secretary + other) live in employees.html.
+  // We filter client-side (rather than in the query) because:
+  //   1) provider_type may be NULL on legacy rows (pre-Migration 13) → defaults to clinical
+  //   2) Allows us to keep the same fetch + cache the full list if ever needed
+  //   3) Future toggle (e.g., "show all staff" admin view) would just remove the filter
+  // Clinical provider types: doctor, hygienist, assistant.
+  // Non-clinical (excluded): secretary, other.
+  var allRows = data || [];
+  doctors = allRows.filter(function(d){
+    var pt = d.provider_type || 'doctor';   // NULL = legacy = doctor (clinical)
+    return pt !== 'secretary' && pt !== 'other';
+  });
 
   // Auto-create the owner-doctor record on first visit (legacy upgrade path).
   // Uses data from the legacy 'doctors' table if available, otherwise sensible defaults.
-  if (doctors.length === 0) {
+  // ── Gate on allRows.length (not doctors.length) ──
+  // After Phase 7.2 filter, doctors may be empty even when allRows has secretary
+  // rows. We only auto-create if the clinic genuinely has no clinic_doctors at all.
+  if (allRows.length === 0) {
     var ownerName = (doctorOwner && doctorOwner.name) || (currentUser.email ? currentUser.email.split('@')[0] : 'الطبيب الرئيسي');
     var ownerRole = (doctorOwner && doctorOwner.specialty) || 'طبيب أسنان';
     var ownerPhone = (doctorOwner && doctorOwner.phone) || null;
@@ -721,18 +737,13 @@ document.addEventListener('click', function(e){
   // Phase 4: Lock guard — Owner-only page
   if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
 
-  // Load owner-doctor record from legacy 'doctors' table (one row per account)
-  // Use maybeSingle so missing row doesn't throw — new users may not have one yet
-  try {
-    var { data: ownerData } = await window.sb.from('doctors')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-    doctorOwner = ownerData;
-  } catch(e) {
-    console.warn('owner doctor lookup failed:', e);
-    doctorOwner = null;
-  }
+  // Phase 7.2 cleanup: removed legacy 'doctors' table lookup.
+  // The legacy 'doctors' table is no longer used (replaced by clinic_doctors in
+  // the multi-tenant migration). The old query was causing a silent 400 error
+  // in the console even though .maybeSingle()+try/catch made it non-fatal.
+  // doctorOwner stays null — loadDoctors() will fall back to email-prefix
+  // defaults when auto-creating the owner row for brand-new accounts.
+  doctorOwner = null;
 
   await loadDoctors();
 })();

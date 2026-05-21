@@ -1306,21 +1306,38 @@ async function saveEmployee() {
       var employeeIdForDoctorOps = editingId || (res.data && res.data.id);
 
       // Case 1: Auto-create a new clinic_doctors row.
-      // Phase 6 X: This now runs for ALL non-owner employees (doctor, hygienist,
-      // assistant, secretary, other) — not just doctor roles. The DB row holds
-      // payroll/contact fields for everyone in one place; the provider_type
-      // column tells us what they are. Triggers:
-      //   • New employee with any non-owner role (no existing doctor_id by
-      //     definition since the employee row was just inserted), OR
-      //   • Edit transitioning a secretary→doctor with no existing row, OR
-      //   • Edit of ANY legacy employee whose doctor_id is null (pre-Phase-X
-      //     secretary without a backing row, getting "upgraded" on first
-      //     save so their phone/color/salary actually persist).
+      //
+      // Phase 7.2 Architectural Fix — REVERSED from Phase 6 X:
+      // We no longer auto-create a clinic_doctors row for EVERY employee.
+      // Now only CLINICAL employees (doctor + hygienist + assistant) get a
+      // backing clinic_doctors row, because:
+      //   • doctors.html shows clinic_doctors rows → secretaries don't belong
+      //   • clinic_employees is the canonical source of truth for HR/identity
+      //   • provider_payouts now has BOTH provider_id AND employee_id columns
+      //     (Migration 18) so non-clinical staff can receive payouts via
+      //     employee_id without needing a doctor row
+      //
+      // Triggers (only when docProviderTypeField is a clinical type):
+      //   • New employee with a clinical role (no existing doctor_id), OR
+      //   • Edit transitioning secretary→doctor with no existing row, OR
+      //   • Edit of clinical employee whose doctor_id is null (pre-Phase-X
+      //     "upgrade on first save").
       // The hasExistingDoctorRow guard prevents duplicate orphan rows.
+      //
+      // For secretary + other:
+      //   • No clinic_doctors row is created
+      //   • doctor_id stays null in clinic_employees
+      //   • Their phone/color/salary persist in clinic_employees only (via
+      //     the wider clinic_employees schema — covered by Phase 6 Q)
+      var isClinicalProviderType = (docProviderTypeField === 'doctor' ||
+                                    docProviderTypeField === 'hygienist' ||
+                                    docProviderTypeField === 'assistant');
       var hasExistingDoctorRow = !!(origEmp && origEmp.doctor_id);
-      var needsAutoCreate = (!editingId && role !== 'owner') ||
-                            (editingId && pendingRoleSwitch === 'secretary→doctor' && !hasExistingDoctorRow) ||
-                            (editingId && !pendingRoleSwitch && !hasExistingDoctorRow && role !== 'owner');
+      var needsAutoCreate = isClinicalProviderType && (
+        (!editingId && role !== 'owner') ||
+        (editingId && pendingRoleSwitch === 'secretary→doctor' && !hasExistingDoctorRow) ||
+        (editingId && !pendingRoleSwitch && !hasExistingDoctorRow && role !== 'owner')
+      );
 
       if (needsAutoCreate && employeeIdForDoctorOps) {
         var newDocColor = docColorField || _pickRandomDoctorColor();
@@ -1545,6 +1562,55 @@ async function saveEmployee() {
             description: 'إلغاء تنشيط بطاقة الطبيب بعد تغيير دور الموظف لسكرتيرة',
             oldValue: { is_active: true },
             newValue: { is_active: false, reason: 'role_changed_to_secretary' }
+          });
+        }
+      }
+
+      // ── Phase 7.2 Case 4: clinical → non-clinical provider_type transition ──
+      // If the Owner is editing an employee with an existing doctor_id, but
+      // changed provider_type from clinical (doctor/hygienist/assistant) to
+      // non-clinical (secretary/other), we need to:
+      //   1) Unlink the employee.doctor_id (so doctors.html no longer shows them)
+      //   2) Deactivate the clinic_doctors row (preserves history via FK)
+      // This is the architectural counterpart to Case 3 — Case 3 handled the
+      // legacy clinic_employees.role transition (doctor→secretary), Case 4
+      // handles the modern provider_type transition.
+      var origDoctorRow = origEmp && origEmp.doctor_id
+                          ? doctors.find(function(d){ return d.id === origEmp.doctor_id; })
+                          : null;
+      var origProviderType = origDoctorRow ? (origDoctorRow.provider_type || 'doctor') : null;
+      var wasClinical = origProviderType
+                        && origProviderType !== 'secretary'
+                        && origProviderType !== 'other';
+      var nowNonClinical = docProviderTypeField === 'secretary' ||
+                           docProviderTypeField === 'other';
+      var skipCase4 = !!pendingDeactivateDoctorId;   // Case 3 already handled it
+
+      if (editingId && origEmp && origEmp.doctor_id && wasClinical && nowNonClinical && !skipCase4) {
+        // Step 1: deactivate the doctor row
+        var case4Deact = await window.sb.from('clinic_doctors')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', origEmp.doctor_id)
+          .eq('owner_id', currentUser.id);
+
+        // Step 2: unlink the employee
+        var case4Unlink = await window.sb.from('clinic_employees')
+          .update({ doctor_id: null, updated_at: new Date().toISOString() })
+          .eq('id', editingId)
+          .eq('owner_id', currentUser.id);
+
+        if (case4Deact.error || case4Unlink.error) {
+          console.warn('Phase 7.2 Case 4: partial failure:',
+                       case4Deact.error, case4Unlink.error);
+          showToast('⚠️ تم حفظ الموظف، لكن فصل بطاقة الطبيب فشل جزئياً', true);
+        } else if (window.logAudit) {
+          window.logAudit('doctor.edit', {
+            entityId: origEmp.doctor_id,
+            description: 'فصل بطاقة الطبيب بعد تغيير نوع الموظف لـ ' +
+                         (docProviderTypeField === 'secretary' ? 'سكرتيرة' : 'موظف آخر'),
+            oldValue: { provider_type: origProviderType, is_active: true, linked: true },
+            newValue: { provider_type: docProviderTypeField, is_active: false, linked: false,
+                        reason: 'clinical_to_non_clinical' }
           });
         }
       }
