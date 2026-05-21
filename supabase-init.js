@@ -474,16 +474,39 @@
   // for the lock modal picker; the full list is used for name recovery
   // and audit-log historical display.
   // Returns [] silently if Migration 9.1 is not applied yet (graceful fallback).
+  // ────────────────────────────────────────────────────────────────────
+  // Phase 7.4: Lock-mode picker only shows employees with system access.
+  // Employees marked has_system_access=false are HR-only (payroll/reports
+  // tracking) and never appear in the lock-mode role switcher.
+  //
+  // Migration 21 added the has_system_access column. Graceful fallback:
+  // if Migration 21 hasn't run yet, fall back to loading all employees
+  // (pre-7.4 behavior — anyone with a pin_hash was effectively a user).
+  // ────────────────────────────────────────────────────────────────────
   async function loadEmployees() {
     if (_employeesListCache) return _employeesListCache;
     try {
       var user = await window.sbGetUser();
       if (!user) return [];
+      // Phase 7.4: filter on has_system_access=true so HR-only employees
+      // don't pollute the role picker.
       var res = await window.sb.from('clinic_employees')
-        .select('id, name, role, doctor_id, pin_hash, is_active')
+        .select('id, name, role, doctor_id, pin_hash, is_active, has_system_access')
         .eq('owner_id', user.id)
+        .eq('has_system_access', true)
         .order('role', { ascending: true })
         .order('name', { ascending: true });
+      // Pre-Migration-21 fallback: if has_system_access column doesn't
+      // exist, retry without the filter (old behavior). 42703 = column
+      // not found; PGRST205 = schema cache miss.
+      if (res.error && /42703|has_system_access|PGRST/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+        console.warn('[SyDentLock] has_system_access column missing — falling back to all-employees mode');
+        res = await window.sb.from('clinic_employees')
+          .select('id, name, role, doctor_id, pin_hash, is_active')
+          .eq('owner_id', user.id)
+          .order('role', { ascending: true })
+          .order('name', { ascending: true });
+      }
       if (res.error) {
         // Migration not applied yet — silently fall back to empty list
         var m = (res.error.message || '') + ' ' + (res.error.code || '');

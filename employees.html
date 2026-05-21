@@ -17,7 +17,7 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260520k2-2"></script>
+<script src="supabase-init.js?v=20260521p74"></script>
 <script src="sidebar.js?v=20260520k2-2"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -420,6 +420,30 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       </div>
 
+      <!-- ═══════════════════════════════════════════════════════════════
+           Phase 7.4: System access toggle
+           ─────────────────────────────────────────────────────────────
+           Separates HR identity from system login. Most non-clinical and
+           support staff (assistants, husbands paying utility bills, etc.)
+           are tracked for payroll only and don't need to log into SyDent.
+           OpenDental and Dentrix follow the same pattern: Employee vs User
+           are distinct entities. Toggling this checkbox hides/shows the
+           PIN fields and changes save-time validation.
+           ═══════════════════════════════════════════════════════════════ -->
+      <div class="form-group" style="background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;padding:12px 14px;margin-top:6px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+          <input type="checkbox" id="eHasSystemAccess" onchange="onSystemAccessChange()" style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue);">
+          <span style="font-weight:700;color:var(--text);">🔐 هذا الموظف يحتاج وصولاً للبرنامج</span>
+        </label>
+        <div class="hint" style="margin-top:6px;font-size:11px;color:var(--text2);line-height:1.6;">
+          • <b style="color:var(--text);">مفعّل:</b> الموظف يحصل على رقم سر ويظهر في شاشة القفل (سكرتيرة، طبيب يستخدم النظام).<br>
+          • <b style="color:var(--text);">غير مفعّل:</b> موظف لتتبع الرواتب والتقارير فقط (مساعد كرسي، ابن صاحب العيادة، إلخ).
+        </div>
+      </div>
+
+      <!-- PIN fields are now inside a conditional wrapper. saveEmployee()
+           skips PIN validation when eHasSystemAccess is unchecked. -->
+      <div id="pinAccessSection">
       <div class="form-group">
         <label>رقم السر (PIN) — 4 إلى 6 أرقام *</label>
         <input type="password" inputmode="numeric" maxlength="6" id="ePin" class="pin-input" placeholder="••••" autocomplete="off">
@@ -430,6 +454,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>تأكيد رقم السر *</label>
         <input type="password" inputmode="numeric" maxlength="6" id="ePinConfirm" class="pin-input" placeholder="••••" autocomplete="off">
       </div>
+      </div>
+      <!-- end #pinAccessSection -->
 
       <div class="modal-msg" id="modalMsg"></div>
 
@@ -646,17 +672,17 @@ async function loadData() {
   // Graceful fallback: if Migration 20 hasn't been applied yet, retry without
   // the new columns (Rule #15 — soft-mode bootstrapping).
   var empRes = await window.sb.from('clinic_employees')
-    .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at, ' +
+    .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at, has_system_access, ' +
             'phone, color, notes, weekly_hours, monthly_salary, share_percent, ' +
             'provider_type, compensation_model')
     .eq('owner_id', currentUser.id)
     .order('role', { ascending: true })
     .order('name', { ascending: true });
 
-  // Pre-Migration-20 fallback: drop the 8 new HR columns if any are missing.
-  if (empRes.error && /42703|phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model/i.test(
+  // Pre-Migration-20/21 fallback: drop the new columns if any are missing.
+  if (empRes.error && /42703|phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model|has_system_access/i.test(
         (empRes.error.message || '') + ' ' + (empRes.error.code || ''))) {
-    console.warn('Phase 7.3: Migration 20 not applied — retrying clinic_employees with legacy columns');
+    console.warn('Phase 7.3/7.4: Migration 20/21 not applied — retrying clinic_employees with legacy columns');
     empRes = await window.sb.from('clinic_employees')
       .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at')
       .eq('owner_id', currentUser.id)
@@ -753,8 +779,16 @@ function renderList() {
       : null;
     var empProviderType = linkedDocForBadge ? linkedDocForBadge.provider_type : null;
 
+    // Phase 7.4: Three possible badges depending on system access state:
+    //   1. Owner          → no badge (has system access by definition)
+    //   2. has_system_access = false  → "تتبع راتب فقط" (HR-only)
+    //   3. has_system_access = true, pin_hash null → "لم يُعيَّن رقم السر"
+    //   4. has_system_access = true, pin_hash set  → "رقم السر محفوظ"
+    var hasAccess = e.has_system_access === true || e.role === 'owner';
     var pinStatus;
-    if (pinSet) {
+    if (!hasAccess) {
+      pinStatus = '<div class="emp-pin-status pin-none-required" title="هذا الموظف لتتبع الرواتب والتقارير فقط — لا يدخل النظام">💰 تتبع راتب فقط</div>';
+    } else if (pinSet) {
       pinStatus = '<div class="emp-pin-status pin-set">✅ رقم السر محفوظ</div>';
     } else {
       pinStatus = '<div class="emp-pin-status pin-unset">⚠️ لم يُعيَّن رقم السر بعد</div>';
@@ -938,6 +972,27 @@ function onRoleChange() {
   updateCompensationFieldsVisibility();
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// Phase 7.4: System access checkbox handler.
+// Shows/hides the PIN fields based on whether this employee needs to log
+// into the system. HR-only employees (most non-clinical staff, payroll
+// recipients without UI access) don't see PIN fields, and saveEmployee()
+// skips PIN validation for them.
+// ═══════════════════════════════════════════════════════════════════════
+function onSystemAccessChange() {
+  var cb = $('eHasSystemAccess');
+  var section = $('pinAccessSection');
+  if (!cb || !section) return;
+  var enabled = cb.checked;
+  section.style.display = enabled ? '' : 'none';
+  // Clear PIN inputs when disabling, so they don't accidentally get saved
+  // if the Owner unchecks then re-saves an existing employee.
+  if (!enabled) {
+    if ($('ePin')) $('ePin').value = '';
+    if ($('ePinConfirm')) $('ePinConfirm').value = '';
+  }
+}
+
 function openAddModal() {
   editingId = null;
   $('modalTitle').textContent = '＋ إضافة موظف';
@@ -948,6 +1003,14 @@ function openAddModal() {
   $('ePin').value = '';
   $('ePinConfirm').value = '';
   clearMsg('modalMsg');
+
+  // Phase 7.4: default new employees to HR-only (unchecked).
+  // Most additions are payroll-only staff (assistants, family members
+  // receiving payouts, etc). Owner must explicitly opt-in to system access.
+  if ($('eHasSystemAccess')) {
+    $('eHasSystemAccess').checked = false;
+    onSystemAccessChange();  // hide PIN fields by default
+  }
 
   // Reset all clinical/staff fields. Picks a fresh color from the curated
   // palette (avoids duplicating an existing doctor's color when possible).
@@ -1049,6 +1112,17 @@ function openEditModal(id) {
   $('eDocCompensation').value = hrComp || 'salary';
   if ($('eDocMonthlySalary')) {
     $('eDocMonthlySalary').value = (hrSalary !== null) ? hrSalary : '';
+  }
+
+  // Phase 7.4: Pre-fill has_system_access from emp record.
+  // Backward compat: if the column is missing (pre-Migration 21), treat
+  // anyone with a pin_hash as having access (their old behavior).
+  if ($('eHasSystemAccess')) {
+    var hasAccess = (emp.has_system_access !== undefined)
+      ? !!emp.has_system_access
+      : !!emp.pin_hash;
+    $('eHasSystemAccess').checked = hasAccess;
+    onSystemAccessChange();
   }
 
   // PIN hint: editing, leave empty to keep current
@@ -1201,9 +1275,22 @@ async function saveEmployee() {
       return;
     }
 
+    // ── Phase 7.4: System access flag ──
+    // Read the checkbox. HR-only employees (unchecked) don't need a PIN
+    // and won't appear in the lock-mode picker. saveEmployee() skips PIN
+    // validation for them and clears any pin_hash currently set on the row.
+    var hasSystemAccess = $('eHasSystemAccess') ? !!$('eHasSystemAccess').checked : true;
+
     var pinHash = null;
-    if (editingId) {
-      // Editing — PIN is optional (leave empty to keep current)
+    var clearPin = false;  // Phase 7.4: signal to NULL out pin_hash in payload
+
+    if (!hasSystemAccess) {
+      // HR-only: no PIN needed, and if there was one, wipe it.
+      // (The employee can still receive payouts, appear in reports, etc.,
+      // but is invisible to the lock-mode role picker.)
+      clearPin = true;
+    } else if (editingId) {
+      // Editing AND access enabled — PIN is optional (leave empty to keep current)
       if (pin) {
         if (!/^\d{4,6}$/.test(pin)) {
           showMsg('modalMsg', 'رقم السر يجب أن يكون 4 إلى 6 أرقام', true);
@@ -1214,11 +1301,20 @@ async function saveEmployee() {
           return;
         }
         pinHash = await hashPin(pin);
+      } else {
+        // Editing, access enabled, no new PIN entered → check if this employee
+        // had no pin yet. If so, the access flag is meaningless without a PIN,
+        // so warn the Owner (soft warning — they can proceed and set it later).
+        if (origEmp && !origEmp.pin_hash) {
+          if (!confirm('اخترت تمكين الوصول للنظام لكن لم تدخل رقم سر. سيظهر الموظف في شاشة القفل دون قدرة على الدخول حتى تضبط له رقم السر لاحقاً.\n\nهل تريد المتابعة؟')) {
+            return;
+          }
+        }
       }
     } else {
-      // Adding new — PIN is required
+      // Adding new AND access enabled — PIN is required
       if (!pin) {
-        showMsg('modalMsg', 'رقم السر مطلوب', true);
+        showMsg('modalMsg', 'رقم السر مطلوب (أو ألغِ خيار "يحتاج وصولاً للبرنامج" إذا كان للرواتب فقط)', true);
         return;
       }
       if (!/^\d{4,6}$/.test(pin)) {
@@ -1324,12 +1420,22 @@ async function saveEmployee() {
       monthly_salary: docMonthlySalaryField,
       share_percent: docShareField,
       provider_type: docProviderTypeField,
-      compensation_model: docCompensationField
+      compensation_model: docCompensationField,
+      // Phase 7.4: system access flag (HR-only vs login user)
+      has_system_access: hasSystemAccess
     };
-    if (pinHash) row.pin_hash = pinHash;
+    // PIN handling: write the new hash if entered, or NULL it out if the
+    // employee just lost system access (clearPin), otherwise leave it
+    // unchanged (don't include in payload).
+    if (pinHash) {
+      row.pin_hash = pinHash;
+    } else if (clearPin) {
+      row.pin_hash = null;
+    }
 
-    // Helper: detect "Migration 20 not applied" error (any of the 8 new
-    // columns missing). Strips the HR fields and retries with legacy schema.
+    // Helper: detect "Migration 20/21 not applied" error (any of the new
+    // columns missing). Strips the HR + access fields and retries with
+    // legacy schema.
     function _stripHRFields(payload) {
       var legacy = Object.assign({}, payload);
       delete legacy.phone;
@@ -1340,13 +1446,14 @@ async function saveEmployee() {
       delete legacy.share_percent;
       delete legacy.provider_type;
       delete legacy.compensation_model;
+      delete legacy.has_system_access;  // Phase 7.4 (Migration 21)
       return legacy;
     }
     function _isHRColumnMissing(err) {
       if (!err) return false;
       var m = (err.message || '') + ' ' + (err.code || '');
-      return /42703.*(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model)/i.test(m) ||
-             /(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model).*42703/i.test(m) ||
+      return /42703.*(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model|has_system_access)/i.test(m) ||
+             /(phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model|has_system_access).*42703/i.test(m) ||
              /42703/.test(m);
     }
 
