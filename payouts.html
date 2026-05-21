@@ -788,12 +788,29 @@ async function loadDoctors() {
   //   • clinical employee → provider_id = doctor_id
   //   • non-clinical employee → employee_id = clinic_employees.id
 
-  // Step 1: load every active+inactive employee from clinic_employees
+  // Step 1: load every active+inactive employee from clinic_employees.
+  // Phase 7.3 Part 2: include the canonical HR fields (Migration 20) so
+  // non-clinical employees can supply monthly_salary/share_percent/etc
+  // directly from clinic_employees (no more null hardcoded for Path B).
+  // Graceful fallback (Rule #15): if Migration 20 isn't applied yet,
+  // retry with the legacy column list so older clinics keep working.
   var empRes = await window.sb.from('clinic_employees')
-    .select('id, name, role, doctor_id, is_active, created_at')
+    .select('id, name, role, doctor_id, is_active, created_at, ' +
+            'monthly_salary, share_percent, provider_type, compensation_model, color')
     .eq('owner_id', currentUser.id)
     .order('role', { ascending: true })
     .order('name', { ascending: true });
+
+  // Pre-Migration-20 fallback: retry without the HR fields if missing.
+  if (empRes.error && /42703|monthly_salary|share_percent|provider_type|compensation_model/i.test(
+        (empRes.error.message || '') + ' ' + (empRes.error.code || ''))) {
+    console.warn('[payouts] Migration 20 not applied — retrying clinic_employees with legacy columns');
+    empRes = await window.sb.from('clinic_employees')
+      .select('id, name, role, doctor_id, is_active, created_at')
+      .eq('owner_id', currentUser.id)
+      .order('role', { ascending: true })
+      .order('name', { ascending: true });
+  }
 
   if (empRes.error) {
     if (isMigrationMissing(empRes.error)) {
@@ -853,28 +870,41 @@ async function loadDoctors() {
   if (employeesList.length > 0) {
     employeesList.forEach(function(emp){
       if (emp.doctor_id && docById[emp.doctor_id]) {
-        // Path A: clinical employee with linked clinic_doctors row
+        // ─── Path A: clinical employee with linked clinic_doctors row ───
+        // Phase 7.3 Part 2: prefer canonical clinic_employees values when
+        // present (Migration 20 made these the source of truth). Falls back
+        // to the clinic_doctors mirror for any field still null/undefined
+        // on clinic_employees — e.g. pre-Migration-20 clinics, or rows the
+        // Owner hasn't re-saved since the backfill.
         var doc = docById[emp.doctor_id];
+        var coalesce = function(canon, mirror) {
+          return (canon !== null && canon !== undefined) ? canon : mirror;
+        };
         unified.push({
           id: doc.id,                              // = clinic_doctors.id
           employeeId: emp.id,
           doctorId: doc.id,
           name: doc.name || emp.name,
-          color: doc.color,
+          color: coalesce(emp.color, doc.color),
           is_active: doc.is_active !== false && emp.is_active !== false,
           is_owner: doc.is_owner,
-          share_percent: doc.share_percent,
-          provider_type: doc.provider_type || 'doctor',
-          compensation_model: doc.compensation_model || 'percentage',
-          monthly_salary: doc.monthly_salary,
+          share_percent: coalesce(emp.share_percent, doc.share_percent),
+          provider_type: coalesce(emp.provider_type, doc.provider_type) || 'doctor',
+          compensation_model: coalesce(emp.compensation_model, doc.compensation_model) || 'percentage',
+          monthly_salary: coalesce(emp.monthly_salary, doc.monthly_salary),
           _hasDoctorLink: true,
           _employeeRole: emp.role
         });
         docById[emp.doctor_id]._consumed = true;
       } else {
-        // Path B: non-clinical employee (secretary, other) — no clinic_doctors row.
-        // Phase 7.2: save via provider_payouts.employee_id instead of provider_id.
-        // Map clinic_employees.role to a sensible default provider_type:
+        // ─── Path B: non-clinical employee (secretary, other) ───
+        // Phase 7.2 reversal: no clinic_doctors row. Phase 7.3 Part 2:
+        // HR fields now live in clinic_employees directly, so monthly_salary
+        // is no longer hardcoded null — it comes from the canonical row.
+        // This fixes the "salary suggestion = 0" bug for secretaries that
+        // showed up during Phase 7.2 v2 Test 4.
+        //
+        // Sensible defaults when the columns aren't populated yet:
         //   role='secretary' → provider_type='secretary', compensation='salary'
         //   role='doctor' without doctor_id → unusual legacy edge case; treat
         //     as 'doctor' so the modal still computes a sensible suggestion.
@@ -885,13 +915,13 @@ async function loadDoctors() {
           employeeId: emp.id,
           doctorId: null,
           name: emp.name,
-          color: null,
+          color: emp.color || null,                // Phase 7.3 Part 2: was hardcoded null
           is_active: emp.is_active !== false,
           is_owner: false,
-          share_percent: null,
-          provider_type: defaultPT,
-          compensation_model: defaultCM,
-          monthly_salary: null,
+          share_percent: (emp.share_percent !== undefined) ? emp.share_percent : null,
+          provider_type: emp.provider_type || defaultPT,
+          compensation_model: emp.compensation_model || defaultCM,
+          monthly_salary: (emp.monthly_salary !== undefined) ? emp.monthly_salary : null,  // Phase 7.3 Part 2: was hardcoded null
           _hasDoctorLink: false,
           _employeeRole: emp.role
         });
