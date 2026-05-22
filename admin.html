@@ -363,6 +363,58 @@ header{
 .btn-save:hover{background:var(--green2);}
 .btn-save:disabled{opacity:.5;cursor:not-allowed;}
 
+/* ===== Phase 7.6C: ALERTS BANNER (expiring trials) ===== */
+.alerts-banner{
+  display:none; /* shown only when there's at least 1 expiring tenant */
+  margin-bottom:16px;
+  padding:12px 14px;
+  background:rgba(255,167,38,0.10);
+  border:1px solid rgba(255,167,38,0.30);
+  border-radius:10px;
+  align-items:center;justify-content:space-between;gap:10px;
+  cursor:pointer;
+  font-family:'Cairo',sans-serif;
+  transition:all .2s;
+  animation:bannerFadeIn .2s ease-out;
+}
+.alerts-banner.show{display:flex;}
+.alerts-banner:hover{background:rgba(255,167,38,0.18);}
+.alerts-banner.critical{
+  background:rgba(239,83,80,0.10);
+  border-color:rgba(239,83,80,0.30);
+}
+.alerts-banner.critical:hover{background:rgba(239,83,80,0.18);}
+.alerts-banner.active{
+  background:rgba(46,232,158,0.10);
+  border-color:rgba(46,232,158,0.35);
+}
+.alerts-banner.active:hover{background:rgba(46,232,158,0.18);}
+.banner-text{
+  flex:1;font-size:13px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;gap:8px;
+}
+.alerts-banner .banner-text{color:#ffa726;}
+.alerts-banner.critical .banner-text{color:#ef5350;}
+.alerts-banner.active .banner-text{color:#2ee89e;}
+.banner-cta{
+  font-size:12px;font-weight:800;
+  padding:4px 10px;border-radius:6px;
+  background:rgba(0,0,0,0.15);
+  white-space:nowrap;
+}
+.banner-close{
+  background:transparent;border:none;
+  color:inherit;font-size:16px;font-weight:800;
+  cursor:pointer;padding:2px 8px;
+  line-height:1;border-radius:6px;
+  transition:background .15s;
+}
+.banner-close:hover{background:rgba(0,0,0,0.20);}
+@keyframes bannerFadeIn{
+  from{opacity:0;transform:translateY(-4px);}
+  to{opacity:1;transform:translateY(0);}
+}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -370,7 +422,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a04"></script>
+<script src="supabase-init.js?v=20260522a05"></script>
 </head>
 <body>
 
@@ -407,6 +459,13 @@ header{
         <div class="stat-num red" id="countRejected">0</div>
         <div class="stat-label">مرفوض</div>
       </div>
+    </div>
+
+    <!-- Phase 7.6C: Alerts Banner (expiring trials in next 7 days) -->
+    <div class="alerts-banner" id="alertsBanner" onclick="onBannerClick(event)" role="button" tabindex="0">
+      <div class="banner-text" id="alertsBannerText"><span class="banner-icon">⚠️</span> <span class="banner-msg"></span></div>
+      <div class="banner-cta" id="alertsBannerCta">اعرض ›</div>
+      <button type="button" class="banner-close" id="alertsBannerClose" onclick="closeExpiringFilter(event)" aria-label="إلغاء الفلتر" style="display:none;">✕</button>
     </div>
 
     <!-- Search -->
@@ -489,6 +548,14 @@ var allRequests = [];
 var searchTerm = '';
 var _searchTimer = null;
 var editingId = null;
+
+// ===== Phase 7.6C: Alerts Banner state =====
+// When true, the list is filtered to show only accepted tenants whose
+// trial_end is within the next 7 days (and not yet expired). Activated by
+// clicking the alerts banner; cleared by clicking the banner's ✕, by
+// pressing a filter tab, or by typing in the search box (search is layered
+// on top, not exclusive).
+var expiringFilterActive = false;
 
 // ===== Phase 7.6B: Activity Metrics + Trial Extension =====
 // Session cache for per-tenant activity metrics. Keyed by user_id.
@@ -1057,6 +1124,14 @@ function setFilter(f, el) {
   currentFilter = f;
   document.querySelectorAll('.tab').forEach(function(t){ t.className = 'tab'; });
   el.className = 'tab active';
+  // Phase 7.6C: picking a tab clears the expiring-soon filter — the tabs
+  // are the primary navigation, and combining "rejected" + "expiring" is
+  // never meaningful (rejected rows have no trial_end). Re-render the
+  // banner so its active state goes away with the filter.
+  if (expiringFilterActive) {
+    expiringFilterActive = false;
+    renderAlertsBanner();
+  }
   renderList();
 }
 
@@ -1229,6 +1304,95 @@ function formatDate(iso) {
   return d.toLocaleDateString('ar-SY') + ' — ' + d.toLocaleTimeString('ar-SY', {hour:'2-digit',minute:'2-digit'});
 }
 
+// ===== Phase 7.6C: Alerts Banner helpers =====
+// Single source of truth for "days remaining" — used by the banner, the
+// expiring-filter predicate, the CSV export, and Step 3's reminder gate.
+// Returns:
+//   null  for permanent accounts (trial_end is null) OR non-accepted rows
+//   N>=0  for an active or just-expired trial (positive = days remaining)
+//   N<0   for trials whose end_date is already in the past
+function getDaysLeft(r) {
+  if (!r || r.status !== 'accepted') return null;
+  if (!r.trial_end) return null;
+  var end = new Date(r.trial_end);
+  if (isNaN(end.getTime())) return null;
+  return Math.ceil((end - new Date()) / 86400000);
+}
+
+// Predicate for "expiring within 7 days": active trial whose remaining
+// days is 1..7 (inclusive). Already-expired (<=0) accounts are NOT
+// included — those need different (re-engagement) treatment, not a
+// pre-expiry warning.
+function isExpiringSoon(r) {
+  var dl = getDaysLeft(r);
+  return dl !== null && dl > 0 && dl <= 7;
+}
+
+// Renders the banner above the search bar. Three visual states:
+//   1. hidden     — no expiring tenants (count === 0)
+//   2. warning    — yellow, 1-3 tenants expiring
+//   3. critical   — red, 4+ tenants expiring
+//   4. active     — green, filter currently applied (regardless of count)
+function renderAlertsBanner() {
+  var banner = document.getElementById('alertsBanner');
+  if (!banner) return;
+  var textWrap = document.getElementById('alertsBannerText');
+  var iconEl   = textWrap ? textWrap.querySelector('.banner-icon') : null;
+  var msgEl    = textWrap ? textWrap.querySelector('.banner-msg')  : null;
+  var cta      = document.getElementById('alertsBannerCta');
+  var closeBtn = document.getElementById('alertsBannerClose');
+  if (!iconEl || !msgEl || !cta || !closeBtn) return;
+
+  var count = allRequests.filter(isExpiringSoon).length;
+
+  // Reset classes each render — avoids stale 'critical'/'active' lingering.
+  banner.className = 'alerts-banner';
+
+  if (count === 0 && !expiringFilterActive) {
+    // Nothing to show, and filter not stuck on.
+    return;
+  }
+
+  banner.classList.add('show');
+
+  if (expiringFilterActive) {
+    // Active state: filter is currently applied. Show ✕ to clear.
+    banner.classList.add('active');
+    iconEl.textContent = '🔍';
+    msgEl.textContent  = 'عرض الحسابات المنتهية قريباً (' + count + ')';
+    cta.style.display = 'none';
+    closeBtn.style.display = 'inline-block';
+  } else {
+    // Warning / critical state. Count > 0 guaranteed (we returned above).
+    if (count > 3) banner.classList.add('critical');
+    iconEl.textContent = '⚠️';
+    msgEl.textContent  = count + ' ' + (count === 1 ? 'حساب ينتهي' : 'حسابات تنتهي') + ' خلال 7 أيام';
+    cta.style.display = 'inline-block';
+    closeBtn.style.display = 'none';
+  }
+}
+
+// Banner body click → toggle filter ON (only when not already active).
+// We delegate from the whole banner so clicks on text OR cta both work.
+// The ✕ button has its own handler (closeExpiringFilter) and calls
+// stopPropagation so we don't re-toggle here.
+function onBannerClick(e) {
+  if (e && e.target && e.target.id === 'alertsBannerClose') return;
+  if (expiringFilterActive) return; // active state: only ✕ clears it
+  expiringFilterActive = true;
+  renderAlertsBanner();
+  renderList();
+}
+
+// ✕ button → clear the filter.
+function closeExpiringFilter(e) {
+  if (e) e.stopPropagation();
+  if (!expiringFilterActive) return;
+  expiringFilterActive = false;
+  renderAlertsBanner();
+  renderList();
+}
+
 function renderAll() {
   pruneActivityCaches();
   var nNew = allRequests.filter(function(r){ return !r.status || r.status === 'new'; }).length;
@@ -1237,6 +1401,15 @@ function renderAll() {
   document.getElementById('countNew').textContent = nNew;
   document.getElementById('countAccepted').textContent = nAcc;
   document.getElementById('countRejected').textContent = nRej;
+
+  // Phase 7.6C: if filter was active but the count just hit 0 (e.g. all
+  // expiring trials got extended), auto-disengage to avoid showing an
+  // empty list with the banner in active state.
+  if (expiringFilterActive && allRequests.filter(isExpiringSoon).length === 0) {
+    expiringFilterActive = false;
+  }
+  renderAlertsBanner();
+
   renderList();
 }
 
@@ -1245,11 +1418,28 @@ function renderList() {
   var filtered = allRequests.filter(function(r){
     var st = r.status || 'new';
     var passFilter = (currentFilter === 'all' || st === currentFilter);
-    return passFilter && matchesSearch(r);
+    if (!passFilter || !matchesSearch(r)) return false;
+    // Phase 7.6C: expiring-soon filter is layered on top of the tab filter
+    // and search. When active, only rows that satisfy isExpiringSoon
+    // survive. This is intentional: the banner activates a STRICTER view,
+    // it doesn't replace the user's other filters.
+    if (expiringFilterActive && !isExpiringSoon(r)) return false;
+    return true;
   });
   if (filtered.length === 0) {
-    var emptyMsg = searchTerm ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد طلبات';
-    var emptyIcon = searchTerm ? '🔍' : '📭';
+    var emptyMsg, emptyIcon;
+    if (expiringFilterActive) {
+      // Banner is showing 'active' but the strict filter returned 0 (e.g.
+      // user is on the 'rejected' tab + expiring filter on). Tell them.
+      emptyMsg = 'لا توجد حسابات تنتهي قريباً ضمن الفلتر الحالي';
+      emptyIcon = '⏰';
+    } else if (searchTerm) {
+      emptyMsg = 'لا توجد نتائج مطابقة للبحث';
+      emptyIcon = '🔍';
+    } else {
+      emptyMsg = 'لا توجد طلبات';
+      emptyIcon = '📭';
+    }
     list.innerHTML = '<div class="empty-state"><div>' + emptyIcon + '</div>' + emptyMsg + '</div>';
     return;
   }
