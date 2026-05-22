@@ -496,14 +496,39 @@ async function fetchActivityFor(userId, reqId) {
   renderList(); // show loader immediately
 
   // Helper for a single count query — returns the count or null on error.
-  // Uses head:true + count:'exact' to avoid pulling row data.
+  // PERF: GET with limit=0 + Prefer:count=exact returns an empty array but
+  // Content-Range header carries the total count (no row payload).
+  // RLS: uses SERVICE_KEY directly to bypass per-tenant RLS policies — the
+  // admin is NOT the owner of these rows, so window.sb (which uses the
+  // publishable anon key) would be filtered out by RLS.
   async function safeCount(table) {
     try {
-      var r = await window.sb.from(table)
-        .select('*', { count: 'exact', head: true })
-        .eq('owner_id', userId);
-      if (r.error) { console.warn(table + ' count error:', r.error.message); return null; }
-      return r.count;
+      var url = SUPABASE_URL + '/rest/v1/' + table +
+                '?select=id&owner_id=eq.' + encodeURIComponent(userId) +
+                '&limit=0';
+      var resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': SERVICE_KEY,
+          'Authorization': 'Bearer ' + SERVICE_KEY,
+          'Prefer': 'count=exact'
+        }
+      });
+      if (!resp.ok && resp.status !== 206) {
+        console.warn(table + ' count HTTP', resp.status);
+        return null;
+      }
+      // Content-Range looks like "0-0/42" — the part after "/" is the total
+      var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
+      var slash = cr.lastIndexOf('/');
+      if (slash < 0) {
+        console.warn(table + ' count: no Content-Range header (cr=', cr, ')');
+        return null;
+      }
+      var totalStr = cr.slice(slash + 1).trim();
+      if (totalStr === '*') return null;
+      var n = parseInt(totalStr, 10);
+      return isNaN(n) ? null : n;
     } catch(e) {
       console.warn(table + ' count exception:', e && e.message);
       return null;
@@ -513,12 +538,28 @@ async function fetchActivityFor(userId, reqId) {
   // employees: also filter is_active=true to match Phase 5 model.
   async function safeActiveEmployees() {
     try {
-      var r = await window.sb.from('clinic_employees')
-        .select('*', { count: 'exact', head: true })
-        .eq('owner_id', userId)
-        .eq('is_active', true);
-      if (r.error) { console.warn('employees count error:', r.error.message); return null; }
-      return r.count;
+      var url = SUPABASE_URL + '/rest/v1/clinic_employees' +
+                '?select=id&owner_id=eq.' + encodeURIComponent(userId) +
+                '&is_active=eq.true&limit=0';
+      var resp = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': SERVICE_KEY,
+          'Authorization': 'Bearer ' + SERVICE_KEY,
+          'Prefer': 'count=exact'
+        }
+      });
+      if (!resp.ok && resp.status !== 206) {
+        console.warn('employees count HTTP', resp.status);
+        return null;
+      }
+      var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
+      var slash = cr.lastIndexOf('/');
+      if (slash < 0) return null;
+      var totalStr = cr.slice(slash + 1).trim();
+      if (totalStr === '*') return null;
+      var n = parseInt(totalStr, 10);
+      return isNaN(n) ? null : n;
     } catch(e) {
       console.warn('employees count exception:', e && e.message);
       return null;
@@ -590,6 +631,19 @@ function renderActivityPanel(reqId) {
   if (c.error === 'no_user_id') {
     return '<div class="activity-panel"><div class="activity-loading" style="color:#ef5350;">⚠️ لا يوجد user_id مرتبط بهذا الحساب</div></div>';
   }
+  // If ALL counts failed AND last_sign_in also failed → likely auth/network issue
+  // Show a retry button instead of four dashes.
+  var allFailed = (c.patients === null && c.appointments === null &&
+                   c.employees === null && c.lastSignIn === null);
+  if (allFailed) {
+    return '<div class="activity-panel">' +
+             '<div class="activity-loading" style="color:#ef5350;">' +
+               '⚠️ فشل جلب البيانات' +
+             '</div>' +
+             '<button class="btn-activity" style="margin-top:8px;" ' +
+               'onclick="retryActivity(\'' + reqId + '\')">🔄 إعادة المحاولة</button>' +
+           '</div>';
+  }
   return (
     '<div class="activity-panel">' +
       '<div class="activity-row"><span>👥 المرضى:</span>     <b>' + fmtMetric(c.patients)     + '</b></div>' +
@@ -598,6 +652,14 @@ function renderActivityPanel(reqId) {
       '<div class="activity-row"><span>🕐 آخر دخول:</span>   <b>' + escapeHtml(timeSince(c.lastSignIn)) + '</b></div>' +
     '</div>'
   );
+}
+
+// Retry button — clears the cache entry and re-fetches.
+function retryActivity(reqId) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+  delete activityCache[reqId];
+  fetchActivityFor(r.user_id, reqId);
 }
 
 // ===== Trial extension (+30 / +90 days) =====
