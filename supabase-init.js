@@ -621,7 +621,34 @@
 
     // Phase 5: if we have a specific employee identity locked in, prefer that name
     var empId = getEmployeeId();
-    if (empId && _employeesListCache) {
+    var ownerMode = isOwner();
+
+    if (ownerMode) {
+      // ── Phase 7.6 Fix: Owner pill never enters Phase 5 employee lookup ──
+      // The owner's identity comes from doctors (is_owner=true), NOT from
+      // clinic_employees. Even if LS_EMPLOYEE_ID is set on this device (from
+      // a pre-Phase-5 setup or stale state), we must NEVER label the owner
+      // as "(محذوف)" because the owner has no clinic_employees row by design.
+      //
+      // Resolution order for the owner's display name:
+      //   1. _doctorsListCache lookup by LS_DOCTOR_ID → "د. {name}"
+      //   2. _allDoctorsListCache fallback (in case the owner row is the
+      //      one and only doctor and is_active was toggled to false somehow)
+      //   3. Default ROLE_LABELS.owner ("المالك") — NEVER "(محذوف)"
+      if (_doctorsListCache) {
+        var ownerDid = getDoctorId();
+        var ownerDoc = ownerDid
+          ? _doctorsListCache.find(function(x){ return x.id === ownerDid; })
+          : null;
+        if (ownerDoc && ownerDoc.name) {
+          label = 'د. ' + ownerDoc.name;
+        } else if (ownerDid && _allDoctorsListCache) {
+          var ownerAny = _allDoctorsListCache.find(function(x){ return x.id === ownerDid; });
+          if (ownerAny && ownerAny.name) label = 'د. ' + ownerAny.name;
+        }
+      }
+      // icon stays as ROLE_ICONS.owner (👑), inactive stays false
+    } else if (empId && _employeesListCache) {
       var emp = (_employeesListCache || []).find(function(e){ return e.id === empId; });
       if (emp && emp.name) {
         // Active employee → show their name + role icon.
@@ -1229,6 +1256,16 @@
   // Reads from _employeesListCache (preloaded in autoInit).
   // Cache contains is_active=true rows only, so "not found" = deactivated.
   function isDoctorAccountInactive() {
+    // ── Phase 7.6 Fix: Owner is never locked by employee logic ──
+    // The clinic owner's identity comes from doctors.is_owner=true (Phase 1
+    // canonical owner record), NOT from clinic_employees. A device with
+    // role='owner' but a stale LS_EMPLOYEE_ID (e.g. from a pre-Phase-5 setup
+    // attempt, a wiped clinic_employees row, or a re-onboarded tenant) must
+    // never be flagged as inactive — that would lock the actual clinic owner
+    // out of their own data.
+    // Employees (secretary, doctor-as-employee) still go through Path 1 below.
+    if (isOwner()) return false;
+
     // ── Path 1: Phase 5 employee-locked device ──
     // If a specific employee is locked in, check if that employee is still
     // active. This is the primary path for all post-Phase-5 devices.
