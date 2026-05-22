@@ -221,14 +221,57 @@ header{
 }
 .btn-activity:hover{background:rgba(159,122,234,0.18);}
 
-.btn-extend{
-  padding:9px 14px;
-  background:rgba(46,232,158,0.07);
-  border:1px solid rgba(46,232,158,0.25);border-radius:8px;
-  color:var(--green);font-family:'Cairo',sans-serif;
-  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+/* ===== Phase 7.6B v2: EXTENSION WIDGET (counter + presets + apply) ===== */
+.extension-widget{
+  margin-top:12px;padding:12px 14px;
+  background:rgba(46,232,158,0.05);
+  border:1px solid rgba(46,232,158,0.18);
+  border-radius:10px;
+  display:flex;flex-direction:column;gap:10px;
 }
-.btn-extend:hover{background:rgba(46,232,158,0.16);}
+.ext-row{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.ext-label{
+  font-size:12px;color:var(--text2);font-weight:700;
+  margin-left:4px;
+}
+.ext-input{
+  width:70px;
+  background:var(--bg3);border:1px solid rgba(46,232,158,0.3);
+  border-radius:8px;padding:8px 10px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;
+  text-align:center;outline:none;
+  transition:border-color .15s;
+}
+.ext-input:focus{border-color:var(--green);}
+/* Hide spinner arrows on Webkit/Mozilla */
+.ext-input::-webkit-outer-spin-button,
+.ext-input::-webkit-inner-spin-button{
+  -webkit-appearance:none;margin:0;
+}
+.ext-input[type="number"]{-moz-appearance:textfield;}
+.ext-unit{font-size:12px;color:var(--text2);font-weight:700;}
+.ext-preset{
+  padding:7px 12px;
+  background:rgba(46,232,158,0.08);
+  border:1px solid rgba(46,232,158,0.25);
+  border-radius:7px;
+  color:var(--green);font-family:'Cairo',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;
+  transition:all .15s;
+}
+.ext-preset:hover{background:rgba(46,232,158,0.18);}
+.ext-apply{
+  padding:8px 16px;
+  background:var(--green);border:none;border-radius:8px;
+  color:var(--bg);font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:800;cursor:pointer;
+  transition:all .15s;
+  margin-right:auto; /* push to far end of row */
+}
+.ext-apply:hover{background:var(--green2);}
+.ext-apply:disabled{opacity:.5;cursor:not-allowed;}
 
 /* ===== ACTIVITY PANEL (expanded inside accepted card) ===== */
 .activity-panel{
@@ -501,10 +544,17 @@ async function fetchActivityFor(userId, reqId) {
   // RLS: uses SERVICE_KEY directly to bypass per-tenant RLS policies — the
   // admin is NOT the owner of these rows, so window.sb (which uses the
   // publishable anon key) would be filtered out by RLS.
-  async function safeCount(table) {
+  //
+  // IMPORTANT: column names differ between tables in the SyDent schema!
+  //   patients.doctor_id     = owner's auth.users.id  (NOT owner_id)
+  //   appointments.doctor_id = owner's auth.users.id  (NOT owner_id)
+  //   clinic_employees.owner_id = owner's auth.users.id
+  // The owner's doctors.id is intentionally identical to auth.users.id
+  // (Phase 1 canonical design) so userId works as both.
+  async function safeCount(table, filterCol) {
     try {
       var url = SUPABASE_URL + '/rest/v1/' + table +
-                '?select=id&owner_id=eq.' + encodeURIComponent(userId) +
+                '?select=id&' + filterCol + '=eq.' + encodeURIComponent(userId) +
                 '&limit=0';
       var resp = await fetch(url, {
         method: 'GET',
@@ -587,9 +637,9 @@ async function fetchActivityFor(userId, reqId) {
 
   // Run all four in parallel for speed.
   var results = await Promise.all([
-    safeCount('patients'),
-    safeCount('appointments'),
-    safeActiveEmployees(),
+    safeCount('patients', 'doctor_id'),       // patients.doctor_id
+    safeCount('appointments', 'doctor_id'),   // appointments.doctor_id
+    safeActiveEmployees(),                    // clinic_employees.owner_id (specialized)
     safeLastSignIn()
   ]);
 
@@ -665,23 +715,108 @@ function retryActivity(reqId) {
   fetchActivityFor(r.user_id, reqId);
 }
 
-// Clean up activityCache + activityExpanded entries for requests that no
-// longer exist in allRequests (e.g. after delete). Called from renderAll.
+// Clean up activityCache + activityExpanded + extendDaysByReq entries for
+// requests that no longer exist in allRequests (e.g. after delete). Called
+// from renderAll.
 function pruneActivityCaches() {
   var liveIds = {};
   for (var i = 0; i < allRequests.length; i++) liveIds[allRequests[i].id] = true;
   for (var k in activityCache)    { if (!liveIds[k]) delete activityCache[k]; }
   for (var k2 in activityExpanded) { if (!liveIds[k2]) delete activityExpanded[k2]; }
+  for (var k3 in extendDaysByReq) { if (!liveIds[k3]) delete extendDaysByReq[k3]; }
 }
 
-// ===== Trial extension (+30 / +90 days) =====
+// ===== Trial extension (custom-days counter + 30/60/90 presets) =====
+// Per-tenant state for the in-card extension widget. Defaults to 30 days
+// the first time the card is rendered. Persists in memory only — reload
+// resets to 30.
+var extendDaysByReq = {};
+
+function getExtendDays(reqId) {
+  if (extendDaysByReq[reqId] == null) extendDaysByReq[reqId] = 30;
+  return extendDaysByReq[reqId];
+}
+
+// Called by the number input's oninput on every keystroke. Stores the
+// pending value but does NOT reflect it back into the input — that would
+// prevent the user from clearing the field to type a new number. We only
+// commit the parsed value to state; clamping happens on blur (onchange).
+function onExtendInput(reqId, raw) {
+  if (raw === '' || raw == null) return; // user mid-edit, do nothing
+  var v = parseInt(raw, 10);
+  if (isNaN(v)) return;
+  // Update internal state but don't write back into the DOM mid-keystroke
+  extendDaysByReq[reqId] = v;
+}
+
+// Called by the number input's onchange (i.e. on blur / commit). This is
+// where we clamp out-of-range values and reflect the clamped result back
+// into the input so the user sees what will actually be applied.
+function onExtendChange(reqId, raw) {
+  var v = parseInt(raw, 10);
+  if (isNaN(v))  v = 30;
+  if (v < 1)     v = 1;
+  if (v > 365)   v = 365;
+  extendDaysByReq[reqId] = v;
+  var inp = document.getElementById('extDays-' + reqId);
+  if (inp && String(v) !== inp.value) inp.value = String(v);
+}
+
+// Preset buttons (+30 / +60 / +90) just fill the input — they DON'T apply.
+// User still presses the apply button to commit. This mirrors Stripe's
+// trial-extension flow.
+function setExtendDays(reqId, days) {
+  extendDaysByReq[reqId] = days;
+  var inp = document.getElementById('extDays-' + reqId);
+  if (inp) inp.value = String(days);
+}
+
+// Render the per-card extension widget. Only called when r.trial_end is set.
+function renderExtensionWidget(reqId) {
+  var days = getExtendDays(reqId);
+  return (
+    '<div class="extension-widget">' +
+      '<div class="ext-row">' +
+        '<span class="ext-label">⏰ تمديد التجربة:</span>' +
+        '<input type="number" id="extDays-' + reqId + '" class="ext-input" ' +
+          'min="1" max="365" value="' + days + '" ' +
+          'oninput="onExtendInput(\'' + reqId + '\', this.value)" ' +
+          'onchange="onExtendChange(\'' + reqId + '\', this.value)">' +
+        '<span class="ext-unit">يوم</span>' +
+      '</div>' +
+      '<div class="ext-row">' +
+        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 30)">+30</button>' +
+        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 60)">+60</button>' +
+        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 90)">+90</button>' +
+        '<button type="button" class="ext-apply" onclick="applyExtend(\'' + reqId + '\')">💾 تمديد</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
 // Smart base: extends from max(current trial_end, today) so a trial that
-// expired a week ago + "+30 days" lands at today+30, not today+23.
-async function extendTrial(reqId, days) {
+// expired a week ago + extension lands at TODAY+N, not TODAY+(N-7).
+async function applyExtend(reqId) {
   var r = allRequests.find(function(x){ return x.id === reqId; });
   if (!r) return;
   if (!r.trial_end) {
     alert('هذا حساب دائم — لا يحتاج تمديد.');
+    return;
+  }
+
+  // Defensive sync: read the input element directly at click time in case
+  // the user clicked 'تمديد' mid-typing without blurring the field first
+  // (in which case onExtendChange hasn't fired yet and the state map might
+  // be stale).
+  var inp = document.getElementById('extDays-' + reqId);
+  if (inp) {
+    var raw = parseInt(inp.value, 10);
+    if (!isNaN(raw)) extendDaysByReq[reqId] = raw;
+  }
+
+  var days = getExtendDays(reqId);
+  if (!Number.isFinite(days) || days < 1 || days > 365) {
+    alert('عدد الأيام غير صالح. الرجاء إدخال رقم بين 1 و 365.');
     return;
   }
 
@@ -691,7 +826,7 @@ async function extendTrial(reqId, days) {
   var newEnd = new Date(base);
   newEnd.setDate(newEnd.getDate() + days);
 
-  // ar-EG locale gives Western digits in DD/MM/YYYY which is least ambiguous
+  // ar-EG locale: long Arabic month name with Western digits
   var dateStr;
   try {
     dateStr = newEnd.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -716,6 +851,8 @@ async function extendTrial(reqId, days) {
     alert('فشل التمديد: ' + res.error.message);
     return;
   }
+  // Reset widget value to the default so the operator starts fresh next time
+  delete extendDaysByReq[reqId];
   loadAndRender();
 }
 
@@ -1130,16 +1267,10 @@ function renderList() {
     } else if (st === 'accepted') {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
       var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
-      // Phase 7.6B: Activity toggle (all accepted), Extension buttons (only if trial)
+      // Phase 7.6B: Activity toggle (all accepted)
       var actBtnLabel = activityExpanded[id] ? '📊 إخفاء النشاط' : '📊 عرض النشاط';
       var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' + actBtnLabel + '</button>';
-      var extendBtns = '';
-      if (r.trial_end) {
-        extendBtns = '<button class="btn-extend" onclick="extendTrial(\'' + id + '\', 30)">+30 يوم</button>' +
-                     '<button class="btn-extend" onclick="extendTrial(\'' + id + '\', 90)">+90 يوم</button>';
-      }
       actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
-                extendBtns +
                 '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
                 '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
                 editBtn +
@@ -1164,6 +1295,7 @@ function renderList() {
         (typeof trialBadge !== 'undefined' ? trialBadge : '') +
       '</div>' +
       '<div class="req-actions">' + actions + '</div>' +
+      (st === 'accepted' && r.trial_end ? renderExtensionWidget(id) : '') +
       (st === 'accepted' ? renderActivityPanel(id) : '') +
     '</div>';
   }).join('');
