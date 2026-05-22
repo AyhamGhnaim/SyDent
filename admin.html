@@ -487,7 +487,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a09"></script>
+<script src="supabase-init.js?v=20260522a10"></script>
 </head>
 <body>
 
@@ -1494,6 +1494,43 @@ function waLink(phone, name, email) {
   return 'https://wa.me/' + num + '?text=' + msg;
 }
 
+// Phase 7.6C-Step3: Trial expiry reminder via WhatsApp Click-to-Chat.
+// Separate from waLink (which sends login credentials on first accept)
+// because the audience and intent are different — this fires for an
+// already-onboarded tenant whose trial is approaching its end, and the
+// message must NOT mention credentials again (which are stale at this
+// point if the doctor changed their password).
+//
+// Uses the same +963 Syrian-prefix normalization as waLink for
+// consistency: a phone stored as "0991234567" becomes "+963991234567"
+// for the wa.me URL. Numbers already in international format pass
+// through unchanged (the leading-zero check fails, so we keep them).
+function waReminderLink(phone, name, daysLeft, trialEndIso) {
+  var num = (phone || '').replace(/\D/g, '');
+  if (num.startsWith('0')) num = '963' + num.substring(1);
+
+  // Format the trial-end date in Arabic-EG long form ("٢٧ مايو ٢٠٢٦").
+  // toLocaleDateString can throw on a few legacy engines, so the ISO
+  // slice is a safe fallback.
+  var dateStr;
+  try {
+    dateStr = new Date(trialEndIso).toLocaleDateString('ar-EG', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+  } catch (e) {
+    dateStr = (trialEndIso || '').slice(0, 10);
+  }
+
+  var msg = encodeURIComponent(
+    'مرحباً د. ' + name + ' 👋\n\n' +
+    'هذه رسالة تذكير ودّية من SyDent 🦷\n\n' +
+    '⏰ تجربتك المجانية تنتهي خلال ' + daysLeft + ' يوم بتاريخ ' + dateStr + '.\n\n' +
+    'للتمديد أو الاستفسار، يرجى التواصل معنا.\n\n' +
+    'شكراً لاختيارك SyDent!'
+  );
+  return 'https://wa.me/' + num + '?text=' + msg;
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   var d = new Date(iso);
@@ -1871,8 +1908,21 @@ function renderList() {
       // Phase 7.6B: Activity toggle (all accepted)
       var actBtnLabel = activityExpanded[id] ? '📊 إخفاء النشاط' : '📊 عرض النشاط';
       var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' + actBtnLabel + '</button>';
+      // Phase 7.6C-Step3: WhatsApp reminder. Shown only for active trials
+      // (daysLeft > 0) — permanent accounts have no expiry to remind about,
+      // and already-expired trials need re-onboarding (different message)
+      // rather than a "your trial ends soon" reminder.
+      // Rendered as an anchor (not a button) so the user can long-press
+      // to copy the wa.me link on mobile, or right-click "open in new
+      // window" on desktop. target=_blank + rel=noopener for security.
+      var waReminderBtn = '';
+      if (r.trial_end && daysLeft !== null && daysLeft > 0) {
+        var waUrl = waReminderLink(r.phone || '', r.name || '', daysLeft, r.trial_end);
+        waReminderBtn = '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">💬 تذكير</a>';
+      }
       actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
                 '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
+                waReminderBtn +
                 '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
                 editBtn +
                 activityBtn;
