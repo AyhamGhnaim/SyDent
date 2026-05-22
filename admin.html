@@ -211,6 +211,54 @@ header{
 }
 .btn-edit:hover{background:rgba(99,179,237,0.18);}
 
+/* ===== Phase 7.6B: ACTIVITY + EXTEND BUTTONS ===== */
+.btn-activity{
+  padding:9px 14px;
+  background:rgba(159,122,234,0.1);
+  border:1px solid rgba(159,122,234,0.25);border-radius:8px;
+  color:#b794f4;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-activity:hover{background:rgba(159,122,234,0.18);}
+
+.btn-extend{
+  padding:9px 14px;
+  background:rgba(46,232,158,0.07);
+  border:1px solid rgba(46,232,158,0.25);border-radius:8px;
+  color:var(--green);font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-extend:hover{background:rgba(46,232,158,0.16);}
+
+/* ===== ACTIVITY PANEL (expanded inside accepted card) ===== */
+.activity-panel{
+  margin-top:12px;padding:12px 14px;
+  background:rgba(159,122,234,0.05);
+  border:1px solid rgba(159,122,234,0.18);
+  border-radius:10px;
+  display:flex;flex-direction:column;gap:7px;
+  animation:activityFadeIn .18s ease-out;
+}
+@keyframes activityFadeIn{
+  from{opacity:0;transform:translateY(-4px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.activity-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:12px;color:var(--text2);
+  padding:4px 0;
+  border-bottom:1px dashed rgba(159,122,234,0.12);
+}
+.activity-row:last-child{border-bottom:none;}
+.activity-row b{
+  color:var(--text);font-weight:800;
+  font-family:'Cairo',sans-serif;font-size:13px;
+}
+.activity-loading{
+  text-align:center;color:var(--text2);font-size:12px;
+  padding:14px 0;font-weight:600;
+}
+
 /* ===== EDIT MODAL ===== */
 .modal-backdrop{
   display:none;position:fixed;inset:0;
@@ -398,6 +446,204 @@ var allRequests = [];
 var searchTerm = '';
 var _searchTimer = null;
 var editingId = null;
+
+// ===== Phase 7.6B: Activity Metrics + Trial Extension =====
+// Session cache for per-tenant activity metrics. Keyed by user_id.
+// Cleared on page reload (so newly-signed-in tenants get fresh numbers).
+// Shape per entry: { loading: bool, loaded: bool, error: string|null,
+//                    patients: number|null, appointments: number|null,
+//                    employees: number|null, lastSignIn: string|null }
+var activityCache = {};
+// Track which tenant cards have their activity panel expanded (by request id).
+var activityExpanded = {};
+
+// Relative time helper — Arabic short form, no future-time handling (we
+// never expect future timestamps from auth.users.last_sign_in_at).
+function timeSince(iso) {
+  if (!iso) return 'لم يدخل بعد';
+  var then = new Date(iso);
+  if (isNaN(then.getTime())) return '—';
+  var sec = (new Date() - then) / 1000;
+  if (sec < 60)         return 'الآن';
+  var min = sec / 60;
+  if (min < 60)         return 'قبل ' + Math.floor(min) + ' دقيقة';
+  var hr  = min / 60;
+  if (hr < 24)          return 'قبل ' + Math.floor(hr)  + ' ساعة';
+  var day = hr / 24;
+  if (day < 30)         return 'قبل ' + Math.floor(day) + ' يوم';
+  if (day < 365)        return 'قبل ' + Math.floor(day/30)  + ' شهر';
+  return                       'قبل ' + Math.floor(day/365) + ' سنة';
+}
+
+// Format a metric value: number, '—' for error, 'جارٍ التحميل...' while loading
+function fmtMetric(v) {
+  if (v === null || v === undefined) return '—';
+  return String(v);
+}
+
+// Lazy-fetch metrics for a tenant. Caches on success AND on partial error
+// (graceful degradation: per-metric fetch failures become null → '—').
+async function fetchActivityFor(userId, reqId) {
+  if (!userId) {
+    activityCache[reqId] = { loading: false, loaded: true, error: 'no_user_id',
+                              patients: null, appointments: null, employees: null,
+                              lastSignIn: null };
+    return;
+  }
+  activityCache[reqId] = { loading: true, loaded: false, error: null,
+                            patients: null, appointments: null, employees: null,
+                            lastSignIn: null };
+  renderList(); // show loader immediately
+
+  // Helper for a single count query — returns the count or null on error.
+  // Uses head:true + count:'exact' to avoid pulling row data.
+  async function safeCount(table) {
+    try {
+      var r = await window.sb.from(table)
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', userId);
+      if (r.error) { console.warn(table + ' count error:', r.error.message); return null; }
+      return r.count;
+    } catch(e) {
+      console.warn(table + ' count exception:', e && e.message);
+      return null;
+    }
+  }
+
+  // employees: also filter is_active=true to match Phase 5 model.
+  async function safeActiveEmployees() {
+    try {
+      var r = await window.sb.from('clinic_employees')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner_id', userId)
+        .eq('is_active', true);
+      if (r.error) { console.warn('employees count error:', r.error.message); return null; }
+      return r.count;
+    } catch(e) {
+      console.warn('employees count exception:', e && e.message);
+      return null;
+    }
+  }
+
+  // last_sign_in: admin API user lookup. Returns ISO string or null.
+  async function safeLastSignIn() {
+    try {
+      var resp = await fetch(
+        SUPABASE_URL + '/auth/v1/admin/users/' + encodeURIComponent(userId),
+        { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
+      );
+      if (!resp.ok) {
+        console.warn('last_sign_in lookup HTTP', resp.status);
+        return null;
+      }
+      var data = await resp.json();
+      return (data && data.last_sign_in_at) || null;
+    } catch(e) {
+      console.warn('last_sign_in exception:', e && e.message);
+      return null;
+    }
+  }
+
+  // Run all four in parallel for speed.
+  var results = await Promise.all([
+    safeCount('patients'),
+    safeCount('appointments'),
+    safeActiveEmployees(),
+    safeLastSignIn()
+  ]);
+
+  activityCache[reqId] = {
+    loading: false, loaded: true, error: null,
+    patients:     results[0],
+    appointments: results[1],
+    employees:    results[2],
+    lastSignIn:   results[3]
+  };
+  renderList();
+}
+
+function toggleActivity(reqId) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+  if (activityExpanded[reqId]) {
+    // Collapse — keep cache for next expansion
+    activityExpanded[reqId] = false;
+    renderList();
+    return;
+  }
+  activityExpanded[reqId] = true;
+  if (!activityCache[reqId] || (!activityCache[reqId].loaded && !activityCache[reqId].loading)) {
+    // No cache yet → fetch (handles the post-error retry too)
+    fetchActivityFor(r.user_id, reqId);
+  } else {
+    renderList();
+  }
+}
+
+// Render the activity panel HTML for a given request. Returns '' if collapsed.
+function renderActivityPanel(reqId) {
+  if (!activityExpanded[reqId]) return '';
+  var c = activityCache[reqId];
+  if (!c || c.loading) {
+    return '<div class="activity-panel"><div class="activity-loading">⏳ جارٍ التحميل...</div></div>';
+  }
+  if (c.error === 'no_user_id') {
+    return '<div class="activity-panel"><div class="activity-loading" style="color:#ef5350;">⚠️ لا يوجد user_id مرتبط بهذا الحساب</div></div>';
+  }
+  return (
+    '<div class="activity-panel">' +
+      '<div class="activity-row"><span>👥 المرضى:</span>     <b>' + fmtMetric(c.patients)     + '</b></div>' +
+      '<div class="activity-row"><span>📅 المواعيد:</span>   <b>' + fmtMetric(c.appointments) + '</b></div>' +
+      '<div class="activity-row"><span>👨‍⚕️ الموظفين النشطين:</span> <b>' + fmtMetric(c.employees) + '</b></div>' +
+      '<div class="activity-row"><span>🕐 آخر دخول:</span>   <b>' + escapeHtml(timeSince(c.lastSignIn)) + '</b></div>' +
+    '</div>'
+  );
+}
+
+// ===== Trial extension (+30 / +90 days) =====
+// Smart base: extends from max(current trial_end, today) so a trial that
+// expired a week ago + "+30 days" lands at today+30, not today+23.
+async function extendTrial(reqId, days) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+  if (!r.trial_end) {
+    alert('هذا حساب دائم — لا يحتاج تمديد.');
+    return;
+  }
+
+  var currentEnd = new Date(r.trial_end);
+  var today = new Date();
+  var base = currentEnd > today ? currentEnd : today;
+  var newEnd = new Date(base);
+  newEnd.setDate(newEnd.getDate() + days);
+
+  // ar-EG locale gives Western digits in DD/MM/YYYY which is least ambiguous
+  var dateStr;
+  try {
+    dateStr = newEnd.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch(e) {
+    dateStr = newEnd.toISOString().slice(0, 10);
+  }
+
+  var msg = 'تمديد تجربة "' + (r.name || '—') + '" بـ ' + days + ' يوم؟\n' +
+            'التاريخ الجديد: ' + dateStr;
+  if (!confirm(msg)) return;
+
+  var res;
+  try {
+    res = await window.sb.from('trial_requests')
+      .update({ trial_end: newEnd.toISOString() })
+      .eq('id', reqId);
+  } catch(e) {
+    alert('فشل التمديد: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+    return;
+  }
+  if (res && res.error) {
+    alert('فشل التمديد: ' + res.error.message);
+    return;
+  }
+  loadAndRender();
+}
 
 // XSS-safe HTML escaping for user-controlled fields rendered into innerHTML.
 // Closes pre-existing theoretical XSS in admin.html (Bug H2 family).
@@ -809,10 +1055,20 @@ function renderList() {
     } else if (st === 'accepted') {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
       var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
+      // Phase 7.6B: Activity toggle (all accepted), Extension buttons (only if trial)
+      var actBtnLabel = activityExpanded[id] ? '📊 إخفاء النشاط' : '📊 عرض النشاط';
+      var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' + actBtnLabel + '</button>';
+      var extendBtns = '';
+      if (r.trial_end) {
+        extendBtns = '<button class="btn-extend" onclick="extendTrial(\'' + id + '\', 30)">+30 يوم</button>' +
+                     '<button class="btn-extend" onclick="extendTrial(\'' + id + '\', 90)">+90 يوم</button>';
+      }
       actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
+                extendBtns +
                 '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
                 '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
-                editBtn;
+                editBtn +
+                activityBtn;
     } else if (st === 'rejected') {
       var trialBadge = '';
       actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
@@ -833,6 +1089,7 @@ function renderList() {
         (typeof trialBadge !== 'undefined' ? trialBadge : '') +
       '</div>' +
       '<div class="req-actions">' + actions + '</div>' +
+      (st === 'accepted' ? renderActivityPanel(id) : '') +
     '</div>';
   }).join('');
 }
