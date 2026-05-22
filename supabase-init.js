@@ -1307,9 +1307,24 @@
   }
 
   async function autoInit() {
-    // Skip on auth & landing pages (pre-auth)
+    // Skip on auth & landing pages (pre-auth) AND admin.html (platform page, not tenant).
+    //
+    // admin.html is the SyDent SaaS platform control panel — it manages
+    // trial_requests for clinic owners across all tenants. It does NOT belong
+    // to any single clinic (no clinic_doctors / clinic_employees row for the
+    // admin user). Running autoInit() here would:
+    //   1. Try to load clinic_employees / clinic_doctors for an admin who has
+    //      no rows → empty caches → confusing "owner deleted" lock pill
+    //   2. Risk injecting the "حسابك معطّل من قِبَل المالك" inactive banner
+    //      (designed for clinic employees, not the platform admin)
+    //   3. Inject sidebar header buttons / role guards that don't apply to
+    //      the platform-level admin role
+    // The admin page has its own auth guard (doctors.role='admin' check) and
+    // runs entirely outside the per-tenant SyDentLock system. See Rule #28 and
+    // the SaaS multi-tenant best practice: keep the global/platform layer
+    // distinct from the tenant layer.
     var path = (window.location.pathname || '').toLowerCase();
-    if (/auth\.html$|landing\.html$|^\/$/i.test(path)) return;
+    if (/auth\.html$|landing\.html$|admin\.html$|^\/$/i.test(path)) return;
 
     // Wait briefly for DOM
     if (document.readyState === 'loading') {

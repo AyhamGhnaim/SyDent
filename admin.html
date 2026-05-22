@@ -190,7 +190,10 @@ header{
       <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/>
       </svg>
-      <span class="name">SyDent</span>
+      <div style="display:flex;flex-direction:column;line-height:1.15;">
+        <span class="name">SyDent</span>
+        <span style="font-size:9px;color:var(--text2);font-weight:600;letter-spacing:0.3px;">لوحة إدارة المنصّة</span>
+      </div>
       <span class="badge">Admin</span>
     </div>
     <div style="display:flex;gap:8px;">
@@ -229,7 +232,7 @@ header{
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260521p75"></script>
+<script src="supabase-init.js?v=20260522a01"></script>
 <script>
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
@@ -265,8 +268,13 @@ window.addEventListener('DOMContentLoaded', async function() {
     window.location.replace('index.html');
     return;
   }
-  // Phase 4: Lock guard — Owner-only page (Secretary/Doctor locked devices can't access admin)
-  if (window.SyDentLock && !window.SyDentLock.guardPage(['owner'])) return;
+  // Note: We intentionally do NOT call window.SyDentLock.guardPage() here.
+  // SyDentLock is the per-tenant device-lock system (Owner/Doctor/Secretary
+  // roles INSIDE a clinic). The admin user is a SaaS platform admin — they
+  // have no clinic_doctors / clinic_employees row, so SyDentLock's checks
+  // would produce a confusing "owner deleted" state. The role='admin' check
+  // above is the only auth gate this page needs (defense-in-depth: RLS on
+  // trial_requests should also restrict mutations to admin role).
   document.getElementById('adminScreen').style.display = 'block';
   loadAndRender();
 });
@@ -325,13 +333,38 @@ async function accept(id) {
 
     if (!userId) {
       var errMsg = data.msg || data.message || JSON.stringify(data);
-      if (!errMsg.includes('already') && !errMsg.includes('exists') && !errMsg.includes('registered')) {
+      var isAlreadyExists = errMsg.includes('already') || errMsg.includes('exists') || errMsg.includes('registered');
+      if (!isAlreadyExists) {
         alert('خطأ: ' + errMsg);
         loadAndRender();
         return;
       }
-      // الحساب موجود مسبقاً — احتفظ بالـ user_id القديم
+      // Account already exists — recover the user_id so the trial_request
+      // gets properly linked. Two recovery paths:
+      //   1. Trust the existing trial_request.user_id (from auth.html signup flow)
+      //   2. Look up the user by email via admin API (for landing.html flow
+      //      where no user_id was saved, or to repair stale rows)
+      // We try path 2 if path 1 is empty, because returning a broken accept
+      // (status='accepted' but user_id=NULL) would silently lock the user out.
       userId = r.user_id;
+      if (!userId) {
+        try {
+          var lookup = await fetch(
+            SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email),
+            { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
+          );
+          var lookupData = await lookup.json();
+          var users = (lookupData && lookupData.users) || [];
+          if (users.length && users[0].id) userId = users[0].id;
+        } catch(lookupErr) {
+          console.warn('user_id recovery lookup failed:', lookupErr);
+        }
+      }
+      if (!userId) {
+        alert('⚠️ الحساب موجود لكن تعذّر ربطه بطلب التجربة. تواصل مع الدعم الفني.');
+        loadAndRender();
+        return;
+      }
     }
 
     var updateData = { status: 'accepted', email: email };
