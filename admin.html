@@ -374,10 +374,12 @@ header{
   align-items:center;justify-content:space-between;gap:10px;
   cursor:pointer;
   font-family:'Cairo',sans-serif;
-  transition:all .2s;
-  animation:bannerFadeIn .2s ease-out;
+  transition:background .2s, border-color .2s;
 }
-.alerts-banner.show{display:flex;}
+/* Animation only attaches when the banner actually appears — avoids
+   wasting one fade-in cycle on page-load while the banner is hidden,
+   which would leave subsequent shows with no visible fade. */
+.alerts-banner.show{display:flex; animation:bannerFadeIn .2s ease-out;}
 .alerts-banner:hover{background:rgba(255,167,38,0.18);}
 .alerts-banner.critical{
   background:rgba(239,83,80,0.10);
@@ -462,7 +464,7 @@ header{
     </div>
 
     <!-- Phase 7.6C: Alerts Banner (expiring trials in next 7 days) -->
-    <div class="alerts-banner" id="alertsBanner" onclick="onBannerClick(event)" role="button" tabindex="0">
+    <div class="alerts-banner" id="alertsBanner" onclick="onBannerClick(event)" onkeydown="onBannerKeydown(event)" role="button" tabindex="0">
       <div class="banner-text" id="alertsBannerText"><span class="banner-icon">⚠️</span> <span class="banner-msg"></span></div>
       <div class="banner-cta" id="alertsBannerCta">اعرض ›</div>
       <button type="button" class="banner-close" id="alertsBannerClose" onclick="closeExpiringFilter(event)" aria-label="إلغاء الفلتر" style="display:none;">✕</button>
@@ -1382,6 +1384,21 @@ function onBannerClick(e) {
   expiringFilterActive = true;
   renderAlertsBanner();
   renderList();
+}
+
+// Keyboard activation for role="button" (Enter / Space). The browser
+// gives focus + tabindex semantics but NOT keyboard click emulation —
+// we wire that ourselves. Space is preventDefault'd because the default
+// behavior on a focused tabindex element is to scroll the page.
+function onBannerKeydown(e) {
+  if (!e) return;
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    if (expiringFilterActive) return;
+    expiringFilterActive = true;
+    renderAlertsBanner();
+    renderList();
+  }
 }
 
 // ✕ button → clear the filter.
