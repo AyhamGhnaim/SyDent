@@ -487,7 +487,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a08"></script>
+<script src="supabase-init.js?v=20260522a09"></script>
 </head>
 <body>
 
@@ -1614,11 +1614,22 @@ function closeExpiringFilter(e) {
 // RFC 4180 cell escape: wrap in double quotes, double-up any internal
 // double quotes. Newlines inside cells become literal CRLF; Excel
 // preserves them as in-cell line breaks because the cell is quoted.
-function csvCell(v) {
-  if (v == null) return '""';
-  var s = String(v);
-  s = s.replace(/"/g, '""');
-  return '"' + s + '"';
+// TSV cell sanitizer. TSV (tab-separated values) does NOT use quotes
+// for escaping — instead, any tab/CR/LF inside a value would break the
+// row structure. We replace those whitespace chars with a single space
+// to keep the file parseable everywhere. This is a deliberate, lossy
+// transform — admin notes containing literal tabs/newlines lose them
+// in the export, but the table layout stays intact in WPS / Excel /
+// Google Sheets / LibreOffice with NO locale-specific hint required.
+//
+// Why TSV instead of CSV: WPS Office Free on non-US Windows locales
+// ignores both commas and the 'sep=,' directive, collapsing all
+// columns into A. CSVs comma-tab-newline ambiguity has too many
+// failure modes; TSV is unambiguous and universally honored by every
+// spreadsheet app's default CSV opener.
+function tsvCell(v) {
+  if (v == null) return '';
+  return String(v).replace(/[\t\r\n]+/g, ' ');
 }
 
 // Compute the list of rows that the export should contain. Mirrors the
@@ -1726,7 +1737,7 @@ async function exportCSV() {
       'الأيام المتبقية'
     ];
     var lines = [];
-    lines.push(headers.map(csvCell).join(','));
+    lines.push(headers.map(tsvCell).join('\t'));
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var line = [
@@ -1739,7 +1750,7 @@ async function exportCSV() {
         fmtCreatedAtForCsv(r.created_at),
         fmtTrialEndForCsv(r),
         fmtDaysLeftForCsv(r)
-      ].map(csvCell).join(',');
+      ].map(tsvCell).join('\t');
       lines.push(line);
     }
     // CRLF for Excel-friendliness (RFC 4180 also specifies CRLF).
@@ -1747,16 +1758,16 @@ async function exportCSV() {
     // BOM ensures Excel on Windows treats the file as UTF-8 instead of
     // its OS-default codepage. Required for Arabic to render correctly.
     //
-    // 'sep=,' hint: on non-US Windows locales (German, French, Italian,
-    // Spanish, Arabic, ...) Excel and WPS Office default to semicolon
-    // as the list separator and ignore commas. Live test in Hamburg
-    // (German locale) confirmed WPS Office collapsed all 9 columns into
-    // column A. Prefixing 'sep=,' tells Excel/WPS Office to use comma
-    // regardless of OS locale. Google Sheets and LibreOffice respect
-    // it too; Apple Numbers shows it as a literal cell in row 1 (rare
-    // on Windows-first deployments and acceptable tradeoff). Standard
-    // workaround used by Salesforce, HubSpot, Shopify CSV exports.
-    var blob = new Blob(['\uFEFF' + 'sep=,\r\n' + csvText], { type: 'text/csv;charset=utf-8;' });
+    // TSV (tab-separated) chosen over CSV after live-test in Hamburg
+    // (German Windows + WPS Office Free) showed that locale's default
+    // CSV behavior splits on ';', not ',', and the 'sep=,' directive
+    // is silently ignored. Tabs have no locale ambiguity — every
+    // spreadsheet app interprets them as column separators regardless
+    // of OS settings. The file extension stays .csv because that's
+    // what users associate with "open in spreadsheet"; the content-
+    // type is tab-separated-values so apps that inspect the MIME
+    // (rare on Windows) get the correct hint.
+    var blob = new Blob(['\uFEFF' + csvText], { type: 'text/tab-separated-values;charset=utf-8;' });
 
     // Trigger download via a temporary anchor — this is the most
     // browser-portable approach and works in all evergreen browsers.
