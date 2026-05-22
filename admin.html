@@ -174,6 +174,104 @@ header{
 }
 .empty-state div{font-size:40px;margin-bottom:12px;}
 
+/* ===== SEARCH BAR ===== */
+.search-wrap{
+  position:relative;margin-bottom:16px;
+}
+.search-input{
+  width:100%;background:var(--bg2);border:1px solid var(--border);
+  border-radius:10px;padding:11px 38px 11px 38px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:13px;outline:none;
+  transition:border-color .2s;
+}
+.search-input:focus{border-color:var(--green);}
+.search-input::placeholder{color:var(--text3);}
+.search-icon{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  font-size:14px;color:var(--text3);pointer-events:none;
+}
+.search-clear{
+  display:none;position:absolute;left:8px;top:50%;
+  transform:translateY(-50%);
+  width:24px;height:24px;border-radius:50%;
+  background:var(--bg3);border:none;
+  color:var(--text2);font-size:14px;cursor:pointer;
+  align-items:center;justify-content:center;
+  font-family:'Cairo',sans-serif;line-height:1;padding:0;
+}
+.search-clear:hover{background:var(--bg4);color:var(--text);}
+
+/* ===== EDIT BUTTON ===== */
+.btn-edit{
+  padding:9px 14px;
+  background:rgba(99,179,237,0.1);
+  border:1px solid rgba(99,179,237,0.25);border-radius:8px;
+  color:#63b3ed;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-edit:hover{background:rgba(99,179,237,0.18);}
+
+/* ===== EDIT MODAL ===== */
+.modal-backdrop{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);
+  z-index:100;align-items:center;justify-content:center;
+  padding:20px;
+}
+.modal-backdrop.show{display:flex;}
+.modal-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:24px;
+  width:100%;max-width:440px;max-height:90vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-head{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:18px;
+}
+.modal-title{font-size:16px;font-weight:800;color:var(--text);}
+.modal-close{
+  background:transparent;border:none;color:var(--text2);
+  font-size:20px;cursor:pointer;padding:4px 8px;
+  line-height:1;border-radius:6px;transition:all .2s;
+}
+.modal-close:hover{background:var(--bg3);color:var(--text);}
+.modal-field{margin-bottom:12px;}
+.modal-field label{
+  display:block;font-size:12px;color:var(--text2);
+  font-weight:600;margin-bottom:5px;
+}
+.modal-field input, .modal-field textarea{
+  width:100%;background:var(--bg3);border:1px solid var(--border);
+  border-radius:8px;padding:10px 12px;color:var(--text);
+  font-family:'Cairo',sans-serif;font-size:13px;outline:none;
+  transition:border-color .2s;resize:vertical;
+}
+.modal-field input:focus, .modal-field textarea:focus{border-color:var(--green);}
+.modal-field textarea{min-height:60px;}
+.modal-hint{
+  font-size:10px;color:var(--text3);margin-top:4px;
+  line-height:1.5;
+}
+.modal-actions{
+  display:flex;gap:8px;margin-top:18px;
+}
+.btn-cancel{
+  flex:1;padding:11px;background:transparent;
+  border:1px solid var(--border);border-radius:8px;
+  color:var(--text2);font-family:'Cairo',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-cancel:hover{border-color:var(--text2);color:var(--text);}
+.btn-save{
+  flex:1;padding:11px;background:var(--green);
+  border:none;border-radius:8px;
+  color:var(--bg);font-family:'Cairo',sans-serif;
+  font-size:13px;font-weight:800;cursor:pointer;transition:all .2s;
+}
+.btn-save:hover{background:var(--green2);}
+.btn-save:disabled{opacity:.5;cursor:not-allowed;}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -220,6 +318,20 @@ header{
       </div>
     </div>
 
+    <!-- Search -->
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input
+        type="text"
+        id="searchInput"
+        class="search-input"
+        placeholder="بحث بالاسم، الهاتف، الإيميل، المدينة، الملاحظات..."
+        oninput="onSearchInput(this.value)"
+        autocomplete="off"
+      >
+      <button type="button" id="searchClear" class="search-clear" onclick="clearSearch()" aria-label="مسح">✕</button>
+    </div>
+
     <!-- Filter -->
     <div class="filter-tabs">
       <button class="tab active" onclick="setFilter('all',this)">الكل</button>
@@ -233,11 +345,199 @@ header{
   </div>
 </div>
 
+<!-- Edit Modal -->
+<div class="modal-backdrop" id="editModal" onclick="onModalBackdropClick(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title">✏️ تعديل بيانات الحساب</div>
+      <button type="button" class="modal-close" onclick="closeEditModal()" aria-label="إغلاق">✕</button>
+    </div>
+
+    <div class="modal-field">
+      <label>الاسم <span style="color:var(--red)">*</span></label>
+      <input type="text" id="editName" autocomplete="off">
+    </div>
+
+    <div class="modal-field">
+      <label>الهاتف <span style="color:var(--red)">*</span></label>
+      <input type="text" id="editPhone" autocomplete="off" dir="ltr" style="text-align:right;">
+    </div>
+
+    <div class="modal-field">
+      <label>الإيميل (للعرض فقط)</label>
+      <input type="text" id="editEmail" autocomplete="off" dir="ltr" style="text-align:right;">
+      <div class="modal-hint">
+        ⚠️ هذا الحقل للعرض في طلب التجربة فقط، ولا يُغيّر بريد الدخول إلى الحساب.
+      </div>
+    </div>
+
+    <div class="modal-field">
+      <label>المدينة</label>
+      <input type="text" id="editCity" autocomplete="off">
+    </div>
+
+    <div class="modal-field">
+      <label>ملاحظات</label>
+      <textarea id="editNotes" rows="2"></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closeEditModal()">إلغاء</button>
+      <button type="button" class="btn-save" id="editSaveBtn" onclick="saveEdit()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
 var currentFilter = 'all';
 var allRequests = [];
+
+// ===== Phase 7.6A: Search + Edit state =====
+var searchTerm = '';
+var _searchTimer = null;
+var editingId = null;
+
+// XSS-safe HTML escaping for user-controlled fields rendered into innerHTML.
+// Closes pre-existing theoretical XSS in admin.html (Bug H2 family).
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Safe escaping for values that appear inside a JS string literal that lives
+// inside an HTML attribute (e.g. onclick="foo('VALUE')"). We need BOTH:
+//   1. JS-string escaping (backslash, single-quote)
+//   2. HTML-attribute escaping (less-than, double-quote, ampersand)
+// Order matters: JS-escape FIRST, then HTML-escape the result.
+function jsAttr(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Search input handlers (debounced 200ms to avoid re-render thrash).
+function onSearchInput(v) {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(function(){ setSearch(v); }, 200);
+}
+function setSearch(v) {
+  searchTerm = (v || '').trim().toLowerCase();
+  var clearBtn = document.getElementById('searchClear');
+  if (clearBtn) clearBtn.style.display = searchTerm ? 'flex' : 'none';
+  renderList();
+}
+function clearSearch() {
+  var inp = document.getElementById('searchInput');
+  if (inp) inp.value = '';
+  clearTimeout(_searchTimer);
+  setSearch('');
+  if (inp) inp.focus();
+}
+function matchesSearch(r) {
+  if (!searchTerm) return true;
+  var hay = (
+    (r.name  || '') + ' ' +
+    (r.phone || '') + ' ' +
+    (r.email || '') + ' ' +
+    (r.city  || '') + ' ' +
+    (r.notes || '')
+  ).toLowerCase();
+  return hay.indexOf(searchTerm) !== -1;
+}
+
+// ===== Edit modal =====
+function openEditModal(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  editingId = id;
+  document.getElementById('editName').value  = r.name  || '';
+  document.getElementById('editPhone').value = r.phone || '';
+  document.getElementById('editEmail').value = r.email || '';
+  document.getElementById('editCity').value  = r.city  || '';
+  document.getElementById('editNotes').value = r.notes || '';
+  document.getElementById('editModal').classList.add('show');
+  // Focus name field for fast typing
+  setTimeout(function(){
+    var nameInp = document.getElementById('editName');
+    if (nameInp) nameInp.focus();
+  }, 50);
+}
+
+function closeEditModal() {
+  editingId = null;
+  var m = document.getElementById('editModal');
+  if (m) m.classList.remove('show');
+  var btn = document.getElementById('editSaveBtn');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = '💾 حفظ';
+  }
+}
+
+function onModalBackdropClick(e) {
+  // Close only when clicking the backdrop itself, not children
+  if (e.target && e.target.id === 'editModal') closeEditModal();
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  var name  = (document.getElementById('editName').value  || '').trim();
+  var phone = (document.getElementById('editPhone').value || '').trim();
+  if (!name)  { alert('الاسم مطلوب');  return; }
+  if (!phone) { alert('الهاتف مطلوب'); return; }
+
+  var emailVal = (document.getElementById('editEmail').value || '').trim();
+  var cityVal  = (document.getElementById('editCity').value  || '').trim();
+  var notesVal = (document.getElementById('editNotes').value || '').trim();
+
+  var updateData = {
+    name:  name,
+    phone: phone,
+    email: emailVal || null,
+    city:  cityVal  || null,
+    notes: notesVal || null
+  };
+
+  var btn = document.getElementById('editSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جارٍ الحفظ...'; }
+
+  var res;
+  try {
+    res = await window.sb.from('trial_requests').update(updateData).eq('id', editingId);
+  } catch(e) {
+    alert('فشل الحفظ: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ'; }
+    return;
+  }
+  if (res && res.error) {
+    alert('فشل الحفظ: ' + res.error.message);
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ'; }
+    return;
+  }
+
+  closeEditModal();
+  loadAndRender();
+}
+
+// Global Escape handler to close modal
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') {
+    var m = document.getElementById('editModal');
+    if (m && m.classList.contains('show')) closeEditModal();
+  }
+});
 
 async function doLogout() {
   if (window.sb) {
@@ -486,41 +786,49 @@ function renderList() {
   var list = document.getElementById('reqList');
   var filtered = allRequests.filter(function(r){
     var st = r.status || 'new';
-    return currentFilter === 'all' || st === currentFilter;
+    var passFilter = (currentFilter === 'all' || st === currentFilter);
+    return passFilter && matchesSearch(r);
   });
   if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state"><div>📭</div>لا توجد طلبات</div>';
+    var emptyMsg = searchTerm ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد طلبات';
+    var emptyIcon = searchTerm ? '🔍' : '📭';
+    list.innerHTML = '<div class="empty-state"><div>' + emptyIcon + '</div>' + emptyMsg + '</div>';
     return;
   }
   list.innerHTML = filtered.map(function(r) {
     var st = r.status || 'new';
     var stLabel = st === 'new' ? 'جديد' : st === 'accepted' ? 'مقبول' : 'مرفوض';
     var id = r.id;
+    // Always-available edit button (all status states)
+    var editBtn = '<button class="btn-edit" onclick="openEditModal(\'' + id + '\')">✏️ تعديل</button>';
     var actions = '';
     if (st === 'new') {
       actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وتفعيل التجربة</button>' +
-                '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>';
+                '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>' +
+                editBtn;
     } else if (st === 'accepted') {
       var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
       var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
       actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
-                '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + (r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
-                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
+                '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
+                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
+                editBtn;
     } else if (st === 'rejected') {
       var trialBadge = '';
       actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
-                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + (r.email||'') + '\')">🗑 حذف</button>';
+                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
+                editBtn;
     }
     return '<div class="req-card ' + st + '">' +
       '<div class="req-top">' +
-        '<div class="req-name">' + (r.name || '—') + '</div>' +
+        '<div class="req-name">' + (escapeHtml(r.name) || '—') + '</div>' +
         '<span class="req-status ' + st + '">' + stLabel + '</span>' +
       '</div>' +
       '<div class="req-info">' +
-        '<div class="req-info-row">📱 <span>' + (r.phone || '—') + '</span></div>' +
-        (r.email ? '<div class="req-info-row">📧 <span>' + r.email + '</span></div>' : '') +
-        (r.city ? '<div class="req-info-row">📍 <span>' + r.city + '</span></div>' : '') +
-        (r.notes ? '<div class="req-info-row">📝 <span>' + r.notes + '</span></div>' : '') +
+        '<div class="req-info-row">📱 <span>' + (escapeHtml(r.phone) || '—') + '</span></div>' +
+        (r.email ? '<div class="req-info-row">📧 <span>' + escapeHtml(r.email) + '</span></div>' : '') +
+        (r.city ? '<div class="req-info-row">📍 <span>' + escapeHtml(r.city) + '</span></div>' : '') +
+        (r.notes ? '<div class="req-info-row">📝 <span>' + escapeHtml(r.notes) + '</span></div>' : '') +
         '<div class="req-info-row">🕐 <span>' + formatDate(r.created_at) + '</span></div>' +
         (typeof trialBadge !== 'undefined' ? trialBadge : '') +
       '</div>' +
