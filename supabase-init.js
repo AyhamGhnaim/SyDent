@@ -1330,6 +1330,36 @@
     if (document.readyState === 'loading') {
       await new Promise(function(r){ document.addEventListener('DOMContentLoaded', r, { once: true }); });
     }
+
+    // ── Defensive platform-admin redirect ─────────────────────────────
+    // Belt-and-suspenders: index.html already redirects admins to admin.html,
+    // but if the admin lands directly on any other tenant page (patients,
+    // appointments, settings, etc.) via a bookmark, deep link, history, or
+    // PWA shortcut, redirect them to admin.html before any tenant-level
+    // logic (caches, banners, role guards) tries to render. Without this,
+    // the admin would see the misleading "Owner deleted" pill + "account
+    // deactivated" banner since they have no clinic_employees row.
+    //
+    // We use a deliberately-cheap check: only fire the query if there's a
+    // session at all. Errors are non-fatal — if the doctors table query
+    // fails, we let the page proceed (graceful degradation; admins are rare).
+    try {
+      var sessRes = await window.sb.auth.getSession();
+      var sUser = sessRes && sessRes.data && sessRes.data.session && sessRes.data.session.user;
+      if (sUser) {
+        var roleRes = await window.sb.from('doctors').select('role').eq('id', sUser.id).maybeSingle();
+        if (roleRes && roleRes.data && roleRes.data.role === 'admin') {
+          window.location.replace('admin.html');
+          return;
+        }
+      }
+    } catch(_adminCheckErr) {
+      // Best-effort. Non-admin users far outnumber admins, so failing
+      // this check should never block a tenant user from their dashboard.
+      console.warn('[SyDentLock] admin role check skipped:', _adminCheckErr && _adminCheckErr.message);
+    }
+    // ──────────────────────────────────────────────────────────────────
+
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
     // Phase 5: preload BOTH caches in parallel; refresh header & apply inactive
