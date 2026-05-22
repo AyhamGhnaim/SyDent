@@ -448,6 +448,8 @@ footer{
   .steps-section{padding:100px 60px;}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js?v=20260522a03"></script>
 </head>
 <body>
 
@@ -678,8 +680,6 @@ footer{
   <a href="auth.html" class="footer-link">تسجيل الدخول</a>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a02"></script>
 <script>
 async function submitRequest() {
   const name = document.getElementById('fname').value.trim();
