@@ -272,6 +272,46 @@ header{
 }
 .ext-apply:hover{background:var(--green2);}
 .ext-apply:disabled{opacity:.5;cursor:not-allowed;}
+/* Shorten variant: orange/yellow apply button — visual cue that the
+   operation REMOVES time rather than adding it. Hover darkens slightly. */
+.ext-apply.shorten{background:#ffa726;}
+.ext-apply.shorten:hover{background:#f59515;}
+
+/* ===== Phase 7.6C-S1.1: MODE SWITCHER (extend / shorten) ===== */
+.ext-mode-row{
+  display:flex;gap:6px;align-items:center;
+  padding-bottom:8px;
+  border-bottom:1px dashed rgba(46,232,158,0.12);
+}
+.ext-mode-btn{
+  padding:6px 12px;font-size:11px;font-weight:700;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text2);
+  font-family:'Cairo',sans-serif;
+  cursor:pointer;
+  transition:all .15s;
+}
+.ext-mode-btn:hover{border-color:var(--text2);color:var(--text);}
+.ext-mode-btn.active{cursor:default;}
+.ext-mode-btn.active.extend{
+  background:rgba(46,232,158,0.15);
+  border-color:rgba(46,232,158,0.5);
+  color:var(--green);
+}
+.ext-mode-btn.active.shorten{
+  background:rgba(255,167,38,0.15);
+  border-color:rgba(255,167,38,0.5);
+  color:#ffa726;
+}
+/* Shorten-variant preset buttons inherit ext-preset but tinted yellow. */
+.ext-preset.shorten{
+  background:rgba(255,167,38,0.08);
+  border-color:rgba(255,167,38,0.25);
+  color:#ffa726;
+}
+.ext-preset.shorten:hover{background:rgba(255,167,38,0.18);}
 
 /* ===== ACTIVITY PANEL (expanded inside accepted card) ===== */
 .activity-panel{
@@ -424,7 +464,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a05"></script>
+<script src="supabase-init.js?v=20260522a06"></script>
 </head>
 <body>
 
@@ -793,6 +833,7 @@ function pruneActivityCaches() {
   for (var k in activityCache)    { if (!liveIds[k]) delete activityCache[k]; }
   for (var k2 in activityExpanded) { if (!liveIds[k2]) delete activityExpanded[k2]; }
   for (var k3 in extendDaysByReq) { if (!liveIds[k3]) delete extendDaysByReq[k3]; }
+  for (var k4 in extendModeByReq) { if (!liveIds[k4]) delete extendModeByReq[k4]; }
 }
 
 // ===== Trial extension (custom-days counter + 30/60/90 presets) =====
@@ -800,6 +841,43 @@ function pruneActivityCaches() {
 // the first time the card is rendered. Persists in memory only — reload
 // resets to 30.
 var extendDaysByReq = {};
+
+// ===== Phase 7.6C-S1.1: Trial Adjust (extend / shorten mode) =====
+// Per-tenant mode state for the trial-adjust widget. 'extend' is the
+// default (matches Phase 7.6B behavior so existing workflows are
+// unchanged). 'shorten' is the new direction. Persists in memory only;
+// reload resets to 'extend'. The mode and the day counter are kept in
+// SEPARATE maps so switching mode preserves whatever number the user
+// already typed — matching what most date-pickers do.
+var extendModeByReq = {};
+
+function getExtendMode(reqId) {
+  if (!extendModeByReq[reqId]) extendModeByReq[reqId] = 'extend';
+  return extendModeByReq[reqId];
+}
+
+// Switching mode only updates state + re-renders the widget. The day
+// counter (extendDaysByReq) is intentionally preserved so an operator
+// can type "5", then realize they meant to shorten, click "تقصير" and
+// keep typing — they don't lose their input.
+//
+// IMPORTANT: same defensive sync as applyAdjust does. If the user typed
+// a new number but didn't blur the input yet (so onExtendChange hasn't
+// fired), the raw DOM value is the truth, not extendDaysByReq. We commit
+// it to the state map FIRST, then re-render — otherwise the re-render
+// would pull the stale state map value and the user's typed number
+// would silently disappear.
+function setExtendMode(reqId, mode) {
+  if (mode !== 'extend' && mode !== 'shorten') return;
+  if (extendModeByReq[reqId] === mode) return; // no-op for same mode
+  var inp = document.getElementById('extDays-' + reqId);
+  if (inp) {
+    var raw = parseInt(inp.value, 10);
+    if (!isNaN(raw)) extendDaysByReq[reqId] = raw;
+  }
+  extendModeByReq[reqId] = mode;
+  renderList();
+}
 
 function getExtendDays(reqId) {
   if (extendDaysByReq[reqId] == null) extendDaysByReq[reqId] = 30;
@@ -840,13 +918,35 @@ function setExtendDays(reqId, days) {
   if (inp) inp.value = String(days);
 }
 
-// Render the per-card extension widget. Only called when r.trial_end is set.
+// Render the per-card adjust widget. Only called when r.trial_end is set.
+// Phase 7.6C-S1.1: now supports both 'extend' (default) and 'shorten' modes.
+// The mode switcher sits at the top; presets and apply-button label/color
+// reflect the current direction. The counter input is shared between modes
+// — switching mode preserves the typed number.
 function renderExtensionWidget(reqId) {
   var days = getExtendDays(reqId);
+  var mode = getExtendMode(reqId);
+  var isShorten = (mode === 'shorten');
+
+  // Mode-dependent labels and visual classes
+  var widgetLabel = '⏰ تعديل التجربة:';
+  var applyLabel  = isShorten ? '💾 تقصير' : '💾 تمديد';
+  var applyClass  = 'ext-apply' + (isShorten ? ' shorten' : '');
+  var presetClass = 'ext-preset' + (isShorten ? ' shorten' : '');
+  var presets     = isShorten ? [1, 7, 30] : [30, 60, 90];
+  var presetSign  = isShorten ? '-' : '+';
+
+  var extendBtnClass  = 'ext-mode-btn' + (!isShorten ? ' active extend'  : '');
+  var shortenBtnClass = 'ext-mode-btn' + (isShorten  ? ' active shorten' : '');
+
   return (
     '<div class="extension-widget">' +
+      '<div class="ext-mode-row">' +
+        '<button type="button" class="' + extendBtnClass  + '" onclick="setExtendMode(\'' + reqId + '\', \'extend\')">➕ تمديد</button>' +
+        '<button type="button" class="' + shortenBtnClass + '" onclick="setExtendMode(\'' + reqId + '\', \'shorten\')">➖ تقصير</button>' +
+      '</div>' +
       '<div class="ext-row">' +
-        '<span class="ext-label">⏰ تمديد التجربة:</span>' +
+        '<span class="ext-label">' + widgetLabel + '</span>' +
         '<input type="number" id="extDays-' + reqId + '" class="ext-input" ' +
           'min="1" max="365" value="' + days + '" ' +
           'oninput="onExtendInput(\'' + reqId + '\', this.value)" ' +
@@ -854,29 +954,52 @@ function renderExtensionWidget(reqId) {
         '<span class="ext-unit">يوم</span>' +
       '</div>' +
       '<div class="ext-row">' +
-        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 30)">+30</button>' +
-        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 60)">+60</button>' +
-        '<button type="button" class="ext-preset" onclick="setExtendDays(\'' + reqId + '\', 90)">+90</button>' +
-        '<button type="button" class="ext-apply" onclick="applyExtend(\'' + reqId + '\')">💾 تمديد</button>' +
+        '<button type="button" class="' + presetClass + '" onclick="setExtendDays(\'' + reqId + '\', ' + presets[0] + ')">' + presetSign + presets[0] + '</button>' +
+        '<button type="button" class="' + presetClass + '" onclick="setExtendDays(\'' + reqId + '\', ' + presets[1] + ')">' + presetSign + presets[1] + '</button>' +
+        '<button type="button" class="' + presetClass + '" onclick="setExtendDays(\'' + reqId + '\', ' + presets[2] + ')">' + presetSign + presets[2] + '</button>' +
+        '<button type="button" class="' + applyClass + '" onclick="applyAdjust(\'' + reqId + '\')">' + applyLabel + '</button>' +
       '</div>' +
     '</div>'
   );
 }
 
-// Smart base: extends from max(current trial_end, today) so a trial that
-// expired a week ago + extension lands at TODAY+N, not TODAY+(N-7).
-async function applyExtend(reqId) {
+// Phase 7.6C-S1.1: Unified apply for both extend AND shorten.
+// Renamed from applyExtend; old call sites in renderExtensionWidget
+// updated. Behavior:
+//
+//   extend mode  (decision 3 / option C):
+//     base = max(currentTrialEnd, today)
+//     newEnd = base + days
+//     — same smart base as Phase 7.6B (an expired trial + extend lands
+//       at today+N, not currentEnd+N).
+//
+//   shorten mode (decision 3 / option C):
+//     base = currentTrialEnd
+//     newEnd = base - days
+//     — strictly relative to the recorded end. Shortening an already-
+//       expired trial just pushes the expiry further into the past
+//       (logically a no-op for access control, but operator may want to
+//       record it for accounting).
+//
+// Safety guards (decision 2 + 4 / option D + C):
+//   - Days input must be 1..365 in either direction (unchanged limits).
+//   - Shorten with days > 30: hardened confirm warns about large window.
+//   - Shorten resulting in newEnd <= today: hardened confirm warns the
+//     account will be immediately suspended.
+//   - Extending a permanent account (trial_end IS NULL) is still
+//     blocked as before — permanent accounts have no trial to adjust.
+async function applyAdjust(reqId) {
   var r = allRequests.find(function(x){ return x.id === reqId; });
   if (!r) return;
   if (!r.trial_end) {
-    alert('هذا حساب دائم — لا يحتاج تمديد.');
+    alert('هذا حساب دائم — لا يحتاج تعديل.');
     return;
   }
 
   // Defensive sync: read the input element directly at click time in case
-  // the user clicked 'تمديد' mid-typing without blurring the field first
-  // (in which case onExtendChange hasn't fired yet and the state map might
-  // be stale).
+  // the user clicked the apply button mid-typing without blurring the
+  // field first (in which case onExtendChange hasn't fired yet and the
+  // state map might be stale).
   var inp = document.getElementById('extDays-' + reqId);
   if (inp) {
     var raw = parseInt(inp.value, 10);
@@ -884,16 +1007,29 @@ async function applyExtend(reqId) {
   }
 
   var days = getExtendDays(reqId);
+  var mode = getExtendMode(reqId);
   if (!Number.isFinite(days) || days < 1 || days > 365) {
     alert('عدد الأيام غير صالح. الرجاء إدخال رقم بين 1 و 365.');
     return;
   }
 
   var currentEnd = new Date(r.trial_end);
+  if (isNaN(currentEnd.getTime())) {
+    alert('تاريخ التجربة الحالي غير صالح. تواصل مع الدعم الفني.');
+    return;
+  }
   var today = new Date();
-  var base = currentEnd > today ? currentEnd : today;
-  var newEnd = new Date(base);
-  newEnd.setDate(newEnd.getDate() + days);
+  var newEnd;
+  if (mode === 'shorten') {
+    // Decision 3-C: shorten from currentEnd (no smart base).
+    newEnd = new Date(currentEnd);
+    newEnd.setDate(newEnd.getDate() - days);
+  } else {
+    // Extend with smart base (Phase 7.6B behavior preserved).
+    var base = currentEnd > today ? currentEnd : today;
+    newEnd = new Date(base);
+    newEnd.setDate(newEnd.getDate() + days);
+  }
 
   // ar-EG locale: long Arabic month name with Western digits
   var dateStr;
@@ -903,8 +1039,33 @@ async function applyExtend(reqId) {
     dateStr = newEnd.toISOString().slice(0, 10);
   }
 
-  var msg = 'تمديد تجربة "' + (r.name || '—') + '" بـ ' + days + ' يوم؟\n' +
-            'التاريخ الجديد: ' + dateStr;
+  // Build the confirmation message. We always show: action verb, days,
+  // tenant name, and resulting date. For shorten, we also stack any
+  // safety warnings ABOVE the action so they're seen first.
+  var name = r.name || '—';
+  var msg;
+  if (mode === 'shorten') {
+    var warnings = [];
+    if (days > 30) {
+      warnings.push('⚠️ تنبيه: تقصير بـ ' + days + ' يوم (أكثر من شهر).');
+    }
+    // Use UTC-noon comparison to avoid off-by-one near midnight edge
+    // cases. If newEnd is at or before today's start, the account loses
+    // access immediately on save.
+    if (newEnd <= today) {
+      warnings.push('🚨 التجربة ستنتهي في الماضي (' + dateStr + ').\n' +
+                    'الحساب سيُعطّل فوراً بعد الحفظ.');
+    }
+    var header = warnings.length
+      ? warnings.join('\n\n') + '\n\n'
+      : '';
+    msg = header +
+          'تقصير تجربة "' + name + '" بـ ' + days + ' يوم؟\n' +
+          'التاريخ الجديد: ' + dateStr;
+  } else {
+    msg = 'تمديد تجربة "' + name + '" بـ ' + days + ' يوم؟\n' +
+          'التاريخ الجديد: ' + dateStr;
+  }
   if (!confirm(msg)) return;
 
   var res;
@@ -913,15 +1074,18 @@ async function applyExtend(reqId) {
       .update({ trial_end: newEnd.toISOString() })
       .eq('id', reqId);
   } catch(e) {
-    alert('فشل التمديد: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+    alert('فشل التعديل: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
     return;
   }
   if (res && res.error) {
-    alert('فشل التمديد: ' + res.error.message);
+    alert('فشل التعديل: ' + res.error.message);
     return;
   }
-  // Reset widget value to the default so the operator starts fresh next time
+  // Reset widget value AND mode to defaults so the operator starts fresh
+  // next time. (Mode reset to 'extend' is the safe default since the
+  // common operation is extension.)
   delete extendDaysByReq[reqId];
+  delete extendModeByReq[reqId];
   loadAndRender();
 }
 
