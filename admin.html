@@ -1521,8 +1521,12 @@ function waReminderLink(phone, name, daysLeft, trialEndIso) {
     dateStr = (trialEndIso || '').slice(0, 10);
   }
 
+  // Tenant names in trial_requests already carry the 'د' / 'د.' honorific
+  // (verified from live data: 'د شذ المار', 'د مجد شاكر', 'د احمد غنيم',
+  // 'د ايهم غنيم'). Adding another 'د. ' here would produce the awkward
+  // 'مرحباً د. د شذ المار'. Just greet the name as stored.
   var msg = encodeURIComponent(
-    'مرحباً د. ' + name + ' 👋\n\n' +
+    'مرحباً ' + name + ' 👋\n\n' +
     'هذه رسالة تذكير ودّية من SyDent 🦷\n\n' +
     '⏰ تجربتك المجانية تنتهي خلال ' + daysLeft + ' يوم بتاريخ ' + dateStr + '.\n\n' +
     'للتمديد أو الاستفسار، يرجى التواصل معنا.\n\n' +
