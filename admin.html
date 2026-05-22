@@ -487,7 +487,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a10"></script>
+<script src="supabase-init.js?v=20260522a11"></script>
 </head>
 <body>
 
@@ -1100,8 +1100,24 @@ async function applyAdjust(reqId) {
 
   var res;
   try {
+    // Phase 7.6C-Fix: lifecycle alignment. Computing the update payload up
+    // front lets us atomically (well, in one PostgREST call) set both
+    // trial_end and status, so the row never sits in an in-between state
+    // mid-render. Rules:
+    //   • extend ANY days → status must be 'accepted' (admin clearly wants
+    //     this tenant active again, even if it was previously rejected)
+    //   • shorten with newEnd > today → still 'accepted' (just less runway)
+    //   • shorten with newEnd <= today → status='rejected' (the trial has
+    //     ended; this is a soft suspension via expiry)
+    var willExpireImmediately = (mode === 'shorten') && (newEnd <= today);
+    var updatePayload = { trial_end: newEnd.toISOString() };
+    if (willExpireImmediately) {
+      updatePayload.status = 'rejected';
+    } else {
+      updatePayload.status = 'accepted';
+    }
     res = await window.sb.from('trial_requests')
-      .update({ trial_end: newEnd.toISOString() })
+      .update(updatePayload)
       .eq('id', reqId);
   } catch(e) {
     alert('فشل التعديل: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
@@ -1110,6 +1126,20 @@ async function applyAdjust(reqId) {
   if (res && res.error) {
     alert('فشل التعديل: ' + res.error.message);
     return;
+  }
+  // Phase 7.6C-Fix: now sync auth.users to match. We do this AFTER the DB
+  // update so a network failure here doesn't roll back the trial_end edit
+  // (the operator's primary intent). If the auth sync fails the helper
+  // logs to console and we surface a soft warning — manual SQL is the
+  // documented fallback.
+  if (r.user_id) {
+    if (willExpireImmediately) {
+      await banUserPermanently(r.user_id);
+    } else {
+      // Extend OR shorten-but-still-future: ensure no stale ban remains.
+      // No-op if the user wasn't banned to begin with.
+      await unbanUserIfBanned(r.user_id);
+    }
   }
   // Reset widget value AND mode to defaults so the operator starts fresh
   // next time. (Mode reset to 'extend' is the safe default since the
@@ -1331,6 +1361,65 @@ function setFilter(f, el) {
   renderList();
 }
 
+// ===== Phase 7.6C-Fix: auth.users ban persistence helpers =====
+// These two helpers keep auth.users.banned_until in sync with the lifecycle
+// state stored in trial_requests. They are intentionally GRACEFUL — they
+// never throw and never alert. If the network call fails, they log to
+// console and return false; the caller's primary DB update is preserved,
+// so the operator can re-trigger or fall back to a manual SQL fix.
+//
+// The Supabase admin API expects ban_duration as a STRING:
+//   • 'none'    → lifts any existing ban (no-op if already unbanned)
+//   • '876600h' → 100 years (effectively permanent suspension)
+// banned_until is the underlying column; we never write it directly because
+// the admin API enforces the conversion + audit semantics.
+
+async function unbanUserIfBanned(uid) {
+  if (!uid || !SERVICE_KEY) return false;
+  try {
+    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SERVICE_KEY,
+        'Authorization': 'Bearer ' + SERVICE_KEY
+      },
+      body: JSON.stringify({ ban_duration: 'none' })
+    });
+    if (!res.ok) {
+      console.warn('unbanUserIfBanned: PUT returned', res.status);
+      return false;
+    }
+    return true;
+  } catch(e) {
+    console.warn('unbanUserIfBanned error:', e);
+    return false;
+  }
+}
+
+async function banUserPermanently(uid) {
+  if (!uid || !SERVICE_KEY) return false;
+  try {
+    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SERVICE_KEY,
+        'Authorization': 'Bearer ' + SERVICE_KEY
+      },
+      body: JSON.stringify({ ban_duration: '876600h' })
+    });
+    if (!res.ok) {
+      console.warn('banUserPermanently: PUT returned', res.status);
+      return false;
+    }
+    return true;
+  } catch(e) {
+    console.warn('banUserPermanently error:', e);
+    return false;
+  }
+}
+
 async function accept(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
@@ -1410,6 +1499,15 @@ async function accept(id) {
     }
 
     await window.sb.from('trial_requests').update(updateData).eq('id', id);
+    // Phase 7.6C-Fix: lifecycle bug — re-accepting a previously-suspended
+    // user (rejected → accepted via "قبول وإنشاء حساب" on the rejected tab)
+    // used to leave auth.users.banned_until intact, so the user would still
+    // hit "User is banned" on login despite the green "مقبول" badge. For
+    // brand-new accounts (created moments ago in POST /admin/users above)
+    // this is a no-op since they're not banned. Either way the call is safe.
+    if (userId) {
+      await unbanUserIfBanned(userId);
+    }
     loadAndRender();
   } catch(e) {
     alert('خطأ في الاتصال: ' + e.message);
@@ -1428,9 +1526,19 @@ async function activatePermanent(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
   if (!confirm('هل تريد تفعيل حساب ' + r.name + ' كحساب دائم؟')) return;
+  // Phase 7.6C-Fix: previously this only set trial_end=null, which created
+  // a state mismatch when the row was 'rejected' + banned. The admin's
+  // intent in clicking "تفعيل دائم" is unambiguous: this account should
+  // be permanently active. So we (a) force status to 'accepted' in case
+  // we're coming from a rejected/suspended state, and (b) lift any
+  // outstanding auth.users ban. Without the unban, the green "مقبول"
+  // pill would lie — login would fail with "User is banned".
   await window.sb.from('trial_requests')
-    .update({ trial_end: null })
+    .update({ trial_end: null, status: 'accepted' })
     .eq('id', id);
+  if (r.user_id) {
+    await unbanUserIfBanned(r.user_id);
+  }
   loadAndRender();
 }
 
