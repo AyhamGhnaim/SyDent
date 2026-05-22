@@ -211,6 +211,29 @@ header{
 }
 .btn-edit:hover{background:rgba(99,179,237,0.18);}
 
+/* ===== Phase 7.6C-Step2: EXPORT CSV BUTTON ===== */
+/* Cyan/teal — distinct from edit-blue, conveys 'data' affordance.
+   Lives in its own row above the search bar; on mobile it stays the
+   full visible width so the icon + label never wrap. */
+.export-row{
+  display:flex;justify-content:flex-end;
+  margin-bottom:12px;
+}
+.btn-export-csv{
+  padding:9px 14px;
+  background:rgba(77,208,225,0.10);
+  border:1px solid rgba(77,208,225,0.30);
+  border-radius:8px;
+  color:#4dd0e1;
+  font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .2s;
+  white-space:nowrap;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.btn-export-csv:hover{background:rgba(77,208,225,0.20);}
+.btn-export-csv:disabled{opacity:.5;cursor:not-allowed;}
+
 /* ===== Phase 7.6B: ACTIVITY + EXTEND BUTTONS ===== */
 .btn-activity{
   padding:9px 14px;
@@ -464,7 +487,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a06"></script>
+<script src="supabase-init.js?v=20260522a07"></script>
 </head>
 <body>
 
@@ -508,6 +531,13 @@ header{
       <div class="banner-text" id="alertsBannerText"><span class="banner-icon">⚠️</span> <span class="banner-msg"></span></div>
       <div class="banner-cta" id="alertsBannerCta">اعرض ›</div>
       <button type="button" class="banner-close" id="alertsBannerClose" onclick="closeExpiringFilter(event)" aria-label="إلغاء الفلتر" style="display:none;">✕</button>
+    </div>
+
+    <!-- Phase 7.6C-Step2: Export CSV (respects current filter + search) -->
+    <div class="export-row">
+      <button type="button" class="btn-export-csv" id="exportCsvBtn" onclick="exportCSV()">
+        <span>📥</span><span>تصدير CSV</span>
+      </button>
     </div>
 
     <!-- Search -->
@@ -1572,6 +1602,185 @@ function closeExpiringFilter(e) {
   expiringFilterActive = false;
   renderAlertsBanner();
   renderList();
+}
+
+// ===== Phase 7.6C-Step2: CSV Export =====
+// Exports the CURRENTLY VISIBLE list (after tab filter + search filter +
+// expiring filter are applied) to a UTF-8 CSV file the operator can open
+// in Excel. Excel on Windows requires a UTF-8 BOM (U+FEFF) at the start
+// of the file to detect the encoding; without it, Arabic renders as
+// gibberish. We also use CRLF line endings (RFC 4180 + Excel-friendly).
+
+// RFC 4180 cell escape: wrap in double quotes, double-up any internal
+// double quotes. Newlines inside cells become literal CRLF; Excel
+// preserves them as in-cell line breaks because the cell is quoted.
+function csvCell(v) {
+  if (v == null) return '""';
+  var s = String(v);
+  s = s.replace(/"/g, '""');
+  return '"' + s + '"';
+}
+
+// Compute the list of rows that the export should contain. Mirrors the
+// EXACT filter chain in renderList — single source of filter logic
+// would be cleaner, but extracting it would touch the hot path in
+// renderList. Kept as a parallel implementation for now; if the filter
+// logic ever drifts, this needs to be updated in lockstep.
+function getFilteredRequestsForExport() {
+  return allRequests.filter(function(r){
+    var st = r.status || 'new';
+    var passFilter = (currentFilter === 'all' || st === currentFilter);
+    if (!passFilter || !matchesSearch(r)) return false;
+    if (expiringFilterActive && !isExpiringSoon(r)) return false;
+    return true;
+  });
+}
+
+// Format trial_end for the spreadsheet:
+//   - permanent account (trial_end IS NULL on an accepted row): "دائم"
+//   - non-accepted / no trial_end: "" (empty cell)
+//   - active or expired trial: ISO yyyy-mm-dd (Excel-sortable)
+function fmtTrialEndForCsv(r) {
+  if (r.status !== 'accepted') return '';
+  if (!r.trial_end) return 'دائم';
+  var d = new Date(r.trial_end);
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+// Format created_at with date + time, local timezone, ISO-style for
+// easy Excel parsing. Example: "2026-05-22 21:09"
+function fmtCreatedAtForCsv(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  var y  = d.getFullYear();
+  var mo = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  var hh = String(d.getHours()).padStart(2, '0');
+  var mi = String(d.getMinutes()).padStart(2, '0');
+  return y + '-' + mo + '-' + dd + ' ' + hh + ':' + mi;
+}
+
+// Status enum → Arabic label
+function fmtStatusForCsv(st) {
+  st = st || 'new';
+  if (st === 'new')      return 'جديد';
+  if (st === 'accepted') return 'مقبول';
+  if (st === 'rejected') return 'مرفوض';
+  return st; // fallback for any future unknown value
+}
+
+// Days remaining for the CSV: number for active trials (1..N), 0/negative
+// for expired trials (so admins can sort by "most overdue"), empty for
+// permanent or non-accepted rows.
+function fmtDaysLeftForCsv(r) {
+  var dl = getDaysLeft(r);
+  return dl === null ? '' : String(dl);
+}
+
+// Today's date as yyyy-mm-dd in LOCAL timezone (not UTC — matches what
+// the operator expects to see in the filename).
+function todayYmdLocal() {
+  var d = new Date();
+  var y  = d.getFullYear();
+  var mo = String(d.getMonth() + 1).padStart(2, '0');
+  var dd = String(d.getDate()).padStart(2, '0');
+  return y + '-' + mo + '-' + dd;
+}
+
+async function exportCSV() {
+  var btn = document.getElementById('exportCsvBtn');
+  // Defensive: button is reusable, no need to gate on disabled state
+  // when the user can already see the filter results.
+  var rows = getFilteredRequestsForExport();
+  if (rows.length === 0) {
+    alert('لا توجد نتائج للتصدير. عدّل الفلتر أو البحث وحاول مرة أخرى.');
+    return;
+  }
+
+  // Brief visual feedback while we build the file. Building is sync but
+  // download triggers a microtask; for very large lists the user
+  // appreciates seeing the state change even if it's <100ms.
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span><span>جارٍ التصدير...</span>';
+  }
+
+  // Hoisted to outer scope so finally can clean them up even on error
+  // partway through the download flow (e.g. a.click() throwing).
+  var url = null;
+  var a = null;
+
+  try {
+    // Header row in Arabic — order MUST match the row builder below.
+    var headers = [
+      'الاسم',
+      'الهاتف',
+      'الإيميل',
+      'المدينة',
+      'الملاحظات',
+      'الحالة',
+      'تاريخ الطلب',
+      'تاريخ انتهاء التجربة',
+      'الأيام المتبقية'
+    ];
+    var lines = [];
+    lines.push(headers.map(csvCell).join(','));
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var line = [
+        r.name,
+        r.phone,
+        r.email,
+        r.city,
+        r.notes,
+        fmtStatusForCsv(r.status),
+        fmtCreatedAtForCsv(r.created_at),
+        fmtTrialEndForCsv(r),
+        fmtDaysLeftForCsv(r)
+      ].map(csvCell).join(',');
+      lines.push(line);
+    }
+    // CRLF for Excel-friendliness (RFC 4180 also specifies CRLF).
+    var csvText = lines.join('\r\n');
+    // BOM ensures Excel on Windows treats the file as UTF-8 instead of
+    // its OS-default codepage. Required for Arabic to render correctly.
+    var blob = new Blob(['\uFEFF' + csvText], { type: 'text/csv;charset=utf-8;' });
+
+    // Trigger download via a temporary anchor — this is the most
+    // browser-portable approach and works in all evergreen browsers.
+    url = URL.createObjectURL(blob);
+    a = document.createElement('a');
+    a.href = url;
+    a.download = 'sydent-tenants-' + todayYmdLocal() + '.csv';
+    // Some browsers require the anchor to be in the DOM for the click
+    // to be honored; we attach, click, then remove immediately.
+    document.body.appendChild(a);
+    a.click();
+  } catch (e) {
+    alert('فشل التصدير: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+  } finally {
+    // Cleanup always runs, even if a.click() threw. Guards on each
+    // step because partial failures could leave only some state set:
+    //   - blob creation failed → url is null, a is null
+    //   - URL.createObjectURL failed → url is null, a is null
+    //   - createElement failed → url is set, a is null
+    //   - appendChild/click failed → url + a are set
+    if (a && a.parentNode) {
+      try { a.parentNode.removeChild(a); } catch (_) {}
+    }
+    if (url) {
+      // Defer revoke so the browser has time to start the download.
+      // Immediate revoke can race the download in some browsers
+      // (notably older Safari).
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>📥</span><span>تصدير CSV</span>';
+    }
+  }
 }
 
 function renderAll() {
