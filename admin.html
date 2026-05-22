@@ -655,11 +655,23 @@ function renderActivityPanel(reqId) {
 }
 
 // Retry button — clears the cache entry and re-fetches.
+// Guard against double-click: if already loading, do nothing.
 function retryActivity(reqId) {
   var r = allRequests.find(function(x){ return x.id === reqId; });
   if (!r) return;
+  var existing = activityCache[reqId];
+  if (existing && existing.loading) return; // already retrying — ignore
   delete activityCache[reqId];
   fetchActivityFor(r.user_id, reqId);
+}
+
+// Clean up activityCache + activityExpanded entries for requests that no
+// longer exist in allRequests (e.g. after delete). Called from renderAll.
+function pruneActivityCaches() {
+  var liveIds = {};
+  for (var i = 0; i < allRequests.length; i++) liveIds[allRequests[i].id] = true;
+  for (var k in activityCache)    { if (!liveIds[k]) delete activityCache[k]; }
+  for (var k2 in activityExpanded) { if (!liveIds[k2]) delete activityExpanded[k2]; }
 }
 
 // ===== Trial extension (+30 / +90 days) =====
@@ -1081,6 +1093,7 @@ function formatDate(iso) {
 }
 
 function renderAll() {
+  pruneActivityCaches();
   var nNew = allRequests.filter(function(r){ return !r.status || r.status === 'new'; }).length;
   var nAcc = allRequests.filter(function(r){ return r.status === 'accepted'; }).length;
   var nRej = allRequests.filter(function(r){ return r.status === 'rejected'; }).length;
