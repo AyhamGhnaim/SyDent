@@ -946,7 +946,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a22"></script>
+<script src="supabase-init.js?v=20260523a23"></script>
 </head>
 <body>
 
@@ -2805,7 +2805,8 @@ function renderTplPreview() {
   Object.keys(TPL_MOCK_VARS).forEach(function(k){
     var needle = '{' + k + '}';
     var val = String(TPL_MOCK_VARS[k]);
-    while (body.indexOf(needle) !== -1) body = body.replace(needle, val);
+    // R6 audit fix: single-pass split/join (see renderTemplate for rationale).
+    if (body.indexOf(needle) !== -1) body = body.split(needle).join(val);
   });
   var bubble = document.getElementById('tplPreviewBubble');
   if (bubble) bubble.textContent = body;
@@ -2933,7 +2934,8 @@ function sendTplTest() {
   Object.keys(TPL_MOCK_VARS).forEach(function(k){
     var needle = '{' + k + '}';
     var val = String(TPL_MOCK_VARS[k]);
-    while (body.indexOf(needle) !== -1) body = body.replace(needle, val);
+    // R6 audit fix: single-pass split/join (see renderTemplate for rationale).
+    if (body.indexOf(needle) !== -1) body = body.split(needle).join(val);
   });
   var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
   window.open(url, '_blank', 'noopener');
@@ -4213,9 +4215,14 @@ async function renderTemplate(code, vars) {
   Object.keys(vars).forEach(function(k){
     var needle = '{' + k + '}';
     var val = (vars[k] == null) ? '' : String(vars[k]);
-    // Safe non-regex global replace (handles repeated placeholders too).
-    while (body.indexOf(needle) !== -1) {
-      body = body.replace(needle, val);
+    // R6 audit fix: split+join replaces ALL occurrences in a single pass.
+    // The previous while(indexOf)+replace pattern looped forever if val
+    // itself contained needle — e.g. a tenant who registered with name
+    // '{name}!' would freeze the admin's browser when "💬 تذكير" was
+    // clicked on their card (val gets re-inserted indefinitely). split/
+    // join is safe because it doesn't re-scan the replacement region.
+    if (body.indexOf(needle) !== -1) {
+      body = body.split(needle).join(val);
     }
   });
   return body;
