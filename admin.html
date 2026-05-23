@@ -546,6 +546,26 @@ header{
 }
 .plan-option:hover{border-color:var(--border2);background:var(--bg4);}
 .plan-option.selected{border-color:var(--green);background:rgba(46,232,158,0.06);}
+/* Phase 7.6E-Part 2.1: permanent option — yellow accent + warning treatment
+   to visually distinguish from regular paid plans. The yellow conveys
+   "exceptional path, proceed with care" — matches the warning copy in the
+   option body. Selected state uses yellow too (instead of inheriting the
+   green selected style) so the operator sees a consistent visual signal
+   that this isn't a normal billing choice. */
+.plan-option.plan-permanent{
+  border-color:rgba(255,167,38,0.30);
+  background:rgba(255,167,38,0.04);
+}
+.plan-option.plan-permanent:hover{
+  border-color:rgba(255,167,38,0.50);
+  background:rgba(255,167,38,0.08);
+}
+.plan-option.plan-permanent.selected{
+  border-color:#ffa726;
+  background:rgba(255,167,38,0.10);
+}
+.plan-option.plan-permanent.selected .plan-radio{border-color:#ffa726;}
+.plan-option.plan-permanent.selected .plan-radio::after{background:#ffa726;}
 .plan-radio{
   width:18px;height:18px;border:2px solid var(--text3);
   border-radius:50%;flex-shrink:0;margin-top:2px;
@@ -581,7 +601,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a12"></script>
+<script src="supabase-init.js?v=20260522a13"></script>
 </head>
 <body>
 
@@ -1623,8 +1643,18 @@ async function transitionAccount(eventType, r, params) {
   }
 
   switch (eventType) {
-    case 'accept': {
-      // new → trial (or re-accept a suspended user back to trial)
+    case 'accept':
+    case 'reactivate': {
+      // accept     : new → trial (first acceptance, may need auth user create)
+      // reactivate : suspended → trial (re-activation of previously-suspended)
+      //
+      // The state mutation is identical (status='accepted', plan='trial',
+      // fresh trial_end, grace cleared, unban auth). The split exists for
+      // the audit trail: 'reactivate' in subscription_events tells the
+      // operator clearly "this account returned to service from suspension"
+      // vs 'accept' which is "this was an initial onboarding". Both are
+      // valid DB event_types (queried from CHECK constraint).
+      //
       // The auth.users row may need to be CREATED (if user_id is null,
       // typical for landing.html signups that didn't auth.signUp first)
       // OR un-banned (if the row was previously suspended). We handle
@@ -1663,6 +1693,37 @@ async function transitionAccount(eventType, r, params) {
         grace_until: null,
         price_paid: priceC,
         currency: cfgC ? cfgC.currency : 'SYP',
+        converted_at: nowIso
+      };
+      authAction = 'unban';
+      break;
+    }
+    case 'make_permanent': {
+      // Phase 7.6E-Part 2.1: admin override for "حساب دائم" — bypasses
+      // the subscription billing model intentionally. Use cases:
+      //   • Personal test/demo accounts (drayhamghnaim1, drayhamghnaim2)
+      //   • VIP / lifetime deals / partner accounts
+      //   • Promotional / compensation accounts
+      //
+      // We persist trial_end=NULL (computeAccountState reads this as
+      // isPermanent=true and renders the ♾️ badge). plan stays at
+      // 'yearly' so the row reads as "yearly with no expiry" — the
+      // closest semantic to a paid lifetime tier without inventing a
+      // new plan code (which would require a Migration).
+      //
+      // For the audit event we use 'convert_yearly' (the closest valid
+      // DB event_type) and stash 'permanent (admin override)' in notes
+      // so the audit log shows operator intent without violating the
+      // event_type CHECK constraint (no make_permanent value in DB).
+      toPlan = 'yearly';
+      amount = 0;  // explicitly zero — no payment captured for permanent
+      updatePayload = {
+        status: 'accepted',
+        plan: 'yearly',
+        trial_end: null,
+        grace_until: null,
+        price_paid: 0,
+        currency: (getPlanConfig('yearly') && getPlanConfig('yearly').currency) || 'SYP',
         converted_at: nowIso
       };
       authAction = 'unban';
@@ -1741,7 +1802,14 @@ async function transitionAccount(eventType, r, params) {
       authAction = 'unban';
       break;
     }
+    case 'reject':
     case 'suspend': {
+      // suspend: active account → suspended (operator pause for active tenant)
+      // reject : new request → rejected (operator declines an intake request)
+      //
+      // Identical state mutation (status='rejected' + ban auth) but the
+      // audit log preserves operator intent: was this an intake decision
+      // or a mid-stream pause? Both are valid DB event_type values.
       updatePayload = { status: 'rejected' };
       authAction = 'ban';
       break;
@@ -1799,16 +1867,34 @@ async function transitionAccount(eventType, r, params) {
   }
 
   // ---- 5. Log immutable audit event ----
+  // The DB event_type CHECK constraint accepts 13 specific values
+  // (queried from pg_constraint). make_permanent is an internal flag,
+  // not a DB value — we translate it to 'convert_yearly' (the closest
+  // semantic) and stash the override intent in notes for the audit log.
+  // For to_trial_end we explicitly carry through 'null' for make_permanent
+  // rather than falling back to fromTrialEnd, so the audit row honestly
+  // reflects 'this transition removed the expiry'.
+  var dbEventType = (eventType === 'make_permanent') ? 'convert_yearly' : eventType;
+  var dbNotes = params.notes || null;
+  if (eventType === 'make_permanent') {
+    dbNotes = (dbNotes ? dbNotes + ' | ' : '') + 'permanent (admin override)';
+  }
+  var toTrialEndForEvent;
+  if (Object.prototype.hasOwnProperty.call(updatePayload, 'trial_end')) {
+    toTrialEndForEvent = updatePayload.trial_end;  // may be null (make_permanent)
+  } else {
+    toTrialEndForEvent = fromTrialEnd;
+  }
   var toStatus = updatePayload.status || fromStatus;
   await logSubscriptionEvent({
     trial_request_id: r.id,
     user_id: newUserId,
-    event_type: eventType,
+    event_type: dbEventType,
     from_plan: fromPlan, to_plan: toPlan,
     from_status: fromStatus, to_status: toStatus,
-    from_trial_end: fromTrialEnd, to_trial_end: updatePayload.trial_end || fromTrialEnd,
+    from_trial_end: fromTrialEnd, to_trial_end: toTrialEndForEvent,
     amount: amount, currency: newRow.currency || 'SYP',
-    notes: params.notes || null
+    notes: dbNotes
   });
 
   return { ok:true, error:null, newRow:newRow };
@@ -1906,6 +1992,21 @@ function openPlanModal(reqId, eventType) {
         '</div>' +
       '</div>';
   }
+  // Phase 7.6E-Part 2.1: 'permanent' option — admin override outside the
+  // subscription billing model. Visually distinguished (yellow accent +
+  // warning copy) so it doesn't get picked by accident. Use cases:
+  // personal/test accounts, demo accounts for prospects, VIP / lifetime
+  // partnerships, promotional comp. Sets trial_end=NULL; audit row
+  // records it as convert_yearly + notes='permanent (admin override)'.
+  optionsHtml +=
+    '<div class="plan-option plan-permanent" data-plan="permanent" onclick="selectPlanOption(\'permanent\')">' +
+      '<div class="plan-radio"></div>' +
+      '<div class="plan-body">' +
+        '<div class="plan-name">♾️ دائم — استخدام داخلي</div>' +
+        '<div class="plan-price" style="color:#ffa726;">بدون انتهاء</div>' +
+        '<div class="plan-meta">⚠️ يتجاوز نموذج الفوترة. للحسابات التجريبية، حسابات العرض، وعروض مدى الحياة فقط.</div>' +
+      '</div>' +
+    '</div>';
   document.getElementById('planModalOptions').innerHTML = optionsHtml;
   var confirmBtn = document.getElementById('planConfirmBtn');
   confirmBtn.disabled = true;
@@ -1936,15 +2037,33 @@ async function confirmPlanChoice() {
   var ctx = planModalContext;
   var r = allRequests.find(function(x){ return x.id === ctx.reqId; });
   if (!r) { closePlanModal(); return; }
+  // Phase 7.6E-Part 2.1: extra confirm for the permanent override. The
+  // primary plan-picker click is already a deliberate action, but since
+  // permanent bypasses the billing model entirely, we ask twice. Cancel
+  // here keeps the modal open with the selection retained, matching how
+  // Stripe and Microsoft Partner Center handle irreversible-feeling
+  // changes (still reversible — operator can downgrade later — but the
+  // intent should be explicit).
+  if (ctx.selectedPlan === 'permanent') {
+    var name = r.name || r.email || ctx.reqId;
+    if (!confirm('تأكيد: تحويل "' + name + '" إلى حساب دائم (بدون انتهاء)؟\n\nهذا يتجاوز نموذج الفوترة. مناسب للحسابات التجريبية والعروض الخاصة فقط.')) {
+      return; // operator backed out — leave modal open with selection
+    }
+  }
   var btn = document.getElementById('planConfirmBtn');
   btn.disabled = true;
   btn.textContent = '⏳ جارٍ...';
-  // The event_type wire format is 'convert_monthly' or 'convert_yearly'
-  // for both convert and upgrade contexts (the only difference is the
-  // semantic — DB-wise it's the same state mutation). For renew_pick
-  // we do convert_X too, because the operator explicitly chose a plan
-  // (different from a same-plan renew which uses 'renew' eventType).
-  var eventType = (ctx.selectedPlan === 'yearly') ? 'convert_yearly' : 'convert_monthly';
+  // event_type wire format:
+  //   yearly    → convert_yearly
+  //   monthly   → convert_monthly
+  //   permanent → make_permanent (internal; translated to convert_yearly
+  //               + notes in transitionAccount before the DB write so the
+  //               event_type CHECK constraint is honored)
+  var eventType;
+  if (ctx.selectedPlan === 'yearly')         eventType = 'convert_yearly';
+  else if (ctx.selectedPlan === 'monthly')   eventType = 'convert_monthly';
+  else if (ctx.selectedPlan === 'permanent') eventType = 'make_permanent';
+  else { closePlanModal(); return; }
   var result = await transitionAccount(eventType, r, {});
   closePlanModal();
   if (!result.ok) {
@@ -2111,17 +2230,20 @@ async function accept(id) {
   loadAndRender();
 }
 
-// reject: new → suspended. Equivalent to 'suspend' for an unaccepted row.
-// We route it through transitionAccount with eventType='suspend' so the
-// auth.users row (if one already exists from auth.html signup) gets banned
-// instead of being left in a half-state. This closes a Bug 7.6D-class
-// regression: pre-Part 2, reject() updated only trial_requests.status
-// and left auth.users unbanned — so a rejected applicant could still log
-// in if they had self-signed-up earlier.
+// reject: new → rejected. Uses the 'reject' event_type for accurate
+// audit trail (distinguishes intake decisions from active-account
+// suspensions). The state mutation is identical to suspend but the
+// operator intent differs: rejecting a NEW intake request is not the
+// same as pausing an active subscriber, even though the row ends up
+// with status='rejected' in both cases.
+//
+// Pre-Part 2 bug closed: this path also bans auth.users via
+// transitionAccount, so self-signed-up users who get rejected can't
+// log in (was a Bug 7.6D-class regression in the old reject()).
 async function reject(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
-  var result = await transitionAccount('suspend', r, { notes: 'Rejected at intake' });
+  var result = await transitionAccount('reject', r, { notes: 'Rejected at intake' });
   if (!result.ok) {
     alert('فشل الرفض: ' + (result.error || 'خطأ غير معروف'));
   }
@@ -2140,15 +2262,15 @@ async function suspendAccount(id, email) {
   loadAndRender();
 }
 
-// reactivateAccount: suspended → trial (re-accept). Uses the 'accept'
-// event type because semantically "un-suspending" a previously-accepted
-// account is the same state mutation as accepting a new request: the
-// account returns to active service. transitionAccount handles unban.
+// reactivateAccount: suspended → trial. Uses the 'reactivate' event_type
+// (distinct from 'accept' which is for initial onboarding) so the audit
+// log clearly distinguishes these two semantically-different operations.
+// Both are valid DB event_type values and produce the same state mutation.
 async function reactivateAccount(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
   if (!confirm('هل تريد إعادة تفعيل حساب ' + (r.name || r.email || id) + '؟\nسيُمنح فترة تجربة جديدة 30 يوم.')) return;
-  var result = await transitionAccount('accept', r, {});
+  var result = await transitionAccount('reactivate', r, {});
   if (!result.ok) {
     alert('فشل إعادة التفعيل: ' + (result.error || 'خطأ غير معروف'));
   }
