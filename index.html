@@ -364,7 +364,7 @@
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a14"></script>
+<script src="supabase-init.js?v=20260523a15"></script>
 <script src="sidebar.js?v=20260522a03"></script>
 </head>
 <body>
@@ -391,22 +391,41 @@
     return;
   }
 
-  // فحص التجربة
+  // ════════════════════════════════════════════════════════════════════
+  // فحص حالة الاشتراك (Phase 7.6F-fix — plan-aware banner)
+  // ════════════════════════════════════════════════════════════════════
+  // قبل هذا الإصلاح: الـ banner كان يقول "تنتهي تجربتك" لكل حساب accepted
+  // عنده trial_end — حتى لو كان مشترك سنوي/شهري مدفوع (bug live-test
+  // مجدي بورج 23 مايو 2026).
+  //
+  // المنطق الجديد (مُتوافق مع Notion/Stripe/ChargeBee):
+  //   • trial      → banner دائم بألوان تدريجية (السلوك القديم)
+  //   • yearly     → banner فقط إذا daysLeft ≤ 30 (تحذير) أو ≤ 7 (عاجل)
+  //   • monthly    → banner فقط إذا daysLeft ≤ 14 (تحذير) أو ≤ 3 (عاجل)
+  //   • trial_end = NULL → دائم، لا banner أبداً
+  //   • daysLeft ≤ 0 → block screen (نص حسب trial/paid)
   const userEmail = session.user.email;
   const { data: trialData } = await window.sb.from('trial_requests')
-    .select('trial_end')
+    .select('trial_end, plan')
     .eq('email', userEmail)
     .eq('status', 'accepted')
     .maybeSingle();
 
   if (trialData && trialData.trial_end) {
     const daysLeft = Math.ceil((new Date(trialData.trial_end) - new Date()) / (1000*60*60*24));
+    const plan = trialData.plan || 'trial'; // fallback آمن للحسابات القديمة
+    const isTrial = (plan === 'trial');
+    const isPaid = (plan === 'monthly' || plan === 'yearly');
+
     if (daysLeft <= 0) {
-      // انتهت التجربة — احجب الداشبورد
+      // انتهت الفترة — احجب الداشبورد (العنوان فقط يتغيّر حسب الحالة؛
+      // النص الوصفي والـ WhatsApp message متطابقان لأن الـ CTA واحدة:
+      // التواصل عبر واتساب للتجديد).
+      var expiredTitle = isPaid ? 'انتهى اشتراكك' : 'انتهت فترة التجربة';
       document.body.innerHTML = `
         <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
           <div style="font-size:60px;margin-bottom:16px;">⏰</div>
-          <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">انتهت فترة التجربة</div>
+          <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">${expiredTitle}</div>
           <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، تواصل معنا عبر واتساب.</div>
           <a href="https://wa.me/963934012433?text=${encodeURIComponent('مرحباً، أريد تجديد اشتراكي في SyDent')}" target="_blank"
             style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
@@ -419,15 +438,51 @@
         </div>`;
       return;
     }
-    // أضف بانر الأيام المتبقية مباشرة
-    var color = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
-    var banner = document.createElement('div');
-    banner.id = 'trialBanner';
-    banner.style.cssText = 'background:rgba(10,22,40,0.97);border-bottom:2px solid ' + color + ';padding:10px 16px;text-align:center;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;color:' + color + ';position:fixed;top:0;left:0;right:0;z-index:9999;';
-    banner.innerHTML = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
-    document.body.insertBefore(banner, document.body.firstChild);
-    // أضف padding للصفحة عشان البانر ما يغطي المحتوى
-    document.body.style.paddingTop = '40px';
+
+    // === تحديد ما إذا كان يظهر banner أم لا (حسب الخطة) ===
+    var showBanner = false;
+    var bannerColor = '#2ee89e';
+    var bannerText = '';
+
+    if (isTrial) {
+      // تجربة: banner دائم بألوان تدريجية (السلوك القديم)
+      showBanner = true;
+      bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
+      bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
+    } else if (plan === 'yearly') {
+      // سنوي: banner فقط ≤30 يوم (Notion/Stripe pattern)
+      if (daysLeft <= 7) {
+        showBanner = true;
+        bannerColor = '#ef5350';
+        bannerText = '🚨 اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+      } else if (daysLeft <= 30) {
+        showBanner = true;
+        bannerColor = '#ffa726';
+        bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+      }
+    } else if (plan === 'monthly') {
+      // شهري: banner فقط ≤14 يوم (دورة قصيرة، تحذير أبكر نسبياً)
+      if (daysLeft <= 3) {
+        showBanner = true;
+        bannerColor = '#ef5350';
+        bannerText = '🚨 اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+      } else if (daysLeft <= 14) {
+        showBanner = true;
+        bannerColor = '#ffa726';
+        bannerText = '⏰ اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+      }
+    }
+    // else: plan غير معروف → لا banner (fail-safe)
+
+    if (showBanner) {
+      var banner = document.createElement('div');
+      banner.id = 'trialBanner';
+      banner.style.cssText = 'background:rgba(10,22,40,0.97);border-bottom:2px solid ' + bannerColor + ';padding:10px 16px;text-align:center;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;color:' + bannerColor + ';position:fixed;top:0;left:0;right:0;z-index:9999;';
+      banner.innerHTML = bannerText;
+      document.body.insertBefore(banner, document.body.firstChild);
+      // أضف padding للصفحة عشان البانر ما يغطي المحتوى
+      document.body.style.paddingTop = '40px';
+    }
   }
 })();
 </script>
