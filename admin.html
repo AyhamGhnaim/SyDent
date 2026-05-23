@@ -534,6 +534,29 @@ header{
 }
 .btn-renew:hover{background:rgba(77,208,225,0.20);}
 
+/* ===== Phase X1: Admin badge + promote/demote buttons ===== */
+.req-admin-badge{
+  display:inline-block;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:5px;
+  background:rgba(255,193,7,0.15);color:#ffc107;
+  border:1px solid rgba(255,193,7,0.35);
+  margin-right:6px;
+}
+.btn-promote{
+  flex:1;padding:9px;background:rgba(255,193,7,0.10);
+  border:1px solid rgba(255,193,7,0.35);border-radius:8px;
+  color:#ffc107;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-promote:hover{background:rgba(255,193,7,0.20);}
+.btn-demote{
+  flex:1;padding:9px;background:rgba(255,167,38,0.08);
+  border:1px solid rgba(255,167,38,0.28);border-radius:8px;
+  color:#ffa726;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-demote:hover{background:rgba(255,167,38,0.18);}
+
 /* ===== Phase 7.6E-Part 2: PLAN PICKER MODAL ===== */
 .plan-option{
   display:flex;align-items:flex-start;gap:10px;
@@ -601,7 +624,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a14"></script>
+<script src="supabase-init.js?v=20260523a16"></script>
 </head>
 <body>
 
@@ -768,6 +791,18 @@ var expiringFilterActive = false;
 var activityCache = {};
 // Track which tenant cards have their activity panel expanded (by request id).
 var activityExpanded = {};
+
+// ===== Phase X1: Promote/Demote Admin state =====
+// `currentAdminUserId` is the auth.uid() of the admin viewing this page.
+// Set once in the DOMContentLoaded handler after session is verified.
+// Used to hide promote/demote buttons on the admin's OWN card (rule #39
+// self-lockout protection — UI layer; the action handlers also defend
+// against it). null until session resolves.
+var currentAdminUserId = null;
+// `adminUserIdsCache` is a Set of doctors.id values where role='admin'.
+// Refreshed on every loadAndRender() so badges and button visibility
+// stay in sync with promote/demote actions. null until first load.
+var adminUserIdsCache = null;
 
 // Relative time helper — Arabic short form, no future-time handling (we
 // never expect future timestamps from auth.users.last_sign_in_at).
@@ -1413,6 +1448,9 @@ window.addEventListener('DOMContentLoaded', async function() {
     window.location.replace('index.html');
     return;
   }
+  // Phase X1: stash the admin's auth.uid so renderList can hide
+  // promote/demote buttons on the admin's OWN card (rule #39).
+  currentAdminUserId = session.user.id;
   // Note: We intentionally do NOT call window.SyDentLock.guardPage() here.
   // SyDentLock is the per-tenant device-lock system (Owner/Doctor/Secretary
   // roles INSIDE a clinic). The admin user is a SaaS platform admin — they
@@ -1444,6 +1482,11 @@ async function loadAndRender() {
     return;
   }
   allRequests = data || [];
+  // Phase X1: refresh admin Set so renderList can show 👑 badges and
+  // promote/demote buttons that reflect ground truth at this moment.
+  // Errors are swallowed inside fetchAdminUserIds (defensive — if the
+  // doctors query fails, we render with no badges rather than crashing).
+  await fetchAdminUserIds();
   renderAll();
 }
 
@@ -2209,10 +2252,38 @@ async function reject(id) {
 }
 
 // suspendAccount: * → suspended. Standard suspend flow.
+// Phase X1 R4 audit: same admin guards as deleteAccount — suspending an
+// admin bans their auth.users row, which would lock them out of the
+// platform. Last-admin suspension would orphan the platform.
 async function suspendAccount(id, email) {
-  if (!confirm('هل تريد إيقاف حساب ' + (email||id) + '؟')) return;
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
+
+  // ---- Phase X1: admin-account safety guards ----
+  var targetIsAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
+  if (targetIsAdmin) {
+    if (r.user_id === currentAdminUserId) {
+      alert('⛔ لا يمكنك إيقاف حسابك الذاتي.\n\n' +
+            'اطلب من admin آخر تنفيذ هذا الإجراء.');
+      return;
+    }
+    var { count: adminCount, error: cntErr } = await window.sb
+      .from('doctors')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'admin');
+    if (cntErr) {
+      alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
+      return;
+    }
+    if (!adminCount || adminCount <= 1) {
+      alert('⛔ لا يمكن إيقاف آخر admin.\n\n' +
+            'يجب أن يبقى admin نشط واحد على الأقل في النظام. ' +
+            'رقّي حساباً آخر إلى admin أولاً ثم أعد المحاولة.');
+      return;
+    }
+  }
+
+  if (!confirm('هل تريد إيقاف حساب ' + (email||id) + '؟')) return;
   var result = await transitionAccount('suspend', r, {});
   if (!result.ok) {
     alert('فشل الإيقاف: ' + (result.error || 'خطأ غير معروف'));
@@ -2247,10 +2318,45 @@ async function reactivateAccount(id) {
 }
 
 // deleteAccount: * → (gone). Hard delete, both stores.
+// Phase X1 R4 audit: added two guards because delete is the ultimate
+// destructive action and the badge 👑 now makes admin-deletion visible:
+//   • self-delete blocked (a deleted admin can't undo it themselves)
+//   • last-admin delete blocked (rule #39 self-lockout — applies to ANY
+//     path that removes an admin, not just demote)
 async function deleteAccount(id, email) {
-  if (!confirm('هل تريد حذف حساب ' + (email||id) + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
+
+  // ---- Phase X1: admin-account safety guards (skip for non-admin tenants) ----
+  var targetIsAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
+  if (targetIsAdmin) {
+    if (r.user_id === currentAdminUserId) {
+      alert('⛔ لا يمكنك حذف حسابك الذاتي.\n\n' +
+            'اطلب من admin آخر تنفيذ هذا الإجراء.');
+      return;
+    }
+    var { count: adminCount, error: cntErr } = await window.sb
+      .from('doctors')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'admin');
+    if (cntErr) {
+      alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
+      return;
+    }
+    if (!adminCount || adminCount <= 1) {
+      alert('⛔ لا يمكن حذف آخر admin.\n\n' +
+            'يجب أن يبقى admin واحد على الأقل في النظام. ' +
+            'رقّي حساباً آخر إلى admin أولاً ثم أعد المحاولة.');
+      return;
+    }
+    // Extra confirmation tier for deleting an admin account (Stripe pattern
+    // for high-impact destructive actions on privileged users).
+    if (!confirm('⚠️ هذا الحساب admin.\n\n' +
+                 'حذفه سيلغي صلاحياته من المنصة فوراً (لا يمكن التراجع).\n\n' +
+                 'هل أنت متأكد بشكل قاطع؟')) return;
+  }
+
+  if (!confirm('هل تريد حذف حساب ' + (email||id) + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
   var result = await transitionAccount('delete', r, {});
   if (!result.ok) {
     alert('⚠️ فشل حذف الطلب: ' + (result.error || 'خطأ غير معروف'));
@@ -2303,6 +2409,194 @@ async function grantGrace(id) {
   if (!result.ok) {
     alert('فشل منح فترة السماح: ' + (result.error || 'خطأ غير معروف'));
   }
+  loadAndRender();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Phase X1 — Promote/Demote Admin
+// ═══════════════════════════════════════════════════════════════════════
+// Three functions:
+//   • fetchAdminUserIds — populates adminUserIdsCache (Set of user_ids
+//     where doctors.role='admin'). Called from loadAndRender.
+//   • promoteToAdmin    — grants platform admin role to a permanent tenant.
+//   • demoteFromAdmin   — revokes platform admin role.
+//
+// These mutate the `doctors` table directly (NOT through transitionAccount,
+// which is for subscription lifecycle only). We still log into
+// subscription_events as the canonical per-tenant audit stream (Stripe
+// pattern: every admin action on a tenant produces one event).
+//
+// Migration 26 prerequisites (must already be in DB):
+//   1. event_type CHECK includes 'promote_to_admin' + 'demote_from_admin'
+//   2. RLS policy "doctors_admin_all" grants the current admin write access
+
+// Refresh the in-memory Set of admin user_ids. Defensive — on failure we
+// set an empty Set so badges and buttons render the safe (no-admin) state
+// rather than crashing the page.
+async function fetchAdminUserIds() {
+  if (!window.sb) { adminUserIdsCache = new Set(); return adminUserIdsCache; }
+  var { data, error } = await window.sb.from('doctors')
+    .select('id').eq('role', 'admin');
+  if (error) {
+    console.warn('[Phase X1] fetchAdminUserIds failed:', error.message);
+    adminUserIdsCache = new Set();
+    return adminUserIdsCache;
+  }
+  adminUserIdsCache = new Set((data || []).map(function(d){ return d.id; }));
+  return adminUserIdsCache;
+}
+
+// promoteToAdmin: tenant (permanent account only) → platform admin.
+// Rule #36: only accepted + trial_end IS NULL accounts can be promoted.
+// Rule #41: audit event written to subscription_events.
+async function promoteToAdmin(reqId) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+
+  // ---- 0. Defensive guards (UI also hides the button when these fail,
+  //         but a determined user could still call this via console) ----
+  if (r.status !== 'accepted') {
+    alert('⚠️ الترقية متاحة فقط للحسابات المقبولة.');
+    return;
+  }
+  if (r.trial_end !== null) {
+    alert('⚠️ الترقية محصورة بالحسابات الدائمة فقط.\n\n' +
+          'إذا أردت ترقية هذا الحساب، حوّله إلى "دائم" أولاً عبر ' +
+          '"💎 تغيير الخطة → دائم".');
+    return;
+  }
+  if (!r.user_id) {
+    alert('⚠️ الحساب بدون user_id — لا يمكن ترقيته.');
+    return;
+  }
+  if (r.user_id === currentAdminUserId) {
+    alert('⚠️ لا يمكنك ترقية حسابك الذاتي.');
+    return;
+  }
+  if (adminUserIdsCache && adminUserIdsCache.has(r.user_id)) {
+    alert('⚠️ هذا الحساب admin بالفعل.');
+    return;
+  }
+
+  // ---- 1. Confirmation (Stripe-style: action + consequence + reversibility) ----
+  var name = r.name || r.email || 'هذا الحساب';
+  var ok = confirm(
+    '👑 ترقية إلى Admin\n\n' +
+    'سيحصل ' + name + ' على صلاحيات كاملة لإدارة المنصة:\n' +
+    '  • رؤية وإدارة كل العيادات\n' +
+    '  • قبول/رفض/إيقاف أي حساب\n' +
+    '  • تعديل الخطط والأسعار\n\n' +
+    'هذا الإجراء قابل للعكس (يمكنك إنزاله لاحقاً).\n\n' +
+    'هل أنت متأكد؟'
+  );
+  if (!ok) return;
+
+  // ---- 2. Mutate doctors.role ----
+  // UPSERT pattern: if the owner already has a doctors row (likely — owners
+  // have role=NULL by default), UPDATE; otherwise INSERT. The id IS the
+  // auth user_id by SyDent convention (see admin.html:821 comment).
+  var { error: upErr } = await window.sb.from('doctors').upsert({
+    id: r.user_id,
+    role: 'admin'
+  }, { onConflict: 'id' });
+
+  if (upErr) {
+    alert('فشلت الترقية: ' + (upErr.message || 'خطأ غير معروف'));
+    return;
+  }
+
+  // ---- 3. Audit event (immutable per Migration 25) ----
+  // No plan/status/trial_end changes — promote is an admin-role mutation,
+  // not a subscription transition. We pass identical from/to values so the
+  // event row is a clean snapshot at the moment of promotion.
+  await logSubscriptionEvent({
+    trial_request_id: r.id,
+    user_id: r.user_id,
+    event_type: 'promote_to_admin',
+    from_plan: r.plan || null, to_plan: r.plan || null,
+    from_status: r.status, to_status: r.status,
+    from_trial_end: r.trial_end, to_trial_end: r.trial_end,
+    amount: null, currency: r.currency || 'SYP',
+    notes: 'Promoted to platform admin'
+  });
+
+  alert('✅ تم ترقية ' + name + ' إلى Admin.');
+  loadAndRender();
+}
+
+// demoteFromAdmin: platform admin → regular tenant.
+// Rule #39: self-lockout protection — count(admins) > 1 before any demote.
+// We re-query the DB live (not from cache) because admin count is the
+// safety boundary; it must reflect ground truth at the moment of action.
+async function demoteFromAdmin(reqId) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+
+  // ---- 0. Self-demote guard (UI also hides the button) ----
+  if (r.user_id === currentAdminUserId) {
+    alert('⚠️ لا يمكنك إنزال حسابك الذاتي.\n\n' +
+          'اطلب من admin آخر تنفيذ هذا الإجراء.');
+    return;
+  }
+  if (!r.user_id) {
+    alert('⚠️ الحساب بدون user_id — لا يمكن إنزاله.');
+    return;
+  }
+
+  // ---- 1. Last-admin guard (rule #39) ----
+  var { count: adminCount, error: cntErr } = await window.sb
+    .from('doctors')
+    .select('id', { count: 'exact', head: true })
+    .eq('role', 'admin');
+
+  if (cntErr) {
+    alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
+    return;
+  }
+  if (!adminCount || adminCount <= 1) {
+    alert('⛔ لا يمكن إنزال آخر admin.\n\n' +
+          'يجب أن يبقى admin واحد على الأقل في النظام. ' +
+          'رقّي حساباً آخر إلى admin أولاً ثم أعد المحاولة.');
+    return;
+  }
+
+  // ---- 2. Confirmation ----
+  var name = r.name || r.email || 'هذا الحساب';
+  var ok = confirm(
+    '👤 إنزال من Admin\n\n' +
+    name + ' سيفقد صلاحيات admin ويعود tenant عادي.\n\n' +
+    'سيظل يستطيع تسجيل الدخول إلى عيادته كالعادة، ' +
+    'لكن لن يتمكن من الوصول إلى admin.html.\n\n' +
+    'هذا الإجراء قابل للعكس (يمكنك ترقيته لاحقاً).\n\n' +
+    'هل أنت متأكد؟'
+  );
+  if (!ok) return;
+
+  // ---- 3. Mutate doctors.role → NULL ----
+  // We do NOT delete the row — owners need it for clinic_doctors linkage.
+  // Setting role=NULL strips admin privileges while preserving identity.
+  var { error: upErr } = await window.sb.from('doctors')
+    .update({ role: null })
+    .eq('id', r.user_id);
+
+  if (upErr) {
+    alert('فشل الإنزال: ' + (upErr.message || 'خطأ غير معروف'));
+    return;
+  }
+
+  // ---- 4. Audit event ----
+  await logSubscriptionEvent({
+    trial_request_id: r.id,
+    user_id: r.user_id,
+    event_type: 'demote_from_admin',
+    from_plan: r.plan || null, to_plan: r.plan || null,
+    from_status: r.status, to_status: r.status,
+    from_trial_end: r.trial_end, to_trial_end: r.trial_end,
+    amount: null, currency: r.currency || 'SYP',
+    notes: 'Demoted from platform admin'
+  });
+
+  alert('✅ تم إنزال ' + name + ' من Admin.');
   loadAndRender();
 }
 
@@ -2744,6 +3038,18 @@ function renderList() {
     var id = r.id;
     var s = computeAccountState(r);
 
+    // Phase X1: admin badge + promote/demote button visibility.
+    // isAdmin: this tenant's user_id is in the admins Set.
+    // isCurrentAdmin: this card is for the admin viewing the page (self).
+    // canPromote: permanent paid account, not admin, not self, has user_id.
+    // canDemote: is admin, not self, has user_id (count guard happens at
+    //            action time — too expensive to re-query per card).
+    var isAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
+    var isCurrentAdmin = (r.user_id && r.user_id === currentAdminUserId);
+    var canPromote = (s.state === 'paid' && s.isPermanent && !isAdmin && !isCurrentAdmin && !!r.user_id);
+    var canDemote = (isAdmin && !isCurrentAdmin && !!r.user_id);
+    var adminBadgeHtml = isAdmin ? '<span class="req-admin-badge">👑 Admin</span>' : '';
+
     // Trial badge row (the ⏰ daysLeft pill). Same color thresholds as
     // pre-Part 2 — red ≤5, yellow ≤10, green >10 — but now driven by
     // state rather than just status.
@@ -2772,7 +3078,7 @@ function renderList() {
       var planLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : s.plan;
       planPillHtml = '<span class="req-plan-pill">' + planLabel + '</span>';
     }
-    var stateBadge = '<div style="display:flex;align-items:center;">' + planPillHtml +
+    var stateBadge = '<div style="display:flex;align-items:center;">' + adminBadgeHtml + planPillHtml +
                      '<span class="req-state ' + s.state + '">' + s.label + '</span></div>';
 
     // Shared buttons (used in multiple states)
@@ -2808,8 +3114,19 @@ function renderList() {
         break;
       case 'paid':
         if (s.isPermanent) {
+          // Phase X1: promote/demote buttons appear only for permanent
+          // accounts (rule #36) and are hidden on the admin's own card
+          // (rule #39 self-lockout protection).
+          var promoteBtn = canPromote
+            ? '<button class="btn-promote" onclick="promoteToAdmin(\'' + id + '\')">👑 ترقية إلى Admin</button>'
+            : '';
+          var demoteBtn = canDemote
+            ? '<button class="btn-demote" onclick="demoteFromAdmin(\'' + id + '\')">👤 إنزال من Admin</button>'
+            : '';
           // Permanent account: no renew, but allow plan change + suspend/delete
           actions = '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
+                    promoteBtn +
+                    demoteBtn +
                     suspendBtn +
                     deleteBtn +
                     editBtn +
