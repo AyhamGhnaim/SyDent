@@ -357,7 +357,9 @@ async function doRegister(e) {
   } catch (err) {
     let msg = err.message || 'فشل إنشاء الحساب';
     if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('registered')) {
-      msg = isEmail ? 'هذا الإيميل مسجّل مسبقاً' : 'هذا الرقم مسجّل مسبقاً';
+      msg = isEmail
+        ? 'هذا الإيميل مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".'
+        : 'هذا الرقم مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".';
     }
     if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة جداً';
     showMsg('❌ ' + msg, 'error');
