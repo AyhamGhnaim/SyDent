@@ -624,7 +624,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a16"></script>
+<script src="supabase-init.js?v=20260523a17"></script>
 </head>
 <body>
 
@@ -2477,6 +2477,15 @@ async function promoteToAdmin(reqId) {
     alert('⚠️ هذا الحساب admin بالفعل.');
     return;
   }
+  // Phase X1 hotfix: email is required for the UPSERT INSERT path
+  // (doctors.email is NOT NULL). The fix needs this column from
+  // trial_requests; bail out with a clear message if it's missing
+  // rather than producing the cryptic Postgres NULL violation.
+  if (!r.email) {
+    alert('⚠️ هذا الحساب بدون email في trial_requests — لا يمكن ترقيته.\n\n' +
+          'حدّث الـ email من زر "✏️ تعديل" أولاً.');
+    return;
+  }
 
   // ---- 1. Confirmation (Stripe-style: action + consequence + reversibility) ----
   var name = r.name || r.email || 'هذا الحساب';
@@ -2495,8 +2504,17 @@ async function promoteToAdmin(reqId) {
   // UPSERT pattern: if the owner already has a doctors row (likely — owners
   // have role=NULL by default), UPDATE; otherwise INSERT. The id IS the
   // auth user_id by SyDent convention (see admin.html:821 comment).
+  //
+  // Phase X1 hotfix (live test 23 May 2026): doctors.email is NOT NULL.
+  // Legacy accounts (e.g. drayhamghnaim1) may have no doctors row at all,
+  // so the UPSERT falls into the INSERT path and would fail with "null
+  // value in column email" if we only sent {id, role}. We include the
+  // email from trial_requests (guarded above) so the INSERT succeeds.
+  // For the UPDATE path the email column is rewritten with the same
+  // value it already holds (both come from auth.users).
   var { error: upErr } = await window.sb.from('doctors').upsert({
     id: r.user_id,
+    email: r.email,
     role: 'admin'
   }, { onConflict: 'id' });
 
