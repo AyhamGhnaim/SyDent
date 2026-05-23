@@ -480,6 +480,100 @@ header{
   to{opacity:1;transform:translateY(0);}
 }
 
+/* ===== Phase 7.6E-Part 2: STATE BADGES (6 lifecycle states) =====
+   Replaces the simple new/accepted/rejected badge with a state-aware
+   badge whose color encodes the computed lifecycle state. Visual cue
+   for daysLeft urgency comes from the trial badge row below the card
+   (existing pattern) rather than from a separate "expiring" state —
+   keeps the state machine to 6 values instead of 8.                 */
+.req-state{
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;
+  white-space:nowrap;
+}
+.req-state.new{background:var(--yellow-dim);color:var(--yellow);}
+.req-state.trial{background:rgba(99,179,237,0.10);color:#63b3ed;}
+.req-state.paid{background:var(--green-dim);color:var(--green);}
+.req-state.grace{background:rgba(255,167,38,0.15);color:#ffa726;}
+.req-state.suspended{background:var(--red-dim);color:var(--red);}
+.req-state.expired{background:rgba(120,135,160,0.18);color:#8a9ab5;}
+
+/* Plan pill — shown next to state for paid plans, distinguishes monthly/yearly */
+.req-plan-pill{
+  font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;
+  background:rgba(159,122,234,0.12);color:#b794f4;
+  margin-right:6px;
+}
+
+/* ===== Phase 7.6E-Part 2: REACTIVATE + GRACE BUTTONS ===== */
+.btn-reactivate{
+  flex:1;padding:9px;background:rgba(46,232,158,0.10);
+  border:1px solid rgba(46,232,158,0.30);border-radius:8px;
+  color:var(--green);font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-reactivate:hover{background:rgba(46,232,158,0.20);}
+.btn-grace{
+  flex:1;padding:9px;background:rgba(255,167,38,0.10);
+  border:1px solid rgba(255,167,38,0.30);border-radius:8px;
+  color:#ffa726;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-grace:hover{background:rgba(255,167,38,0.18);}
+.btn-upgrade{
+  flex:1;padding:9px;background:rgba(159,122,234,0.10);
+  border:1px solid rgba(159,122,234,0.30);border-radius:8px;
+  color:#b794f4;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-upgrade:hover{background:rgba(159,122,234,0.20);}
+.btn-renew{
+  flex:1;padding:9px;background:rgba(77,208,225,0.10);
+  border:1px solid rgba(77,208,225,0.30);border-radius:8px;
+  color:#4dd0e1;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;
+}
+.btn-renew:hover{background:rgba(77,208,225,0.20);}
+
+/* ===== Phase 7.6E-Part 2: PLAN PICKER MODAL ===== */
+.plan-option{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:14px;
+  background:var(--bg3);
+  border:2px solid var(--border);
+  border-radius:10px;
+  cursor:pointer;transition:all .15s;
+  margin-bottom:10px;
+}
+.plan-option:hover{border-color:var(--border2);background:var(--bg4);}
+.plan-option.selected{border-color:var(--green);background:rgba(46,232,158,0.06);}
+.plan-radio{
+  width:18px;height:18px;border:2px solid var(--text3);
+  border-radius:50%;flex-shrink:0;margin-top:2px;
+  position:relative;transition:border-color .15s;
+}
+.plan-option.selected .plan-radio{border-color:var(--green);}
+.plan-option.selected .plan-radio::after{
+  content:'';position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+}
+.plan-body{flex:1;}
+.plan-name{font-size:14px;font-weight:800;color:var(--text);margin-bottom:4px;}
+.plan-price{font-size:13px;font-weight:700;color:var(--green);margin-bottom:4px;}
+.plan-meta{font-size:11px;color:var(--text2);line-height:1.5;}
+.plan-savings{
+  display:inline-block;margin-right:6px;
+  font-size:10px;font-weight:700;
+  padding:2px 7px;border-radius:4px;
+  background:rgba(46,232,158,0.15);color:var(--green);
+}
+.modal-state-hint{
+  font-size:11px;color:var(--text2);
+  background:var(--bg3);
+  padding:9px 11px;border-radius:8px;
+  margin-bottom:14px;line-height:1.6;
+}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -487,7 +581,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a11"></script>
+<script src="supabase-init.js?v=20260522a12"></script>
 </head>
 <body>
 
@@ -606,6 +700,22 @@ header{
     <div class="modal-actions">
       <button type="button" class="btn-cancel" onclick="closeEditModal()">إلغاء</button>
       <button type="button" class="btn-save" id="editSaveBtn" onclick="saveEdit()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phase 7.6E-Part 2: Plan Picker Modal (used for convert + renew + upgrade) -->
+<div class="modal-backdrop" id="planModal" onclick="onPlanModalBackdropClick(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title" id="planModalTitle">💎 اختر خطة الاشتراك</div>
+      <button type="button" class="modal-close" onclick="closePlanModal()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="modal-state-hint" id="planModalHint"></div>
+    <div id="planModalOptions"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closePlanModal()">إلغاء</button>
+      <button type="button" class="btn-save" id="planConfirmBtn" onclick="confirmPlanChoice()" disabled>✅ تأكيد</button>
     </div>
   </div>
 </div>
@@ -1079,9 +1189,6 @@ async function applyAdjust(reqId) {
     if (days > 30) {
       warnings.push('⚠️ تنبيه: تقصير بـ ' + days + ' يوم (أكثر من شهر).');
     }
-    // Use UTC-noon comparison to avoid off-by-one near midnight edge
-    // cases. If newEnd is at or before today's start, the account loses
-    // access immediately on save.
     if (newEnd <= today) {
       warnings.push('🚨 التجربة ستنتهي في الماضي (' + dateStr + ').\n' +
                     'الحساب سيُعطّل فوراً بعد الحفظ.');
@@ -1098,48 +1205,16 @@ async function applyAdjust(reqId) {
   }
   if (!confirm(msg)) return;
 
-  var res;
-  try {
-    // Phase 7.6C-Fix: lifecycle alignment. Computing the update payload up
-    // front lets us atomically (well, in one PostgREST call) set both
-    // trial_end and status, so the row never sits in an in-between state
-    // mid-render. Rules:
-    //   • extend ANY days → status must be 'accepted' (admin clearly wants
-    //     this tenant active again, even if it was previously rejected)
-    //   • shorten with newEnd > today → still 'accepted' (just less runway)
-    //   • shorten with newEnd <= today → status='rejected' (the trial has
-    //     ended; this is a soft suspension via expiry)
-    var willExpireImmediately = (mode === 'shorten') && (newEnd <= today);
-    var updatePayload = { trial_end: newEnd.toISOString() };
-    if (willExpireImmediately) {
-      updatePayload.status = 'rejected';
-    } else {
-      updatePayload.status = 'accepted';
-    }
-    res = await window.sb.from('trial_requests')
-      .update(updatePayload)
-      .eq('id', reqId);
-  } catch(e) {
-    alert('فشل التعديل: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+  // Phase 7.6E-Part 2: delegate to transitionAccount. The state machine
+  // handles the trial_end math (recomputes from r, not from our local
+  // newEnd, to avoid a race if r mutated since render), the status
+  // flip on shorten-to-past, the auth ban/unban, and the event log.
+  // Our job here is just the operator UX (confirm + widget reset).
+  var eventType = (mode === 'shorten') ? 'shorten' : 'extend';
+  var result = await transitionAccount(eventType, r, { days: days });
+  if (!result.ok) {
+    alert('فشل التعديل: ' + (result.error || 'خطأ غير معروف'));
     return;
-  }
-  if (res && res.error) {
-    alert('فشل التعديل: ' + res.error.message);
-    return;
-  }
-  // Phase 7.6C-Fix: now sync auth.users to match. We do this AFTER the DB
-  // update so a network failure here doesn't roll back the trial_end edit
-  // (the operator's primary intent). If the auth sync fails the helper
-  // logs to console and we surface a soft warning — manual SQL is the
-  // documented fallback.
-  if (r.user_id) {
-    if (willExpireImmediately) {
-      await banUserPermanently(r.user_id);
-    } else {
-      // Extend OR shorten-but-still-future: ensure no stale ban remains.
-      // No-op if the user wasn't banned to begin with.
-      await unbanUserIfBanned(r.user_id);
-    }
   }
   // Reset widget value AND mode to defaults so the operator starts fresh
   // next time. (Mode reset to 'extend' is the safe default since the
@@ -1326,6 +1401,12 @@ window.addEventListener('DOMContentLoaded', async function() {
   // above is the only auth gate this page needs (defense-in-depth: RLS on
   // trial_requests should also restrict mutations to admin role).
   document.getElementById('adminScreen').style.display = 'block';
+  // Phase 7.6E-Part 2: prefetch subscription_plans into a cache so renders
+  // and the plan picker modal can read prices/durations without per-render
+  // DB hits. We don't await this — loadAndRender works against a fallback
+  // (hardcoded defaults) if the config isn't ready yet, and the next
+  // render after the await resolves will pick up the real values.
+  loadPlanConfig();
   loadAndRender();
 });
 
@@ -1359,6 +1440,517 @@ function setFilter(f, el) {
     renderAlertsBanner();
   }
   renderList();
+}
+
+// ============================================================
+// ===== Phase 7.6E-Part 2: Subscription Lifecycle Engine =====
+// ============================================================
+//
+// Architecture (Stripe + Microsoft Partner Center inspired):
+//
+//   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+//   │ planCache    │   │ computeState │   │transitionAcct│
+//   │ (from DB)    │──▶│  (pure func) │   │ (multi-store │
+//   │ prices/days  │   │ → 6 states   │   │   writer)    │
+//   └──────────────┘   └──────────────┘   └──────────────┘
+//                                                 │
+//                              ┌──────────────────┼──────────────────┐
+//                              ▼                  ▼                  ▼
+//                     trial_requests      auth.users           subscription_events
+//                       (status,plan,      (banned_until)       (immutable audit)
+//                        trial_end)
+//
+// Rule #33: every lifecycle action goes through transitionAccount, which
+//           writes to ALL THREE stores atomically (sequentially with safe
+//           ordering: DB first, auth second, event last). Never call
+//           window.sb.from('trial_requests').update(...) for a lifecycle
+//           change directly — that's how Bug 7.6D ban desync happened.
+//
+// Rule #34: schema-driven config (subscription_plans table), immutable
+//           audit (subscription_events), no hardcoded prices/durations.
+//
+// 6 lifecycle states (computed, not stored):
+//   • new        — status='new'                                      (yellow)
+//   • trial      — status='accepted' + plan='trial' + active expiry   (blue)
+//   • paid       — status='accepted' + plan in (monthly,yearly)       (green)
+//   • grace      — status='accepted' + trial_end past + grace_until    (orange)
+//                  in future                                            
+//   • suspended  — status='rejected' (regardless of plan)              (red)
+//   • expired    — status='accepted' + trial_end past + no grace        (grey)
+//                  (sub-state of paid/trial after expiry)
+//
+// Note: "expiring soon" is NOT a separate state — it's a daysLeft<=N
+// rendering variant on trial/paid. Keeping the state set to 6 (not 8)
+// matches Stripe's grouping pattern and keeps the action-button matrix
+// tractable.
+
+// === Plan config cache (loaded from subscription_plans on page boot) ===
+// Why a cache: every render reads plan prices/durations to size the
+// extend-on-renew preview and to render the plan picker. One DB read at
+// boot is dramatically cheaper than per-render queries.
+var planConfigCache = {};
+var planConfigLoaded = false;
+
+async function loadPlanConfig() {
+  if (!window.sb) return false;
+  try {
+    var res = await window.sb.from('subscription_plans')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (res.error) {
+      console.warn('loadPlanConfig: query error', res.error);
+      // Fallback to hardcoded defaults so the page doesn't break if the
+      // table is missing (e.g. Migration 23 wasn't run on this DB yet).
+      // These mirror the Migration 23 seed exactly.
+      planConfigCache = {
+        trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       currency:'SYP' },
+        monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP' },
+        yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP' }
+      };
+      planConfigLoaded = true;
+      return false;
+    }
+    planConfigCache = {};
+    (res.data || []).forEach(function(p){ planConfigCache[p.code] = p; });
+    planConfigLoaded = true;
+    return true;
+  } catch(e) {
+    console.warn('loadPlanConfig error:', e);
+    return false;
+  }
+}
+
+function getPlanConfig(code) {
+  return planConfigCache[code] || null;
+}
+
+// Format price for display (Arabic locale with Western digits)
+function formatPrice(amount, currency) {
+  if (amount == null) return '—';
+  try {
+    var n = Number(amount).toLocaleString('en-US');
+    return n + ' ' + (currency || 'SYP');
+  } catch(e) {
+    return String(amount) + ' ' + (currency || 'SYP');
+  }
+}
+
+// === computeAccountState — pure function, no I/O ===
+// Returns { state, daysLeft, daysIntoGrace, label, isPermanent }
+// Note: a row with trial_end=NULL is treated as 'permanent paid' (the
+// historical 'تفعيل دائم' affordance) and goes into the 'paid' state
+// with isPermanent=true so the badge can show ♾️ instead of a counter.
+function computeAccountState(r) {
+  var st = r.status || 'new';
+  var now = new Date();
+  var trialEnd = r.trial_end ? new Date(r.trial_end) : null;
+  var graceUntil = r.grace_until ? new Date(r.grace_until) : null;
+  var plan = r.plan || 'trial';
+  var isPermanent = (st === 'accepted' && trialEnd === null);
+  var daysLeft = null;
+  if (trialEnd && !isNaN(trialEnd.getTime())) {
+    daysLeft = Math.ceil((trialEnd - now) / 86400000);
+  }
+
+  if (st === 'new') return { state:'new', daysLeft:null, label:'جديد', isPermanent:false, plan:plan };
+  if (st === 'rejected') return { state:'suspended', daysLeft:null, label:'موقوف', isPermanent:false, plan:plan };
+
+  // st === 'accepted' from here
+  if (isPermanent) {
+    return { state:'paid', daysLeft:null, label:'دائم', isPermanent:true, plan:plan };
+  }
+  if (trialEnd && trialEnd > now) {
+    // Active subscription window
+    if (plan === 'trial') return { state:'trial', daysLeft:daysLeft, label:'تجربة', isPermanent:false, plan:plan };
+    return { state:'paid', daysLeft:daysLeft, label:(plan==='yearly'?'سنوي':'شهري'), isPermanent:false, plan:plan };
+  }
+  // trialEnd past or invalid → grace or expired
+  if (graceUntil && graceUntil > now) {
+    var daysIntoGrace = Math.ceil((graceUntil - now) / 86400000);
+    return { state:'grace', daysLeft:daysIntoGrace, label:'فترة سماح', isPermanent:false, plan:plan };
+  }
+  return { state:'expired', daysLeft:daysLeft, label:'منتهي', isPermanent:false, plan:plan };
+}
+
+// === transitionAccount — the multi-store state machine writer ===
+//
+// This is the SINGLE entry point for every lifecycle mutation. It
+// guarantees that trial_requests + auth.users + subscription_events
+// stay in sync. Rule #33: never write to trial_requests directly for
+// a lifecycle change — go through this helper.
+//
+// Supported eventType values (must match subscription_events.event_type
+// CHECK constraint from Migration 23, which has 13 values; we use 9 of
+// them in Part 2, treating reactivate as 'accept' for simplicity):
+//   • accept             — new → trial (creates auth user if missing)
+//   • convert_monthly    — trial/paid → paid (monthly)
+//   • convert_yearly     — trial/paid → paid (yearly)
+//   • renew              — paid → paid (extend by plan.duration)
+//   • extend             — * → +N days
+//   • shorten            — * → -N days
+//   • enter_grace        — expired-on-server → grace (14d soft window)
+//   • suspend            — * → suspended (bans auth)
+//   • delete             — * → (row deleted, auth user deleted)
+//
+// Returns: { ok: bool, error: string|null, newRow: object|null }
+async function transitionAccount(eventType, r, params) {
+  params = params || {};
+  if (!r || !r.id) return { ok:false, error:'invalid_request', newRow:null };
+
+  // ---- 1. Snapshot the current state for the audit event ----
+  var fromState = computeAccountState(r);
+  var fromPlan = r.plan || 'trial';
+  var fromStatus = r.status || 'new';
+  var fromTrialEnd = r.trial_end || null;
+
+  // ---- 2. Compute the trial_requests UPDATE payload + auth action ----
+  var updatePayload = {};
+  var authAction = 'noop'; // 'unban' | 'ban' | 'noop'
+  var newUserId = r.user_id || null;
+  var amount = null;
+  var toPlan = fromPlan;
+  var nowIso = new Date().toISOString();
+
+  function addDays(date, days) {
+    var d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d.toISOString();
+  }
+  function todayPlus(days) {
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString();
+  }
+
+  switch (eventType) {
+    case 'accept': {
+      // new → trial (or re-accept a suspended user back to trial)
+      // The auth.users row may need to be CREATED (if user_id is null,
+      // typical for landing.html signups that didn't auth.signUp first)
+      // OR un-banned (if the row was previously suspended). We handle
+      // user creation outside transitionAccount and pass in the new
+      // user_id via params.userId — keeps this helper focused on state.
+      var cfg = getPlanConfig('trial');
+      var dur = cfg ? cfg.duration_days : 30;
+      toPlan = 'trial';
+      updatePayload = {
+        status: 'accepted',
+        plan: 'trial',
+        trial_end: todayPlus(dur),
+        grace_until: null,
+        currency: cfg ? cfg.currency : 'SYP'
+      };
+      if (params.userId) {
+        updatePayload.user_id = params.userId;
+        newUserId = params.userId;
+      }
+      if (params.email) updatePayload.email = params.email;
+      authAction = 'unban';
+      break;
+    }
+    case 'convert_monthly':
+    case 'convert_yearly': {
+      var planCode = (eventType === 'convert_monthly') ? 'monthly' : 'yearly';
+      var cfgC = getPlanConfig(planCode);
+      var durC = cfgC ? cfgC.duration_days : (planCode === 'yearly' ? 365 : 30);
+      var priceC = cfgC ? cfgC.price : (planCode === 'yearly' ? 2000000 : 200000);
+      toPlan = planCode;
+      amount = priceC;
+      updatePayload = {
+        status: 'accepted',
+        plan: planCode,
+        trial_end: todayPlus(durC),
+        grace_until: null,
+        price_paid: priceC,
+        currency: cfgC ? cfgC.currency : 'SYP',
+        converted_at: nowIso
+      };
+      authAction = 'unban';
+      break;
+    }
+    case 'renew': {
+      // Extend trial_end by plan.duration_days. If currently expired,
+      // base is "now"; if still active, base is the existing trial_end
+      // (so we add a fresh period on top of remaining time — same UX
+      // as Stripe's renew-now).
+      var cfgR = getPlanConfig(fromPlan);
+      var durR = cfgR ? cfgR.duration_days : 30;
+      var priceR = cfgR ? cfgR.price : 0;
+      var nowD = new Date();
+      var baseR = (r.trial_end && new Date(r.trial_end) > nowD)
+        ? new Date(r.trial_end)
+        : nowD;
+      amount = priceR;
+      updatePayload = {
+        status: 'accepted',
+        trial_end: addDays(baseR, durR),
+        grace_until: null,
+        price_paid: priceR
+      };
+      authAction = 'unban';
+      break;
+    }
+    case 'extend':
+    case 'shorten': {
+      // params.days (1..365) — direction encoded in eventType.
+      // For shorten, if the new trial_end is in the past, status flips
+      // to 'rejected' + ban (this is the "shorten-to-past" suspension
+      // path documented in Phase 7.6D).
+      var days = parseInt(params.days, 10);
+      if (!Number.isFinite(days) || days < 1 || days > 365) {
+        return { ok:false, error:'invalid_days', newRow:null };
+      }
+      if (!r.trial_end) {
+        return { ok:false, error:'permanent_account_no_adjust', newRow:null };
+      }
+      var curEnd = new Date(r.trial_end);
+      var todayD = new Date();
+      var newEnd;
+      if (eventType === 'shorten') {
+        newEnd = new Date(curEnd);
+        newEnd.setDate(newEnd.getDate() - days);
+      } else {
+        var baseE = curEnd > todayD ? curEnd : todayD;
+        newEnd = new Date(baseE);
+        newEnd.setDate(newEnd.getDate() + days);
+      }
+      var willExpire = (eventType === 'shorten') && (newEnd <= todayD);
+      updatePayload = { trial_end: newEnd.toISOString() };
+      if (willExpire) {
+        updatePayload.status = 'rejected';
+        authAction = 'ban';
+      } else {
+        updatePayload.status = 'accepted';
+        authAction = 'unban';
+      }
+      break;
+    }
+    case 'enter_grace': {
+      // Manual grace-period grant for an expired account. 14 days is
+      // SyDent's house default (Microsoft Partner Center uses 30, Stripe
+      // uses 23h; 14 is the middle ground for our payment-collection
+      // tempo). Operator can override via params.days.
+      var graceDays = parseInt(params.days, 10);
+      if (!Number.isFinite(graceDays) || graceDays < 1 || graceDays > 90) {
+        graceDays = 14;
+      }
+      updatePayload = {
+        status: 'accepted',
+        grace_until: todayPlus(graceDays)
+      };
+      authAction = 'unban';
+      break;
+    }
+    case 'suspend': {
+      updatePayload = { status: 'rejected' };
+      authAction = 'ban';
+      break;
+    }
+    case 'delete': {
+      // Special path: row is deleted, not updated. Auth user too.
+      // We still log a 'delete' event AFTER deletion so the audit
+      // trail survives the row deletion (subscription_events has
+      // user_id snapshot for this exact reason).
+      var del = await window.sb.from('trial_requests').delete().eq('id', r.id);
+      if (del.error) {
+        return { ok:false, error:del.error.message, newRow:null };
+      }
+      if (newUserId && SERVICE_KEY) {
+        try {
+          await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + newUserId, {
+            method: 'DELETE',
+            headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
+          });
+        } catch(e) { console.warn('delete auth user failed:', e); }
+      }
+      // Log delete event (best-effort; row is already gone, the FK is
+      // ON DELETE SET NULL or similar, so trial_request_id may be null)
+      await logSubscriptionEvent({
+        trial_request_id: null,
+        user_id: newUserId,
+        event_type: 'delete',
+        from_plan: fromPlan, to_plan: null,
+        from_status: fromStatus, to_status: 'deleted',
+        from_trial_end: fromTrialEnd, to_trial_end: null,
+        amount: null, currency: r.currency || 'SYP',
+        notes: 'Account deleted by admin'
+      });
+      return { ok:true, error:null, newRow:null };
+    }
+    default:
+      return { ok:false, error:'unknown_event_type', newRow:null };
+  }
+
+  // ---- 3. Write to trial_requests (DB is the primary store) ----
+  var upd = await window.sb.from('trial_requests')
+    .update(updatePayload).eq('id', r.id).select().maybeSingle();
+  if (upd.error) {
+    return { ok:false, error:upd.error.message, newRow:null };
+  }
+  var newRow = upd.data || Object.assign({}, r, updatePayload);
+
+  // ---- 4. Sync auth.users (best-effort; DB update is authoritative) ----
+  if (newUserId && authAction !== 'noop') {
+    if (authAction === 'ban') {
+      await banUserPermanently(newUserId);
+    } else if (authAction === 'unban') {
+      await unbanUserIfBanned(newUserId);
+    }
+  }
+
+  // ---- 5. Log immutable audit event ----
+  var toStatus = updatePayload.status || fromStatus;
+  await logSubscriptionEvent({
+    trial_request_id: r.id,
+    user_id: newUserId,
+    event_type: eventType,
+    from_plan: fromPlan, to_plan: toPlan,
+    from_status: fromStatus, to_status: toStatus,
+    from_trial_end: fromTrialEnd, to_trial_end: updatePayload.trial_end || fromTrialEnd,
+    amount: amount, currency: newRow.currency || 'SYP',
+    notes: params.notes || null
+  });
+
+  return { ok:true, error:null, newRow:newRow };
+}
+
+// === logSubscriptionEvent — append-only audit log writer ===
+// Failure here is non-fatal (best-effort) — the primary state writes
+// have already succeeded. We log to console so a sweep can catch
+// missing events if the table goes offline.
+async function logSubscriptionEvent(ev) {
+  if (!window.sb) return false;
+  try {
+    var performedBy = 'admin';
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        performedBy = 'admin:' + (sess.data.session.user.email || sess.data.session.user.id);
+      }
+    } catch(e) { /* fall through with default 'admin' */ }
+    var payload = Object.assign({}, ev, { performed_by: performedBy });
+    var res = await window.sb.from('subscription_events').insert(payload);
+    if (res.error) {
+      console.warn('logSubscriptionEvent error:', res.error);
+      return false;
+    }
+    return true;
+  } catch(e) {
+    console.warn('logSubscriptionEvent exception:', e);
+    return false;
+  }
+}
+
+// ===== Phase 7.6E-Part 2: Plan Picker Modal =====
+// Used for three operations that all need the operator to pick monthly
+// vs yearly: convert (trial→paid), upgrade (change plan), and the
+// initial paid-plan choice from a 'new' request (rare but supported).
+// State: planModalContext holds the in-flight transition until confirm.
+var planModalContext = null; // { reqId, eventType, selectedPlan }
+
+function openPlanModal(reqId, eventType) {
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) return;
+  planModalContext = { reqId: reqId, eventType: eventType, selectedPlan: null };
+  var titleMap = {
+    convert: '💎 ترقية إلى اشتراك مدفوع',
+    upgrade: '💎 تغيير الخطة'
+  };
+  document.getElementById('planModalTitle').textContent = titleMap[eventType] || '💎 اختر خطة';
+  // Hint reflects current state for context
+  var state = computeAccountState(r);
+  var hint = 'الحساب الحالي: <strong>' + (r.name || '—') + '</strong> — ';
+  if (state.state === 'trial') {
+    hint += 'تجربة';
+    if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
+  } else if (state.state === 'paid') {
+    hint += (state.plan === 'yearly' ? 'سنوي' : 'شهري');
+    if (state.isPermanent) hint += ' — دائم';
+    else if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
+  } else {
+    hint += state.label;
+  }
+  document.getElementById('planModalHint').innerHTML = hint;
+  // Render plan options (monthly + yearly only — trial isn't a paid choice)
+  var optionsHtml = '';
+  var monthlyP = getPlanConfig('monthly');
+  var yearlyP = getPlanConfig('yearly');
+  if (monthlyP) {
+    optionsHtml +=
+      '<div class="plan-option" data-plan="monthly" onclick="selectPlanOption(\'monthly\')">' +
+        '<div class="plan-radio"></div>' +
+        '<div class="plan-body">' +
+          '<div class="plan-name">' + escapeHtml(monthlyP.display_name || 'شهري') + '</div>' +
+          '<div class="plan-price">' + formatPrice(monthlyP.price, monthlyP.currency) + ' / ' + monthlyP.duration_days + ' يوم</div>' +
+          '<div class="plan-meta">دفعة واحدة شهرية. التجديد يدوي.</div>' +
+        '</div>' +
+      '</div>';
+  }
+  if (yearlyP) {
+    // Compute savings vs 12× monthly if both exist
+    var savingsBadge = '';
+    if (monthlyP && yearlyP.price && monthlyP.price) {
+      var monthlyEq = monthlyP.price * 12;
+      if (yearlyP.price < monthlyEq) {
+        var pct = Math.round((1 - yearlyP.price / monthlyEq) * 100);
+        if (pct > 0) savingsBadge = '<span class="plan-savings">وفّر ~' + pct + '%</span>';
+      }
+    }
+    optionsHtml +=
+      '<div class="plan-option" data-plan="yearly" onclick="selectPlanOption(\'yearly\')">' +
+        '<div class="plan-radio"></div>' +
+        '<div class="plan-body">' +
+          '<div class="plan-name">' + escapeHtml(yearlyP.display_name || 'سنوي') + ' ' + savingsBadge + '</div>' +
+          '<div class="plan-price">' + formatPrice(yearlyP.price, yearlyP.currency) + ' / ' + yearlyP.duration_days + ' يوم</div>' +
+          '<div class="plan-meta">دفعة واحدة سنوية. الأنسب للعيادات المستقرّة.</div>' +
+        '</div>' +
+      '</div>';
+  }
+  document.getElementById('planModalOptions').innerHTML = optionsHtml;
+  var confirmBtn = document.getElementById('planConfirmBtn');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = '✅ تأكيد';
+  document.getElementById('planModal').classList.add('show');
+}
+
+function selectPlanOption(planCode) {
+  if (!planModalContext) return;
+  planModalContext.selectedPlan = planCode;
+  document.querySelectorAll('#planModalOptions .plan-option').forEach(function(el){
+    el.classList.toggle('selected', el.getAttribute('data-plan') === planCode);
+  });
+  document.getElementById('planConfirmBtn').disabled = false;
+}
+
+function closePlanModal() {
+  planModalContext = null;
+  document.getElementById('planModal').classList.remove('show');
+}
+
+function onPlanModalBackdropClick(e) {
+  if (e && e.target && e.target.id === 'planModal') closePlanModal();
+}
+
+async function confirmPlanChoice() {
+  if (!planModalContext || !planModalContext.selectedPlan) return;
+  var ctx = planModalContext;
+  var r = allRequests.find(function(x){ return x.id === ctx.reqId; });
+  if (!r) { closePlanModal(); return; }
+  var btn = document.getElementById('planConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ جارٍ...';
+  // The event_type wire format is 'convert_monthly' or 'convert_yearly'
+  // for both convert and upgrade contexts (the only difference is the
+  // semantic — DB-wise it's the same state mutation). For renew_pick
+  // we do convert_X too, because the operator explicitly chose a plan
+  // (different from a same-plan renew which uses 'renew' eventType).
+  var eventType = (ctx.selectedPlan === 'yearly') ? 'convert_yearly' : 'convert_monthly';
+  var result = await transitionAccount(eventType, r, {});
+  closePlanModal();
+  if (!result.ok) {
+    alert('فشل تغيير الخطة: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
 }
 
 // ===== Phase 7.6C-Fix: auth.users ban persistence helpers =====
@@ -1420,6 +2012,28 @@ async function banUserPermanently(uid) {
   }
 }
 
+// ============================================================
+// ===== Phase 7.6E-Part 2: Lifecycle wrappers (thin shells) =====
+// ============================================================
+// Every public lifecycle function now delegates to transitionAccount.
+// They handle:
+//   • UI side-effects (confirm dialogs, button busy states)
+//   • Pre-checks unique to that operation (e.g. accept's POST /admin/users
+//     to create the auth row before transitionAccount can write to it)
+//   • Post-action errors → user-friendly alerts
+//
+// What they DO NOT do:
+//   • Direct writes to trial_requests (those go through transitionAccount)
+//   • Direct ban/unban calls (those go through transitionAccount)
+//   • Direct subscription_events writes (logged automatically)
+//
+// This means Bug 7.6D (ban desync) is structurally prevented: every
+// lifecycle path writes BOTH stores via the same helper, by construction.
+
+// accept: new → trial. Special pre-step: ensure the auth.users row exists
+// (POST /admin/users) before delegating to transitionAccount, because
+// transitionAccount doesn't create auth rows — it only mutates existing
+// state. The auth-create logic stays here (auth API, not state machine).
 async function accept(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
@@ -1430,7 +2044,11 @@ async function accept(id) {
   var btn = document.querySelector('[data-id="' + id + '"].btn-accept');
   if (btn) { btn.textContent = '⏳ جارٍ...'; btn.disabled = true; }
 
+  var userId = null;
   try {
+    // Step 1: create the auth.users row (POST /admin/users), or recover
+    // the user_id if it already exists. Same logic as pre-Part-2 — this
+    // is the auth-creation layer, not the state-machine layer.
     var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users', {
       method: 'POST',
       headers: {
@@ -1446,23 +2064,17 @@ async function accept(id) {
       })
     });
     var data = await res.json();
-    var userId = data.id || null;
+    userId = data.id || null;
 
     if (!userId) {
       var errMsg = data.msg || data.message || JSON.stringify(data);
-      var isAlreadyExists = errMsg.includes('already') || errMsg.includes('exists') || errMsg.includes('registered');
+      var isAlreadyExists = errMsg.indexOf('already') >= 0 || errMsg.indexOf('exists') >= 0 || errMsg.indexOf('registered') >= 0;
       if (!isAlreadyExists) {
         alert('خطأ: ' + errMsg);
         loadAndRender();
         return;
       }
-      // Account already exists — recover the user_id so the trial_request
-      // gets properly linked. Two recovery paths:
-      //   1. Trust the existing trial_request.user_id (from auth.html signup flow)
-      //   2. Look up the user by email via admin API (for landing.html flow
-      //      where no user_id was saved, or to repair stale rows)
-      // We try path 2 if path 1 is empty, because returning a broken accept
-      // (status='accepted' but user_id=NULL) would silently lock the user out.
+      // Recover existing user_id (same two-path strategy as pre-Part 2)
       userId = r.user_id;
       if (!userId) {
         try {
@@ -1483,105 +2095,122 @@ async function accept(id) {
         return;
       }
     }
-
-    var updateData = { status: 'accepted', email: email };
-    if (userId) updateData.user_id = userId;
-
-    // إذا كان حساب موقوف لـ trial_end بالماضي، نعطيه 30 يوم جديد
-    // إذا كان دائم (NULL) أو مستقبلي، ما نلمسه
-    var hadFutureTrial = r.trial_end && new Date(r.trial_end) > new Date();
-    var wasPermanent = r.trial_end === null && r.status === 'accepted';
-
-    if (!hadFutureTrial && !wasPermanent) {
-      var trialEnd = new Date();
-      trialEnd.setDate(trialEnd.getDate() + 30);
-      updateData.trial_end = trialEnd.toISOString();
-    }
-
-    await window.sb.from('trial_requests').update(updateData).eq('id', id);
-    // Phase 7.6C-Fix: lifecycle bug — re-accepting a previously-suspended
-    // user (rejected → accepted via "قبول وإنشاء حساب" on the rejected tab)
-    // used to leave auth.users.banned_until intact, so the user would still
-    // hit "User is banned" on login despite the green "مقبول" badge. For
-    // brand-new accounts (created moments ago in POST /admin/users above)
-    // this is a no-op since they're not banned. Either way the call is safe.
-    if (userId) {
-      await unbanUserIfBanned(userId);
-    }
-    loadAndRender();
   } catch(e) {
     alert('خطأ في الاتصال: ' + e.message);
     loadAndRender();
-  }
-}
-
-async function reject(id) {
-  await window.sb.from('trial_requests')
-    .update({ status: 'rejected' })
-    .eq('id', id);
-  loadAndRender();
-}
-
-async function activatePermanent(id) {
-  var r = allRequests.find(function(x){ return x.id === id; });
-  if (!r) return;
-  if (!confirm('هل تريد تفعيل حساب ' + r.name + ' كحساب دائم؟')) return;
-  // Phase 7.6C-Fix: previously this only set trial_end=null, which created
-  // a state mismatch when the row was 'rejected' + banned. The admin's
-  // intent in clicking "تفعيل دائم" is unambiguous: this account should
-  // be permanently active. So we (a) force status to 'accepted' in case
-  // we're coming from a rejected/suspended state, and (b) lift any
-  // outstanding auth.users ban. Without the unban, the green "مقبول"
-  // pill would lie — login would fail with "User is banned".
-  await window.sb.from('trial_requests')
-    .update({ trial_end: null, status: 'accepted' })
-    .eq('id', id);
-  if (r.user_id) {
-    await unbanUserIfBanned(r.user_id);
-  }
-  loadAndRender();
-}
-
-async function suspendAccount(id, email) {
-  if (!confirm('هل تريد إيقاف حساب ' + (email||id) + '؟')) return;
-  var r = allRequests.find(function(x){ return x.id === id; });
-  var uid = r ? r.user_id : null;
-
-  await window.sb.from('trial_requests')
-    .update({ status: 'rejected' })
-    .eq('id', id);
-
-  if (uid && SERVICE_KEY) {
-    try {
-      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY },
-        body: JSON.stringify({ ban_duration: '876600h' })
-      });
-    } catch(e) { console.error('Suspend error:', e); }
-  }
-  loadAndRender();
-}
-
-async function deleteAccount(id, email) {
-  if (!confirm('هل تريد حذف حساب ' + (email||id) + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
-  var r = allRequests.find(function(x){ return x.id === id; });
-  var uid = r ? r.user_id : null;
-
-  var delRes = await window.sb.from('trial_requests').delete().eq('id', id);
-  if (delRes.error) {
-    console.warn('delete trial_request failed:', delRes.error);
-    alert('⚠️ فشل حذف الطلب: ' + delRes.error.message);
     return;
   }
 
-  if (uid && SERVICE_KEY) {
-    try {
-      await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-        method: 'DELETE',
-        headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
-      });
-    } catch(e) { console.error('Delete error:', e); }
+  // Step 2: delegate the actual state transition.
+  // transitionAccount('accept') will: set status='accepted', plan='trial',
+  // trial_end=+30d, link user_id, unban (no-op for new users), log event.
+  var result = await transitionAccount('accept', r, { userId: userId, email: email });
+  if (!result.ok) {
+    alert('فشل قبول الطلب: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// reject: new → suspended. Equivalent to 'suspend' for an unaccepted row.
+// We route it through transitionAccount with eventType='suspend' so the
+// auth.users row (if one already exists from auth.html signup) gets banned
+// instead of being left in a half-state. This closes a Bug 7.6D-class
+// regression: pre-Part 2, reject() updated only trial_requests.status
+// and left auth.users unbanned — so a rejected applicant could still log
+// in if they had self-signed-up earlier.
+async function reject(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var result = await transitionAccount('suspend', r, { notes: 'Rejected at intake' });
+  if (!result.ok) {
+    alert('فشل الرفض: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// suspendAccount: * → suspended. Standard suspend flow.
+async function suspendAccount(id, email) {
+  if (!confirm('هل تريد إيقاف حساب ' + (email||id) + '؟')) return;
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var result = await transitionAccount('suspend', r, {});
+  if (!result.ok) {
+    alert('فشل الإيقاف: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// reactivateAccount: suspended → trial (re-accept). Uses the 'accept'
+// event type because semantically "un-suspending" a previously-accepted
+// account is the same state mutation as accepting a new request: the
+// account returns to active service. transitionAccount handles unban.
+async function reactivateAccount(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  if (!confirm('هل تريد إعادة تفعيل حساب ' + (r.name || r.email || id) + '؟\nسيُمنح فترة تجربة جديدة 30 يوم.')) return;
+  var result = await transitionAccount('accept', r, {});
+  if (!result.ok) {
+    alert('فشل إعادة التفعيل: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// deleteAccount: * → (gone). Hard delete, both stores.
+async function deleteAccount(id, email) {
+  if (!confirm('هل تريد حذف حساب ' + (email||id) + ' نهائياً؟\nهذا الإجراء لا يمكن التراجع عنه!')) return;
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var result = await transitionAccount('delete', r, {});
+  if (!result.ok) {
+    alert('⚠️ فشل حذف الطلب: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// openConvertPicker: trial → paid (operator picks monthly or yearly).
+// Replaces the old "تفعيل دائم" affordance (which was an MVP shortcut —
+// permanent accounts have no billing context, no audit trail of what
+// they're paying for). The picker explicitly captures the operator's
+// intent and writes price_paid + converted_at into the row.
+function openConvertPicker(id) {
+  openPlanModal(id, 'convert');
+}
+
+// openUpgradePicker: paid (monthly) → paid (yearly), or change plan in
+// general. Same picker UI, different semantic for the operator's mental
+// model. transitionAccount handles both via convert_monthly/convert_yearly.
+function openUpgradePicker(id) {
+  openPlanModal(id, 'upgrade');
+}
+
+// renewAccount: paid → paid with extended trial_end. For 'monthly' plans,
+// extends by 30 days; for 'yearly', extends by 365 days. The operator
+// typically renews after confirming the doctor paid for another period.
+async function renewAccount(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  var cfg = getPlanConfig(r.plan || 'monthly');
+  var dur = cfg ? cfg.duration_days : 30;
+  var label = cfg ? cfg.display_name : (r.plan || 'الاشتراك');
+  if (!confirm('هل تم استلام دفعة التجديد لحساب ' + (r.name || '—') + '؟\nسيُمدّد الاشتراك (' + label + ') بـ ' + dur + ' يوم.')) return;
+  var result = await transitionAccount('renew', r, {});
+  if (!result.ok) {
+    alert('فشل التجديد: ' + (result.error || 'خطأ غير معروف'));
+  }
+  loadAndRender();
+}
+
+// grantGrace: expired → grace. Operator explicitly extends the
+// post-expiry buffer for a doctor who's promised to pay soon. Default
+// 14 days (industry-standard dunning window). This is a manual action
+// in Part 2; an automated cron job (Phase 8) could grant it on expiry.
+async function grantGrace(id) {
+  var r = allRequests.find(function(x){ return x.id === id; });
+  if (!r) return;
+  if (!confirm('منح فترة سماح 14 يوم لحساب ' + (r.name || '—') + '؟\nسيستطيع الحساب الدخول خلال هذه الفترة لإتمام الدفع.')) return;
+  var result = await transitionAccount('enter_grace', r, { days: 14 });
+  if (!result.ok) {
+    alert('فشل منح فترة السماح: ' + (result.error || 'خطأ غير معروف'));
   }
   loadAndRender();
 }
@@ -1973,6 +2602,25 @@ function renderAll() {
   renderList();
 }
 
+// Phase 7.6E-Part 2: renderList — state-aware rendering.
+// Architecture:
+//   1. computeAccountState(r) returns one of 6 states + metadata
+//   2. The state determines: badge color/label, plan pill, daysLeft row,
+//      WhatsApp reminder visibility, and which action buttons appear
+//   3. Action buttons are context-sensitive (see table in comment below)
+//
+// Action button matrix:
+// ┌──────────┬──────────────────────────────────────────────────────────┐
+// │ state    │ buttons (left to right)                                   │
+// ├──────────┼──────────────────────────────────────────────────────────┤
+// │ new      │ [قبول التجربة] [رفض] [تعديل]                              │
+// │ trial    │ [💎 ترقية] [⏸ إيقاف] [💬 تذكير?] [🗑 حذف] [تعديل] [نشاط] │
+// │ paid     │ [🔄 تجديد] [💎 تغيير الخطة] [⏸ إيقاف] [💬 تذكير?]         │
+// │          │ [🗑 حذف] [تعديل] [نشاط]                                   │
+// │ grace    │ [💎 ترقية/تجديد] [⏸ إيقاف] [🗑 حذف] [تعديل] [نشاط]       │
+// │ suspended│ [✅ إعادة تفعيل] [🗑 حذف] [تعديل]                          │
+// │ expired  │ [⏰ منح سماح] [💎 ترقية] [⏸ إيقاف] [🗑 حذف] [تعديل] [نشاط]│
+// └──────────┴──────────────────────────────────────────────────────────┘
 function renderList() {
   var list = document.getElementById('reqList');
   var filtered = allRequests.filter(function(r){
@@ -1989,8 +2637,6 @@ function renderList() {
   if (filtered.length === 0) {
     var emptyMsg, emptyIcon;
     if (expiringFilterActive) {
-      // Banner is showing 'active' but the strict filter returned 0 (e.g.
-      // user is on the 'rejected' tab + expiring filter on). Tell them.
       emptyMsg = 'لا توجد حسابات تنتهي قريباً ضمن الفلتر الحالي';
       emptyIcon = '⏰';
     } else if (searchTerm) {
@@ -2004,50 +2650,134 @@ function renderList() {
     return;
   }
   list.innerHTML = filtered.map(function(r) {
-    var st = r.status || 'new';
-    var stLabel = st === 'new' ? 'جديد' : st === 'accepted' ? 'مقبول' : 'مرفوض';
     var id = r.id;
-    // Always-available edit button (all status states)
-    var editBtn = '<button class="btn-edit" onclick="openEditModal(\'' + id + '\')">✏️ تعديل</button>';
-    var actions = '';
-    if (st === 'new') {
-      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وتفعيل التجربة</button>' +
-                '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>' +
-                editBtn;
-    } else if (st === 'accepted') {
-      var daysLeft = r.trial_end ? Math.ceil((new Date(r.trial_end) - new Date()) / (1000*60*60*24)) : null;
-      var trialBadge = daysLeft === null ? '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>' : ('<div class="req-info-row" style="color:' + (daysLeft<=5?'#ef5350':daysLeft<=10?'#ffa726':'#2ee89e') + '">⏰ <span>' + (daysLeft>0?'تنتهي خلال '+daysLeft+' يوم':'انتهت التجربة') + '</span></div>');
-      // Phase 7.6B: Activity toggle (all accepted)
-      var actBtnLabel = activityExpanded[id] ? '📊 إخفاء النشاط' : '📊 عرض النشاط';
-      var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' + actBtnLabel + '</button>';
-      // Phase 7.6C-Step3: WhatsApp reminder. Shown only for active trials
-      // (daysLeft > 0) — permanent accounts have no expiry to remind about,
-      // and already-expired trials need re-onboarding (different message)
-      // rather than a "your trial ends soon" reminder.
-      // Rendered as an anchor (not a button) so the user can long-press
-      // to copy the wa.me link on mobile, or right-click "open in new
-      // window" on desktop. target=_blank + rel=noopener for security.
-      var waReminderBtn = '';
-      if (r.trial_end && daysLeft !== null && daysLeft > 0) {
-        var waUrl = waReminderLink(r.phone || '', r.name || '', daysLeft, r.trial_end);
-        waReminderBtn = '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">💬 تذكير</a>';
+    var s = computeAccountState(r);
+
+    // Trial badge row (the ⏰ daysLeft pill). Same color thresholds as
+    // pre-Part 2 — red ≤5, yellow ≤10, green >10 — but now driven by
+    // state rather than just status.
+    var trialBadgeHtml = '';
+    if (s.state === 'paid' && s.isPermanent) {
+      trialBadgeHtml = '<div class="req-info-row" style="color:#2ee89e">♾️ <span>حساب دائم</span></div>';
+    } else if (s.state === 'trial' || s.state === 'paid') {
+      var dl = s.daysLeft;
+      if (dl !== null) {
+        var color = dl <= 5 ? '#ef5350' : dl <= 10 ? '#ffa726' : '#2ee89e';
+        var txt = dl > 0 ? 'تنتهي خلال ' + dl + ' يوم' : 'انتهت';
+        trialBadgeHtml = '<div class="req-info-row" style="color:' + color + '">⏰ <span>' + txt + '</span></div>';
       }
-      actions = '<button class="btn-accept" onclick="activatePermanent(\'' + id + '\')">✅ تفعيل دائم</button>' +
-                '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>' +
-                waReminderBtn +
-                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
-                editBtn +
-                activityBtn;
-    } else if (st === 'rejected') {
-      var trialBadge = '';
-      actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وإنشاء حساب</button>' +
-                '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>' +
-                editBtn;
+    } else if (s.state === 'grace') {
+      trialBadgeHtml = '<div class="req-info-row" style="color:#ffa726">🟠 <span>فترة سماح — متبقي ' + s.daysLeft + ' يوم</span></div>';
+    } else if (s.state === 'expired') {
+      trialBadgeHtml = '<div class="req-info-row" style="color:#8a9ab5">⏰ <span>انتهى الاشتراك</span></div>';
+    } else if (s.state === 'suspended') {
+      trialBadgeHtml = '<div class="req-info-row" style="color:#ef5350">⛔ <span>الحساب موقوف</span></div>';
     }
-    return '<div class="req-card ' + st + '">' +
+
+    // State badge in card header. Plan pill shown for paid/grace states
+    // so the operator can see at a glance which plan is in force.
+    var planPillHtml = '';
+    if ((s.state === 'paid' || s.state === 'grace') && !s.isPermanent) {
+      var planLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : s.plan;
+      planPillHtml = '<span class="req-plan-pill">' + planLabel + '</span>';
+    }
+    var stateBadge = '<div style="display:flex;align-items:center;">' + planPillHtml +
+                     '<span class="req-state ' + s.state + '">' + s.label + '</span></div>';
+
+    // Shared buttons (used in multiple states)
+    var editBtn = '<button class="btn-edit" onclick="openEditModal(\'' + id + '\')">✏️ تعديل</button>';
+    var deleteBtn = '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>';
+    var suspendBtn = '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>';
+    var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' +
+                      (activityExpanded[id] ? '📊 إخفاء النشاط' : '📊 عرض النشاط') + '</button>';
+
+    // WhatsApp reminder — only meaningful for trial/paid with active expiry.
+    // Permanent and grace accounts don't get one (different message contexts).
+    var waReminderBtn = '';
+    if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
+      var waUrl = waReminderLink(r.phone || '', r.name || '', s.daysLeft, r.trial_end);
+      waReminderBtn = '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">💬 تذكير</a>';
+    }
+
+    // Per-state action button assembly
+    var actions = '';
+    switch (s.state) {
+      case 'new':
+        actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وتفعيل التجربة</button>' +
+                  '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>' +
+                  editBtn;
+        break;
+      case 'trial':
+        actions = '<button class="btn-upgrade" onclick="openConvertPicker(\'' + id + '\')">💎 ترقية إلى مدفوع</button>' +
+                  suspendBtn +
+                  waReminderBtn +
+                  deleteBtn +
+                  editBtn +
+                  activityBtn;
+        break;
+      case 'paid':
+        if (s.isPermanent) {
+          // Permanent account: no renew, but allow plan change + suspend/delete
+          actions = '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
+                    suspendBtn +
+                    deleteBtn +
+                    editBtn +
+                    activityBtn;
+        } else {
+          actions = '<button class="btn-renew" onclick="renewAccount(\'' + id + '\')">🔄 تجديد</button>' +
+                    '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
+                    suspendBtn +
+                    waReminderBtn +
+                    deleteBtn +
+                    editBtn +
+                    activityBtn;
+        }
+        break;
+      case 'grace':
+        actions = '<button class="btn-renew" onclick="renewAccount(\'' + id + '\')">🔄 تجديد</button>' +
+                  '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
+                  suspendBtn +
+                  deleteBtn +
+                  editBtn +
+                  activityBtn;
+        break;
+      case 'expired':
+        actions = '<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\')">✅ إعادة تجربة 30 يوم</button>' +
+                  '<button class="btn-grace" onclick="grantGrace(\'' + id + '\')">⏰ منح فترة سماح 14 يوم</button>' +
+                  '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 ترقية/تجديد</button>' +
+                  suspendBtn +
+                  deleteBtn +
+                  editBtn +
+                  activityBtn;
+        break;
+      case 'suspended':
+        actions = '<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\')">✅ إعادة تفعيل</button>' +
+                  deleteBtn +
+                  editBtn;
+        break;
+    }
+
+    // Card status class for the existing border-color/opacity rules.
+    // We keep the old new/accepted/rejected vocabulary for the wrapper
+    // class so existing CSS continues to apply; the new state badge
+    // is the source of truth for the operator-facing label.
+    var cardStatusClass = r.status || 'new';
+
+    // Extension widget appears for any row with a trial_end (i.e. not
+    // a permanent account and not a brand-new request). This includes
+    // trial, paid (non-permanent), grace, and expired states — operators
+    // sometimes need to adjust an already-expired trial_end before
+    // making other decisions.
+    var showExtensionWidget = !!r.trial_end && s.state !== 'new' && s.state !== 'suspended';
+
+    // Activity panel: show for any accepted (active or expired) state.
+    // Suspended rows have no meaningful "last active" data exposed.
+    var showActivityPanel = (s.state !== 'new' && s.state !== 'suspended');
+
+    return '<div class="req-card ' + cardStatusClass + '">' +
       '<div class="req-top">' +
         '<div class="req-name">' + (escapeHtml(r.name) || '—') + '</div>' +
-        '<span class="req-status ' + st + '">' + stLabel + '</span>' +
+        stateBadge +
       '</div>' +
       '<div class="req-info">' +
         '<div class="req-info-row">📱 <span>' + (escapeHtml(r.phone) || '—') + '</span></div>' +
@@ -2055,11 +2785,11 @@ function renderList() {
         (r.city ? '<div class="req-info-row">📍 <span>' + escapeHtml(r.city) + '</span></div>' : '') +
         (r.notes ? '<div class="req-info-row">📝 <span>' + escapeHtml(r.notes) + '</span></div>' : '') +
         '<div class="req-info-row">🕐 <span>' + formatDate(r.created_at) + '</span></div>' +
-        (typeof trialBadge !== 'undefined' ? trialBadge : '') +
+        trialBadgeHtml +
       '</div>' +
       '<div class="req-actions">' + actions + '</div>' +
-      (st === 'accepted' && r.trial_end ? renderExtensionWidget(id) : '') +
-      (st === 'accepted' ? renderActivityPanel(id) : '') +
+      (showExtensionWidget ? renderExtensionWidget(id) : '') +
+      (showActivityPanel ? renderActivityPanel(id) : '') +
     '</div>';
   }).join('');
 }
