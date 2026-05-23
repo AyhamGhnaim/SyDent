@@ -980,6 +980,180 @@ header{
 }
 .tpl-switch.on .tpl-switch-knob{transform:translateX(16px);}
 
+/* ===== Phase X4: Subscription Events Viewer (in-page section) =====
+ * Same collapsible-section pattern as Phase X2 Plans Editor and
+ * Phase X3 Templates Editor (rule #34: consistent platform-layer
+ * UX). Lives inside admin.html instead of a separate page because:
+ *   1. Avoids cross-page session race (getSession() can transiently
+ *      return null on cold tab load before localStorage hydrates).
+ *   2. Reuses allRequests cache for tenant name resolution — no
+ *      duplicate fetch.
+ *   3. No risk of "link broken" UX when GitHub Pages deploy lags,
+ *      cache misbehaves, or browser quirks intercept navigation.
+ *      The section is part of the page that already loaded. */
+.events-viewer-section{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;margin-bottom:18px;overflow:hidden;
+}
+.events-viewer-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;cursor:pointer;user-select:none;
+  background:var(--bg3);transition:background .15s;
+  font-weight:700;font-size:14px;color:var(--text);
+}
+.events-viewer-header:hover{background:var(--bg4);}
+.events-viewer-toggle{font-size:12px;color:var(--text2);transition:transform .2s;}
+.events-viewer-section.open .events-viewer-toggle{transform:rotate(90deg);}
+.events-viewer-body{display:none;padding:18px;}
+.events-viewer-section.open .events-viewer-body{display:block;}
+
+/* Filters */
+.evf-filters{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;margin-bottom:14px;
+}
+.evf-group{display:flex;flex-direction:column;gap:4px;}
+.evf-group label{font-size:11px;color:var(--text2);font-weight:600;}
+.evf-group input,.evf-group select{
+  background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);padding:8px 10px;border-radius:8px;
+  font-family:inherit;font-size:13px;width:100%;
+}
+.evf-group input:focus,.evf-group select:focus{outline:none;border-color:var(--green);}
+.evf-search{grid-column:span 2;}
+.evf-actions{
+  grid-column:span 2;display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+}
+.evf-btn{
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);padding:8px 14px;border-radius:8px;
+  font-family:inherit;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;white-space:nowrap;
+}
+.evf-btn:hover{background:var(--bg4);border-color:var(--green);}
+.evf-btn-primary{background:var(--green);color:#0a1628;border-color:var(--green);}
+.evf-btn-primary:hover{background:var(--green2);color:#0a1628;}
+.evf-btn-csv{background:rgba(66,165,245,0.1);border-color:#42a5f5;color:#42a5f5;}
+.evf-btn-csv:hover{background:#42a5f5;color:#0a1628;}
+
+/* Event type chips */
+.evf-chips-section{margin-bottom:14px;}
+.evf-chips-label{font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px;}
+.evf-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.evf-chip{
+  padding:4px 10px;border-radius:14px;font-size:11px;font-weight:600;
+  cursor:pointer;user-select:none;transition:all 0.15s;
+  border:1px solid var(--border);background:var(--bg3);color:var(--text2);
+}
+.evf-chip:hover{border-color:var(--green);color:var(--text);}
+.evf-chip.active{background:var(--green-dim);color:var(--green);border-color:var(--green);}
+
+/* Counter */
+.evf-counter{
+  font-size:12px;color:var(--text2);margin:10px 0;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+}
+.evf-counter strong{color:var(--text);font-weight:700;}
+
+/* Events list */
+.evf-list{display:flex;flex-direction:column;gap:8px;}
+.evf-card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;
+  cursor:pointer;transition:all 0.15s;
+}
+.evf-card:hover{border-color:var(--border2);background:var(--bg4);}
+.evf-card-meta{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;font-size:13px;}
+.evf-time{color:var(--text2);font-size:11px;font-weight:600;}
+.evf-tenant{color:var(--text);font-weight:700;}
+.evf-tenant-email{color:rgba(74,96,128,0.85);font-size:11px;}
+.evf-by{color:var(--text3);font-size:11px;font-style:italic;margin-top:4px;}
+.evf-summary{font-size:12px;color:var(--text);line-height:1.6;margin-top:6px;}
+
+/* Event type badges */
+.evf-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700;
+  border:1px solid var(--border);background:var(--bg);
+}
+.evf-badge.lifecycle{background:var(--green-dim);color:var(--green);border-color:var(--green);}
+.evf-badge.auth{background:rgba(66,165,245,0.1);color:#42a5f5;border-color:#42a5f5;}
+.evf-badge.config{background:rgba(171,71,188,0.1);color:#ab47bc;border-color:#ab47bc;}
+.evf-badge.destructive{background:var(--red-dim);color:var(--red);border-color:var(--red);}
+.evf-badge.warning{background:var(--yellow-dim);color:var(--yellow);border-color:var(--yellow);}
+
+/* States */
+.evf-state{
+  background:var(--bg3);border:1px dashed var(--border);
+  border-radius:12px;padding:30px 16px;text-align:center;
+  color:var(--text2);font-size:13px;
+}
+.evf-state-icon{font-size:32px;margin-bottom:8px;display:block;}
+
+/* Pagination */
+.evf-pagination{display:flex;justify-content:center;margin-top:12px;}
+.evf-load-more{
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);padding:10px 24px;border-radius:10px;
+  font-family:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all 0.15s;
+}
+.evf-load-more:hover{background:var(--bg4);border-color:var(--green);}
+.evf-load-more:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* Drill-down modal — reuses .modal-overlay pattern but uniquely scoped */
+.evf-modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.7);
+  display:none;z-index:200;align-items:flex-start;justify-content:center;
+  padding:40px 20px;overflow-y:auto;
+}
+.evf-modal-overlay.open{display:flex;}
+.evf-modal-card{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:14px;width:100%;max-width:680px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.evf-modal-head{
+  padding:16px 18px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.evf-modal-head h3{font-size:16px;color:var(--text);font-weight:700;}
+.evf-modal-close{
+  background:transparent;border:none;color:var(--text2);
+  font-size:22px;cursor:pointer;padding:4px 8px;border-radius:6px;
+}
+.evf-modal-close:hover{background:var(--bg3);color:var(--text);}
+.evf-modal-body{padding:16px 18px;}
+.evf-detail-row{
+  display:grid;grid-template-columns:130px 1fr;gap:10px;
+  padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;
+}
+.evf-detail-row:last-child{border-bottom:none;}
+.evf-detail-label{color:var(--text2);font-weight:600;}
+.evf-detail-value{color:var(--text);word-break:break-word;}
+.evf-json-block{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:8px;padding:10px;margin-top:10px;
+  font-family:'Courier New', monospace;font-size:11px;
+  color:var(--text2);white-space:pre-wrap;word-break:break-word;
+  direction:ltr;text-align:left;max-height:300px;overflow-y:auto;
+}
+.evf-diff-row{
+  display:grid;grid-template-columns:100px 1fr 1fr;gap:8px;
+  padding:6px 0;border-bottom:1px solid var(--border);
+  font-size:12px;align-items:center;
+}
+.evf-diff-row:last-child{border-bottom:none;}
+.evf-diff-label{color:var(--text2);font-weight:600;font-size:11px;}
+.evf-diff-from{color:var(--red);text-decoration:line-through;font-family:monospace;}
+.evf-diff-to{color:var(--green);font-family:monospace;}
+
+@media (max-width:680px){
+  .evf-card-meta{flex-direction:column;align-items:flex-start;gap:4px;}
+  .evf-detail-row{grid-template-columns:1fr;gap:2px;}
+  .evf-diff-row{grid-template-columns:1fr;gap:2px;}
+}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -988,7 +1162,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a27"></script>
+<script src="supabase-init.js?v=20260523a28"></script>
 </head>
 <body>
 
@@ -1006,7 +1180,7 @@ header{
       <span class="badge">Admin</span>
     </div>
     <div style="display:flex;gap:8px;">
-      <button type="button" class="btn-logout" onclick="window.location.href='subscription-events.html'" title="سجلّ أحداث الاشتراكات">📋 السجلّ</button>
+      <button type="button" class="btn-logout" onclick="toggleEventsSection()" title="سجلّ أحداث الاشتراكات">📋 السجلّ</button>
       <button class="btn-logout" onclick="doLogout()">خروج</button>
     </div>
   </header>
@@ -1241,8 +1415,75 @@ header{
       </div>
     </div>
 
+    <!-- Phase X4: Subscription Events Viewer (collapsible section) -->
+    <div class="events-viewer-section" id="eventsViewerSection">
+      <div class="events-viewer-header" onclick="toggleEventsSection()" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleEventsSection();}">
+        <span>📋 سجلّ أحداث الاشتراكات</span>
+        <span class="events-viewer-toggle">▶</span>
+      </div>
+      <div class="events-viewer-body">
+        <!-- Date + Search filters -->
+        <div class="evf-filters">
+          <div class="evf-group">
+            <label for="evfDateFrom">📅 من تاريخ</label>
+            <input type="date" id="evfDateFrom" onchange="evfApplyFilters()">
+          </div>
+          <div class="evf-group">
+            <label for="evfDateTo">📅 إلى تاريخ</label>
+            <input type="date" id="evfDateTo" onchange="evfApplyFilters()">
+          </div>
+          <div class="evf-group evf-search">
+            <label for="evfSearch">🔍 بحث عميل (الاسم، الإيميل، الهاتف)</label>
+            <input type="text" id="evfSearch" placeholder="مثال: محمد، 09xxxx" oninput="evfOnSearchInput()">
+          </div>
+          <div class="evf-actions">
+            <button type="button" class="evf-btn" onclick="evfResetFilters()">↺ إعادة تعيين</button>
+            <button type="button" class="evf-btn evf-btn-primary" onclick="evfApplyFilters()">🔄 تحديث</button>
+            <button type="button" class="evf-btn evf-btn-csv" onclick="evfExportCsv()">📥 CSV</button>
+          </div>
+        </div>
+
+        <!-- Event type chips (multi-select) -->
+        <div class="evf-chips-section">
+          <div class="evf-chips-label">🏷 نوع الحدث (متعدّد الاختيار، فاضي = الكل)</div>
+          <div class="evf-chips" id="evfChipsWrap"></div>
+        </div>
+
+        <!-- Counter -->
+        <div class="evf-counter">
+          <div id="evfCounterText">اضغط 🔄 تحديث لتحميل الأحداث</div>
+          <div id="evfCounterAgg" style="color:var(--text3);font-size:11px;"></div>
+        </div>
+
+        <!-- Events list -->
+        <div class="evf-list" id="evfList">
+          <div class="evf-state">
+            <span class="evf-state-icon">⏳</span>
+            <div>سيتم تحميل الأحداث عند فتح السجلّ لأول مرة...</div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="evf-pagination" id="evfPaginationWrap" style="display:none;">
+          <button type="button" class="evf-load-more" id="evfBtnLoadMore" onclick="evfLoadMore()">⬇ تحميل المزيد (50)</button>
+        </div>
+      </div>
+    </div>
+
     <!-- List -->
     <div class="requests-list" id="reqList"></div>
+  </div>
+</div>
+
+<!-- Phase X4: Drill-down modal for event details -->
+<div class="evf-modal-overlay" id="evfModalOverlay" onclick="evfCloseModalIfBackdrop(event)">
+  <div class="evf-modal-card" onclick="event.stopPropagation()">
+    <div class="evf-modal-head">
+      <h3>تفاصيل الحدث</h3>
+      <button type="button" class="evf-modal-close" onclick="evfCloseModal()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="evf-modal-body" id="evfModalBody"></div>
   </div>
 </div>
 
@@ -4801,6 +5042,513 @@ async function exportCSV() {
       btn.innerHTML = '<span>📥</span><span>تصدير CSV</span>';
     }
   }
+}
+
+// ============================================================
+// ===== Phase X4: Subscription Events Viewer (in-section) ====
+// ============================================================
+//
+// Read-only audit log over subscription_events. Lives inside
+// admin.html as a collapsible section (same pattern as Phase X2
+// Plans Editor and Phase X3 Templates Editor) — NOT a separate
+// page. The cross-page approach was abandoned after live testing
+// revealed multiple failure modes (Brave/Safari cache, session
+// race, redirect loops). In-page section eliminates all of them:
+//
+//   - allRequests already in memory → no duplicate fetch for
+//     tenant name resolution (just a lookup map)
+//   - admin session already verified at page entry → no auth
+//     gate, no getSession() race condition
+//   - No navigation → no GitHub Pages deploy lag, no cache miss,
+//     no browser quirks intercepting clicks
+//
+// State:
+//   evfAllEvents       - accumulated events from DB (paginated)
+//   evfTenantMap       - tenant_id → {name,email,phone} from allRequests
+//   evfSelectedTypes   - Set of selected event_type codes (empty = all)
+//   evfHasMore         - whether DB has more rows beyond current page
+//   evfLoadToken       - latest-wins guard for async filter changes
+//   evfInitialized     - true after first open (triggers initial load)
+
+var EVF_EVENT_TYPES = {
+  // Lifecycle (Phase 7.6E + earlier)
+  'accept':           { label_ar: 'قبول طلب',          category: 'lifecycle',   emoji: '✅' },
+  'reject':           { label_ar: 'رفض طلب',           category: 'destructive', emoji: '🚫' },
+  'convert_monthly':  { label_ar: 'تحويل لشهري',       category: 'lifecycle',   emoji: '💎' },
+  'convert_yearly':   { label_ar: 'تحويل لسنوي',       category: 'lifecycle',   emoji: '💎' },
+  'renew':            { label_ar: 'تجديد',             category: 'lifecycle',   emoji: '🔄' },
+  'extend':           { label_ar: 'تمديد تجربة',       category: 'lifecycle',   emoji: '➕' },
+  'shorten':          { label_ar: 'تقصير تجربة',       category: 'warning',     emoji: '➖' },
+  'enter_grace':      { label_ar: 'فترة سماح',         category: 'warning',     emoji: '⏰' },
+  'suspend':          { label_ar: 'إيقاف',             category: 'warning',     emoji: '⏸' },
+  'reactivate':       { label_ar: 'إعادة تفعيل',       category: 'lifecycle',   emoji: '▶️' },
+  'delete':           { label_ar: 'حذف',               category: 'destructive', emoji: '🗑' },
+  // Auth (Phase X1)
+  'promote_to_admin': { label_ar: 'ترقية لمسؤول',      category: 'auth',        emoji: '👑' },
+  'demote_from_admin':{ label_ar: 'تنزيل من مسؤول',    category: 'auth',        emoji: '👤' },
+  // Config (Phase X2, X3)
+  'plan_updated':     { label_ar: 'تعديل خطة',         category: 'config',      emoji: '⚙️' },
+  'template_updated': { label_ar: 'تعديل قالب رسالة',  category: 'config',      emoji: '💬' }
+};
+
+var evfAllEvents = [];
+var evfTenantMap = {};
+var evfSelectedTypes = new Set();
+var evfPageSize = 50;
+var evfHasMore = false;
+var evfSearchDebounce = null;
+var evfLoadToken = 0;
+var evfInitialized = false;
+
+// Toggle the events section. On first open, render chips, build
+// tenant map from allRequests, set default 30-day range, and load.
+function toggleEventsSection() {
+  var sec = document.getElementById('eventsViewerSection');
+  if (!sec) return;
+  var willOpen = !sec.classList.contains('open');
+  sec.classList.toggle('open');
+
+  if (willOpen && !evfInitialized) {
+    evfInitialized = true;
+    // Build tenant map from allRequests (already loaded by loadAndRender).
+    // No extra DB query needed — this is the key benefit of the in-page
+    // architecture over a separate page.
+    evfRebuildTenantMap();
+    // Default date range = last 30 days (matches Stripe Events page).
+    var today = new Date();
+    var thirtyAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    document.getElementById('evfDateFrom').value = evfToIsoDate(thirtyAgo);
+    document.getElementById('evfDateTo').value = evfToIsoDate(today);
+    evfRenderChips();
+    evfLoadEvents(true);
+    // Scroll into view smoothly so the user sees the section after toggle.
+    setTimeout(function() {
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  } else if (willOpen) {
+    // Re-open: rebuild tenant map (allRequests may have changed) and
+    // scroll into view, but don't re-fetch events (let the user press
+    // 🔄 تحديث if they want a refresh).
+    evfRebuildTenantMap();
+    setTimeout(function() {
+      sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+}
+
+function evfRebuildTenantMap() {
+  var map = {};
+  (allRequests || []).forEach(function(r) {
+    map[r.id] = { name: r.name || '', email: r.email || '', phone: r.phone || '' };
+  });
+  evfTenantMap = map;
+}
+
+function evfToIsoDate(d) {
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+// XSS-safe HTML escaping (reuses existing escapeHtml from admin.html).
+// Defined separately as a local alias so this section is self-contained
+// in case escapeHtml is ever refactored.
+function evfEscape(s) { return escapeHtml(s); }
+
+// Render the multi-select chips for event type filtering
+function evfRenderChips() {
+  var wrap = document.getElementById('evfChipsWrap');
+  if (!wrap) return;
+  var html = '';
+  Object.keys(EVF_EVENT_TYPES).forEach(function(code) {
+    var t = EVF_EVENT_TYPES[code];
+    var active = evfSelectedTypes.has(code) ? ' active' : '';
+    html += '<span class="evf-chip' + active + '" data-code="' + evfEscape(code) + '" ' +
+            'onclick="evfToggleChip(\'' + code + '\')">' +
+            t.emoji + ' ' + evfEscape(t.label_ar) + '</span>';
+  });
+  wrap.innerHTML = html;
+}
+
+function evfToggleChip(code) {
+  if (evfSelectedTypes.has(code)) evfSelectedTypes.delete(code);
+  else                            evfSelectedTypes.add(code);
+  evfRenderChips();
+  evfApplyFilters();
+}
+
+function evfResetFilters() {
+  var today = new Date();
+  var thirtyAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  document.getElementById('evfDateFrom').value = evfToIsoDate(thirtyAgo);
+  document.getElementById('evfDateTo').value = evfToIsoDate(today);
+  document.getElementById('evfSearch').value = '';
+  evfSelectedTypes.clear();
+  evfRenderChips();
+  evfLoadEvents(true);
+}
+
+function evfApplyFilters() {
+  evfLoadEvents(true);
+}
+
+function evfOnSearchInput() {
+  if (evfSearchDebounce) clearTimeout(evfSearchDebounce);
+  evfSearchDebounce = setTimeout(function() {
+    // Search is client-side filter over already-loaded rows — no DB hit.
+    // Date and type filters DO hit the DB, but search alone is local.
+    evfRenderList();
+  }, 300);
+}
+
+// Load events from DB with current filters applied at SQL level
+// for date and type, and client-side for tenant search. Pagination
+// uses Supabase range() with pageSize+1 trick to detect hasMore.
+async function evfLoadEvents(reset) {
+  var myToken = ++evfLoadToken;  // D6 latest-wins guard
+  if (reset) {
+    evfAllEvents = [];
+    document.getElementById('evfList').innerHTML =
+      '<div class="evf-state"><span class="evf-state-icon">⏳</span><div>جارٍ التحميل...</div></div>';
+    document.getElementById('evfPaginationWrap').style.display = 'none';
+  }
+
+  var dateFrom = document.getElementById('evfDateFrom').value;
+  var dateTo = document.getElementById('evfDateTo').value;
+  var typesArr = Array.from(evfSelectedTypes);
+
+  var q = window.sb.from('subscription_events').select('*').order('created_at', { ascending: false });
+
+  if (dateFrom) {
+    // Use LOCAL time boundaries (R15 fix from original X4 audit).
+    // <input type="date"> stores local YYYY-MM-DD; without this fix
+    // we'd miss events in the timezone offset window (Damascus UTC+3).
+    var fromLocal = new Date(dateFrom + 'T00:00:00');
+    if (!isNaN(fromLocal.getTime())) {
+      q = q.gte('created_at', fromLocal.toISOString());
+    }
+  }
+  if (dateTo) {
+    var toLocal = new Date(dateTo + 'T23:59:59.999');
+    if (!isNaN(toLocal.getTime())) {
+      q = q.lte('created_at', toLocal.toISOString());
+    }
+  }
+  if (typesArr.length > 0) {
+    q = q.in('event_type', typesArr);
+  }
+  var offset = evfAllEvents.length;
+  q = q.range(offset, offset + evfPageSize);
+
+  var res;
+  try {
+    res = await q;
+  } catch (e) {
+    if (myToken !== evfLoadToken) return;  // stale
+    document.getElementById('evfList').innerHTML =
+      '<div class="evf-state"><span class="evf-state-icon">⚠️</span><div>خطأ: ' +
+      evfEscape(e && e.message ? e.message : String(e)) + '</div></div>';
+    return;
+  }
+  if (myToken !== evfLoadToken) return;  // newer load started — discard
+
+  if (res.error) {
+    document.getElementById('evfList').innerHTML =
+      '<div class="evf-state"><span class="evf-state-icon">⚠️</span><div>خطأ: ' +
+      evfEscape(res.error.message) + '</div></div>';
+    return;
+  }
+  var rows = res.data || [];
+  if (rows.length > evfPageSize) {
+    evfHasMore = true;
+    rows = rows.slice(0, evfPageSize);
+  } else {
+    evfHasMore = false;
+  }
+  evfAllEvents = evfAllEvents.concat(rows);
+  evfRenderList();
+}
+
+function evfLoadMore() {
+  var btn = document.getElementById('evfBtnLoadMore');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ جارٍ التحميل...';
+  evfLoadEvents(false).finally(function() {
+    btn.disabled = false;
+    btn.textContent = '⬇ تحميل المزيد (50)';
+  });
+}
+
+function evfRenderList() {
+  var search = (document.getElementById('evfSearch').value || '').trim().toLowerCase();
+  var filtered;
+  if (search) {
+    filtered = evfAllEvents.filter(function(ev) {
+      var t = evfTenantMap[ev.trial_request_id];
+      if (!t) return false;
+      var hay = (t.name + ' ' + t.email + ' ' + t.phone).toLowerCase();
+      return hay.indexOf(search) >= 0;
+    });
+  } else {
+    filtered = evfAllEvents;
+  }
+
+  var listEl = document.getElementById('evfList');
+  if (filtered.length === 0) {
+    listEl.innerHTML =
+      '<div class="evf-state"><span class="evf-state-icon">🔍</span>' +
+      '<div>لا توجد أحداث تطابق الفلاتر الحالية.</div>' +
+      '<div style="font-size:11px;margin-top:6px;color:var(--text3);">' +
+      'جرّب توسيع نطاق التاريخ أو إلغاء تحديد نوع الحدث.</div></div>';
+  } else {
+    var html = '';
+    filtered.forEach(function(ev) { html += evfRenderCard(ev); });
+    listEl.innerHTML = html;
+  }
+
+  var counterEl = document.getElementById('evfCounterText');
+  if (search) {
+    counterEl.innerHTML = 'عرض <strong>' + filtered.length + '</strong> من <strong>' +
+                         evfAllEvents.length + '</strong> حدث (بعد البحث)';
+  } else {
+    counterEl.innerHTML = 'عرض <strong>' + filtered.length + '</strong> حدث';
+  }
+  var aggEl = document.getElementById('evfCounterAgg');
+  aggEl.textContent = evfHasMore ? 'يوجد المزيد — اضغط تحميل المزيد' : 'نهاية النتائج';
+  document.getElementById('evfPaginationWrap').style.display =
+    (evfHasMore && !search) ? 'flex' : 'none';
+}
+
+function evfRenderCard(ev) {
+  var t = evfTenantMap[ev.trial_request_id] || { name: '—', email: '', phone: '' };
+  var meta = EVF_EVENT_TYPES[ev.event_type] || { label_ar: ev.event_type, category: 'config', emoji: '•' };
+  var when = evfFormatTimestamp(ev.created_at);
+  var summary = evfBuildSummary(ev);
+  var byShort = evfShortPerformedBy(ev.performed_by);
+  // D8 fix: pass event ID (primary key), not array index — search
+  // debounce can cause filtered.length to shift between render and click
+  var idAttr = evfEscape(String(ev.id || ''));
+  return '' +
+    '<div class="evf-card" onclick="evfOpenModal(\'' + idAttr + '\')" role="button" tabindex="0" ' +
+    'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();evfOpenModal(\'' + idAttr + '\');}">' +
+      '<div class="evf-card-meta">' +
+        '<span class="evf-badge ' + meta.category + '">' + meta.emoji + ' ' + evfEscape(meta.label_ar) + '</span>' +
+        '<span class="evf-tenant">' + evfEscape(t.name || '—') + '</span>' +
+        (t.email ? '<span class="evf-tenant-email">' + evfEscape(t.email) + '</span>' : '') +
+        '<span class="evf-time">' + evfEscape(when) + '</span>' +
+      '</div>' +
+      '<div class="evf-summary">' + summary + '</div>' +
+      (byShort ? '<div class="evf-by">' + evfEscape(byShort) + '</div>' : '') +
+    '</div>';
+}
+
+function evfBuildSummary(ev) {
+  var parts = [];
+  if (ev.event_type === 'plan_updated' || ev.event_type === 'template_updated') {
+    if (ev.from_plan) parts.push('<strong>' + evfEscape(ev.from_plan) + '</strong>');
+  }
+  if (ev.from_plan && ev.to_plan && ev.from_plan !== ev.to_plan) {
+    parts.push(evfEscape(ev.from_plan) + ' ← ' + evfEscape(ev.to_plan));
+  }
+  if (ev.from_status && ev.to_status && ev.from_status !== ev.to_status) {
+    parts.push(evfEscape(ev.from_status) + ' ← ' + evfEscape(ev.to_status));
+  }
+  if (ev.amount && Number(ev.amount) > 0) {
+    parts.push('<strong>' + Number(ev.amount).toLocaleString('ar-SY') + '</strong> ' + evfEscape(ev.currency || 'SYP'));
+  }
+  if (ev.notes) {
+    var n = String(ev.notes);
+    var preview = n.length > 80 ? n.substring(0, 80) + '…' : n;
+    parts.push('<span style="color:var(--text2);">' + evfEscape(preview) + '</span>');
+  }
+  return parts.length > 0 ? parts.join(' · ') : '<span style="color:var(--text3);">—</span>';
+}
+
+function evfShortPerformedBy(pb) {
+  if (!pb) return '';
+  var s = String(pb);
+  if (s.indexOf('admin:') === 0) return 'بواسطة: ' + s.substring(6);
+  return 'بواسطة: ' + s;
+}
+
+function evfFormatTimestamp(iso) {
+  if (!iso) return '';
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('ar-EG', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    });
+  } catch (e) { return iso; }
+}
+
+// Drill-down modal — open by event ID (D8 fix: stable across renders)
+function evfOpenModal(eventId) {
+  if (!eventId) return;
+  var ev = null;
+  for (var i = 0; i < evfAllEvents.length; i++) {
+    if (String(evfAllEvents[i].id) === String(eventId)) { ev = evfAllEvents[i]; break; }
+  }
+  if (!ev) return;
+
+  var t = evfTenantMap[ev.trial_request_id] || { name: '—', email: '', phone: '' };
+  var meta = EVF_EVENT_TYPES[ev.event_type] || { label_ar: ev.event_type, category: 'config', emoji: '•' };
+
+  var rows = '';
+  rows += evfDetailRow('🆔 ID', evfEscape(ev.id));
+  rows += evfDetailRow('📅 الوقت', evfEscape(evfFormatTimestamp(ev.created_at)) + ' <code style="color:var(--text3);font-size:11px;">(' + evfEscape(ev.created_at || '') + ')</code>');
+  rows += evfDetailRow('🏷 نوع الحدث',
+    '<span class="evf-badge ' + meta.category + '">' + meta.emoji + ' ' + evfEscape(meta.label_ar) +
+    '</span> <code style="color:var(--text3);font-size:11px;">(' + evfEscape(ev.event_type) + ')</code>');
+  rows += evfDetailRow('👤 العميل', evfEscape(t.name || '—') +
+    (t.email ? '<br><span style="color:var(--text3);font-size:11px;">' + evfEscape(t.email) + '</span>' : '') +
+    (t.phone ? '<br><span style="color:var(--text3);font-size:11px;">' + evfEscape(t.phone) + '</span>' : ''));
+  if (ev.from_plan || ev.to_plan) {
+    rows += evfDetailRow('💎 الخطة',
+      (ev.from_plan ? evfEscape(ev.from_plan) : '—') + ' ← ' +
+      (ev.to_plan ? evfEscape(ev.to_plan) : '—'));
+  }
+  if (ev.from_status || ev.to_status) {
+    rows += evfDetailRow('🏁 الحالة',
+      (ev.from_status ? evfEscape(ev.from_status) : '—') + ' ← ' +
+      (ev.to_status ? evfEscape(ev.to_status) : '—'));
+  }
+  if (ev.from_trial_end || ev.to_trial_end) {
+    rows += evfDetailRow('⏰ نهاية التجربة',
+      (ev.from_trial_end ? evfEscape(ev.from_trial_end) : '—') + ' ← ' +
+      (ev.to_trial_end ? evfEscape(ev.to_trial_end) : '—'));
+  }
+  if (ev.amount && Number(ev.amount) > 0) {
+    rows += evfDetailRow('💰 المبلغ',
+      '<strong>' + Number(ev.amount).toLocaleString('ar-SY') + '</strong> ' +
+      evfEscape(ev.currency || 'SYP'));
+  }
+  if (ev.performed_by) {
+    rows += evfDetailRow('👨‍💼 بواسطة', evfEscape(ev.performed_by));
+  }
+  if (ev.notes) {
+    rows += evfDetailRow('📝 ملاحظات', evfRenderNotes(ev.notes));
+  }
+  rows += evfDetailRow('🧾 JSON الكامل',
+    '<div class="evf-json-block">' + evfEscape(JSON.stringify(ev, null, 2)) + '</div>');
+
+  document.getElementById('evfModalBody').innerHTML = rows;
+  document.getElementById('evfModalOverlay').classList.add('open');
+}
+
+function evfDetailRow(label, valueHtml) {
+  return '<div class="evf-detail-row"><div class="evf-detail-label">' + label +
+         '</div><div class="evf-detail-value">' + valueHtml + '</div></div>';
+}
+
+function evfRenderNotes(notes) {
+  try {
+    var parsed = JSON.parse(notes);
+    if (parsed && typeof parsed === 'object' && parsed.diff && typeof parsed.diff === 'object') {
+      var diffHtml = '';
+      Object.keys(parsed.diff).forEach(function(k) {
+        var d = parsed.diff[k];
+        if (!d || typeof d !== 'object') return;
+        var fromVal, toVal;
+        if (d.from_preview !== undefined || d.to_preview !== undefined) {
+          fromVal = (d.from_preview != null ? d.from_preview : '');
+          toVal   = (d.to_preview   != null ? d.to_preview   : '');
+        } else {
+          fromVal = (d.from != null ? String(d.from) : '');
+          toVal   = (d.to   != null ? String(d.to)   : '');
+        }
+        diffHtml += '<div class="evf-diff-row">' +
+                    '<div class="evf-diff-label">' + evfEscape(k) + '</div>' +
+                    '<div class="evf-diff-from">' + evfEscape(fromVal) + '</div>' +
+                    '<div class="evf-diff-to">' + evfEscape(toVal) + '</div></div>';
+      });
+      var header = '';
+      if (parsed.plan_code) header = '<div style="margin-bottom:8px;color:var(--text2);font-size:11px;">خطة: <strong>' + evfEscape(parsed.plan_code) + '</strong></div>';
+      else if (parsed.template_code) header = '<div style="margin-bottom:8px;color:var(--text2);font-size:11px;">قالب: <strong>' + evfEscape(parsed.template_code) + '</strong></div>';
+      return header + diffHtml + '<div class="evf-json-block">' + evfEscape(notes) + '</div>';
+    }
+  } catch (e) { /* not JSON — fall through */ }
+  return '<div style="white-space:pre-wrap;">' + evfEscape(String(notes)) + '</div>';
+}
+
+function evfCloseModal() {
+  document.getElementById('evfModalOverlay').classList.remove('open');
+}
+
+function evfCloseModalIfBackdrop(ev) {
+  if (ev.target.id === 'evfModalOverlay') evfCloseModal();
+}
+
+// Esc closes modal (only when it's open — don't interfere with edit modal)
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var modal = document.getElementById('evfModalOverlay');
+    if (modal && modal.classList.contains('open')) evfCloseModal();
+  }
+});
+
+// CSV export — exports ALL currently-loaded events (after tenant
+// search filter, if any). UTF-8 BOM + CRLF for Excel Arabic compat.
+function evfExportCsv() {
+  var search = (document.getElementById('evfSearch').value || '').trim().toLowerCase();
+  var rows = search
+    ? evfAllEvents.filter(function(ev) {
+        var t = evfTenantMap[ev.trial_request_id];
+        if (!t) return false;
+        return (t.name + ' ' + t.email + ' ' + t.phone).toLowerCase().indexOf(search) >= 0;
+      })
+    : evfAllEvents.slice();
+
+  if (rows.length === 0) {
+    alert('لا توجد أحداث للتصدير. حاول توسيع الفلاتر أولاً.');
+    return;
+  }
+
+  var headers = [
+    'الوقت','نوع الحدث','العميل','الإيميل','الهاتف',
+    'من خطة','إلى خطة','من حالة','إلى حالة',
+    'من نهاية تجربة','إلى نهاية تجربة',
+    'المبلغ','العملة','بواسطة','ملاحظات','ID'
+  ];
+  var lines = [headers.map(evfCsvCell).join(',')];
+
+  rows.forEach(function(ev) {
+    var t = evfTenantMap[ev.trial_request_id] || { name: '', email: '', phone: '' };
+    var meta = EVF_EVENT_TYPES[ev.event_type] || { label_ar: ev.event_type };
+    var row = [
+      evfFormatTimestamp(ev.created_at),
+      meta.label_ar + ' (' + ev.event_type + ')',
+      t.name, t.email, t.phone,
+      ev.from_plan || '', ev.to_plan || '',
+      ev.from_status || '', ev.to_status || '',
+      ev.from_trial_end || '', ev.to_trial_end || '',
+      ev.amount == null ? '' : String(ev.amount),
+      ev.currency || '',
+      ev.performed_by || '',
+      ev.notes || '',
+      ev.id || ''
+    ];
+    lines.push(row.map(evfCsvCell).join(','));
+  });
+
+  var blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  a.download = 'subscription-events-' + ts + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function evfCsvCell(v) {
+  if (v == null) return '""';
+  return '"' + String(v).replace(/"/g, '""') + '"';
 }
 
 // ============================================================
