@@ -324,6 +324,115 @@ nav{
 .step-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;}
 .step-desc{font-size:13px;color:var(--text2);line-height:1.7;}
 
+/* ========= PRICING SECTION (Phase X2.1) ========= */
+.pricing-section{
+  padding:80px 24px;
+  background:var(--bg);
+}
+.pricing-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:20px;
+  max-width:1100px;margin:0 auto;
+}
+.pricing-card{
+  position:relative;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:32px 24px;
+  display:flex;flex-direction:column;
+  transition:transform .2s,border-color .2s,box-shadow .2s;
+}
+.pricing-card:hover{
+  transform:translateY(-4px);
+  border-color:var(--border2);
+  box-shadow:0 12px 32px rgba(0,0,0,0.25);
+}
+.pricing-card.featured{
+  border-color:var(--green);
+  box-shadow:0 0 0 1px var(--green) inset;
+}
+.pricing-card.featured::before{
+  content:'الأكثر شعبية';
+  position:absolute;top:-12px;left:50%;transform:translateX(-50%);
+  background:var(--green);color:var(--bg);
+  padding:4px 14px;border-radius:999px;
+  font-size:11px;font-weight:800;letter-spacing:0.5px;
+  white-space:nowrap;
+}
+.pricing-card-name{
+  font-size:18px;font-weight:800;color:var(--green);margin-bottom:4px;
+}
+.pricing-card-tagline{
+  font-size:12px;color:var(--text2);margin-bottom:18px;line-height:1.5;
+}
+.pricing-card-price-row{
+  display:flex;align-items:baseline;gap:8px;margin-bottom:4px;
+  flex-wrap:wrap;
+}
+.pricing-card-price{
+  font-size:32px;font-weight:800;color:var(--text);line-height:1;
+}
+.pricing-card-currency{
+  font-size:14px;color:var(--text2);font-weight:700;
+}
+.pricing-card-period{
+  font-size:13px;color:var(--text2);margin-bottom:20px;
+}
+.pricing-card-limits{
+  display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;
+}
+.pricing-card-limit{
+  background:var(--bg3);padding:5px 10px;border-radius:6px;
+  border:1px solid var(--border);
+  font-size:11px;color:var(--text2);
+}
+.pricing-features{list-style:none;padding:0;margin:0 0 24px 0;flex:1;}
+.pricing-feature{
+  display:flex;align-items:flex-start;gap:10px;
+  font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5;
+}
+.pricing-feature::before{
+  content:'✓';color:var(--green);font-weight:800;flex-shrink:0;font-size:14px;
+}
+.pricing-savings-badge{
+  display:inline-block;
+  background:rgba(46,232,158,0.15);
+  color:var(--green);
+  border:1px solid var(--border2);
+  padding:3px 8px;border-radius:5px;
+  font-size:10px;font-weight:800;margin-right:6px;
+}
+.pricing-cta{
+  display:block;text-align:center;text-decoration:none;
+  padding:12px 18px;
+  background:var(--green);color:var(--bg);
+  border-radius:10px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;
+  transition:all .2s;
+}
+.pricing-cta:hover{background:var(--green2);transform:translateY(-1px);}
+.pricing-cta-outline{
+  background:transparent;color:var(--green);
+  border:1.5px solid var(--border2);
+}
+.pricing-cta-outline:hover{
+  border-color:var(--green);
+  background:var(--green-dim);
+  transform:translateY(-1px);
+}
+.pricing-loading{
+  text-align:center;font-size:14px;color:var(--text2);
+  padding:40px 0;
+}
+.pricing-error{
+  max-width:600px;margin:0 auto;
+  text-align:center;font-size:13px;color:var(--text2);
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:10px;padding:24px;line-height:1.7;
+}
+
 /* ========= FORM SECTION ========= */
 .form-section{
   padding:80px 24px;
@@ -443,13 +552,15 @@ footer{
 @media(min-width:1200px){
   .features-grid{grid-template-columns:repeat(3,1fr);}
   .steps-grid{grid-template-columns:repeat(3,1fr);}
+  .pricing-grid{grid-template-columns:repeat(3,1fr);}
   nav{padding:0 60px;}
   .section{padding:100px 60px;}
   .steps-section{padding:100px 60px;}
+  .pricing-section{padding:100px 60px;}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a14"></script>
+<script src="supabase-init.js?v=20260523a20"></script>
 </head>
 <body>
 
@@ -465,6 +576,7 @@ footer{
     </div>
   </a>
   <div class="nav-actions">
+    <a href="#pricing" class="btn-outline nav-pricing-link">الأسعار</a>
     <a href="auth.html" class="btn-outline">تسجيل الدخول</a>
     <a href="auth.html?tab=register" class="btn-primary">جرّب مجاناً</a>
   </div>
@@ -622,6 +734,16 @@ footer{
   </div>
 </section>
 
+<!-- PRICING (Phase X2.1) -->
+<section class="pricing-section" id="pricing">
+  <div class="section-label">الأسعار</div>
+  <h2 class="section-title">خطط مرنة تناسب عيادتك</h2>
+  <p class="section-sub">ابدأ مجاناً ثم اختر ما يناسبك. لا التزامات، لا رسوم خفية.</p>
+  <div id="pricingGrid" class="pricing-grid">
+    <div class="pricing-loading">⏳ جارٍ تحميل الخطط...</div>
+  </div>
+</section>
+
 <!-- FOOTER -->
 <footer>
   <a href="landing.html" class="footer-logo">
@@ -644,6 +766,170 @@ footer{
 //   • The dual-form maintenance burden (landing form + auth.html register)
 // Landing.html is now pure marketing; the "جرّب مجاناً" CTA links to
 // auth.html?tab=register which auto-opens the registration tab.
+</script>
+
+<script>
+// ============================================================================
+// Phase X2.1 — Pricing section loader
+// ============================================================================
+// Reads subscription_plans live from Supabase and renders 3 pricing cards
+// (one per active plan). is_active=false plans are silently hidden — admin
+// can hide a plan from the public site by toggling the switch in
+// admin.html → ⚙️ إعدادات الخطط without touching code.
+//
+// Yearly cards get an auto-computed savings badge ("وفّر ~38%") when both
+// monthly + yearly are active — same logic the admin plan picker uses
+// (admin.html line ~2697). Single source of truth: subscription_plans.
+//
+// Failure modes:
+//   • Supabase library missing            → fallback hardcoded card set
+//   • Query error / network failure       → error panel with retry hint
+//   • No active plans (all toggled off)   → friendly "no plans available" message
+//
+// CTA for every card points to auth.html?tab=register&plan=<code> so admin
+// can later use the ?plan= hint to pre-select an interest in the
+// onboarding flow (future Phase 7.6G).
+// ============================================================================
+(function(){
+  function escHtml(s){
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+  function fmtPrice(n){
+    if (n == null || isNaN(Number(n))) return '0';
+    try { return Number(n).toLocaleString('en-US'); }
+    catch(e) { return String(n); }
+  }
+  function renderError(msg){
+    var grid = document.getElementById('pricingGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="pricing-error">' +
+      '⚠️ تعذّر تحميل الأسعار حالياً.' +
+      '<br>' + (msg ? escHtml(msg) : 'يرجى المحاولة لاحقاً.') +
+      '<br><br>للاستفسار: <a href="auth.html?tab=register" style="color:#2ee89e;text-decoration:underline;">سجّل اهتمامك</a> وسنتواصل معك.' +
+      '</div>';
+  }
+  function renderEmpty(){
+    var grid = document.getElementById('pricingGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="pricing-error">' +
+      'لا توجد خطط متاحة حالياً.' +
+      '<br><br><a href="auth.html?tab=register" style="color:#2ee89e;text-decoration:underline;">تواصل معنا</a> لمعرفة المزيد.' +
+      '</div>';
+  }
+  function renderPlans(plans){
+    var grid = document.getElementById('pricingGrid');
+    if (!grid) return;
+    if (!plans || plans.length === 0) { renderEmpty(); return; }
+    // Sort by sort_order ascending, then by code as tie-breaker.
+    plans = plans.slice().sort(function(a,b){
+      var sa = a.sort_order == null ? 999 : Number(a.sort_order);
+      var sb = b.sort_order == null ? 999 : Number(b.sort_order);
+      if (sa !== sb) return sa - sb;
+      return String(a.code || '').localeCompare(String(b.code || ''));
+    });
+    // Build a lookup for savings calc.
+    var byCode = {};
+    plans.forEach(function(p){ byCode[p.code] = p; });
+    // Identify "featured" plan — yearly if present and active, else monthly.
+    var featuredCode = (byCode.yearly && byCode.yearly.is_active) ? 'yearly'
+                     : (byCode.monthly && byCode.monthly.is_active) ? 'monthly'
+                     : null;
+    var html = '';
+    plans.forEach(function(p){
+      if (p.is_active === false) return; // skip inactive — admin hid it
+      var name = escHtml(p.display_name || p.code || '—');
+      var price = fmtPrice(p.price);
+      var dur = (p.duration_days == null ? '—' : Number(p.duration_days));
+      var curr = escHtml(p.currency || 'SYP');
+      var tagline = '';
+      if (p.code === 'trial')       tagline = 'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.';
+      else if (p.code === 'monthly') tagline = 'دفعة شهرية مرنة. أوقف متى شئت.';
+      else if (p.code === 'yearly')  tagline = 'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.';
+      // Compute savings badge for yearly when monthly also active.
+      var savingsBadge = '';
+      if (p.code === 'yearly' && byCode.monthly && byCode.monthly.is_active &&
+          Number(byCode.monthly.price) > 0 && Number(p.price) > 0) {
+        var monthlyEq = Number(byCode.monthly.price) * 12;
+        if (Number(p.price) < monthlyEq) {
+          var pct = Math.round((1 - Number(p.price) / monthlyEq) * 100);
+          if (pct > 0) savingsBadge = '<span class="pricing-savings-badge">وفّر ~' + pct + '%</span>';
+        }
+      }
+      // Limits chips.
+      var limits = '';
+      if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
+        limits += '<span class="pricing-card-limit">👥 حتى ' + Number(p.max_employees) + ' موظف</span>';
+      } else {
+        limits += '<span class="pricing-card-limit">👥 بلا حد</span>';
+      }
+      if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
+        limits += '<span class="pricing-card-limit">🦷 حتى ' + Number(p.max_patients) + ' مريض</span>';
+      } else {
+        limits += '<span class="pricing-card-limit">🦷 بلا حد</span>';
+      }
+      // Features.
+      var feats = Array.isArray(p.features) ? p.features : [];
+      var featsHtml = '';
+      feats.forEach(function(f){
+        featsHtml += '<li class="pricing-feature">' + escHtml(String(f)) + '</li>';
+      });
+      // CTA: trial uses primary green, paid plans use outline (paid signup
+      // still routes through trial — admin converts after acceptance).
+      var ctaClass = (p.code === 'trial') ? 'pricing-cta' : 'pricing-cta pricing-cta-outline';
+      var ctaLabel = (p.code === 'trial') ? 'ابدأ تجربتك المجانية ←' : 'سجّل اهتمامك ←';
+      var ctaHref = 'auth.html?tab=register&plan=' + encodeURIComponent(p.code);
+      var isFeatured = (p.code === featuredCode);
+      html +=
+        '<div class="pricing-card' + (isFeatured ? ' featured' : '') + '">' +
+          '<div class="pricing-card-name">' + savingsBadge + name + '</div>' +
+          '<div class="pricing-card-tagline">' + escHtml(tagline) + '</div>' +
+          '<div class="pricing-card-price-row">' +
+            '<span class="pricing-card-price">' + price + '</span>' +
+            '<span class="pricing-card-currency">' + curr + '</span>' +
+          '</div>' +
+          '<div class="pricing-card-period">لمدة ' + dur + ' يوم</div>' +
+          '<div class="pricing-card-limits">' + limits + '</div>' +
+          '<ul class="pricing-features">' + featsHtml + '</ul>' +
+          '<a href="' + ctaHref + '" class="' + ctaClass + '">' + ctaLabel + '</a>' +
+        '</div>';
+    });
+    if (!html) { renderEmpty(); return; }
+    grid.innerHTML = html;
+  }
+  async function loadPricing(){
+    // Wait briefly for supabase-init.js to set window.sb.
+    var tries = 0;
+    while (!window.sb && tries < 30) {
+      await new Promise(function(r){ setTimeout(r, 100); });
+      tries++;
+    }
+    if (!window.sb) {
+      renderError('فشل تحميل مكتبة الاتصال.');
+      return;
+    }
+    try {
+      var res = await window.sb.from('subscription_plans')
+        .select('*')
+        .order('sort_order', { ascending: true });
+      if (res.error) {
+        console.warn('loadPricing query error:', res.error);
+        renderError(res.error.message || '');
+        return;
+      }
+      renderPlans(res.data || []);
+    } catch(e) {
+      console.warn('loadPricing exception:', e);
+      renderError(e && e.message ? e.message : String(e));
+    }
+  }
+  // Kick off after DOM ready (the section element must exist before we render).
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadPricing);
+  } else {
+    loadPricing();
+  }
+})();
 </script>
 
 <script>
