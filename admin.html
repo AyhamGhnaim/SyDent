@@ -781,7 +781,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a18"></script>
+<script src="supabase-init.js?v=20260523a19"></script>
 </head>
 <body>
 
@@ -2196,6 +2196,40 @@ async function savePlanEdits() {
         updatePayload.updated_by = sess.data.session.user.email || 'admin';
       }
     } catch(e) { /* best-effort; column has a default or is nullable */ }
+
+    // Optimistic concurrency check (Rule #34 — enterprise mindset):
+    // Re-fetch the row's updated_at and verify it matches what we loaded
+    // into planEditorState.original. If another admin (or this admin in
+    // another tab) wrote to the row between our open and our save, we
+    // abort with a clear message rather than silently overwriting.
+    if (o.updated_at) {
+      try {
+        var check = await window.sb.from('subscription_plans')
+          .select('updated_at,updated_by')
+          .eq('code', o.code)
+          .maybeSingle();
+        if (check && check.data && check.data.updated_at && check.data.updated_at !== o.updated_at) {
+          var whoLine = check.data.updated_by ? ('\n\nآخر تعديل بواسطة: ' + check.data.updated_by) : '';
+          alert('⚠️ تم تعديل هذه الخطة من جلسة أخرى منذ فتحك للمحرّر.' + whoLine +
+                '\n\nسيتم إعادة تحميل أحدث نسخة لتجنّب الكتابة فوق تعديلات الآخرين. راجع التغييرات ثم احفظ من جديد.');
+          await loadPlanConfig();
+          var stale = getPlanConfig(o.code);
+          if (stale) {
+            planEditorState.original = JSON.parse(JSON.stringify(stale));
+            planEditorState.edited   = JSON.parse(JSON.stringify(stale));
+            planEditorState.isDirty  = false;
+            renderPlanEditorFields(planEditorState.edited);
+            renderPlanPreview(planEditorState.edited);
+            updatePlanDirtyUI();
+          }
+          return;
+        }
+      } catch(e) {
+        console.warn('savePlanEdits: optimistic check failed (proceeding):', e);
+        // Non-fatal — we'd rather risk a rare overwrite than block all saves
+        // when the network is flaky. The audit log preserves history either way.
+      }
+    }
 
     var upd = await window.sb.from('subscription_plans')
       .update(updatePayload)
