@@ -396,29 +396,95 @@ var searchDebounce = null;
 // filter2 sequence can let filter1's late response overwrite filter2.
 var loadEventsToken = 0;
 
-/* ===== Auth gate ===== */
+/* ===== Auth gate =====
+ * Matches admin.html auth pattern (Phase X1 rule #39): require an
+ * authenticated session AND a doctors row with role='admin'. The
+ * admin user has no clinic_doctors/clinic_employees row (they're a
+ * platform admin, not a tenant), so SyDentLock is NOT called here.
+ *
+ * Defensive logging: every branch logs to console + shows a visible
+ * status indicator if redirect happens, so a "blank page" or
+ * "back to admin.html" outcome can be diagnosed without browser
+ * dev tools. Production-ready failure path (no silent redirects). */
 window.addEventListener('DOMContentLoaded', async function() {
+  console.log('[subscription-events] DOMContentLoaded');
+  // Show a temporary loading state so the user knows JS is running
+  // (rather than staring at a blank page during the auth check).
+  var bodyEl = document.body;
+  var splash = document.createElement('div');
+  splash.id = 'authSplash';
+  splash.style.cssText = 'position:fixed;inset:0;background:#0a1628;color:#e1f4ee;display:flex;align-items:center;justify-content:center;font-family:Cairo,sans-serif;z-index:9999;flex-direction:column;gap:12px;';
+  splash.innerHTML = '<div style="font-size:32px;">⏳</div><div id="authSplashText">جارٍ التحقق من الجلسة...</div>';
+  bodyEl.appendChild(splash);
+
+  function setSplash(text) {
+    var t = document.getElementById('authSplashText');
+    if (t) t.textContent = text;
+    console.log('[subscription-events] ' + text);
+  }
+  function showSplashError(text, detail) {
+    splash.innerHTML = '<div style="font-size:48px;">⚠️</div>' +
+      '<div style="font-size:16px;font-weight:700;">' + text + '</div>' +
+      (detail ? '<div style="font-size:12px;color:#8a9ab5;max-width:400px;text-align:center;padding:0 20px;">' + detail + '</div>' : '') +
+      '<button onclick="window.location.href=\'admin.html\'" style="margin-top:16px;padding:8px 20px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;font-family:inherit;font-weight:700;cursor:pointer;">← عودة للإدارة</button>';
+    console.error('[subscription-events] ' + text, detail);
+  }
+
+  setSplash('جارٍ انتظار تحميل Supabase...');
   var tries = 0;
   while (!window.sb && tries < 50) {
     await new Promise(function(r){ setTimeout(r, 100); });
     tries++;
   }
   if (!window.sb) {
-    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#ef9a9a">تعذّر تحميل Supabase</div>';
+    showSplashError('تعذّر تحميل Supabase', 'تأكد من الاتصال بالإنترنت وأعد تحميل الصفحة.');
     return;
   }
-  var sessRes = await window.sb.auth.getSession();
+
+  setSplash('جارٍ التحقق من الجلسة...');
+  var sessRes;
+  try {
+    sessRes = await window.sb.auth.getSession();
+  } catch (e) {
+    showSplashError('فشل التحقق من الجلسة', e && e.message ? e.message : String(e));
+    return;
+  }
   var session = sessRes && sessRes.data ? sessRes.data.session : null;
   if (!session || !session.user) {
-    window.location.replace('auth.html');
+    setSplash('لا توجد جلسة — تحويل لصفحة تسجيل الدخول...');
+    setTimeout(function(){ window.location.replace('auth.html'); }, 800);
     return;
   }
-  var roleRes = await window.sb.from('doctors').select('role').eq('id', session.user.id).maybeSingle();
+
+  setSplash('جارٍ التحقق من صلاحية المدير...');
+  var roleRes;
+  try {
+    roleRes = await window.sb.from('doctors').select('role').eq('id', session.user.id).maybeSingle();
+  } catch (e) {
+    showSplashError('فشل التحقق من الصلاحية', e && e.message ? e.message : String(e));
+    return;
+  }
+  if (roleRes && roleRes.error) {
+    showSplashError('خطأ في قاعدة البيانات', roleRes.error.message || 'تعذّر قراءة الصلاحية');
+    return;
+  }
   var roleData = roleRes ? roleRes.data : null;
   if (!roleData || roleData.role !== 'admin') {
-    window.location.replace('index.html');
+    // No redirect loop — show a clear message so the admin doesn't
+    // get bounced back to admin.html silently (which would feel like
+    // the link is "broken"). This is the failure that motivated this
+    // entire diagnostics block.
+    showSplashError(
+      'لا تمتلك صلاحية مدير',
+      'هذه الصفحة متاحة فقط لمسؤولي منصّة SyDent. ' +
+      'إذا كنت ترى هذا الخطأ بالخطأ، تأكد من تسجيل الدخول بحساب الإدارة.'
+    );
     return;
   }
+
+  // Auth passed — remove splash and show the page
+  console.log('[subscription-events] auth OK, rendering page');
+  splash.remove();
   document.getElementById('page').style.display = 'block';
 
   // Default date range = last 30 days (matches Stripe Events default)
