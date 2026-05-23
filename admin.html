@@ -557,6 +557,163 @@ header{
 }
 .btn-demote:hover{background:rgba(255,167,38,0.18);}
 
+/* ===== Phase X2: Plans & Pricing Editor ===== */
+.plan-editor-section{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;margin-bottom:18px;overflow:hidden;
+}
+.plan-editor-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;cursor:pointer;user-select:none;
+  background:var(--bg3);transition:background .15s;
+  font-weight:700;font-size:14px;color:var(--text);
+}
+.plan-editor-header:hover{background:var(--bg4);}
+.plan-editor-toggle{font-size:12px;color:var(--text2);transition:transform .2s;}
+.plan-editor-section.open .plan-editor-toggle{transform:rotate(90deg);}
+.plan-editor-body{display:none;padding:18px;}
+.plan-editor-section.open .plan-editor-body{display:block;}
+
+.plan-tabs-wrap{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.plan-tab{
+  flex:1;min-width:90px;padding:10px 14px;
+  background:transparent;border:1px solid var(--border);border-radius:8px;
+  color:var(--text2);font-family:'Cairo',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.plan-tab:hover{background:var(--bg3);}
+.plan-tab.active{
+  background:rgba(255,193,7,0.10);
+  border-color:rgba(255,193,7,0.35);color:#ffc107;
+}
+
+.plan-edit-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;
+  margin-bottom:14px;
+}
+@media(max-width:680px){.plan-edit-grid{grid-template-columns:1fr;}}
+
+.plan-edit-pane{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:10px;padding:14px;
+}
+.plan-field{margin-bottom:12px;}
+.plan-field label{
+  display:block;font-size:11px;color:var(--text2);
+  font-weight:600;margin-bottom:5px;
+}
+.plan-field input,.plan-field textarea{
+  width:100%;background:var(--bg2);border:1px solid var(--border);
+  color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;
+  padding:8px 10px;border-radius:7px;box-sizing:border-box;
+}
+.plan-field input:focus,.plan-field textarea:focus{
+  outline:none;border-color:rgba(255,193,7,0.45);
+}
+.plan-field textarea{resize:vertical;min-height:90px;font-size:12px;line-height:1.55;}
+.plan-field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.plan-field-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+@media(max-width:480px){
+  .plan-field-row,.plan-field-row3{grid-template-columns:1fr;}
+}
+.plan-field-hint{font-size:10px;color:var(--text3);margin-top:3px;}
+
+.plan-toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--bg2);border-radius:7px;
+  border:1px solid var(--border);margin-bottom:12px;
+}
+.plan-toggle-label{font-size:13px;font-weight:600;color:var(--text);}
+.plan-toggle-sublabel{font-size:10px;color:var(--text2);margin-top:2px;}
+.plan-switch{
+  position:relative;width:42px;height:22px;
+  background:var(--bg4);border-radius:11px;cursor:pointer;
+  border:1px solid var(--border);transition:all .2s;
+}
+.plan-switch.on{background:rgba(46,232,158,0.25);border-color:rgba(46,232,158,0.5);}
+.plan-switch-knob{
+  position:absolute;top:1px;right:1px;width:18px;height:18px;
+  background:var(--text);border-radius:50%;transition:all .2s;
+}
+.plan-switch.on .plan-switch-knob{right:21px;background:#2ee89e;}
+
+.plan-preview-pane{
+  background:linear-gradient(135deg,var(--bg3) 0%,var(--bg4) 100%);
+  border:1px solid var(--border2);border-radius:10px;
+  padding:18px;display:flex;flex-direction:column;
+}
+.preview-label{
+  font-size:10px;color:var(--text3);text-transform:uppercase;
+  letter-spacing:0.6px;margin-bottom:10px;
+}
+.preview-card{flex:1;display:flex;flex-direction:column;}
+.preview-card-name{font-size:18px;font-weight:800;color:#ffc107;margin-bottom:6px;}
+.preview-card-price{
+  font-size:24px;font-weight:800;color:var(--text);margin-bottom:2px;
+}
+.preview-card-currency{font-size:13px;color:var(--text2);font-weight:600;margin-right:4px;}
+.preview-card-duration{font-size:11px;color:var(--text2);margin-bottom:14px;}
+.preview-card-limits{
+  display:flex;gap:10px;flex-wrap:wrap;
+  font-size:11px;color:var(--text2);margin-bottom:12px;
+}
+.preview-card-limit{
+  background:var(--bg2);padding:4px 8px;border-radius:5px;
+  border:1px solid var(--border);
+}
+.preview-features{list-style:none;padding:0;margin:0;flex:1;}
+.preview-feature{
+  display:flex;align-items:flex-start;gap:8px;
+  font-size:12px;color:var(--text);margin-bottom:7px;line-height:1.5;
+}
+.preview-feature::before{
+  content:'✓';color:#2ee89e;font-weight:800;flex-shrink:0;
+}
+.preview-features-empty{
+  font-size:11px;color:var(--text3);font-style:italic;
+  padding:8px;text-align:center;
+}
+.preview-inactive-badge{
+  display:inline-block;font-size:10px;font-weight:700;
+  padding:3px 8px;border-radius:5px;
+  background:rgba(255,87,87,0.15);color:#ff5757;
+  border:1px solid rgba(255,87,87,0.35);margin-bottom:10px;
+}
+
+.plan-actions-row{
+  display:flex;gap:10px;justify-content:flex-end;
+  padding-top:10px;border-top:1px solid var(--border);
+}
+.btn-revert-plan{
+  padding:9px 16px;background:transparent;
+  border:1px solid var(--border);border-radius:8px;
+  color:var(--text2);font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.btn-revert-plan:hover:not(:disabled){background:var(--bg3);color:var(--text);}
+.btn-revert-plan:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-save-plan{
+  padding:9px 18px;
+  background:rgba(255,193,7,0.10);
+  border:1px solid rgba(255,193,7,0.35);
+  border-radius:8px;color:#ffc107;
+  font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+}
+.btn-save-plan:hover:not(:disabled){background:rgba(255,193,7,0.20);}
+.btn-save-plan:disabled{
+  opacity:0.4;cursor:not-allowed;
+  background:transparent;color:var(--text3);border-color:var(--border);
+}
+.plan-dirty-indicator{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:#ffc107;margin-left:6px;vertical-align:middle;
+  animation:planDirtyPulse 1.4s ease-in-out infinite;
+}
+@keyframes planDirtyPulse{
+  0%,100%{opacity:1;}50%{opacity:0.45;}
+}
+
 /* ===== Phase 7.6E-Part 2: PLAN PICKER MODAL ===== */
 .plan-option{
   display:flex;align-items:flex-start;gap:10px;
@@ -624,7 +781,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a17"></script>
+<script src="supabase-init.js?v=20260523a18"></script>
 </head>
 <body>
 
@@ -697,6 +854,75 @@ header{
       <button class="tab" onclick="setFilter('new',this)">جديد</button>
       <button class="tab" onclick="setFilter('accepted',this)">مقبول</button>
       <button class="tab" onclick="setFilter('rejected',this)">مرفوض</button>
+    </div>
+
+    <!-- Phase X2: Plans & Pricing Editor -->
+    <div class="plan-editor-section" id="planEditorSection">
+      <div class="plan-editor-header" onclick="togglePlanEditor()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePlanEditor();}">
+        <span>⚙️ إعدادات الخطط <span id="planDirtyIndicator" style="display:none;" class="plan-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
+        <span class="plan-editor-toggle">▶</span>
+      </div>
+      <div class="plan-editor-body">
+        <div class="plan-tabs-wrap" id="planTabsWrap">
+          <button type="button" class="plan-tab active" data-plan-code="trial"   onclick="selectPlanTab('trial',this)">🆓 تجربة</button>
+          <button type="button" class="plan-tab"        data-plan-code="monthly" onclick="selectPlanTab('monthly',this)">💵 شهري</button>
+          <button type="button" class="plan-tab"        data-plan-code="yearly"  onclick="selectPlanTab('yearly',this)">💎 سنوي</button>
+        </div>
+        <div class="plan-edit-grid">
+          <div class="plan-edit-pane">
+            <div class="plan-field">
+              <label for="planFldDisplayName">اسم العرض</label>
+              <input type="text" id="planFldDisplayName" oninput="onPlanFieldChange()" autocomplete="off">
+            </div>
+            <div class="plan-field-row3">
+              <div class="plan-field">
+                <label for="planFldDuration">المدة (يوم)</label>
+                <input type="number" id="planFldDuration" min="1" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+              <div class="plan-field">
+                <label for="planFldPrice">السعر</label>
+                <input type="number" id="planFldPrice" min="0" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+              <div class="plan-field">
+                <label for="planFldSort">الترتيب</label>
+                <input type="number" id="planFldSort" min="1" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+            </div>
+            <div class="plan-field-row">
+              <div class="plan-field">
+                <label for="planFldMaxEmp">حد الموظفين <span style="color:var(--text3);font-weight:400;">(فارغ = بلا حد)</span></label>
+                <input type="number" id="planFldMaxEmp" min="1" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+              <div class="plan-field">
+                <label for="planFldMaxPat">حد المرضى <span style="color:var(--text3);font-weight:400;">(فارغ = بلا حد)</span></label>
+                <input type="number" id="planFldMaxPat" min="1" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+            </div>
+            <div class="plan-field">
+              <label for="planFldFeatures">الميزات (سطر لكل ميزة)</label>
+              <textarea id="planFldFeatures" oninput="onPlanFieldChange()" placeholder="كل الميزات&#10;حتى 5 موظفين&#10;حتى 50 مريض&#10;بدون التزام"></textarea>
+              <div class="plan-field-hint">كل سطر يصبح بنداً منفصلاً في بطاقة العرض. السطور الفارغة تُحذف تلقائياً.</div>
+            </div>
+            <div class="plan-toggle-row">
+              <div>
+                <div class="plan-toggle-label">الخطة نشطة</div>
+                <div class="plan-toggle-sublabel">عند الإيقاف، لن تظهر للمشتركين الجدد. الاشتراكات الحالية لن تتأثر.</div>
+              </div>
+              <div class="plan-switch" id="planSwitchActive" onclick="onPlanToggleActive()" role="switch" aria-checked="true" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onPlanToggleActive();}">
+                <span class="plan-switch-knob"></span>
+              </div>
+            </div>
+          </div>
+          <div class="plan-preview-pane">
+            <div class="preview-label">معاينة مباشرة</div>
+            <div class="preview-card" id="planPreviewCard"></div>
+          </div>
+        </div>
+        <div class="plan-actions-row">
+          <button type="button" class="btn-revert-plan" id="btnRevertPlan" onclick="revertPlanEdits()" disabled>↺ إلغاء التعديلات</button>
+          <button type="button" class="btn-save-plan"   id="btnSavePlan"   onclick="savePlanEdits()"   disabled>💾 حفظ التغييرات</button>
+        </div>
+      </div>
     </div>
 
     <!-- List -->
@@ -1564,11 +1790,19 @@ async function loadPlanConfig() {
       console.warn('loadPlanConfig: query error', res.error);
       // Fallback to hardcoded defaults so the page doesn't break if the
       // table is missing (e.g. Migration 23 wasn't run on this DB yet).
-      // These mirror the Migration 23 seed exactly.
+      // These mirror the Migration 23 seed exactly. All editable fields are
+      // populated (features / is_active / sort_order / limits) so the
+      // Phase X2 plan editor renders correctly even in this degraded state.
       planConfigCache = {
-        trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       currency:'SYP' },
-        monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP' },
-        yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP' }
+        trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       currency:'SYP',
+                   features:['كل الميزات','حتى 5 موظفين','حتى 50 مريض','بدون التزام'],
+                   max_employees:5, max_patients:50, is_active:true, sort_order:1 },
+        monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP',
+                   features:['كل الميزات','موظفين بلا حدود','مرضى بلا حدود','دعم فني','نسخ احتياطي يومي'],
+                   max_employees:null, max_patients:null, is_active:true, sort_order:2 },
+        yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP',
+                   features:['كل ميزات الشهري','خصم ~16%','أولوية الدعم','ميزات حصرية قادمة'],
+                   max_employees:null, max_patients:null, is_active:true, sort_order:3 }
       };
       planConfigLoaded = true;
       return false;
@@ -1597,6 +1831,431 @@ function formatPrice(amount, currency) {
     return String(amount) + ' ' + (currency || 'SYP');
   }
 }
+
+// ============================================================================
+// === Phase X2: Plans & Pricing Editor =======================================
+// ============================================================================
+// admin edits subscription_plans rows (display_name / duration_days / price /
+// features / max_employees / max_patients / sort_order / is_active) directly
+// from the UI. Pattern follows Stripe Product Catalog + ChargeBee plan editor:
+//
+//   1. select tab (trial / monthly / yearly)
+//   2. tweak fields — live preview on the right reflects every keystroke
+//   3. save → confirm() → UPDATE + logSubscriptionEvent('plan_updated') +
+//      reload planConfigCache (so subsequent admin transitions see new prices)
+//
+// price_paid snapshots in trial_requests are NOT touched (Rule #40) — existing
+// subscribers keep the price they paid; the new price only affects future
+// purchases. This matches Stripe and ChargeBee behavior.
+//
+// Audit notes field captures a JSON diff of changed fields only (Stripe events
+// pattern) so the subscription_events viewer can render a clean change log.
+// ============================================================================
+
+var planEditorState = {
+  selectedCode: 'trial',
+  original: null,    // canonical copy from DB (deep-cloned on tab select)
+  edited:   null,    // working copy being mutated by inputs
+  isDirty:  false
+};
+
+function togglePlanEditor() {
+  var sec = document.getElementById('planEditorSection');
+  if (!sec) return;
+  var willOpen = !sec.classList.contains('open');
+  if (!willOpen && planEditorState.isDirty) {
+    if (!confirm('لديك تعديلات غير محفوظة على خطة "' + (planEditorState.edited && planEditorState.edited.display_name || planEditorState.selectedCode) + '". الإغلاق سيُلغي هذه التعديلات. متابعة؟')) {
+      return;
+    }
+    revertPlanEdits(true); // silent revert
+  }
+  sec.classList.toggle('open', willOpen);
+  if (willOpen) {
+    // Re-load fresh from cache every time the section opens so the editor
+    // reflects any external changes (e.g. another admin tab made an edit).
+    selectPlanTab(planEditorState.selectedCode, null);
+  }
+}
+
+function selectPlanTab(code, btnEl) {
+  if (planEditorState.isDirty && code !== planEditorState.selectedCode) {
+    if (!confirm('لديك تعديلات غير محفوظة. التبديل سيُلغي هذه التعديلات. متابعة؟')) {
+      return;
+    }
+  }
+  planEditorState.selectedCode = code;
+  // Update tab active state — find the matching tab regardless of which
+  // element triggered this (programmatic calls pass null).
+  var wrap = document.getElementById('planTabsWrap');
+  if (wrap) {
+    var tabs = wrap.querySelectorAll('.plan-tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-plan-code') === code);
+    }
+  }
+  var src = getPlanConfig(code);
+  if (!src) {
+    alert('لم يتم تحميل بيانات الخطة "' + code + '" بعد. جرّب إعادة تحميل الصفحة.');
+    return;
+  }
+  // Deep clone via JSON round-trip — features is a JSONB array, this is safe.
+  planEditorState.original = JSON.parse(JSON.stringify(src));
+  planEditorState.edited   = JSON.parse(JSON.stringify(src));
+  planEditorState.isDirty  = false;
+  renderPlanEditorFields(planEditorState.edited);
+  renderPlanPreview(planEditorState.edited);
+  updatePlanDirtyUI();
+}
+
+function renderPlanEditorFields(p) {
+  document.getElementById('planFldDisplayName').value = p.display_name || '';
+  document.getElementById('planFldDuration').value    = (p.duration_days == null ? '' : String(p.duration_days));
+  document.getElementById('planFldPrice').value       = (p.price == null ? '' : String(p.price));
+  document.getElementById('planFldSort').value        = (p.sort_order == null ? '' : String(p.sort_order));
+  document.getElementById('planFldMaxEmp').value      = (p.max_employees == null ? '' : String(p.max_employees));
+  document.getElementById('planFldMaxPat').value      = (p.max_patients == null ? '' : String(p.max_patients));
+  document.getElementById('planFldFeatures').value    = stringifyFeatures(p.features);
+  var sw = document.getElementById('planSwitchActive');
+  if (sw) {
+    sw.classList.toggle('on', !!p.is_active);
+    sw.setAttribute('aria-checked', p.is_active ? 'true' : 'false');
+  }
+}
+
+function parseFeatures(text) {
+  if (!text) return [];
+  var lines = String(text).split('\n');
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var s = lines[i].trim();
+    if (s) out.push(s);
+  }
+  return out;
+}
+
+function stringifyFeatures(arr) {
+  if (!arr || !Array.isArray(arr)) return '';
+  return arr.join('\n');
+}
+
+function readEditorIntoState() {
+  // Pull all field values into planEditorState.edited. Numeric fields are
+  // parsed defensively: blank → null (unlimited for limits, falls into
+  // validation for required ones); non-numeric → NaN → caught by validate.
+  var ed = planEditorState.edited;
+  if (!ed) return;
+  ed.display_name  = (document.getElementById('planFldDisplayName').value || '').trim();
+  var dur = document.getElementById('planFldDuration').value;
+  ed.duration_days = dur === '' ? null : Number(dur);
+  var pr = document.getElementById('planFldPrice').value;
+  ed.price = pr === '' ? null : Number(pr);
+  var srt = document.getElementById('planFldSort').value;
+  ed.sort_order = srt === '' ? null : Number(srt);
+  var me = document.getElementById('planFldMaxEmp').value;
+  ed.max_employees = me === '' ? null : Number(me);
+  var mp = document.getElementById('planFldMaxPat').value;
+  ed.max_patients = mp === '' ? null : Number(mp);
+  ed.features = parseFeatures(document.getElementById('planFldFeatures').value);
+  // is_active is mutated separately via onPlanToggleActive() — no read needed.
+}
+
+function onPlanFieldChange() {
+  readEditorIntoState();
+  computePlanDirty();
+  renderPlanPreview(planEditorState.edited);
+  updatePlanDirtyUI();
+}
+
+function onPlanToggleActive() {
+  if (!planEditorState.edited) return;
+  planEditorState.edited.is_active = !planEditorState.edited.is_active;
+  var sw = document.getElementById('planSwitchActive');
+  if (sw) {
+    sw.classList.toggle('on', !!planEditorState.edited.is_active);
+    sw.setAttribute('aria-checked', planEditorState.edited.is_active ? 'true' : 'false');
+  }
+  computePlanDirty();
+  renderPlanPreview(planEditorState.edited);
+  updatePlanDirtyUI();
+}
+
+function computePlanDirty() {
+  var o = planEditorState.original;
+  var e = planEditorState.edited;
+  if (!o || !e) { planEditorState.isDirty = false; return; }
+  // Compare each editable field. JSON.stringify on features handles arrays.
+  var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active'];
+  for (var i = 0; i < keys.length; i++) {
+    var a = o[keys[i]]; var b = e[keys[i]];
+    // Normalize null/undefined to null for comparison.
+    if (a === undefined) a = null;
+    if (b === undefined) b = null;
+    if (a !== b) { planEditorState.isDirty = true; return; }
+  }
+  if (JSON.stringify(o.features || []) !== JSON.stringify(e.features || [])) {
+    planEditorState.isDirty = true; return;
+  }
+  planEditorState.isDirty = false;
+}
+
+function updatePlanDirtyUI() {
+  var saveBtn   = document.getElementById('btnSavePlan');
+  var revertBtn = document.getElementById('btnRevertPlan');
+  var dot       = document.getElementById('planDirtyIndicator');
+  if (saveBtn)   saveBtn.disabled   = !planEditorState.isDirty;
+  if (revertBtn) revertBtn.disabled = !planEditorState.isDirty;
+  if (dot)       dot.style.display  = planEditorState.isDirty ? 'inline-block' : 'none';
+}
+
+function renderPlanPreview(p) {
+  var box = document.getElementById('planPreviewCard');
+  if (!box || !p) return;
+  var inactive = !p.is_active
+    ? '<div class="preview-inactive-badge">⏸️ موقوفة</div>'
+    : '';
+  var name = escapeHtml(p.display_name || '—');
+  var priceNum = (p.price == null || isNaN(Number(p.price))) ? 0 : Number(p.price);
+  var priceStr = priceNum.toLocaleString('en-US');
+  var dur = (p.duration_days == null || isNaN(Number(p.duration_days))) ? '—' : String(p.duration_days);
+  var curr = escapeHtml(p.currency || 'SYP');
+  var limits = '';
+  if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
+    limits += '<span class="preview-card-limit">👥 حتى ' + Number(p.max_employees) + ' موظف</span>';
+  } else {
+    limits += '<span class="preview-card-limit">👥 بلا حد</span>';
+  }
+  if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
+    limits += '<span class="preview-card-limit">🦷 حتى ' + Number(p.max_patients) + ' مريض</span>';
+  } else {
+    limits += '<span class="preview-card-limit">🦷 بلا حد</span>';
+  }
+  var featsArr = Array.isArray(p.features) ? p.features : [];
+  var featsHtml = '';
+  if (featsArr.length === 0) {
+    featsHtml = '<li class="preview-features-empty">— لا ميزات مُعرّفة —</li>';
+  } else {
+    for (var i = 0; i < featsArr.length; i++) {
+      featsHtml += '<li class="preview-feature">' + escapeHtml(String(featsArr[i])) + '</li>';
+    }
+  }
+  box.innerHTML =
+    inactive +
+    '<div class="preview-card-name">' + name + '</div>' +
+    '<div class="preview-card-price">' + priceStr + ' <span class="preview-card-currency">' + curr + '</span></div>' +
+    '<div class="preview-card-duration">لمدة ' + dur + ' يوم</div>' +
+    '<div class="preview-card-limits">' + limits + '</div>' +
+    '<ul class="preview-features">' + featsHtml + '</ul>';
+}
+
+function validatePlanEdits(p) {
+  // Rule #34 / enterprise mindset: thorough client-side validation. SQL
+  // CHECK constraints from Migration 23 will catch some issues server-side
+  // but the UX is much nicer when caught here with clear Arabic messages.
+  if (!p) return { ok:false, error:'لا توجد بيانات لحفظها.' };
+  if (!p.display_name || p.display_name.length < 1) {
+    return { ok:false, error:'اسم العرض مطلوب.' };
+  }
+  if (p.display_name.length > 80) {
+    return { ok:false, error:'اسم العرض طويل جداً (الحد الأقصى 80 حرف).' };
+  }
+  if (p.duration_days == null || isNaN(Number(p.duration_days)) || Number(p.duration_days) < 1) {
+    return { ok:false, error:'المدة (يوم) يجب أن تكون رقماً ≥ 1.' };
+  }
+  if (Number(p.duration_days) > 3650) {
+    return { ok:false, error:'المدة (يوم) كبيرة بشكل غير معقول (الحد الأقصى 3650 يوم = 10 سنوات).' };
+  }
+  if (p.price == null || isNaN(Number(p.price)) || Number(p.price) < 0) {
+    return { ok:false, error:'السعر يجب أن يكون رقماً ≥ 0.' };
+  }
+  if (p.sort_order == null || isNaN(Number(p.sort_order)) || Number(p.sort_order) < 1) {
+    return { ok:false, error:'الترتيب يجب أن يكون رقماً ≥ 1.' };
+  }
+  if (p.max_employees != null && (isNaN(Number(p.max_employees)) || Number(p.max_employees) < 1)) {
+    return { ok:false, error:'حد الموظفين يجب أن يكون رقماً ≥ 1 أو فارغاً (بلا حد).' };
+  }
+  if (p.max_patients != null && (isNaN(Number(p.max_patients)) || Number(p.max_patients) < 1)) {
+    return { ok:false, error:'حد المرضى يجب أن يكون رقماً ≥ 1 أو فارغاً (بلا حد).' };
+  }
+  if (!Array.isArray(p.features) || p.features.length === 0) {
+    return { ok:false, error:'يجب إضافة ميزة واحدة على الأقل.' };
+  }
+  for (var i = 0; i < p.features.length; i++) {
+    if (typeof p.features[i] !== 'string' || p.features[i].length > 200) {
+      return { ok:false, error:'كل ميزة يجب أن تكون نصاً طوله ≤ 200 حرف.' };
+    }
+  }
+  return { ok:true, error:null };
+}
+
+function buildPlanDiff(orig, edited) {
+  // Compact JSON diff of changed scalar fields + features-changed flag.
+  // Used in the audit log notes so the events viewer can render a clean
+  // "Price: 200000 → 250000" delta without parsing two full rows.
+  if (!orig || !edited) return {};
+  var diff = {};
+  var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active'];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    var a = orig[k]; var b = edited[k];
+    if (a === undefined) a = null;
+    if (b === undefined) b = null;
+    if (a !== b) diff[k] = { from:a, to:b };
+  }
+  var oFeat = Array.isArray(orig.features)   ? orig.features   : [];
+  var eFeat = Array.isArray(edited.features) ? edited.features : [];
+  if (JSON.stringify(oFeat) !== JSON.stringify(eFeat)) {
+    diff.features = { from_count:oFeat.length, to_count:eFeat.length, changed:true };
+  }
+  return diff;
+}
+
+function revertPlanEdits(silent) {
+  if (!planEditorState.original) return;
+  if (!silent) {
+    if (!planEditorState.isDirty) return;
+    if (!confirm('إلغاء كل التعديلات على خطة "' + (planEditorState.edited && planEditorState.edited.display_name || planEditorState.selectedCode) + '"؟')) return;
+  }
+  planEditorState.edited  = JSON.parse(JSON.stringify(planEditorState.original));
+  planEditorState.isDirty = false;
+  renderPlanEditorFields(planEditorState.edited);
+  renderPlanPreview(planEditorState.edited);
+  updatePlanDirtyUI();
+}
+
+async function savePlanEdits() {
+  if (!planEditorState.isDirty || !planEditorState.edited || !planEditorState.original) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+
+  // Pull fresh values one more time defensively (in case a paste event
+  // didn't fire the oninput handler in some browser).
+  readEditorIntoState();
+  computePlanDirty();
+  if (!planEditorState.isDirty) {
+    alert('لا توجد تعديلات للحفظ.');
+    updatePlanDirtyUI();
+    return;
+  }
+
+  var p = planEditorState.edited;
+  var o = planEditorState.original;
+  var v = validatePlanEdits(p);
+  if (!v.ok) { alert('⚠️ ' + v.error); return; }
+
+  var diff = buildPlanDiff(o, p);
+  if (!diff || Object.keys(diff).length === 0) {
+    // Defensive — shouldn't happen since isDirty was true, but guard anyway.
+    alert('لا توجد تعديلات للحفظ.');
+    return;
+  }
+
+  // Extra confirm for deactivation (destructive-ish — affects new signups).
+  if (o.is_active === true && p.is_active === false) {
+    if (!confirm('⚠️ تعطيل خطة "' + p.display_name + '" سيمنع المشتركين الجدد من اختيارها. الاشتراكات الحالية على هذه الخطة لن تتأثر.\n\nمتابعة؟')) {
+      return;
+    }
+  }
+  // Standard save confirm. Translate field codes to Arabic labels for UX.
+  var labelMap = {
+    display_name:'الاسم',
+    duration_days:'المدة',
+    price:'السعر',
+    sort_order:'الترتيب',
+    max_employees:'حد الموظفين',
+    max_patients:'حد المرضى',
+    is_active:'حالة التفعيل',
+    features:'الميزات'
+  };
+  var changedKeys = Object.keys(diff);
+  var changedArabic = changedKeys.map(function(k){ return labelMap[k] || k; });
+  var summaryLine = changedArabic.length + ' حقل مُعدّل: ' + changedArabic.join('، ');
+  if (!confirm('حفظ التعديلات على خطة "' + p.display_name + '"؟\n\n' + summaryLine)) {
+    return;
+  }
+
+  var saveBtn = document.getElementById('btnSavePlan');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جاري الحفظ...'; }
+
+  try {
+    // UPDATE: send only the editable fields, never the primary key or
+    // server-managed timestamps. updated_at is touched by a trigger.
+    var updatePayload = {
+      display_name:  p.display_name,
+      duration_days: Number(p.duration_days),
+      price:         Number(p.price),
+      sort_order:    Number(p.sort_order),
+      max_employees: (p.max_employees == null ? null : Number(p.max_employees)),
+      max_patients:  (p.max_patients == null ? null : Number(p.max_patients)),
+      features:      p.features,
+      is_active:     !!p.is_active
+    };
+    // updated_by — write the admin's email if available, falling back to a
+    // generic marker. Matches the performed_by convention in subscription_events.
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        updatePayload.updated_by = sess.data.session.user.email || 'admin';
+      }
+    } catch(e) { /* best-effort; column has a default or is nullable */ }
+
+    var upd = await window.sb.from('subscription_plans')
+      .update(updatePayload)
+      .eq('code', o.code)
+      .select()
+      .maybeSingle();
+
+    if (upd.error) {
+      console.error('savePlanEdits: update error', upd.error);
+      alert('❌ فشل الحفظ: ' + (upd.error.message || 'خطأ غير معروف'));
+      return;
+    }
+
+    // Audit event (best-effort — DB write already succeeded).
+    // trial_request_id + user_id are null because this event mutates the
+    // plan catalog, not a specific tenant subscription.
+    var notesObj = { plan_code:o.code, diff:diff };
+    await logSubscriptionEvent({
+      trial_request_id: null,
+      user_id:          null,
+      event_type:       'plan_updated',
+      from_plan:        o.code,
+      to_plan:          o.code,
+      from_status:      null,
+      to_status:        null,
+      from_trial_end:   null,
+      to_trial_end:     null,
+      amount:           null,
+      currency:         p.currency || o.currency || 'SYP',
+      notes:            JSON.stringify(notesObj)
+    });
+
+    // Refresh the in-memory cache so subsequent admin operations (transitions,
+    // pricing modals, etc.) immediately see the new values without a page
+    // reload. This is the same cache loadAndRender / transitionAccount read.
+    await loadPlanConfig();
+
+    // Rebind editor state to the freshly-saved row (now the new "original").
+    var fresh = getPlanConfig(o.code) || upd.data || updatePayload;
+    fresh.code = o.code;
+    fresh.currency = fresh.currency || o.currency || 'SYP';
+    planEditorState.original = JSON.parse(JSON.stringify(fresh));
+    planEditorState.edited   = JSON.parse(JSON.stringify(fresh));
+    planEditorState.isDirty  = false;
+    renderPlanEditorFields(planEditorState.edited);
+    renderPlanPreview(planEditorState.edited);
+    updatePlanDirtyUI();
+
+    alert('✅ تم حفظ تعديلات خطة "' + p.display_name + '".');
+  } catch(e) {
+    console.error('savePlanEdits exception:', e);
+    alert('❌ خطأ غير متوقع: ' + (e && e.message ? e.message : String(e)));
+  } finally {
+    if (saveBtn) { saveBtn.textContent = '💾 حفظ التغييرات'; updatePlanDirtyUI(); }
+  }
+}
+
+// ============================================================================
+// === End Phase X2 ===========================================================
+// ============================================================================
 
 // === computeAccountState — pure function, no I/O ===
 // Returns { state, daysLeft, daysIntoGrace, label, isPermanent }
