@@ -946,7 +946,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a23"></script>
+<script src="supabase-init.js?v=20260523a24"></script>
 </head>
 <body>
 
@@ -4289,6 +4289,121 @@ function openWaReminder(phone, name, daysLeft, trialEndIso, ev) {
   return false;
 }
 
+// =============================================================================
+// Phase X3 محادثة 2 — three additional WA action buttons.
+//
+// Industry pattern (Oracle Cloud / Adobe Admin Console / GitLab / Oracle
+// Health / GoHighLevel): every accepted account exposes a "Resend Welcome"
+// affordance on its row. SyDent applies the same pattern via click-to-chat:
+// the admin clicks the button → wa.me opens with the current DB-template
+// body pre-filled → admin reviews + hits Send in WhatsApp.
+//
+// All three follow the same shape as openWaReminder/waReminderLink:
+//   <state-async helper>  → renderTemplate('wa_*', vars) → wa.me URL
+//   <opener>(... ev)       → href="#" + onclick="return open*(...)"
+//
+// jsAttr() is the single-source escape used by renderList for all
+// onclick-embedded string literals. Same XSS surface as the existing
+// 💬 تذكير button, no new attack vector.
+// =============================================================================
+
+// 👋 Welcome (resend) — for any accepted account.
+//
+// Phase 7.6F moved welcome delivery into the unified signup flow, so the
+// inline waLink() call in accept() was removed. This adapter is the manual
+// replay path: account exists, user lost the email/changed phone/needs the
+// credentials again. Email fallback mirrors what the original signup-time
+// email would have been (digits + '@sydent.com').
+async function waWelcomeLink(phone, name, email) {
+  var num = normalizeWaPhone(phone);
+  var emailVal = email || (num + '@sydent.com');
+  var body = await renderTemplate('wa_welcome', {
+    name: name,
+    login_url: 'https://ayhamghnaim.github.io/SyDent',
+    email: emailVal
+  });
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+}
+
+function openWaWelcome(phone, name, email, ev) {
+  if (ev) { try { ev.preventDefault(); } catch(_){} }
+  waWelcomeLink(phone, name, email).then(function(url){
+    window.open(url, '_blank', 'noopener');
+  }).catch(function(e){
+    console.error('openWaWelcome failed:', e);
+    alert('❌ تعذّر بناء رسالة الترحيب: ' + (e && e.message ? e.message : e));
+  });
+  return false;
+}
+
+// ⏸ Suspended notice — only shown for currently-suspended accounts.
+//
+// Single variable ({name}) because the message is intentionally generic —
+// the admin contacts the tenant separately to discuss the reason; the WA
+// nudge is just "we've paused your account, please reach out".
+async function waSuspendedLink(phone, name) {
+  var num = normalizeWaPhone(phone);
+  var body = await renderTemplate('wa_suspended', { name: name });
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+}
+
+function openWaSuspended(phone, name, ev) {
+  if (ev) { try { ev.preventDefault(); } catch(_){} }
+  waSuspendedLink(phone, name).then(function(url){
+    window.open(url, '_blank', 'noopener');
+  }).catch(function(e){
+    console.error('openWaSuspended failed:', e);
+    alert('❌ تعذّر بناء رسالة الإيقاف: ' + (e && e.message ? e.message : e));
+  });
+  return false;
+}
+
+// ✅ Renewal notice — for paid (non-permanent) accounts.
+//
+// admin decides when to send (the button stays available for the entire
+// paid lifecycle, not just immediately post-renewal — same as how Intercom
+// keeps "Send message" available on every customer card regardless of
+// recency). plan_name comes pre-formatted in Arabic by renderList so the
+// helper doesn't need to translate it again. price is snapshot from
+// trial_requests.price_paid; if null/0 the template renders '—' (em-dash)
+// and admin can edit the body in the WA tab before sending.
+async function waRenewedLink(phone, name, planName, trialEndIso, price) {
+  var num = normalizeWaPhone(phone);
+  var dateStr;
+  try {
+    dateStr = new Date(trialEndIso).toLocaleDateString('ar-EG', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+  } catch (e) {
+    dateStr = (trialEndIso || '').slice(0, 10);
+  }
+  var priceStr;
+  var n = Number(price);
+  if (price && isFinite(n) && n > 0) {
+    priceStr = n.toLocaleString('ar-SY') + ' ل.س';
+  } else {
+    priceStr = '—';
+  }
+  var body = await renderTemplate('wa_renewed', {
+    name: name,
+    plan_name: planName || '',
+    trial_end: dateStr,
+    price: priceStr
+  });
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+}
+
+function openWaRenewed(phone, name, planName, trialEndIso, price, ev) {
+  if (ev) { try { ev.preventDefault(); } catch(_){} }
+  waRenewedLink(phone, name, planName, trialEndIso, price).then(function(url){
+    window.open(url, '_blank', 'noopener');
+  }).catch(function(e){
+    console.error('openWaRenewed failed:', e);
+    alert('❌ تعذّر بناء رسالة التجديد: ' + (e && e.message ? e.message : e));
+  });
+  return false;
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   var d = new Date(iso);
@@ -4737,6 +4852,49 @@ function renderList() {
                       ',\'' + safeEnd + '\',event)" class="btn-whatsapp">💬 تذكير</a>';
     }
 
+    // 👋 Welcome resend — Industry pattern (Oracle/Adobe/GitLab): every
+    // accepted account exposes a "resend welcome" affordance. Excluded
+    // states: 'new' (no user_id yet) and 'suspended' (sending login credits
+    // to a paused account is contradictory — wa_suspended is the right
+    // template for that case instead). Phone gate is mandatory.
+    var waWelcomeBtn = '';
+    if (s.state !== 'new' && s.state !== 'suspended' && r.phone) {
+      var wlPhone = jsAttr(r.phone || '');
+      var wlName  = jsAttr(r.name || '');
+      var wlEmail = jsAttr(r.email || '');
+      waWelcomeBtn = '<a href="#" onclick="return openWaWelcome(\'' + wlPhone +
+                     '\',\'' + wlName + '\',\'' + wlEmail +
+                     '\',event)" class="btn-whatsapp">👋 ترحيب</a>';
+    }
+
+    // ⏸ Suspended notice — only meaningful for currently-suspended rows.
+    // No daysLeft/trial_end variables to pre-fill; just {name}.
+    var waSuspendedBtn = '';
+    if (s.state === 'suspended' && r.phone) {
+      var spPhone = jsAttr(r.phone || '');
+      var spName  = jsAttr(r.name || '');
+      waSuspendedBtn = '<a href="#" onclick="return openWaSuspended(\'' + spPhone +
+                       '\',\'' + spName + '\',event)" class="btn-whatsapp">⏸ إشعار إيقاف</a>';
+    }
+
+    // ✅ Renewal notice — admin's discretion (decision: always available
+    // for paid non-permanent accounts, not gated to a recent renew). Plan
+    // label is the Arabic display string already used by planPillHtml so
+    // the rendered WA body reads "📋 الخطة: سنوي" not "yearly".
+    var waRenewedBtn = '';
+    if (s.state === 'paid' && !s.isPermanent && r.phone && r.trial_end) {
+      var rnPhone = jsAttr(r.phone || '');
+      var rnName  = jsAttr(r.name || '');
+      var rnPlanLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : (s.plan || '');
+      var rnPlan  = jsAttr(rnPlanLabel);
+      var rnEnd   = jsAttr(r.trial_end || '');
+      var rnPrice = jsAttr(String(r.price_paid == null ? '' : r.price_paid));
+      waRenewedBtn = '<a href="#" onclick="return openWaRenewed(\'' + rnPhone +
+                     '\',\'' + rnName + '\',\'' + rnPlan +
+                     '\',\'' + rnEnd + '\',\'' + rnPrice +
+                     '\',event)" class="btn-whatsapp">✅ إشعار تجديد</a>';
+    }
+
     // Per-state action button assembly
     var actions = '';
     switch (s.state) {
@@ -4749,6 +4907,7 @@ function renderList() {
         actions = '<button class="btn-upgrade" onclick="openConvertPicker(\'' + id + '\')">💎 ترقية إلى مدفوع</button>' +
                   suspendBtn +
                   waReminderBtn +
+                  waWelcomeBtn +
                   deleteBtn +
                   editBtn +
                   activityBtn;
@@ -4764,19 +4923,27 @@ function renderList() {
           var demoteBtn = canDemote
             ? '<button class="btn-demote" onclick="demoteFromAdmin(\'' + id + '\')">👤 إنزال من Admin</button>'
             : '';
-          // Permanent account: no renew, but allow plan change + suspend/delete
+          // Permanent account: no renew, but allow plan change + suspend/delete.
+          // Phase X3 محادثة 2: welcome resend stays available (an admin may
+          // need to re-deliver credentials to a permanent account).
           actions = '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
                     promoteBtn +
                     demoteBtn +
                     suspendBtn +
+                    waWelcomeBtn +
                     deleteBtn +
                     editBtn +
                     activityBtn;
         } else {
+          // Phase X3 محادثة 2: welcome + renewed buttons added. Order:
+          // reminder (trial-expiry nudge) → welcome (resend creds) →
+          // renewed (post-renew confirmation) — least to most paid-specific.
           actions = '<button class="btn-renew" onclick="renewAccount(\'' + id + '\')">🔄 تجديد</button>' +
                     '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
                     suspendBtn +
                     waReminderBtn +
+                    waWelcomeBtn +
+                    waRenewedBtn +
                     deleteBtn +
                     editBtn +
                     activityBtn;
@@ -4786,6 +4953,7 @@ function renderList() {
         actions = '<button class="btn-renew" onclick="renewAccount(\'' + id + '\')">🔄 تجديد</button>' +
                   '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 تغيير الخطة</button>' +
                   suspendBtn +
+                  waWelcomeBtn +
                   deleteBtn +
                   editBtn +
                   activityBtn;
@@ -4795,12 +4963,14 @@ function renderList() {
                   '<button class="btn-grace" onclick="grantGrace(\'' + id + '\')">⏰ منح فترة سماح 14 يوم</button>' +
                   '<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\')">💎 ترقية/تجديد</button>' +
                   suspendBtn +
+                  waWelcomeBtn +
                   deleteBtn +
                   editBtn +
                   activityBtn;
         break;
       case 'suspended':
         actions = '<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\')">✅ إعادة تفعيل</button>' +
+                  waSuspendedBtn +
                   deleteBtn +
                   editBtn;
         break;
