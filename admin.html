@@ -898,6 +898,7 @@ header{
   border:1px solid var(--border);border-radius:8px;
 }
 .btn-test-send-tpl,
+.btn-reset-tpl,
 .btn-revert-tpl,
 .btn-save-tpl{
   padding:9px 16px;font-size:12px;font-weight:600;
@@ -907,6 +908,8 @@ header{
 .btn-test-send-tpl{background:#25d366;color:#fff;}
 .btn-test-send-tpl:hover{background:#1ebe5b;}
 .btn-test-send-tpl:disabled{background:var(--bg3);color:var(--text3);cursor:not-allowed;}
+.btn-reset-tpl{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.btn-reset-tpl:hover{background:var(--bg);color:var(--text);}
 .btn-revert-tpl{background:var(--bg3);color:var(--text2);}
 .btn-revert-tpl:hover:not(:disabled){background:var(--bg);}
 .btn-revert-tpl:disabled{opacity:.5;cursor:not-allowed;}
@@ -943,7 +946,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a21"></script>
+<script src="supabase-init.js?v=20260523a22"></script>
 </head>
 <body>
 
@@ -1142,6 +1145,7 @@ header{
             <input type="tel" id="tplTestPhone" placeholder="رقمك للاختبار (مثلاً 0991234567)" autocomplete="off">
             <button type="button" class="btn-test-send-tpl" onclick="sendTplTest()" title="فتح WhatsApp مع الرسالة الحالية">📤 تجريبي</button>
           </div>
+          <button type="button" class="btn-reset-tpl"  id="btnResetTpl"  onclick="resetTplToFallback()" title="إعادة النص إلى القيمة الافتراضية المُضمَّنة في الكود">↩ افتراضي</button>
           <button type="button" class="btn-revert-tpl" id="btnRevertTpl" onclick="revertTplEdits()" disabled>↺ إلغاء التعديلات</button>
           <button type="button" class="btn-save-tpl"   id="btnSaveTpl"   onclick="saveTplEdits()"   disabled>💾 حفظ التغييرات</button>
         </div>
@@ -2832,6 +2836,48 @@ function revertTplEdits() {
   tplEditorState.edited = JSON.parse(JSON.stringify(tplEditorState.original));
   tplEditorState.isDirty = false;
   renderTplEditorFields(tplEditorState.edited);
+  renderTplPreview();
+  updateTplDirtyUI();
+}
+
+// Reset the editor's body to the FALLBACK_TEMPLATES default — the
+// hardcoded string that lives in this file (and that Migration 28.2
+// seeded into DB at install time). Different from revertTplEdits:
+//   revertTplEdits   → restore original = last DB snapshot loaded for this tab
+//   resetTplToFallback → restore the always-available default body, ignoring
+//                        any historical edits saved to DB
+//
+// Only the body is reset (not title/description/is_active) — those are
+// admin's metadata around the template. Admin must still hit "💾 حفظ"
+// to persist this reset to DB; until then it's just a local edit
+// (isDirty flips on so the save button lights up).
+//
+// Discovered in live test محادثة 1: admin selected-all + deleted body,
+// then realized there was no path to recover the seeded default.
+// revertTplEdits would restore whatever was last saved (which could
+// itself have been a mistake). This is the "factory reset" button.
+function resetTplToFallback() {
+  if (!tplEditorState.edited) return;
+  var code = tplEditorState.currentCode;
+  var defaultBody = FALLBACK_TEMPLATES[code];
+  if (!defaultBody) {
+    alert('⚠️ لا يوجد نص افتراضي مُضمَّن لهذا القالب.');
+    return;
+  }
+  if (tplEditorState.edited.body === defaultBody) {
+    alert('ℹ️ النص الحالي مطابق للنص الافتراضي.');
+    return;
+  }
+  if (!confirm('إعادة نص "' + tplCodeLabel(code) + '" إلى القيمة الافتراضية؟\n\n' +
+               'سيُستبدَل كل المحتوى الحالي بالنص الأصلي المُضمَّن في الكود.\n\n' +
+               'هذا تعديل محلّي — لن يُحفَظ في قاعدة البيانات حتى تضغط "💾 حفظ التغييرات".')) {
+    return;
+  }
+  tplEditorState.edited.body = defaultBody;
+  // Update DOM so user sees the new body immediately.
+  var fldBody = document.getElementById('tplFldBody');
+  if (fldBody) fldBody.value = defaultBody;
+  computeTplDirty();
   renderTplPreview();
   updateTplDirtyUI();
 }
