@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -442,14 +445,24 @@ window.addEventListener('DOMContentLoaded', async function() {
   }
 
   setSplash('جارٍ التحقق من الجلسة...');
-  var sessRes;
-  try {
-    sessRes = await window.sb.auth.getSession();
-  } catch (e) {
-    showSplashError('فشل التحقق من الجلسة', e && e.message ? e.message : String(e));
-    return;
+  // Retry loop: getSession() can return null on first call if the
+  // refresh token is still being processed by the Supabase client.
+  // We give it up to 3 seconds (10 retries × 300ms) before giving up.
+  var session = null;
+  var sessionTries = 0;
+  while (!session && sessionTries < 10) {
+    try {
+      var sessRes = await window.sb.auth.getSession();
+      session = sessRes && sessRes.data ? sessRes.data.session : null;
+      if (session && session.user) break;
+    } catch (e) {
+      console.warn('[subscription-events] getSession retry', sessionTries, 'failed:', e);
+    }
+    sessionTries++;
+    if (sessionTries < 10) {
+      await new Promise(function(r){ setTimeout(r, 300); });
+    }
   }
-  var session = sessRes && sessRes.data ? sessRes.data.session : null;
   if (!session || !session.user) {
     setSplash('لا توجد جلسة — تحويل لصفحة تسجيل الدخول...');
     setTimeout(function(){ window.location.replace('auth.html'); }, 800);
@@ -470,10 +483,10 @@ window.addEventListener('DOMContentLoaded', async function() {
   }
   var roleData = roleRes ? roleRes.data : null;
   if (!roleData || roleData.role !== 'admin') {
-    // No redirect loop — show a clear message so the admin doesn't
-    // get bounced back to admin.html silently (which would feel like
-    // the link is "broken"). This is the failure that motivated this
-    // entire diagnostics block.
+    // No redirect — show a clear message. Redirecting to index.html
+    // would bounce the admin back to admin.html (index.html itself
+    // redirects admins there), making it look like "the link is
+    // broken". A loud error with a back button is the right UX.
     showSplashError(
       'لا تمتلك صلاحية مدير',
       'هذه الصفحة متاحة فقط لمسؤولي منصّة SyDent. ' +
