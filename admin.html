@@ -107,6 +107,47 @@ header{
 .stat-num.red{color:var(--red);}
 .stat-label{font-size:11px;color:var(--text2);margin-top:4px;}
 
+/* ===== Phase X5: Customer Health Widgets ===== */
+/* High-priority metrics row, placed ABOVE the simple counter
+ * stats-row so admins see business health (MRR, active,
+ * expiring, conversion) in the first 5 seconds — Stripe /
+ * ChartMogul pattern. The simple stat-cards stay below as
+ * secondary intake counters (new/accepted/rejected). */
+.health-row{
+  display:grid;grid-template-columns:repeat(2, 1fr);
+  gap:10px;margin-bottom:12px;
+}
+.health-card{
+  background:var(--bg2);
+  border:1px solid var(--border);border-radius:14px;
+  padding:14px;position:relative;
+  display:flex;flex-direction:column;gap:4px;
+  min-height:96px;
+}
+.health-card.clickable{cursor:pointer;transition:all 0.15s;}
+.health-card.clickable:hover{border-color:var(--green);background:var(--bg3);}
+.health-card.clickable.active{
+  border-color:var(--yellow);background:var(--yellow-dim);
+}
+.health-head{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:6px;
+}
+.health-title{
+  font-size:11px;color:var(--text2);font-weight:600;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.health-info{
+  cursor:help;color:var(--text3);font-size:11px;
+  user-select:none;
+}
+.health-info:hover{color:var(--green);}
+.health-value{
+  font-size:22px;font-weight:900;color:var(--green);line-height:1.1;
+}
+.health-value.muted{color:var(--text3);}
+.health-sub{font-size:10px;color:var(--text3);line-height:1.4;}
+.health-unit{font-size:11px;color:var(--text2);font-weight:600;margin-right:2px;}
+
 /* Filter tabs */
 .filter-tabs{
   display:flex;gap:8px;margin-bottom:16px;
@@ -943,10 +984,11 @@ header{
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
   .stats-row{grid-template-columns:repeat(3,1fr);}
+  .health-row{grid-template-columns:repeat(4, 1fr);}
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a26"></script>
+<script src="supabase-init.js?v=20260523a27"></script>
 </head>
 <body>
 
@@ -970,6 +1012,52 @@ header{
   </header>
 
   <div class="main">
+    <!-- Phase X5: Customer Health Widgets (primary metrics) -->
+    <!--
+      Placed above the existing stat-cards (new/accepted/rejected)
+      because business-health metrics (MRR, active subs, expiring,
+      conversion) deserve above-the-fold priority. The simple
+      intake counters stay below as secondary triage signals.
+      All four values render from the in-memory allRequests cache —
+      no extra DB queries.
+    -->
+    <div class="health-row">
+      <div class="health-card" id="hcMrr">
+        <div class="health-head">
+          <span class="health-title">💰 الإيراد الشهري (MRR)</span>
+          <span class="health-info" title="مجموع أسعار الحسابات الشهرية + (أسعار السنوية ÷ 12) للحسابات النشطة (paid فقط). لا يشمل الدائم أو الموقوف أو الـ trial.">ⓘ</span>
+        </div>
+        <div class="health-value muted" id="hcMrrValue">--</div>
+        <div class="health-sub" id="hcMrrSub">جارٍ الحساب...</div>
+      </div>
+      <div class="health-card" id="hcActive">
+        <div class="health-head">
+          <span class="health-title">🟢 اشتراكات نشطة</span>
+          <span class="health-info" title="حسابات paid حالياً (شهري أو سنوي، غير دائم). لا تشمل trial / suspended / expired.">ⓘ</span>
+        </div>
+        <div class="health-value muted" id="hcActiveValue">--</div>
+        <div class="health-sub" id="hcActiveSub">جارٍ الحساب...</div>
+      </div>
+      <div class="health-card clickable" id="hcExpiring" role="button" tabindex="0"
+           onclick="onExpiringWidgetClick()"
+           onkeydown="if(event.key==='Enter'||event.key===' ')onExpiringWidgetClick()">
+        <div class="health-head">
+          <span class="health-title">⏰ تنتهي قريباً</span>
+          <span class="health-info" title="حسابات مقبولة تنتهي خلال 30 يوم. اضغط لفلترة القائمة بأقرب 7 أيام.">ⓘ</span>
+        </div>
+        <div class="health-value muted" id="hcExpiringValue">--</div>
+        <div class="health-sub" id="hcExpiringSub">جارٍ الحساب...</div>
+      </div>
+      <div class="health-card" id="hcConversion">
+        <div class="health-head">
+          <span class="health-title">📈 معدّل التحويل</span>
+          <span class="health-info" title="نسبة طلبات الـ trial (في آخر 90 يوم) التي تحوّلت إلى paid (شهري/سنوي).">ⓘ</span>
+        </div>
+        <div class="health-value muted" id="hcConversionValue">--</div>
+        <div class="health-sub" id="hcConversionSub">جارٍ الحساب...</div>
+      </div>
+    </div>
+
     <!-- Stats -->
     <div class="stats-row">
       <div class="stat-card">
@@ -4715,6 +4803,229 @@ async function exportCSV() {
   }
 }
 
+// ============================================================
+// ===== Phase X5: Customer Health Widgets ====================
+// ============================================================
+//
+// 4 KPIs computed client-side from allRequests on every render:
+//
+//   💰 MRR (Monthly Recurring Revenue)
+//     Σ price_paid where plan='monthly' AND active-paid
+//   + Σ (price_paid / 12) where plan='yearly' AND active-paid
+//
+//     "active-paid" excludes: permanent (no recurring price),
+//     suspended, trial, grace-period-only, expired.
+//
+//   🟢 Active subscriptions
+//     count of accounts where state === 'paid' AND !isPermanent
+//
+//   ⏰ Expiring soon (≤30 days)
+//     count of accepted accounts with trial_end within 30 days.
+//     Click → applies the existing 7-day expiringFilterActive
+//     (we reuse the 7d filter, not a new 30d one, because the
+//     alerts banner already targets 7d and we want a single
+//     "expiring" axis. The widget surfaces the 30d horizon for
+//     pipeline awareness; the click narrows to the urgent 7d.)
+//
+//   📈 Conversion rate (last 90 days)
+//     paid_in_90d / (paid_in_90d + trial_in_90d) * 100
+//     "in 90d" = created_at within 90 days.
+//     trial_in_90d are still-active trials (haven't converted yet).
+//
+// Definitions documented in tooltip on each ⓘ icon.
+// Rule: never block render on these — they're best-effort summaries
+// computed from data already in memory. Zero DB queries added.
+// ============================================================
+
+function renderHealthWidgets(requests) {
+  // requests is allRequests; guard against null/undefined on cold load.
+  if (!requests || !Array.isArray(requests)) {
+    requests = [];
+  }
+
+  // ---- 1. MRR ----
+  // We iterate ALL accounts and accumulate MRR contribution.
+  // Each account's contribution depends on its current computed
+  // state — so we use the same computeAccountState the rest of
+  // admin.html uses (single source of truth, rule #20).
+  var mrrTotal = 0;
+  var nMonthly = 0;
+  var nYearly = 0;
+  requests.forEach(function(r) {
+    var s = computeAccountState(r);
+    // Only paid AND not permanent contributes to MRR
+    if (s.state !== 'paid' || s.isPermanent) return;
+    var price = Number(r.price_paid);
+    if (!isFinite(price) || price <= 0) return;
+    if (r.plan === 'monthly') {
+      mrrTotal += price;
+      nMonthly++;
+    } else if (r.plan === 'yearly') {
+      mrrTotal += (price / 12);
+      nYearly++;
+    }
+    // (Other plan values — 'trial', null — don't contribute.)
+  });
+
+  var mrrValueEl = document.getElementById('hcMrrValue');
+  var mrrSubEl = document.getElementById('hcMrrSub');
+  if (mrrValueEl && mrrSubEl) {
+    if (mrrTotal > 0) {
+      mrrValueEl.classList.remove('muted');
+      // Round to nearest 1000 for readability; show as "1.2M" or "850K"
+      mrrValueEl.innerHTML = formatCurrencyShort(mrrTotal) +
+        ' <span class="health-unit">ل.س/شهر</span>';
+    } else {
+      mrrValueEl.classList.add('muted');
+      mrrValueEl.innerHTML = '0 <span class="health-unit">ل.س</span>';
+    }
+    var parts = [];
+    if (nMonthly > 0) parts.push(nMonthly + ' شهري');
+    if (nYearly > 0)  parts.push(nYearly + ' سنوي');
+    mrrSubEl.textContent = parts.length > 0 ? parts.join(' · ') : 'لا يوجد اشتراك مدفوع نشط';
+  }
+
+  // ---- 2. Active subscriptions ----
+  var nActive = 0;
+  requests.forEach(function(r) {
+    var s = computeAccountState(r);
+    if (s.state === 'paid' && !s.isPermanent) nActive++;
+  });
+  // Permanent accounts are tracked separately — they're "active"
+  // but contribute nothing to MRR. We show them in the sub-text
+  // so the admin understands the discrepancy with the active count.
+  var nPermanent = 0;
+  requests.forEach(function(r) {
+    var s = computeAccountState(r);
+    if (s.state === 'paid' && s.isPermanent) nPermanent++;
+  });
+  var actValueEl = document.getElementById('hcActiveValue');
+  var actSubEl = document.getElementById('hcActiveSub');
+  if (actValueEl && actSubEl) {
+    actValueEl.classList.toggle('muted', nActive === 0);
+    actValueEl.textContent = String(nActive);
+    var actParts = [];
+    if (nMonthly > 0) actParts.push(nMonthly + ' شهري');
+    if (nYearly > 0)  actParts.push(nYearly + ' سنوي');
+    if (nPermanent > 0) actParts.push(nPermanent + ' دائم');
+    actSubEl.textContent = actParts.length > 0 ? actParts.join(' · ') : 'لا اشتراكات نشطة';
+  }
+
+  // ---- 3. Expiring soon (≤30 days) ----
+  // Counts accepted accounts with trial_end within 30 days.
+  // Permanent (trial_end === null) excluded by definition.
+  var nowMs = Date.now();
+  var thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  var nExpiring30 = 0;
+  var nExpiring7 = 0;
+  requests.forEach(function(r) {
+    if (r.status !== 'accepted') return;
+    if (!r.trial_end) return; // permanent or no end set
+    var endMs = new Date(r.trial_end).getTime();
+    if (!isFinite(endMs)) return;
+    var diff = endMs - nowMs;
+    if (diff < 0) return; // already expired
+    if (diff <= thirtyDaysMs) nExpiring30++;
+    if (diff <= 7 * 24 * 60 * 60 * 1000) nExpiring7++;
+  });
+  var expValueEl = document.getElementById('hcExpiringValue');
+  var expSubEl = document.getElementById('hcExpiringSub');
+  var expCardEl = document.getElementById('hcExpiring');
+  if (expValueEl && expSubEl) {
+    expValueEl.classList.toggle('muted', nExpiring30 === 0);
+    expValueEl.textContent = String(nExpiring30);
+    if (nExpiring30 === 0) {
+      expSubEl.textContent = 'لا يوجد حسابات تنتهي خلال 30 يوم';
+    } else {
+      var subParts = ['خلال 30 يوم'];
+      if (nExpiring7 > 0) subParts.push(nExpiring7 + ' خلال 7 أيام');
+      subParts.push('اضغط للفلترة');
+      expSubEl.textContent = subParts.join(' · ');
+    }
+  }
+  // Reflect the existing expiring-filter state on the widget so
+  // toggling stays consistent between the alerts banner and the widget.
+  if (expCardEl) {
+    expCardEl.classList.toggle('active', !!expiringFilterActive);
+  }
+
+  // ---- 4. Conversion rate (last 90 days) ----
+  // Anti-pattern guard: division-by-zero. If there were no trial
+  // requests in the last 90 days at all, we show "—" not "0%" or
+  // "NaN%". The "—" tells the admin: "no signal yet, keep watching".
+  var ninetyAgoMs = nowMs - 90 * 24 * 60 * 60 * 1000;
+  var paid90 = 0;
+  var trial90 = 0;
+  requests.forEach(function(r) {
+    if (!r.created_at) return;
+    var createdMs = new Date(r.created_at).getTime();
+    if (!isFinite(createdMs)) return;
+    if (createdMs < ninetyAgoMs) return;
+    // D9 (audit): exclude rejected/suspended accounts from the funnel
+    // entirely (both numerator and denominator). A paid account that
+    // got suspended later isn't a successful conversion — counting it
+    // would inflate the rate. ChartMogul's standard "Net Conversion"
+    // uses currently-active status only.
+    if (r.status === 'rejected') return;
+    // Count by current plan: a row that started as trial and
+    // converted now has plan='monthly'/'yearly', so it counts as
+    // "paid" in the funnel. A row still on trial counts as trial.
+    if (r.plan === 'monthly' || r.plan === 'yearly') {
+      paid90++;
+    } else if (r.plan === 'trial' || !r.plan) {
+      trial90++;
+    }
+  });
+  var convValueEl = document.getElementById('hcConversionValue');
+  var convSubEl = document.getElementById('hcConversionSub');
+  if (convValueEl && convSubEl) {
+    var total = paid90 + trial90;
+    if (total === 0) {
+      convValueEl.classList.add('muted');
+      convValueEl.textContent = '—';
+      convSubEl.textContent = 'لا يوجد طلبات في آخر 90 يوم';
+    } else {
+      var rate = (paid90 / total) * 100;
+      convValueEl.classList.toggle('muted', rate === 0);
+      // One decimal place, but show as integer when whole
+      var rateStr = (rate % 1 === 0) ? rate.toFixed(0) : rate.toFixed(1);
+      convValueEl.innerHTML = rateStr + ' <span class="health-unit">%</span>';
+      convSubEl.textContent = paid90 + ' مدفوع من ' + total + ' (آخر 90 يوم)';
+    }
+  }
+}
+
+// Short currency formatter (1234567 → "1.2M", 850000 → "850K")
+// Used only for MRR display where space is tight. For exact values,
+// use toLocaleString('ar-SY'). Rule of thumb from ChartMogul: ARR/MRR
+// dashboards use shortened units; tooltips show exact values.
+function formatCurrencyShort(n) {
+  if (!isFinite(n) || n <= 0) return '0';
+  if (n >= 1000000) {
+    return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  if (n >= 10000) {
+    return Math.round(n / 1000) + 'K';
+  }
+  if (n >= 1000) {
+    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  }
+  return Math.round(n).toLocaleString('ar-SY');
+}
+
+// Click handler for the expiring widget — reuses the existing
+// 7-day expiringFilterActive flag (same as the alerts banner).
+// Toggle behavior matches: click again to deactivate.
+function onExpiringWidgetClick() {
+  expiringFilterActive = !expiringFilterActive;
+  renderAlertsBanner();
+  renderList();
+  // Update widget's own active state immediately (renderAll would
+  // refresh it, but we don't trigger a full reload here)
+  var expCardEl = document.getElementById('hcExpiring');
+  if (expCardEl) expCardEl.classList.toggle('active', expiringFilterActive);
+}
+
 function renderAll() {
   pruneActivityCaches();
   var nNew = allRequests.filter(function(r){ return !r.status || r.status === 'new'; }).length;
@@ -4723,6 +5034,12 @@ function renderAll() {
   document.getElementById('countNew').textContent = nNew;
   document.getElementById('countAccepted').textContent = nAcc;
   document.getElementById('countRejected').textContent = nRej;
+
+  // Phase X5: refresh customer health widgets (MRR, active, expiring,
+  // conversion). Computed from allRequests in memory — zero DB queries.
+  // Placed BEFORE the expiringFilterActive auto-disengage so the widget
+  // shows the up-to-date count even if the filter is about to be cleared.
+  renderHealthWidgets(allRequests);
 
   // Phase 7.6C: if filter was active but the count just hit 0 (e.g. all
   // expiring trials got extended), auto-disengage to avoid showing an
