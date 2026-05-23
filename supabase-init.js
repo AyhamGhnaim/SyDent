@@ -41,11 +41,132 @@
     return user;
   };
 
+  // ─────────────────────────────────────────────────────────
+  // Phase 7.6F — ensureAccountAccessible
+  // ─────────────────────────────────────────────────────────
+  // Called by tenant pages AFTER authentication (sbGetUser / sbRequireAuth).
+  // Blocks access when the trial_request is in a non-accessible state:
+  //   • 'new'       → admin hasn't reviewed yet → redirect to pending.html
+  //   • 'rejected'  → admin declined → sign-out + redirect to landing
+  //   • 'suspended' → admin paused service → sign-out + redirect to landing
+  // For 'accepted' (incl. trial/monthly/yearly/permanent) the gate is a pass-through.
+  //
+  // Skip rules:
+  //   • Admin users (doctors.role='admin') always bypass — they manage the platform
+  //     and don't have a tenant trial_request.
+  //   • The grandfathered pre-Phase 7.6E owners with NULL trial_request also bypass
+  //     (treated as legacy 'accepted' — Migration 22 backfilled them anyway).
+  //
+  // Returns: true if the account is accessible, false if a redirect was issued.
+  // Callers should `if (!await ensureAccountAccessible()) return;` to short-circuit.
+  //
+  // Resilience: any RPC error or unexpected shape → fail-open (return true).
+  // We prefer letting an authenticated user IN over a false-positive lockout,
+  // because the per-page RLS rules already protect tenant data.
+  window.ensureAccountAccessible = async function(user) {
+    try {
+      if (!user) user = await window.sbGetUser();
+      if (!user) return false; // shouldn't get here — caller should auth-check first
+
+      // Admin bypass: platform users have no tenant subscription.
+      try {
+        var roleRes = await window.sb.from('doctors')
+          .select('role').eq('id', user.id).maybeSingle();
+        if (roleRes && roleRes.data && roleRes.data.role === 'admin') return true;
+      } catch(roleErr) { /* fall through — non-admin path is the safe default */ }
+
+      // Read the trial_request for this user.
+      var trRes = await window.sb.from('trial_requests')
+        .select('status').eq('user_id', user.id).maybeSingle();
+      // No row at all → legacy pre-7.6E account or RLS hid it. Migration 22 should
+      // have backfilled. Fail-open (the RLS layer still gates the actual data).
+      if (!trRes || !trRes.data) return true;
+
+      var status = trRes.data.status;
+
+      // 'accepted' covers all paid/trial active states (plan field carries the tier).
+      if (status === 'accepted') return true;
+
+      // Non-accessible states → redirect.
+      if (status === 'new') {
+        window.location.replace('pending.html');
+        return false;
+      }
+      if (status === 'rejected' || status === 'suspended') {
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e){}
+        window.location.replace('auth.html?denied=' + encodeURIComponent(status));
+        return false;
+      }
+      // Unknown status → fail-open (don't lock out on a typo'd value).
+      return true;
+    } catch(err) {
+      console.warn('[ensureAccountAccessible] gate error (fail-open):', err);
+      return true;
+    }
+  };
+
   // تسجيل خروج
   window.sbSignOut = async function() {
     await window.sb.auth.signOut();
     window.location.href = 'auth.html';
   };
+
+  // ─────────────────────────────────────────────────────────
+  // Phase 7.6F — Auto-gate on page load
+  // ─────────────────────────────────────────────────────────
+  // Runs ensureAccountAccessible automatically on tenant pages, so we don't
+  // need to modify 9+ tenant pages individually. The gate runs after the
+  // first auth state event (we know whether a user is logged in by then).
+  //
+  // Skipped pages: auth.html, landing.html, pending.html, admin.html.
+  // These are either pre-auth (landing/auth/pending) or admin-only (admin),
+  // none of which should be gated against trial_request status.
+  //
+  // Why a small delay before running: tenant pages do their own auth check
+  // shortly after load (await getUser → redirect-if-null). Running the gate
+  // too eagerly races with that. We wait for either:
+  //   • The first onAuthStateChange event (SIGNED_IN / TOKEN_REFRESHED), OR
+  //   • A 1.2 second fallback timer (if no event fires, fall back to a
+  //     direct getUser check — handles already-signed-in pages).
+  (function autoGate() {
+    try {
+      var path = (window.location.pathname || '').toLowerCase();
+      var page = path.split('/').pop() || 'index.html';
+      var skip = { 'auth.html':1, 'landing.html':1, 'pending.html':1, 'admin.html':1 };
+      if (skip[page]) return;
+
+      var gateRan = false;
+      var runGate = async function(reason) {
+        if (gateRan) return;
+        gateRan = true;
+        try {
+          var user = await window.sbGetUser();
+          if (!user) return; // tenant page's own auth check will redirect — let it
+          await window.ensureAccountAccessible(user);
+        } catch(e) {
+          console.warn('[autoGate] failed (' + reason + '):', e);
+        }
+      };
+
+      // Listen for the first auth event (preferred path).
+      try {
+        var sub = window.sb.auth.onAuthStateChange(function(event, session){
+          if (session) runGate('authEvent:' + event);
+        });
+        // Best-effort unsubscribe after the first run to avoid leaks; supabase
+        // returns { data: { subscription: { unsubscribe } } } shape.
+        setTimeout(function(){
+          try { if (sub && sub.data && sub.data.subscription) sub.data.subscription.unsubscribe(); } catch(e){}
+        }, 5000);
+      } catch(subErr) { /* listener unavailable — fall back to timer below */ }
+
+      // Fallback: if no auth event fires within 1.2s, run the gate directly.
+      // Covers the case where the user is already signed in (no fresh event).
+      setTimeout(function(){ runGate('fallback'); }, 1200);
+    } catch(outerErr) {
+      console.warn('[autoGate] init error:', outerErr);
+    }
+  })();
 
   console.log('[SyDent] Supabase initialized');
 })();

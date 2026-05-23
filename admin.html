@@ -601,7 +601,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a13"></script>
+<script src="supabase-init.js?v=20260523a14"></script>
 </head>
 <body>
 
@@ -2149,81 +2149,39 @@ async function banUserPermanently(uid) {
 // This means Bug 7.6D (ban desync) is structurally prevented: every
 // lifecycle path writes BOTH stores via the same helper, by construction.
 
-// accept: new → trial. Special pre-step: ensure the auth.users row exists
-// (POST /admin/users) before delegating to transitionAccount, because
-// transitionAccount doesn't create auth rows — it only mutates existing
-// state. The auth-create logic stays here (auth API, not state machine).
+// accept: new → trial. Phase 7.6F: the user_id is guaranteed to already exist
+// because traders now self-signup via auth.html (which creates auth.users +
+// trial_requests in one go, password set by the trader themselves). This
+// function used to POST to /auth/v1/admin/users with a hardcoded password='0000'
+// to bridge the gap from the old landing.html (which only inserted
+// trial_requests with no user_id). That security flaw is now eliminated.
+//
+// Legacy orphan rows (user_id IS NULL, status='new', created before Phase 7.6F)
+// are rejected with a clear message. They were swept by Migration 24 — any
+// stragglers should be deleted manually via the row's reject button.
 async function accept(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
-  var phone = r.phone.trim();
-  var emailNum = phone.replace(/\D/g,'');
-  var email = emailNum + '@sydent.com';
+
+  // Phase 7.6F guard: orphan trial_requests cannot be activated (the trader
+  // has no auth.users row to log into). The admin should reject and ask the
+  // trader to re-signup via auth.html.
+  if (!r.user_id) {
+    alert('⚠️ هذا الطلب قديم (قبل Phase 7.6F) ولا يمكن تفعيله.\n\n' +
+          'التاجر لم ينشئ حساب auth (لا يوجد user_id).\n\n' +
+          'الحل: ارفض الطلب واطلب من التاجر التسجيل من جديد عبر auth.html');
+    return;
+  }
 
   var btn = document.querySelector('[data-id="' + id + '"].btn-accept');
   if (btn) { btn.textContent = '⏳ جارٍ...'; btn.disabled = true; }
 
-  var userId = null;
-  try {
-    // Step 1: create the auth.users row (POST /admin/users), or recover
-    // the user_id if it already exists. Same logic as pre-Part-2 — this
-    // is the auth-creation layer, not the state-machine layer.
-    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SERVICE_KEY,
-        'Authorization': 'Bearer ' + SERVICE_KEY
-      },
-      body: JSON.stringify({
-        email: email,
-        password: '0000',
-        email_confirm: true,
-        user_metadata: { full_name: r.name }
-      })
-    });
-    var data = await res.json();
-    userId = data.id || null;
-
-    if (!userId) {
-      var errMsg = data.msg || data.message || JSON.stringify(data);
-      var isAlreadyExists = errMsg.indexOf('already') >= 0 || errMsg.indexOf('exists') >= 0 || errMsg.indexOf('registered') >= 0;
-      if (!isAlreadyExists) {
-        alert('خطأ: ' + errMsg);
-        loadAndRender();
-        return;
-      }
-      // Recover existing user_id (same two-path strategy as pre-Part 2)
-      userId = r.user_id;
-      if (!userId) {
-        try {
-          var lookup = await fetch(
-            SUPABASE_URL + '/auth/v1/admin/users?email=' + encodeURIComponent(email),
-            { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
-          );
-          var lookupData = await lookup.json();
-          var users = (lookupData && lookupData.users) || [];
-          if (users.length && users[0].id) userId = users[0].id;
-        } catch(lookupErr) {
-          console.warn('user_id recovery lookup failed:', lookupErr);
-        }
-      }
-      if (!userId) {
-        alert('⚠️ الحساب موجود لكن تعذّر ربطه بطلب التجربة. تواصل مع الدعم الفني.');
-        loadAndRender();
-        return;
-      }
-    }
-  } catch(e) {
-    alert('خطأ في الاتصال: ' + e.message);
-    loadAndRender();
-    return;
-  }
-
-  // Step 2: delegate the actual state transition.
-  // transitionAccount('accept') will: set status='accepted', plan='trial',
-  // trial_end=+30d, link user_id, unban (no-op for new users), log event.
-  var result = await transitionAccount('accept', r, { userId: userId, email: email });
+  // Delegate to transitionAccount: sets status='accepted', plan='trial',
+  // trial_end=+30d, links/preserves user_id, unbans auth.users, logs event.
+  var result = await transitionAccount('accept', r, {
+    userId: r.user_id,
+    email: r.email
+  });
   if (!result.ok) {
     alert('فشل قبول الطلب: ' + (result.error || 'خطأ غير معروف'));
   }
@@ -2269,6 +2227,17 @@ async function suspendAccount(id, email) {
 async function reactivateAccount(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
+
+  // Phase 7.6F guard: orphan rows (no user_id) can't actually log in even if
+  // we flip status back to 'accepted' — no auth.users row exists to unban.
+  // Reject with a clear message; admin should delete and ask trader to re-signup.
+  if (!r.user_id) {
+    alert('⚠️ هذا الطلب قديم (قبل Phase 7.6F) — لا يمكن إعادة تفعيله.\n\n' +
+          'لا يوجد حساب auth مربوط (user_id فارغ).\n\n' +
+          'الحل: احذف هذا الطلب واطلب من التاجر التسجيل من جديد عبر auth.html');
+    return;
+  }
+
   if (!confirm('هل تريد إعادة تفعيل حساب ' + (r.name || r.email || id) + '؟\nسيُمنح فترة تجربة جديدة 30 يوم.')) return;
   var result = await transitionAccount('reactivate', r, {});
   if (!result.ok) {

@@ -13,7 +13,7 @@
 <title>SyDent — تسجيل الدخول</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a04"></script>
+<script src="supabase-init.js?v=20260523a14"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -128,8 +128,9 @@ body{
       <input type="text" id="regName" placeholder="د. أيهم غنيم" required>
     </div>
     <div class="form-group">
-      <label>رقم الموبايل</label>
-      <input type="tel" id="regPhone" placeholder="09xxxxxxxx" required>
+      <label>رقم الموبايل أو البريد الإلكتروني</label>
+      <input type="text" id="regContact" placeholder="09xxxxxxxx أو doctor@example.com" required>
+      <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5;">يمكنك استخدام رقم موبايلك أو بريدك الإلكتروني — ستستخدم نفسه لتسجيل الدخول لاحقاً.</div>
     </div>
     <div class="form-group">
       <label>المدينة</label>
@@ -142,10 +143,14 @@ body{
       </select>
     </div>
     <div class="form-group">
+      <label>ملاحظات (اختياري)</label>
+      <textarea id="regNotes" placeholder="أي معلومات إضافية..." rows="2" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;outline:none;resize:vertical;direction:rtl;"></textarea>
+    </div>
+    <div class="form-group">
       <label>كلمة المرور (6 أحرف على الأقل)</label>
       <input type="password" id="regPass" placeholder="••••••••" autocomplete="new-password" minlength="6" required>
     </div>
-    <button type="submit" class="btn-submit" id="regBtn">إرسال طلب التجربة</button>
+    <button type="submit" class="btn-submit" id="regBtn">إنشاء حساب التجربة</button>
   </form>
 </div>
 
@@ -153,6 +158,25 @@ body{
 // إذا الدكتور مسجّل دخول مسبقاً، انقله للـ dashboard
 // إلا إذا جاء من تسجيل خروج (logged_out=1)
 (async function(){
+  // Phase 7.6F: honor ?tab=register or #register in the URL (used by landing.html
+  // CTAs that link directly to the registration form). Done synchronously before
+  // any await so the tab swap is visible on first paint — no flash of "login" tab.
+  try {
+    var qs = new URLSearchParams(window.location.search);
+    var hash = (window.location.hash || '').replace('#', '').toLowerCase();
+    if (qs.get('tab') === 'register' || hash === 'register') {
+      switchTab('register');
+    }
+    // Phase 7.6F: surface a denial reason when ensureAccountAccessible bounced
+    // the user back here (e.g. ?denied=rejected or ?denied=suspended).
+    var denied = qs.get('denied');
+    if (denied === 'rejected') {
+      showMsg('❌ تم رفض طلب التجربة. تواصل مع الدعم.', 'error');
+    } else if (denied === 'suspended') {
+      showMsg('⏸ حسابك موقوف حالياً. تواصل مع الدعم لإعادة التفعيل.', 'error');
+    }
+  } catch(e) { /* URLSearchParams missing or other — safe fallback to default login tab */ }
+
   await new Promise(r => setTimeout(r, 150));
   if (!window.sb) return;
   // إذا قادم من logout، تأكد من تنظيف الـsession
@@ -198,9 +222,43 @@ async function doLogin(e) {
   try {
     const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    showMsg('✅ تم تسجيل الدخول، جارٍ التحويل...', 'success');
+
+    // Phase 7.6F: check admin role first (admins bypass the trial_request gate).
     const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', data.user.id).maybeSingle();
-    var dest = (roleData && roleData.role === 'admin') ? 'admin.html' : 'index.html';
+    var isAdmin = (roleData && roleData.role === 'admin');
+
+    if (!isAdmin) {
+      // Tenant path: check trial_request status before allowing in.
+      const { data: trData } = await window.sb.from('trial_requests')
+        .select('status').eq('user_id', data.user.id).maybeSingle();
+      var status = trData ? trData.status : null;
+
+      if (status === 'new') {
+        showMsg('🕐 حسابك قيد المراجعة — سنفعّله خلال 24 ساعة.', 'error');
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e){}
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        return;
+      }
+      if (status === 'rejected') {
+        showMsg('❌ تم رفض طلب التجربة. تواصل مع الدعم للتفاصيل.', 'error');
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e){}
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        return;
+      }
+      if (status === 'suspended') {
+        showMsg('⏸ حسابك موقوف حالياً. تواصل مع الدعم لإعادة التفعيل.', 'error');
+        try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e){}
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        return;
+      }
+      // status === 'accepted' or NULL (legacy) → proceed
+    }
+
+    showMsg('✅ تم تسجيل الدخول، جارٍ التحويل...', 'success');
+    var dest = isAdmin ? 'admin.html' : 'index.html';
     setTimeout(() => { window.location.href = dest; }, 600);
   } catch (err) {
     let msg = err.message || 'فشل تسجيل الدخول';
@@ -216,47 +274,95 @@ async function doRegister(e) {
   hideMsg();
   const btn = document.getElementById('regBtn');
   const name = document.getElementById('regName').value.trim();
-  const phone = document.getElementById('regPhone').value.trim();
+  const contact = document.getElementById('regContact').value.trim();
   const city = document.getElementById('regCity').value;
+  const notes = document.getElementById('regNotes').value.trim();
   const password = document.getElementById('regPass').value;
 
-  if (!phone) { showMsg('❌ يرجى إدخال رقم الموبايل', 'error'); return; }
+  // Phase 7.6F: validation
+  if (!name) { showMsg('❌ يرجى إدخال الاسم الكامل', 'error'); return; }
+  if (!contact) { showMsg('❌ يرجى إدخال رقم الموبايل أو الإيميل', 'error'); return; }
   if (password.length < 6) { showMsg('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
 
-  // إنشاء إيميل من رقم الموبايل
-  const emailNum = phone.replace(/\D/g, '');
-  const email = emailNum + '@sydent.com';
+  // Phase 7.6F: detect whether contact is an email or a phone number.
+  // Email: contains '@'. Phone: digits only (with optional separators).
+  // The trader uses the SAME value to log in later (auth.html doLogin already
+  // applies the same digits-only → @sydent.com transform).
+  var isEmail = contact.indexOf('@') !== -1;
+  var email, phoneForRow;
+  if (isEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+      showMsg('❌ تنسيق الإيميل غير صحيح', 'error'); return;
+    }
+    email = contact.toLowerCase();
+    phoneForRow = null;
+  } else {
+    // Phone path: digits only allowed (with optional separators we strip)
+    if (!/^[\d\s+\-()]+$/.test(contact)) {
+      showMsg('❌ أدخل رقم موبايل أو إيميل صحيح', 'error'); return;
+    }
+    var digits = contact.replace(/\D/g, '');
+    if (digits.length < 9) { showMsg('❌ رقم الموبايل قصير جداً', 'error'); return; }
+    email = digits + '@sydent.com';
+    phoneForRow = digits;
+  }
 
   btn.disabled = true;
   btn.innerHTML = 'جارٍ الإنشاء<span class="spinner"></span>';
 
   try {
-    // إنشاء حساب Supabase
+    // Step 1: create the auth.users row (self-signup with trader-chosen password)
     const { data, error } = await window.sb.auth.signUp({
-      email, password,
-      options: { data: { full_name: name, phone: phone } }
+      email: email,
+      password: password,
+      options: { data: { full_name: name, phone: phoneForRow || '' } }
     });
     if (error) throw error;
+    if (!data || !data.user) throw new Error('تعذّر إنشاء الحساب');
 
-    // حفظ طلب تجربة بحالة new
-    await window.sb.from('trial_requests').insert({
+    // Step 2: insert the trial_request row linked to the new user_id.
+    // Status='new' means: pending admin review. The ensureAccountAccessible()
+    // gate in supabase-init.js will block login until admin sets status='accepted'.
+    const { error: trErr } = await window.sb.from('trial_requests').insert({
       name: name,
-      phone: phone,
+      phone: phoneForRow,
       city: city || null,
+      notes: notes || null,
       status: 'new',
       email: email,
-      user_id: data.user ? data.user.id : null
+      user_id: data.user.id
     });
+    if (trErr) {
+      // The auth.users row was created but the trial_request insert failed.
+      // We can't roll back the auth.users from this client (no SERVICE_KEY here),
+      // but the trader can re-try and the existing auth.users will be re-found
+      // by admin. Log and show a friendly error.
+      console.error('trial_requests insert failed:', trErr);
+      showMsg('⚠️ تم إنشاء الحساب لكن فشل تسجيل طلب التجربة. تواصل مع الدعم.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'إنشاء حساب التجربة';
+      return;
+    }
 
-    showMsg('✅ تم إنشاء حسابك! سيتم مراجعة طلبك وتفعيله قريباً.', 'success');
-    setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+    // Step 3: sign out the just-created session (the user is 'new', not yet approved).
+    // This avoids the auto-redirect in the top-of-page IIFE running on pending.html
+    // (it would redirect 'new' users to index.html, which ensureAccountAccessible
+    // would then block — extra round-trip we avoid by signing out cleanly here).
+    try { await window.sb.auth.signOut({ scope: 'local' }); } catch(e) {}
+
+    // Step 4: redirect to the professional pending page with the contact for clarity.
+    var contactParam = encodeURIComponent(phoneForRow ? phoneForRow : email);
+    var contactType  = phoneForRow ? 'phone' : 'email';
+    window.location.href = 'pending.html?contact=' + contactParam + '&type=' + contactType;
   } catch (err) {
     let msg = err.message || 'فشل إنشاء الحساب';
-    if (msg.toLowerCase().includes('already')) msg = 'هذا الرقم مسجّل مسبقاً';
+    if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('registered')) {
+      msg = isEmail ? 'هذا الإيميل مسجّل مسبقاً' : 'هذا الرقم مسجّل مسبقاً';
+    }
     if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة جداً';
     showMsg('❌ ' + msg, 'error');
     btn.disabled = false;
-    btn.textContent = 'إرسال طلب التجربة';
+    btn.textContent = 'إنشاء حساب التجربة';
   }
 }
 </script>

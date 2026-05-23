@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<title>SyDent — طلبك قيد المراجعة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
+  --border:rgba(46,232,158,0.15);
+  --green:#2ee89e;--amber:#ffb347;
+  --text:#e1f4ee;--text2:#8a9ab5;
+}
+body{
+  font-family:'Cairo',sans-serif;
+  background: linear-gradient(135deg, #0a1628 0%, #0f2038 50%, #0a1628 100%);
+  color:var(--text);min-height:100vh;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.pending-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:20px;
+  width:100%;max-width:460px;
+  padding:40px 32px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+  text-align:center;
+  animation:fadeUp .5s ease;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}}
+.icon-wrap{
+  width:80px;height:80px;margin:0 auto 22px;
+  border-radius:50%;
+  background:rgba(255,179,71,0.12);
+  border:2px solid rgba(255,179,71,0.35);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+.icon-wrap::before{
+  content:'';position:absolute;inset:-6px;border-radius:50%;
+  border:2px solid rgba(255,179,71,0.18);
+  animation:pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1);opacity:.6;}
+  50%{transform:scale(1.08);opacity:.2;}
+}
+.icon-wrap svg{width:42px;height:42px;}
+h1{font-size:22px;font-weight:800;color:var(--text);margin-bottom:10px;}
+.subtitle{font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:24px;}
+.contact-box{
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 16px;
+  margin-bottom:22px;
+  display:none;
+}
+.contact-box.show{display:block;}
+.contact-box-label{font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:600;}
+.contact-box-value{font-size:15px;color:var(--green);font-weight:700;direction:ltr;text-align:right;letter-spacing:.3px;}
+.steps{
+  background:rgba(46,232,158,0.04);
+  border:1px solid rgba(46,232,158,0.1);
+  border-radius:12px;
+  padding:18px;
+  margin-bottom:24px;
+  text-align:right;
+}
+.steps-title{font-size:13px;font-weight:700;color:var(--green);margin-bottom:12px;}
+.step-item{
+  display:flex;align-items:flex-start;gap:10px;
+  font-size:13px;color:var(--text2);margin-bottom:9px;line-height:1.6;
+}
+.step-item:last-child{margin-bottom:0;}
+.step-num{
+  flex-shrink:0;width:22px;height:22px;border-radius:50%;
+  background:rgba(46,232,158,0.15);
+  color:var(--green);font-size:12px;font-weight:800;
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-top:1px;
+}
+.actions{display:flex;gap:10px;flex-direction:column;}
+.btn{
+  width:100%;padding:13px;
+  border-radius:10px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .2s;text-decoration:none;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.btn-primary{background:var(--green);color:var(--bg);border:none;}
+.btn-primary:hover{background:#26d48e;}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-outline:hover{border-color:var(--green);color:var(--green);}
+@media (max-width:480px){
+  .pending-card{padding:32px 22px;}
+  h1{font-size:19px;}
+}
+</style>
+</head>
+<body>
+
+<div class="pending-card">
+  <div class="icon-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffb347" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <polyline points="12 6 12 12 16 14"></polyline>
+    </svg>
+  </div>
+
+  <h1>طلبك قيد المراجعة</h1>
+  <p class="subtitle">
+    تم استلام طلب التجربة بنجاح.<br>
+    سنقوم بمراجعة طلبك وتفعيل حسابك خلال 24 ساعة.
+  </p>
+
+  <div class="contact-box" id="contactBox">
+    <div class="contact-box-label" id="contactLabel">رقم التواصل</div>
+    <div class="contact-box-value" id="contactValue">—</div>
+  </div>
+
+  <div class="steps">
+    <div class="steps-title">الخطوات التالية</div>
+    <div class="step-item">
+      <span class="step-num">١</span>
+      <span>سيقوم فريقنا بمراجعة طلبك والتأكد من بياناتك.</span>
+    </div>
+    <div class="step-item">
+      <span class="step-num">٢</span>
+      <span>بعد التفعيل، يمكنك تسجيل الدخول مباشرة باستخدام بياناتك.</span>
+    </div>
+    <div class="step-item">
+      <span class="step-num">٣</span>
+      <span>تجربة مجانية 30 يوماً — استمتع بكافة الميزات.</span>
+    </div>
+  </div>
+
+  <div class="actions">
+    <a href="auth.html" class="btn btn-primary">جرّب تسجيل الدخول</a>
+    <a href="landing.html" class="btn btn-outline">العودة للصفحة الرئيسية</a>
+  </div>
+</div>
+
+<script>
+// Phase 7.6F: display the contact (phone or email) that the trader used to sign up.
+// Read from ?contact=...&type=phone|email. Defensive: if the params are missing
+// or malformed, just hide the contact box — the page still serves its purpose.
+(function(){
+  try {
+    var qs = new URLSearchParams(window.location.search);
+    var contact = qs.get('contact');
+    var type = qs.get('type');
+    if (!contact) return;
+    var box = document.getElementById('contactBox');
+    var lbl = document.getElementById('contactLabel');
+    var val = document.getElementById('contactValue');
+    if (!box || !lbl || !val) return;
+    // Light sanity check on type — only show known values.
+    if (type === 'phone') {
+      lbl.textContent = 'رقم التواصل';
+    } else if (type === 'email') {
+      lbl.textContent = 'البريد الإلكتروني';
+    } else {
+      lbl.textContent = 'وسيلة التواصل';
+    }
+    // URLSearchParams.get() already URL-decodes; set as textContent (XSS-safe).
+    val.textContent = contact;
+    box.classList.add('show');
+  } catch(e) { /* graceful: just leave the contact box hidden */ }
+})();
+</script>
+
+</body>
+</html>

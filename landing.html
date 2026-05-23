@@ -449,7 +449,7 @@ footer{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260522a04"></script>
+<script src="supabase-init.js?v=20260523a14"></script>
 </head>
 <body>
 
@@ -466,7 +466,7 @@ footer{
   </a>
   <div class="nav-actions">
     <a href="auth.html" class="btn-outline">تسجيل الدخول</a>
-    <a href="#request" class="btn-primary">جرّب مجاناً</a>
+    <a href="auth.html?tab=register" class="btn-primary">جرّب مجاناً</a>
   </div>
 </nav>
 
@@ -478,7 +478,7 @@ footer{
   <h1>إدارة عيادتك<br><span>بكل سهولة</span></h1>
   <p>نظام متكامل لإدارة مرضاك، مواعيدك، وجلساتك — من أي جهاز، في أي وقت.</p>
   <div class="hero-btns">
-    <a href="#request" class="btn-hero">أرسل طلب التجربة المجانية ←</a>
+    <a href="auth.html?tab=register" class="btn-hero">أرسل طلب التجربة المجانية ←</a>
     <a href="auth.html" class="btn-hero-outline">تسجيل الدخول</a>
   </div>
 
@@ -606,8 +606,8 @@ footer{
   <div class="steps-grid">
     <div class="step">
       <div class="step-num">١</div>
-      <div class="step-title">أرسل طلبك</div>
-      <div class="step-desc">أرسل اسمك ورقم هاتفك وسنتواصل معك لتفعيل حسابك مجاناً.</div>
+      <div class="step-title">سجّل حسابك</div>
+      <div class="step-desc">سجّل ببياناتك وكلمة مرورك — يكفي رقم موبايل أو بريد إلكتروني.</div>
     </div>
     <div class="step">
       <div class="step-num">٢</div>
@@ -618,52 +618,6 @@ footer{
       <div class="step-num">٣</div>
       <div class="step-title">ابدأ الإدارة</div>
       <div class="step-desc">جدوّل المواعيد، سجّل الجلسات، وتابع المدفوعات من أي جهاز.</div>
-    </div>
-  </div>
-</section>
-
-<!-- REQUEST FORM -->
-<section class="form-section" id="request">
-  <div class="form-card">
-    <div id="formContent">
-      <div class="form-card-title">أرسل طلب التجربة المجانية</div>
-      <div class="form-card-sub">تواصل معنا وسنفعّل حسابك خلال 24 ساعة</div>
-      <div class="msg-box" id="msgBox"></div>
-      <div class="form-group">
-        <label>الاسم الكامل *</label>
-        <input type="text" id="fname" placeholder="د. أحمد محمد">
-      </div>
-      <div class="form-group">
-        <label>رقم الهاتف *</label>
-        <input type="tel" id="fphone" placeholder="09xxxxxxxx" dir="ltr" style="text-align:right">
-      </div>
-      <div class="form-group">
-        <label>المدينة</label>
-        <select id="fcity">
-          <option value="">اختر مدينتك</option>
-          <option>دمشق</option>
-          <option>حلب</option>
-          <option>حمص</option>
-          <option>حماة</option>
-          <option>اللاذقية</option>
-          <option>طرطوس</option>
-          <option>دير الزور</option>
-          <option>الرقة</option>
-          <option>إدلب</option>
-          <option>درعا</option>
-          <option>أخرى</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>ملاحظات (اختياري)</label>
-        <textarea id="fnotes" placeholder="أي معلومات إضافية..."></textarea>
-      </div>
-      <button class="btn-form" onclick="submitRequest()">أرسل الطلب ←</button>
-    </div>
-    <div class="form-success" id="formSuccess">
-      <div class="success-icon">✅</div>
-      <p>وصل طلبك بنجاح!</p>
-      <span>سنتواصل معك خلال 24 ساعة لتفعيل حسابك.</span>
     </div>
   </div>
 </section>
@@ -681,50 +635,15 @@ footer{
 </footer>
 
 <script>
-async function submitRequest() {
-  const name = document.getElementById('fname').value.trim();
-  const phone = document.getElementById('fphone').value.trim();
-  const city = document.getElementById('fcity').value;
-  const notes = document.getElementById('fnotes').value.trim();
-  const msgBox = document.getElementById('msgBox');
-  const btn = document.querySelector('.btn-form');
-
-  msgBox.className = 'msg-box';
-  msgBox.style.display = 'none';
-
-  if (!name) { showMsg('error', 'يرجى إدخال الاسم الكامل'); return; }
-  if (!phone) { showMsg('error', 'يرجى إدخال رقم الهاتف'); return; }
-
-  if (!window.sb) { showMsg('error', 'تعذّر الاتصال بالخادم'); return; }
-
-  btn.disabled = true;
-  btn.textContent = 'جارٍ الإرسال...';
-
-  const { error } = await window.sb.from('trial_requests').insert({
-    name: name,
-    phone: phone,
-    city: city || null,
-    notes: notes || null,
-    status: 'new'
-  });
-
-  if (error) {
-    showMsg('error', 'حدث خطأ: ' + error.message);
-    btn.disabled = false;
-    btn.textContent = 'أرسل الطلب ←';
-    return;
-  }
-
-  // Show success
-  document.getElementById('formContent').style.display = 'none';
-  document.getElementById('formSuccess').style.display = 'block';
-}
-
-function showMsg(type, text) {
-  const msgBox = document.getElementById('msgBox');
-  msgBox.className = 'msg-box show ' + type;
-  msgBox.textContent = text;
-}
+// Phase 7.6F (Phase 7.6F: Unified Signup Flow): the in-page request form was
+// removed. All trial signup goes through auth.html (single source of truth).
+// The trader self-creates an auth.users row with their own password, then
+// admin reviews & accepts via admin.html. This eliminates:
+//   • The orphan trial_requests rows (no user_id) that the old landing flow created
+//   • The hardcoded password='0000' security flaw in admin.html accept()
+//   • The dual-form maintenance burden (landing form + auth.html register)
+// Landing.html is now pure marketing; the "جرّب مجاناً" CTA links to
+// auth.html?tab=register which auto-opens the registration tab.
 </script>
 
 <script>
