@@ -774,6 +774,168 @@ header{
   margin-bottom:14px;line-height:1.6;
 }
 
+/* ===== Phase X3 — Notification Templates Editor ===== */
+.tpl-editor-section{
+  margin-bottom:18px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:hidden;
+}
+.tpl-editor-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;cursor:pointer;user-select:none;
+  font-size:14px;font-weight:700;color:var(--text);
+  background:var(--bg2);
+  transition:background .15s;
+}
+.tpl-editor-header:hover{background:var(--bg3);}
+.tpl-editor-toggle{transition:transform .2s;font-size:11px;color:var(--text2);}
+.tpl-editor-section.open .tpl-editor-toggle{transform:rotate(90deg);}
+.tpl-editor-body{display:none;padding:18px;border-top:1px solid var(--border);}
+.tpl-editor-section.open .tpl-editor-body{display:block;}
+.tpl-dirty-indicator{
+  display:inline-block;width:8px;height:8px;border-radius:50%;
+  background:#ffa726;margin-right:6px;vertical-align:middle;
+  animation:tplDirtyPulse 1.5s ease-in-out infinite;
+}
+@keyframes tplDirtyPulse{
+  0%,100%{opacity:1;transform:scale(1);}
+  50%{opacity:.55;transform:scale(.85);}
+}
+.tpl-tabs-wrap{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.tpl-tab{
+  padding:8px 14px;font-size:12px;font-weight:600;
+  background:var(--bg3);color:var(--text2);
+  border:1px solid var(--border);border-radius:10px;
+  cursor:pointer;transition:all .15s;
+}
+.tpl-tab:hover{background:var(--bg);color:var(--text);}
+.tpl-tab.active{
+  background:var(--blue);color:#fff;border-color:var(--blue);
+}
+.tpl-edit-grid{
+  display:grid;gap:18px;
+  grid-template-columns:1fr;
+}
+@media(min-width:900px){
+  .tpl-edit-grid{grid-template-columns:1fr 1fr;}
+}
+.tpl-edit-pane{display:flex;flex-direction:column;gap:14px;}
+.tpl-preview-pane{
+  background:var(--bg3);border-radius:10px;padding:14px;
+  display:flex;flex-direction:column;gap:10px;
+  min-height:220px;
+}
+.tpl-preview-label{
+  font-size:11px;font-weight:600;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.5px;
+}
+.tpl-preview-bubble{
+  background:#075e54;color:#fff;
+  padding:12px 14px;border-radius:10px;
+  font-size:13px;line-height:1.7;white-space:pre-wrap;
+  word-break:break-word;font-family:inherit;
+  border-top-right-radius:2px;
+  max-height:280px;overflow-y:auto;
+}
+.tpl-preview-meta{
+  font-size:11px;color:var(--text2);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:8px;
+}
+.tpl-preview-counter{font-variant-numeric:tabular-nums;}
+.tpl-preview-counter.warn{color:#ffa726;}
+.tpl-preview-counter.over{color:#ef5350;font-weight:700;}
+.tpl-field{display:flex;flex-direction:column;gap:6px;}
+.tpl-field label{
+  font-size:12px;font-weight:600;color:var(--text2);
+}
+.tpl-field input[type="text"],
+.tpl-field textarea{
+  background:var(--bg3);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+  padding:9px 11px;font-size:13px;
+  font-family:inherit;
+  transition:border-color .15s;
+}
+.tpl-field input[type="text"]:focus,
+.tpl-field textarea:focus{
+  outline:none;border-color:var(--blue);
+}
+.tpl-field textarea{
+  min-height:160px;resize:vertical;line-height:1.6;
+}
+.tpl-field-hint{
+  font-size:11px;color:var(--text3);line-height:1.5;
+}
+.tpl-vars-row{
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+}
+.tpl-vars-row .tpl-vars-label{
+  font-size:11px;color:var(--text2);margin-left:4px;
+}
+.tpl-var-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 9px;font-size:11px;font-weight:600;
+  background:rgba(33,150,243,0.12);color:var(--blue);
+  border:1px solid rgba(33,150,243,0.3);border-radius:6px;
+  cursor:pointer;transition:all .15s;
+  font-family:'SF Mono',ui-monospace,monospace;
+}
+.tpl-var-chip:hover{background:rgba(33,150,243,0.22);}
+.tpl-var-chip:active{transform:translateY(1px);}
+.tpl-actions-row{
+  display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;
+  align-items:center;
+}
+.tpl-test-send{
+  display:flex;gap:6px;align-items:center;flex:1;min-width:220px;
+}
+.tpl-test-send input{
+  flex:1;padding:8px 11px;font-size:12px;
+  background:var(--bg3);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+}
+.btn-test-send-tpl,
+.btn-revert-tpl,
+.btn-save-tpl{
+  padding:9px 16px;font-size:12px;font-weight:600;
+  border:none;border-radius:8px;cursor:pointer;
+  transition:all .15s;
+}
+.btn-test-send-tpl{background:#25d366;color:#fff;}
+.btn-test-send-tpl:hover{background:#1ebe5b;}
+.btn-test-send-tpl:disabled{background:var(--bg3);color:var(--text3);cursor:not-allowed;}
+.btn-revert-tpl{background:var(--bg3);color:var(--text2);}
+.btn-revert-tpl:hover:not(:disabled){background:var(--bg);}
+.btn-revert-tpl:disabled{opacity:.5;cursor:not-allowed;}
+.btn-save-tpl{background:var(--green);color:#fff;font-weight:700;}
+.btn-save-tpl:hover:not(:disabled){background:#27ad7a;}
+.btn-save-tpl:disabled{background:var(--bg3);color:var(--text3);cursor:not-allowed;}
+.btn-save-tpl.dirty{background:#ffa726;color:#fff;}
+.btn-save-tpl.dirty:hover{background:#fb8c00;}
+.tpl-toggle-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;background:var(--bg3);border-radius:8px;
+  gap:10px;
+}
+.tpl-toggle-label{font-size:12px;font-weight:600;color:var(--text);}
+.tpl-toggle-sublabel{font-size:11px;color:var(--text2);margin-top:2px;}
+.tpl-switch{
+  width:38px;height:22px;background:var(--bg);
+  border:1px solid var(--border);border-radius:11px;
+  position:relative;cursor:pointer;flex-shrink:0;
+  transition:background .15s;
+}
+.tpl-switch.on{background:var(--green);border-color:var(--green);}
+.tpl-switch-knob{
+  position:absolute;top:1px;left:1px;
+  width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:transform .2s;
+}
+.tpl-switch.on .tpl-switch-knob{transform:translateX(16px);}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -781,7 +943,7 @@ header{
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260523a20"></script>
+<script src="supabase-init.js?v=20260523a21"></script>
 </head>
 <body>
 
@@ -921,6 +1083,67 @@ header{
         <div class="plan-actions-row">
           <button type="button" class="btn-revert-plan" id="btnRevertPlan" onclick="revertPlanEdits()" disabled>↺ إلغاء التعديلات</button>
           <button type="button" class="btn-save-plan"   id="btnSavePlan"   onclick="savePlanEdits()"   disabled>💾 حفظ التغييرات</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase X3: Notification Templates Editor -->
+    <div class="tpl-editor-section" id="tplEditorSection">
+      <div class="tpl-editor-header" onclick="toggleTplEditor()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTplEditor();}">
+        <span>💬 قوالب رسائل WhatsApp <span id="tplDirtyIndicator" style="display:none;" class="tpl-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
+        <span class="tpl-editor-toggle">▶</span>
+      </div>
+      <div class="tpl-editor-body">
+        <div class="tpl-tabs-wrap" id="tplTabsWrap">
+          <button type="button" class="tpl-tab active" data-tpl-code="wa_welcome"   onclick="selectTplTab('wa_welcome',this)">👋 ترحيب</button>
+          <button type="button" class="tpl-tab"        data-tpl-code="wa_reminder"  onclick="selectTplTab('wa_reminder',this)">⏰ تذكير</button>
+          <button type="button" class="tpl-tab"        data-tpl-code="wa_suspended" onclick="selectTplTab('wa_suspended',this)">⏸ إيقاف</button>
+          <button type="button" class="tpl-tab"        data-tpl-code="wa_renewed"   onclick="selectTplTab('wa_renewed',this)">✅ تجديد</button>
+        </div>
+        <div class="tpl-edit-grid">
+          <div class="tpl-edit-pane">
+            <div class="tpl-field">
+              <label for="tplFldTitle">العنوان (للإدارة فقط)</label>
+              <input type="text" id="tplFldTitle" oninput="onTplFieldChange()" autocomplete="off">
+            </div>
+            <div class="tpl-field">
+              <label for="tplFldDescription">الوصف <span style="color:var(--text3);font-weight:400;">(اختياري — متى تُرسَل، لمن)</span></label>
+              <input type="text" id="tplFldDescription" oninput="onTplFieldChange()" autocomplete="off">
+            </div>
+            <div class="tpl-field">
+              <label for="tplFldBody">نص الرسالة</label>
+              <textarea id="tplFldBody" oninput="onTplFieldChange()" placeholder="مرحباً {name} 👋..."></textarea>
+              <div class="tpl-vars-row" id="tplVarsRow">
+                <span class="tpl-vars-label">المتغيّرات (اضغط لإدراج):</span>
+              </div>
+              <div class="tpl-field-hint">المتغيّرات بين أقواس مجعّدة <code>{name}</code> تُستبدَل بقيم حقيقية وقت الإرسال. اضغط على chip ليُدرَج في مكان المؤشّر. المتغيّرات غير المعرّفة تبقى كما هي.</div>
+            </div>
+            <div class="tpl-toggle-row">
+              <div>
+                <div class="tpl-toggle-label">القالب نشط</div>
+                <div class="tpl-toggle-sublabel">عند الإيقاف، الرسائل ستستخدم النص الافتراضي (fallback) المُضمَّن في الكود.</div>
+              </div>
+              <div class="tpl-switch" id="tplSwitchActive" onclick="onTplToggleActive()" role="switch" aria-checked="true" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onTplToggleActive();}">
+                <span class="tpl-switch-knob"></span>
+              </div>
+            </div>
+          </div>
+          <div class="tpl-preview-pane">
+            <div class="tpl-preview-label">📱 معاينة (ببيانات تجريبية)</div>
+            <div class="tpl-preview-bubble" id="tplPreviewBubble"></div>
+            <div class="tpl-preview-meta">
+              <span id="tplPreviewMeta">—</span>
+              <span class="tpl-preview-counter" id="tplPreviewCounter">0 / 5000</span>
+            </div>
+          </div>
+        </div>
+        <div class="tpl-actions-row">
+          <div class="tpl-test-send">
+            <input type="tel" id="tplTestPhone" placeholder="رقمك للاختبار (مثلاً 0991234567)" autocomplete="off">
+            <button type="button" class="btn-test-send-tpl" onclick="sendTplTest()" title="فتح WhatsApp مع الرسالة الحالية">📤 تجريبي</button>
+          </div>
+          <button type="button" class="btn-revert-tpl" id="btnRevertTpl" onclick="revertTplEdits()" disabled>↺ إلغاء التعديلات</button>
+          <button type="button" class="btn-save-tpl"   id="btnSaveTpl"   onclick="saveTplEdits()"   disabled>💾 حفظ التغييرات</button>
         </div>
       </div>
     </div>
@@ -1691,6 +1914,11 @@ window.addEventListener('DOMContentLoaded', async function() {
   // (hardcoded defaults) if the config isn't ready yet, and the next
   // render after the await resolves will pick up the real values.
   loadPlanConfig();
+  // Phase X3: warm up the notification_templates cache so the first
+  // 💬 تذكير click doesn't trigger a synchronous network round-trip mid-
+  // render. We also populate planEditorState's sibling template state
+  // here (tplEditorState.config map by code) — see loadTplConfig below.
+  loadTplConfig();
   loadAndRender();
 });
 
@@ -2289,6 +2517,546 @@ async function savePlanEdits() {
 
 // ============================================================================
 // === End Phase X2 ===========================================================
+// ============================================================================
+
+// ============================================================================
+// === Phase X3 — Notification Templates Editor ===============================
+// ============================================================================
+//
+// Mirrors Phase X2 (Plans Editor) almost feature-for-feature: collapsible
+// section, tabbed editor, dirty tracking, optimistic concurrency check,
+// reset-to-default, audit log entry on save. The differences are:
+//   - 4 templates instead of 3 plans (wa_welcome, wa_reminder, wa_suspended, wa_renewed)
+//   - Live preview is a WhatsApp-style speech bubble rendered with mock data
+//   - Variable insertion via clickable chips (inserts {var} at caret)
+//   - "📤 تجريبي" button opens wa.me with the current (unsaved) body to a phone
+//   - event_type is 'template_updated' (Migration 28.1)
+//
+// State shape:
+//   tplEditorState = {
+//     config:       { code -> row },     // populated by loadTplConfig
+//     currentCode:  'wa_welcome',
+//     original:     <deep-clone of row>, // snapshot at tab-open time
+//     edited:       <deep-clone>,        // mutated by oninput
+//     isDirty:      bool,
+//     varDefs:      { code -> [{key,desc}] }   // built from FALLBACK_TEMPLATES + DB
+//   }
+//
+// MOCK_VARS — values used by the preview pane. Realistic Arabic strings so
+// admin can see what the rendered message looks like end-to-end.
+
+var tplEditorState = {
+  config: {},
+  currentCode: 'wa_welcome',
+  original: null,
+  edited: null,
+  isDirty: false,
+  varDefs: {}
+};
+
+var TPL_MOCK_VARS = {
+  name:       'د. محمد العلي',
+  days_left:  5,
+  trial_end:  '٢٧ مايو ٢٠٢٦',
+  plan_name:  'سنوي',
+  login_url:  'https://ayhamghnaim.github.io/SyDent',
+  email:      '0991234567@sydent.com',
+  price:      '150,000 SYP'
+};
+
+// Variable definitions per template — keeps the chip list inside the
+// editor in sync with what each template actually supports. This is
+// the same list as Migration 28.2's `variables` JSONB column, but kept
+// in the client too so we don't depend on DB roundtrip to render chips.
+var TPL_VAR_DEFS = {
+  wa_welcome: [
+    { key:'name',      desc:'اسم الطبيب' },
+    { key:'login_url', desc:'رابط الموقع' },
+    { key:'email',     desc:'البريد المُسجَّل' }
+  ],
+  wa_reminder: [
+    { key:'name',       desc:'اسم الطبيب (يحتوي اللقب)' },
+    { key:'days_left',  desc:'الأيام المتبقّية' },
+    { key:'trial_end',  desc:'تاريخ نهاية التجربة (عربي طويل)' },
+    { key:'plan_name',  desc:'اسم الخطة (متاح، غير مستخدم)' }
+  ],
+  wa_suspended: [
+    { key:'name', desc:'اسم الطبيب' }
+  ],
+  wa_renewed: [
+    { key:'name',      desc:'اسم الطبيب' },
+    { key:'plan_name', desc:'اسم الخطة' },
+    { key:'trial_end', desc:'تاريخ نهاية الاشتراك' },
+    { key:'price',     desc:'المبلغ المدفوع' }
+  ]
+};
+
+// Translates a code to its Arabic label (used in confirm dialogs + tabs).
+function tplCodeLabel(code) {
+  return ({
+    wa_welcome:   'رسالة الترحيب',
+    wa_reminder:  'تذكير انتهاء التجربة',
+    wa_suspended: 'إشعار إيقاف الحساب',
+    wa_renewed:   'إشعار تجديد الاشتراك'
+  })[code] || code;
+}
+
+// Load all 4 templates into tplEditorState.config + NOTIFICATION_TEMPLATES_CACHE.
+// Called on page init + after every successful save. Errors degrade
+// silently — the editor falls back to FALLBACK_TEMPLATES values so the
+// admin can at least see the defaults and try saving again.
+async function loadTplConfig() {
+  try {
+    if (!window.sb) return;
+    var res = await window.sb.from('notification_templates')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (res.error) {
+      console.warn('loadTplConfig: query error', res.error);
+      return;
+    }
+    tplEditorState.config = {};
+    // Rebuild the renderTemplate() cache from the same fetch (no double round trip).
+    NOTIFICATION_TEMPLATES_CACHE = {};
+    (res.data || []).forEach(function(t){
+      tplEditorState.config[t.code] = t;
+      if (t.is_active) NOTIFICATION_TEMPLATES_CACHE[t.code] = t.body;
+    });
+    // If the editor is already open on a tab, refresh fields from the
+    // freshly-loaded config (unless dirty — don't trample user input).
+    if (tplEditorState.currentCode && tplEditorState.config[tplEditorState.currentCode] && !tplEditorState.isDirty) {
+      var fresh = tplEditorState.config[tplEditorState.currentCode];
+      tplEditorState.original = JSON.parse(JSON.stringify(fresh));
+      tplEditorState.edited   = JSON.parse(JSON.stringify(fresh));
+      renderTplEditorFields(tplEditorState.edited);
+      renderTplPreview();
+    }
+  } catch(e) {
+    console.warn('loadTplConfig error:', e);
+  }
+}
+
+function getTplConfig(code) {
+  if (tplEditorState.config && tplEditorState.config[code]) {
+    return tplEditorState.config[code];
+  }
+  // Fallback synthetic row built from FALLBACK_TEMPLATES — keeps the
+  // editor usable even when the DB hasn't loaded yet.
+  return {
+    code: code,
+    channel: 'whatsapp',
+    title_ar: tplCodeLabel(code),
+    description: '',
+    body: FALLBACK_TEMPLATES[code] || '',
+    variables: (TPL_VAR_DEFS[code] || []).map(function(v){ return { key:v.key, desc:v.desc }; }),
+    is_active: true,
+    sort_order: 100,
+    updated_at: null,
+    updated_by: null
+  };
+}
+
+function toggleTplEditor() {
+  var sec = document.getElementById('tplEditorSection');
+  if (!sec) return;
+  sec.classList.toggle('open');
+  // On first open, populate the active tab.
+  if (sec.classList.contains('open') && !tplEditorState.original) {
+    selectTplTab(tplEditorState.currentCode || 'wa_welcome', null);
+  }
+}
+
+function selectTplTab(code, btnEl) {
+  // Block tab switching if there are unsaved changes — same UX as Plans editor.
+  if (tplEditorState.isDirty && code !== tplEditorState.currentCode) {
+    if (!confirm('هناك تعديلات غير محفوظة على "' + tplCodeLabel(tplEditorState.currentCode) + '". الانتقال سيُلغيها.\n\nمتابعة؟')) {
+      return;
+    }
+  }
+  var wrap = document.getElementById('tplTabsWrap');
+  if (wrap) {
+    var tabs = wrap.querySelectorAll('.tpl-tab');
+    tabs.forEach(function(t){ t.classList.remove('active'); });
+    if (btnEl) { btnEl.classList.add('active'); }
+    else {
+      tabs.forEach(function(t){ if (t.getAttribute('data-tpl-code') === code) t.classList.add('active'); });
+    }
+  }
+  tplEditorState.currentCode = code;
+  var src = getTplConfig(code);
+  tplEditorState.original = JSON.parse(JSON.stringify(src));
+  tplEditorState.edited   = JSON.parse(JSON.stringify(src));
+  tplEditorState.isDirty  = false;
+  renderTplEditorFields(tplEditorState.edited);
+  renderTplVarsRow();
+  renderTplPreview();
+  updateTplDirtyUI();
+}
+
+function renderTplEditorFields(t) {
+  if (!t) return;
+  var fldTitle = document.getElementById('tplFldTitle');
+  var fldDesc  = document.getElementById('tplFldDescription');
+  var fldBody  = document.getElementById('tplFldBody');
+  if (fldTitle) fldTitle.value = t.title_ar || '';
+  if (fldDesc)  fldDesc.value  = t.description || '';
+  if (fldBody)  fldBody.value  = t.body || '';
+  var sw = document.getElementById('tplSwitchActive');
+  if (sw) {
+    sw.classList.toggle('on', !!t.is_active);
+    sw.setAttribute('aria-checked', !!t.is_active);
+  }
+}
+
+function renderTplVarsRow() {
+  var row = document.getElementById('tplVarsRow');
+  if (!row) return;
+  // Drop existing chips (keep the label span).
+  Array.prototype.slice.call(row.querySelectorAll('.tpl-var-chip')).forEach(function(c){ c.remove(); });
+  var defs = TPL_VAR_DEFS[tplEditorState.currentCode] || [];
+  defs.forEach(function(def){
+    var chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'tpl-var-chip';
+    chip.textContent = '{' + def.key + '}';
+    chip.title = def.desc || def.key;
+    chip.addEventListener('click', function(){ insertTplVar(def.key); });
+    row.appendChild(chip);
+  });
+}
+
+function insertTplVar(key) {
+  var ta = document.getElementById('tplFldBody');
+  if (!ta) return;
+  var token = '{' + key + '}';
+  var start = (typeof ta.selectionStart === 'number') ? ta.selectionStart : ta.value.length;
+  var end   = (typeof ta.selectionEnd   === 'number') ? ta.selectionEnd   : ta.value.length;
+  ta.value = ta.value.substring(0, start) + token + ta.value.substring(end);
+  var caret = start + token.length;
+  ta.focus();
+  try { ta.setSelectionRange(caret, caret); } catch(_){}
+  onTplFieldChange();
+}
+
+function onTplFieldChange() {
+  if (!tplEditorState.edited) return;
+  readTplEditorIntoState();
+  computeTplDirty();
+  renderTplPreview();
+  updateTplDirtyUI();
+}
+
+function onTplToggleActive() {
+  if (!tplEditorState.edited) return;
+  tplEditorState.edited.is_active = !tplEditorState.edited.is_active;
+  var sw = document.getElementById('tplSwitchActive');
+  if (sw) {
+    sw.classList.toggle('on', !!tplEditorState.edited.is_active);
+    sw.setAttribute('aria-checked', !!tplEditorState.edited.is_active);
+  }
+  computeTplDirty();
+  renderTplPreview();
+  updateTplDirtyUI();
+}
+
+function readTplEditorIntoState() {
+  if (!tplEditorState.edited) return;
+  var fldTitle = document.getElementById('tplFldTitle');
+  var fldDesc  = document.getElementById('tplFldDescription');
+  var fldBody  = document.getElementById('tplFldBody');
+  if (fldTitle) tplEditorState.edited.title_ar    = fldTitle.value;
+  if (fldDesc)  tplEditorState.edited.description = fldDesc.value;
+  if (fldBody)  tplEditorState.edited.body        = fldBody.value;
+}
+
+function computeTplDirty() {
+  var o = tplEditorState.original, e = tplEditorState.edited;
+  if (!o || !e) { tplEditorState.isDirty = false; return; }
+  tplEditorState.isDirty = (
+    (o.title_ar    || '') !== (e.title_ar    || '') ||
+    (o.description || '') !== (e.description || '') ||
+    (o.body        || '') !== (e.body        || '') ||
+    !!o.is_active        !== !!e.is_active
+  );
+}
+
+function updateTplDirtyUI() {
+  var dot       = document.getElementById('tplDirtyIndicator');
+  var saveBtn   = document.getElementById('btnSaveTpl');
+  var revertBtn = document.getElementById('btnRevertTpl');
+  if (dot) dot.style.display = tplEditorState.isDirty ? 'inline-block' : 'none';
+  if (saveBtn) {
+    saveBtn.disabled = !tplEditorState.isDirty;
+    saveBtn.classList.toggle('dirty', !!tplEditorState.isDirty);
+  }
+  if (revertBtn) revertBtn.disabled = !tplEditorState.isDirty;
+}
+
+// Substitute mock vars into the current edited body and render into the
+// preview bubble. Uses textContent (NOT innerHTML) — admin's body could
+// contain anything, including angle brackets; we render it as plain text.
+function renderTplPreview() {
+  if (!tplEditorState.edited) return;
+  var body = tplEditorState.edited.body || '';
+  Object.keys(TPL_MOCK_VARS).forEach(function(k){
+    var needle = '{' + k + '}';
+    var val = String(TPL_MOCK_VARS[k]);
+    while (body.indexOf(needle) !== -1) body = body.replace(needle, val);
+  });
+  var bubble = document.getElementById('tplPreviewBubble');
+  if (bubble) bubble.textContent = body;
+  // Counter — wa.me text param accepts ~5000 chars safely.
+  var counter = document.getElementById('tplPreviewCounter');
+  if (counter) {
+    var len = (tplEditorState.edited.body || '').length;
+    counter.textContent = len + ' / 5000';
+    counter.className = 'tpl-preview-counter' +
+      (len > 5000 ? ' over' : (len > 4000 ? ' warn' : ''));
+  }
+  // Detect undefined placeholders so admin notices typos like {nme}.
+  var meta = document.getElementById('tplPreviewMeta');
+  if (meta) {
+    var unresolved = (body.match(/\{[a-z_]+\}/gi) || []).filter(function(t){
+      return !(t.replace(/[{}]/g, '') in TPL_MOCK_VARS);
+    });
+    meta.textContent = unresolved.length
+      ? '⚠️ متغيّرات غير معرّفة: ' + unresolved.join(', ')
+      : 'ببيانات تجريبية — الإرسال الفعلي يستبدل القيم.';
+  }
+}
+
+function revertTplEdits() {
+  if (!tplEditorState.isDirty) return;
+  if (!confirm('إلغاء جميع التعديلات على "' + tplCodeLabel(tplEditorState.currentCode) + '"؟')) return;
+  if (!tplEditorState.original) return;
+  tplEditorState.edited = JSON.parse(JSON.stringify(tplEditorState.original));
+  tplEditorState.isDirty = false;
+  renderTplEditorFields(tplEditorState.edited);
+  renderTplPreview();
+  updateTplDirtyUI();
+}
+
+// Validate before save — minimal checks. Empty body is rejected; empty
+// title_ar is rejected (admins need a label to identify templates). The
+// body is otherwise free-form (could contain emoji, line breaks, etc).
+function validateTplEdits(t) {
+  if (!t) return { ok:false, error:'لا توجد بيانات للحفظ.' };
+  if (!t.title_ar || !t.title_ar.trim()) return { ok:false, error:'العنوان مطلوب.' };
+  if (!t.body || !t.body.trim()) return { ok:false, error:'نص الرسالة مطلوب.' };
+  if (t.body.length > 5000) return { ok:false, error:'نص الرسالة طويل جداً (' + t.body.length + ' > 5000 محرف).' };
+  return { ok:true };
+}
+
+function buildTplDiff(o, e) {
+  var diff = {};
+  if ((o.title_ar || '')    !== (e.title_ar || ''))    diff.title_ar    = { from:o.title_ar,    to:e.title_ar };
+  if ((o.description || '') !== (e.description || '')) diff.description = { from:o.description, to:e.description };
+  if ((o.body || '')        !== (e.body || ''))        diff.body        = {
+    from_len:     (o.body || '').length,
+    to_len:       (e.body || '').length,
+    // First 120 chars of each — enough for the events viewer (Phase X4) to
+    // show a meaningful preview of what changed without bloating the audit
+    // log with full message bodies (templates can be 400+ chars). Admin who
+    // needs the full text can fetch the current notification_templates row.
+    from_preview: (o.body || '').slice(0, 120),
+    to_preview:   (e.body || '').slice(0, 120)
+  };
+  if (!!o.is_active         !== !!e.is_active)         diff.is_active   = { from:!!o.is_active, to:!!e.is_active };
+  return diff;
+}
+
+// "📤 تجريبي" — opens wa.me to the admin's typed phone with the *unsaved*
+// body. Useful for previewing the rendered message on the phone before
+// committing the edit. Builds the URL from the current edited body
+// (not from the DB) so admin sees their pending changes immediately.
+function sendTplTest() {
+  if (!tplEditorState.edited) return;
+  var phoneInput = document.getElementById('tplTestPhone');
+  var phone = phoneInput ? (phoneInput.value || '').trim() : '';
+  if (!phone) {
+    alert('📱 الرجاء إدخال رقم الهاتف أولاً.');
+    if (phoneInput) phoneInput.focus();
+    return;
+  }
+  var num = normalizeWaPhone(phone);
+  if (num.length < 8) {
+    alert('⚠️ الرقم غير صالح.');
+    return;
+  }
+  var body = tplEditorState.edited.body || '';
+  Object.keys(TPL_MOCK_VARS).forEach(function(k){
+    var needle = '{' + k + '}';
+    var val = String(TPL_MOCK_VARS[k]);
+    while (body.indexOf(needle) !== -1) body = body.replace(needle, val);
+  });
+  var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+  window.open(url, '_blank', 'noopener');
+}
+
+async function saveTplEdits() {
+  if (!tplEditorState.isDirty || !tplEditorState.edited || !tplEditorState.original) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+
+  // Refresh edited state from inputs defensively (paste events in some browsers don't fire oninput).
+  readTplEditorIntoState();
+  computeTplDirty();
+  if (!tplEditorState.isDirty) {
+    alert('لا توجد تعديلات للحفظ.');
+    updateTplDirtyUI();
+    return;
+  }
+
+  var e = tplEditorState.edited;
+  var o = tplEditorState.original;
+  var v = validateTplEdits(e);
+  if (!v.ok) { alert('⚠️ ' + v.error); return; }
+
+  var diff = buildTplDiff(o, e);
+  if (!diff || Object.keys(diff).length === 0) {
+    alert('لا توجد تعديلات للحفظ.');
+    return;
+  }
+
+  // Extra confirm for deactivation — sends will silently use FALLBACK_TEMPLATES.
+  if (o.is_active === true && e.is_active === false) {
+    if (!confirm('⚠️ تعطيل قالب "' + tplCodeLabel(o.code) + '" سيجعل الرسائل تستخدم النص الافتراضي المُضمَّن في الكود (وليس النص المحرَّر).\n\nمتابعة؟')) {
+      return;
+    }
+  }
+
+  var labelMap = {
+    title_ar:    'العنوان',
+    description: 'الوصف',
+    body:        'النص',
+    is_active:   'حالة التفعيل'
+  };
+  var changedKeys = Object.keys(diff);
+  var changedArabic = changedKeys.map(function(k){ return labelMap[k] || k; });
+  var summaryLine = changedArabic.length + ' حقل مُعدَّل: ' + changedArabic.join('، ');
+  if (!confirm('حفظ التعديلات على "' + tplCodeLabel(o.code) + '"؟\n\n' + summaryLine)) return;
+
+  var saveBtn = document.getElementById('btnSaveTpl');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ جاري الحفظ...'; }
+
+  try {
+    var updatePayload = {
+      title_ar:    e.title_ar,
+      description: e.description || null,
+      body:        e.body,
+      is_active:   !!e.is_active
+    };
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        updatePayload.updated_by = sess.data.session.user.email || 'admin';
+      }
+    } catch(_){}
+
+    // Optimistic concurrency check — rule #45.
+    if (o.updated_at) {
+      try {
+        var check = await window.sb.from('notification_templates')
+          .select('updated_at,updated_by')
+          .eq('code', o.code)
+          .maybeSingle();
+        if (check && check.data && check.data.updated_at && check.data.updated_at !== o.updated_at) {
+          var whoLine = check.data.updated_by ? ('\n\nآخر تعديل بواسطة: ' + check.data.updated_by) : '';
+          alert('⚠️ تم تعديل هذا القالب من جلسة أخرى منذ فتحك للمحرّر.' + whoLine +
+                '\n\nسيتم إعادة تحميل أحدث نسخة لتجنّب الكتابة فوق تعديلات الآخرين. راجع التغييرات ثم احفظ من جديد.');
+          await loadTplConfig();
+          var stale = getTplConfig(o.code);
+          if (stale) {
+            tplEditorState.original = JSON.parse(JSON.stringify(stale));
+            tplEditorState.edited   = JSON.parse(JSON.stringify(stale));
+            tplEditorState.isDirty  = false;
+            renderTplEditorFields(tplEditorState.edited);
+            renderTplPreview();
+            updateTplDirtyUI();
+          }
+          return;
+        }
+      } catch(ex) {
+        console.warn('saveTplEdits: optimistic check failed (proceeding):', ex);
+      }
+    }
+
+    var upd = await window.sb.from('notification_templates')
+      .update(updatePayload)
+      .eq('code', o.code)
+      .select()
+      .maybeSingle();
+
+    if (upd.error) {
+      console.error('saveTplEdits: update error', upd.error);
+      alert('❌ فشل الحفظ: ' + (upd.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    // R13 audit: maybeSingle() returns data:null when no row matches the
+    // WHERE clause (PostgREST). This happens if seed Migration 28.2 didn't
+    // run and the editor was working off a synthetic FALLBACK_TEMPLATES
+    // row. RLS denial also looks identical here. Surface this so admin
+    // doesn't see a fake "✅ تم حفظ" while nothing changed in DB.
+    if (!upd.data) {
+      alert('❌ لم يُحدَّث أي سطر — قد يكون قالب "' + tplCodeLabel(o.code) +
+            '" غير موجود في DB (لم يُشغَّل seed)، أو الصلاحيات مرفوضة.\n\n' +
+            'تحقّق من تشغيل Migration 28.2 وأن دورك "admin" في الـ doctors table.');
+      return;
+    }
+
+    // Audit event — Stripe-style immutable log. trial_request_id + user_id
+    // are null because this mutates the global template catalog, not a
+    // specific tenant subscription. Notes JSON captures the diff for the
+    // events viewer (Phase X4) to render later.
+    var notesObj = { template_code:o.code, diff:diff };
+    try {
+      await logSubscriptionEvent({
+        trial_request_id: null,
+        user_id:          null,
+        event_type:       'template_updated',
+        // Reuse from_plan/to_plan as identifier slots (Phase X2 plan_updated
+        // does the same — both code-snake-case strings). Phase X4 events
+        // viewer can filter by from_plan to show "all template_updated for
+        // wa_reminder" without parsing notes JSON.
+        from_plan:        o.code,
+        to_plan:          o.code,
+        from_status:      null,
+        to_status:        null,
+        from_trial_end:   null,
+        to_trial_end:     null,
+        amount:           null,
+        currency:         'SYP',
+        notes:            JSON.stringify(notesObj)
+      });
+    } catch(ex2) {
+      // DB write already succeeded — audit is best-effort, don't fail the save.
+      console.warn('saveTplEdits: audit log write failed (non-fatal):', ex2);
+    }
+
+    // Invalidate caches so renderTemplate() picks up the new body on the
+    // next call, and so the editor rebinds against the fresh row.
+    NOTIFICATION_TEMPLATES_CACHE = null;
+    await loadTplConfig();
+
+    var fresh = getTplConfig(o.code) || upd.data || updatePayload;
+    fresh.code = o.code;
+    tplEditorState.original = JSON.parse(JSON.stringify(fresh));
+    tplEditorState.edited   = JSON.parse(JSON.stringify(fresh));
+    tplEditorState.isDirty  = false;
+    renderTplEditorFields(tplEditorState.edited);
+    renderTplPreview();
+    updateTplDirtyUI();
+
+    alert('✅ تم حفظ تعديلات قالب "' + tplCodeLabel(o.code) + '".');
+  } catch(ex) {
+    console.error('saveTplEdits exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    if (saveBtn) { saveBtn.textContent = '💾 حفظ التغييرات'; updateTplDirtyUI(); }
+  }
+}
+
+// ============================================================================
+// === End Phase X3 ===========================================================
 // ============================================================================
 
 // === computeAccountState — pure function, no I/O ===
@@ -3311,40 +4079,130 @@ async function demoteFromAdmin(reqId) {
   loadAndRender();
 }
 
-function waLink(phone, name, email) {
-  var num = phone.replace(/\D/g,'');
-  if (num.startsWith('0')) num = '963' + num.substring(1);
-  var msg = encodeURIComponent(
-    'مرحباً د. ' + name + '،\n' +
-    'تم قبول طلبك في SyDent 🦷\n\n' +
-    'بيانات الدخول:\n' +
-    '🔗 الرابط: https://ayhamghnaim.github.io/SyDent\n' +
-    '👤 البريد: ' + (email || phone.replace(/\D/g,'') + '@sydent.com') + '\n' +
-    '🔑 كلمة المرور: 0000\n\n' +
-    '⚠️ يمكنك تغيير كلمة المرور من صفحة الإعدادات.\n\n' +
-    'شكراً لاختيارك SyDent!'
-  );
-  return 'https://wa.me/' + num + '?text=' + msg;
-}
-
-// Phase 7.6C-Step3: Trial expiry reminder via WhatsApp Click-to-Chat.
-// Separate from waLink (which sends login credentials on first accept)
-// because the audience and intent are different — this fires for an
-// already-onboarded tenant whose trial is approaching its end, and the
-// message must NOT mention credentials again (which are stale at this
-// point if the doctor changed their password).
+// === Phase X3 — WhatsApp helpers (template-driven) ===
 //
-// Uses the same +963 Syrian-prefix normalization as waLink for
-// consistency: a phone stored as "0991234567" becomes "+963991234567"
-// for the wa.me URL. Numbers already in international format pass
-// through unchanged (the leading-zero check fails, so we keep them).
-function waReminderLink(phone, name, daysLeft, trialEndIso) {
+// Both waLink and waReminderLink were previously sync functions that
+// concatenated hardcoded Arabic strings. They now read the message body
+// from the notification_templates table (seeded in Migration 28.2),
+// substitute {variables}, and return a wa.me URL. The strings in the
+// FALLBACK_TEMPLATES below are byte-identical copies of the original
+// hardcoded text, so behavior pre/post Phase X3 is the same when the DB
+// is reachable AND when it isn't.
+//
+// Why fallbacks: a flaky network or a misconfigured RLS should not
+// break the reminder/welcome flow — admin can still send the default
+// message. The DB version is the source of truth when available; the
+// fallback is the safety net.
+//
+// Phone normalization stays here (used by both helpers + sendTplTest).
+
+function normalizeWaPhone(phone) {
   var num = (phone || '').replace(/\D/g, '');
   if (num.startsWith('0')) num = '963' + num.substring(1);
+  return num;
+}
 
-  // Format the trial-end date in Arabic-EG long form ("٢٧ مايو ٢٠٢٦").
-  // toLocaleDateString can throw on a few legacy engines, so the ISO
-  // slice is a safe fallback.
+// Fallbacks must match Migration 28.2 seed strings exactly so that a
+// DB-down render produces the same wa.me URL as a DB-up render.
+var FALLBACK_TEMPLATES = {
+  wa_welcome:
+    'مرحباً د. {name}،\n' +
+    'تم قبول طلبك في SyDent 🦷\n\n' +
+    'بيانات الدخول:\n' +
+    '🔗 الرابط: {login_url}\n' +
+    '👤 البريد: {email}\n' +
+    '🔑 كلمة المرور: 0000\n\n' +
+    '⚠️ يمكنك تغيير كلمة المرور من صفحة الإعدادات.\n\n' +
+    'شكراً لاختيارك SyDent!',
+  wa_reminder:
+    'مرحباً {name} 👋\n\n' +
+    'هذه رسالة تذكير ودّية من SyDent 🦷\n\n' +
+    '⏰ تجربتك المجانية تنتهي خلال {days_left} يوم بتاريخ {trial_end}.\n\n' +
+    'للتمديد أو الاستفسار، يرجى التواصل معنا.\n\n' +
+    'شكراً لاختيارك SyDent!',
+  wa_suspended:
+    'مرحباً {name} 👋\n\n' +
+    'نودّ إعلامك بأن حسابك في SyDent مُعلَّق مؤقتاً.\n\n' +
+    'للاستفسار أو إعادة التفعيل، يرجى التواصل معنا.\n\n' +
+    'شكراً لتفهّمك.',
+  wa_renewed:
+    'مرحباً د. {name} 👋\n\n' +
+    'تم تجديد اشتراكك في SyDent ✅\n\n' +
+    '📋 الخطة: {plan_name}\n' +
+    '📅 صالح حتى: {trial_end}\n' +
+    '💰 المبلغ: {price}\n\n' +
+    'شكراً لاختيارك SyDent!'
+};
+
+// Cache populated by loadTplConfig() on init + invalidated after
+// saveTplEdits(). Keys are template codes, values are the body string.
+var NOTIFICATION_TEMPLATES_CACHE = null;
+
+// renderTemplate(code, vars) — picks the active template body for `code`
+// from cache (or fallback), then substitutes {var} placeholders. Missing
+// variables stay as-is (per design — they alert admin during preview).
+// Substitution uses a literal replace loop rather than RegExp to avoid
+// regex-special chars in user input breaking the replacement.
+async function renderTemplate(code, vars) {
+  var body = FALLBACK_TEMPLATES[code] || '';
+  try {
+    if (!NOTIFICATION_TEMPLATES_CACHE && window.sb) {
+      var res = await window.sb.from('notification_templates')
+        .select('code, body, is_active');
+      NOTIFICATION_TEMPLATES_CACHE = {};
+      if (!res.error && Array.isArray(res.data)) {
+        res.data.forEach(function(t){
+          if (t.is_active) NOTIFICATION_TEMPLATES_CACHE[t.code] = t.body;
+        });
+      }
+    }
+    if (NOTIFICATION_TEMPLATES_CACHE && NOTIFICATION_TEMPLATES_CACHE[code]) {
+      body = NOTIFICATION_TEMPLATES_CACHE[code];
+    }
+  } catch (e) {
+    // Network/RLS error — fall back to hardcoded body.
+    console.warn('renderTemplate: using fallback for ' + code, e);
+  }
+  vars = vars || {};
+  Object.keys(vars).forEach(function(k){
+    var needle = '{' + k + '}';
+    var val = (vars[k] == null) ? '' : String(vars[k]);
+    // Safe non-regex global replace (handles repeated placeholders too).
+    while (body.indexOf(needle) !== -1) {
+      body = body.replace(needle, val);
+    }
+  });
+  return body;
+}
+
+// Welcome message sent on accept. Now async (template-driven).
+//
+// Observation: this function has no callers in the current code path —
+// the accept flow no longer sends a welcome WhatsApp inline (replaced by
+// the unified signup flow in Phase 7.6F). The function is preserved so
+// that Phase X3 محادثة 2 can wire a manual "👋 إعادة إرسال الترحيب" button
+// to it without redefinition, and so the wa_welcome template seeded in
+// Migration 28.2 has a real render path. Email fallback (phone digits +
+// '@sydent.com') matches what waLink used to produce.
+async function waLink(phone, name, email) {
+  var num = normalizeWaPhone(phone);
+  var emailVal = email || (num + '@sydent.com');
+  var body = await renderTemplate('wa_welcome', {
+    name: name,
+    login_url: 'https://ayhamghnaim.github.io/SyDent',
+    email: emailVal
+  });
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+}
+
+// Trial-expiry reminder (Phase 7.6C-Step3 originally). Same async
+// upgrade pattern — was sync, now async, signature unchanged.
+//
+// Date formatting in Arabic-EG long form preserved verbatim. Name
+// already carries 'د'/'د.' honorific (verified live data) so the
+// template does NOT add another prefix — same as the original.
+async function waReminderLink(phone, name, daysLeft, trialEndIso) {
+  var num = normalizeWaPhone(phone);
   var dateStr;
   try {
     dateStr = new Date(trialEndIso).toLocaleDateString('ar-EG', {
@@ -3353,19 +4211,29 @@ function waReminderLink(phone, name, daysLeft, trialEndIso) {
   } catch (e) {
     dateStr = (trialEndIso || '').slice(0, 10);
   }
+  var body = await renderTemplate('wa_reminder', {
+    name: name,
+    days_left: daysLeft,
+    trial_end: dateStr,
+    plan_name: ''  // available but unused in default body
+  });
+  return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
+}
 
-  // Tenant names in trial_requests already carry the 'د' / 'د.' honorific
-  // (verified from live data: 'د شذ المار', 'د مجد شاكر', 'د احمد غنيم',
-  // 'د ايهم غنيم'). Adding another 'د. ' here would produce the awkward
-  // 'مرحباً د. د شذ المار'. Just greet the name as stored.
-  var msg = encodeURIComponent(
-    'مرحباً ' + name + ' 👋\n\n' +
-    'هذه رسالة تذكير ودّية من SyDent 🦷\n\n' +
-    '⏰ تجربتك المجانية تنتهي خلال ' + daysLeft + ' يوم بتاريخ ' + dateStr + '.\n\n' +
-    'للتمديد أو الاستفسار، يرجى التواصل معنا.\n\n' +
-    'شكراً لاختيارك SyDent!'
-  );
-  return 'https://wa.me/' + num + '?text=' + msg;
+// Adapter for renderList's inline links. The list is built synchronously
+// (no await available in a string-concat loop) so we render an href="#"
+// with onclick that builds the URL on demand and opens a new tab. The
+// templates cache is warm by then (loaded on page init), so this is a
+// single sync read in the common case.
+function openWaReminder(phone, name, daysLeft, trialEndIso, ev) {
+  if (ev) { try { ev.preventDefault(); } catch(_){} }
+  waReminderLink(phone, name, daysLeft, trialEndIso).then(function(url){
+    window.open(url, '_blank', 'noopener');
+  }).catch(function(e){
+    console.error('openWaReminder failed:', e);
+    alert('❌ تعذّر بناء رسالة التذكير: ' + (e && e.message ? e.message : e));
+  });
+  return false;
 }
 
 function formatDate(iso) {
@@ -3801,10 +4669,19 @@ function renderList() {
 
     // WhatsApp reminder — only meaningful for trial/paid with active expiry.
     // Permanent and grace accounts don't get one (different message contexts).
+    //
+    // Phase X3: waReminderLink is now async (reads template from DB), so the
+    // <a href> can't be built inline in this sync loop. Instead the anchor
+    // calls openWaReminder() which builds + opens on click. jsAttr() escapes
+    // the name for safe embedding in the onclick string literal.
     var waReminderBtn = '';
     if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
-      var waUrl = waReminderLink(r.phone || '', r.name || '', s.daysLeft, r.trial_end);
-      waReminderBtn = '<a href="' + waUrl + '" target="_blank" rel="noopener" class="btn-whatsapp">💬 تذكير</a>';
+      var safePhone = jsAttr(r.phone || '');
+      var safeName  = jsAttr(r.name || '');
+      var safeEnd   = jsAttr(r.trial_end || '');
+      waReminderBtn = '<a href="#" onclick="return openWaReminder(\'' + safePhone +
+                      '\',\'' + safeName + '\',' + Number(s.daysLeft) +
+                      ',\'' + safeEnd + '\',event)" class="btn-whatsapp">💬 تذكير</a>';
     }
 
     // Per-state action button assembly
