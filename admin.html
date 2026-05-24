@@ -6321,6 +6321,11 @@ var c360State = {
   requestId: null,
   events: [],
   eventsLoaded: false,
+  // Concurrency guard: true while c360LoadEvents is in flight. Prevents
+  // c360RenderTab('timeline') from launching a second fetch when a first
+  // one is still pending (which would cause the "جارٍ تحميل" stuck UI
+  // observed in the v43 live test for د. مجدي بورج).
+  eventsLoading: false,
   activeTab: 'overview',
   escHandler: null,
   // Token-based latest-wins guard (rule #55). Incremented on every events
@@ -6344,6 +6349,9 @@ function openCustomer360(reqId) {
   if (c360State.requestId !== reqId) {
     c360State.events = [];
     c360State.eventsLoaded = false;
+    // Don't carry the in-flight flag across customers — a previous
+    // customer's pending fetch is already invalidated by the token bump.
+    c360State.eventsLoading = false;
   }
   c360State.requestId = reqId;
   c360State.activeTab = 'overview';
@@ -6363,15 +6371,20 @@ function openCustomer360(reqId) {
 
   // Header badges — mirror the renderList badges so the drawer header
   // matches the card visually.
+  //
+  // NOTE on duplication: for paid yearly/monthly, computeAccountState
+  // already returns label='سنوي'/'شهري'. The card layout uses BOTH a
+  // plan-pill AND the state badge because the pill carries no text-
+  // emphasis colour. In the drawer's tighter header, showing both
+  // produces a literal "سنوي سنوي" repetition that looks like a bug,
+  // so we skip the plan-pill here. The state badge alone carries the
+  // plan name for paid rows.
   if (badgesEl) {
     var s = computeAccountState(r);
     var isAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
     var html = '';
     if (isAdmin) html += '<span class="req-admin-badge">👑 Admin</span>';
-    if ((s.state === 'paid' || s.state === 'grace') && !s.isPermanent) {
-      var planLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : c360EscapeHtml(s.plan || '');
-      html += '<span class="req-plan-pill">' + planLabel + '</span>';
-    }
+    // (plan-pill intentionally omitted — see comment above)
     html += '<span class="req-state ' + c360EscapeHtml(s.state) + '">' + c360EscapeHtml(s.label || '') + '</span>';
     badgesEl.innerHTML = html;
   }
@@ -6402,6 +6415,29 @@ function openCustomer360(reqId) {
   // Lock body scroll while drawer is open (best-effort — won't break the
   // page if anything goes wrong).
   try { document.body.style.overflow = 'hidden'; } catch(e) {}
+
+  // Bug-fix (v43 live test): auto-fetch activity stats if not cached.
+  // Without this, opening the drawer for a customer whose "📊 عرض النشاط"
+  // button hadn't been clicked yet shows "—" for patients/appointments/
+  // employees/last-sign-in across Overview and Risk tabs. The Phase 7.6B
+  // toggle still works as before for the inline panel; we just don't
+  // require it as a precondition for the drawer.
+  //
+  // We do NOT call renderList() inside the loader's auto-renders to keep
+  // the page stable while the drawer is open; instead we re-render only
+  // the currently visible tab.
+  if (r.user_id && (!activityCache[r.id] || (!activityCache[r.id].loaded && !activityCache[r.id].loading))) {
+    var loadingReqId = reqId;
+    fetchActivityFor(r.user_id, r.id).then(function(){
+      // Re-render only if drawer is still open for the SAME customer
+      // (rule #55 latest-wins). Other tabs read the same cache lazily.
+      if (c360State.requestId === loadingReqId) {
+        c360RenderTab(c360State.activeTab);
+      }
+    }).catch(function(err){
+      console.warn('c360 auto-fetch activity failed:', err);
+    });
+  }
 }
 
 function closeCustomer360() {
@@ -6436,15 +6472,31 @@ function c360RenderTab(tab) {
     body.innerHTML = c360BuildOverview(r);
   } else if (tab === 'timeline') {
     body.innerHTML = c360BuildTimeline(r);
-    // Lazy-load events on first visit
-    if (!c360State.eventsLoaded) {
+    // Lazy-load events on first visit. We use two flags here:
+    //   eventsLoaded — fetch has completed (success or failure)
+    //   eventsLoading — fetch is in flight; another caller must NOT
+    //                   restart it (would cause token races + the
+    //                   "جارٍ تحميل" stuck symptom from v43 live test).
+    if (!c360State.eventsLoaded && !c360State.eventsLoading) {
       var currentReqId = c360State.requestId;
+      c360State.eventsLoading = true;
       c360LoadEvents(r).then(function(){
+        c360State.eventsLoading = false;
         // Re-render only if user is still on the timeline tab AND still
         // looking at the same customer (rule #55).
         if (c360State.activeTab === 'timeline' && c360State.requestId === currentReqId) {
           var b = document.getElementById('c360Body');
           if (b) b.innerHTML = c360BuildTimeline(r);
+        }
+      }).catch(function(err){
+        c360State.eventsLoading = false;
+        console.warn('c360 timeline lazy-load failed:', err);
+        // Surface failure in UI so the user isn't stuck on the spinner.
+        c360State.eventsLoaded = true;
+        c360State.events = [];
+        if (c360State.activeTab === 'timeline' && c360State.requestId === currentReqId) {
+          var b2 = document.getElementById('c360Body');
+          if (b2) b2.innerHTML = c360BuildTimeline(r);
         }
       });
     }
@@ -6711,28 +6763,83 @@ function c360BuildComm(r) {
 async function c360LoadEvents(r) {
   var myToken = ++c360State.loadEventsToken;
   try {
-    var q = window.sb.from('subscription_events')
-      .select('*')
-      .order('created_at', { ascending: true })
-      .limit(200);
+    // Strategy: run two simple eq() queries in parallel rather than one
+    // .or() query. Two reasons:
+    //   1. The .or() variant produced an unexplained stuck-spinner in
+    //      the v43 live test for د. مجدي بورج; isolated eq queries are
+    //      the boringly-reliable PostgREST path that every other table
+    //      in this codebase uses successfully.
+    //   2. We can dedup results client-side (some events have BOTH
+    //      user_id and trial_request_id set; .or() returns them once,
+    //      two queries return them twice, dedup by id is cheap).
+    var queries = [
+      window.sb.from('subscription_events')
+        .select('*')
+        .eq('trial_request_id', r.id)
+        .order('created_at', { ascending: true })
+        .limit(200)
+    ];
     if (r.user_id) {
-      q = q.or('user_id.eq.' + r.user_id + ',trial_request_id.eq.' + r.id);
-    } else {
-      q = q.eq('trial_request_id', r.id);
+      queries.push(
+        window.sb.from('subscription_events')
+          .select('*')
+          .eq('user_id', r.user_id)
+          .order('created_at', { ascending: true })
+          .limit(200)
+      );
     }
-    var res = await q;
+    var results = await Promise.all(queries);
     // Stale check — user has switched customers since this fetch started.
     if (myToken !== c360State.loadEventsToken) return;
-    if (res.error) {
-      console.warn('c360LoadEvents: error loading events:', res.error);
-      c360State.events = [];
-    } else {
-      c360State.events = res.data || [];
+
+    // Aggregate + dedup by event id. Events that match both filters
+    // appear twice across the two result sets but share the same primary
+    // key, so a simple by-id map collapses them safely.
+    var seen = {};
+    var merged = [];
+    var anyError = null;
+    for (var qi = 0; qi < results.length; qi++) {
+      var res = results[qi];
+      if (res.error) {
+        if (!anyError) anyError = res.error;
+        continue;
+      }
+      var rows = res.data || [];
+      for (var ri = 0; ri < rows.length; ri++) {
+        var ev = rows[ri];
+        if (!ev || !ev.id) continue;
+        if (seen[ev.id]) continue;
+        seen[ev.id] = true;
+        merged.push(ev);
+      }
     }
+    // Sort merged result chronologically (ascending — c360BuildTimeline
+    // reverses for display).
+    merged.sort(function(a, b){
+      var ad = String(a.created_at || ''), bd = String(b.created_at || '');
+      return ad < bd ? -1 : ad > bd ? 1 : 0;
+    });
+
+    if (anyError && merged.length === 0) {
+      // Both queries failed (e.g. RLS denial). Log enough detail to
+      // diagnose without leaking PII.
+      console.warn('c360LoadEvents: all queries failed', {
+        code: anyError.code,
+        message: anyError.message,
+        details: anyError.details,
+        hint: anyError.hint,
+        user_id: r.user_id,
+        request_id: r.id
+      });
+    } else if (anyError) {
+      // Partial failure — we still have rows, log a softer warning.
+      console.info('c360LoadEvents: one branch failed, returning partial results:', anyError.code, anyError.message);
+    }
+    c360State.events = merged;
     c360State.eventsLoaded = true;
   } catch (e) {
     if (myToken !== c360State.loadEventsToken) return;
-    console.warn('c360LoadEvents threw:', e);
+    console.warn('c360LoadEvents threw:', e && (e.stack || e.message || e));
     c360State.events = [];
     c360State.eventsLoaded = true; // mark loaded so we don't retry indefinitely
   }
