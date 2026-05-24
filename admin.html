@@ -1634,7 +1634,7 @@ header{
  *   1. Skeleton loaders   (.sk-*)    — replace "⏳ جارٍ التحميل..."
  *   2. Empty states v2    (.es-*)    — contextual, action-oriented
  *   3. Mobile breakpoints            — sub-680px polish for X1–X8
- *   4. Keyboard shortcuts (.kbs-*)   — help modal + footer chip
+ *   4. Keyboard shortcuts (.kbs-*)   — help modal + always-on FAB
  *   5. a11y + microinteractions      — focus-visible, reduced-motion
  *
  * Class prefixes are disjoint from every existing namespace
@@ -1769,8 +1769,9 @@ header{
 }
 
 /* ===== 4. KEYBOARD SHORTCUTS UI ===================================
- * Help modal triggered by `?`, plus a discreet footer chip that
- * onboards new admins to the existence of shortcuts. Linear pattern.
+ * Help modal triggered by `?`, plus an always-visible circular FAB
+ * (bottom-left) that opens the same modal on click. Material Design
+ * FAB pattern: 48×48, accent color, shadow lift on hover.
  * =================================================================== */
 .kbs-modal-back{
   position:fixed; inset:0; background:rgba(0,0,0,0.55);
@@ -1823,24 +1824,46 @@ header{
   direction:ltr;
 }
 .kbs-key-plus{font-size:11px; color:var(--text3);}
-/* Footer chip — discreet onboarding hint, dismissible. */
-.kbs-chip{
-  position:fixed; bottom:16px; left:16px; z-index:80;
-  background:var(--bg2); border:1px solid var(--border2);
-  border-radius:20px; padding:6px 12px 6px 8px;
-  display:none; align-items:center; gap:6px;
-  font-size:11px; color:var(--text2); cursor:pointer;
-  box-shadow:0 4px 12px rgba(0,0,0,0.3);
-  transition:all .15s;
+/* Floating Action Button (FAB) — always-visible shortcut helper.
+ * Material Design FAB pattern: 48×48 circle, accent color, shadow lift.
+ * Positioned bottom-left in RTL admin so it doesn't conflict with
+ * the bulk-bar (top) or the iPhone home-indicator (handled below). */
+.kbs-fab{
+  position:fixed; bottom:20px; left:20px; z-index:80;
+  width:48px; height:48px; border-radius:50%;
+  background:var(--green); border:none;
+  color:var(--bg); font-family:'Cairo',sans-serif;
+  font-size:22px; font-weight:900; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(46,232,158,0.35), 0 2px 4px rgba(0,0,0,0.3);
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+  padding:0; line-height:1;
 }
-.kbs-chip.show{display:inline-flex;}
-.kbs-chip:hover{border-color:var(--green); color:var(--text);}
-.kbs-chip .kbs-key{font-size:10px; min-width:20px; padding:2px 5px;}
-.kbs-chip-x{
-  background:transparent; border:none; color:var(--text3);
-  cursor:pointer; padding:0 0 0 4px; font-size:13px;
+.kbs-fab:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(46,232,158,0.5), 0 3px 6px rgba(0,0,0,0.35);
 }
-.kbs-chip-x:hover{color:var(--red);}
+.kbs-fab:active{transform:translateY(0);}
+/* Tooltip on hover — appears to the right of FAB (RTL: visually next to it). */
+.kbs-fab::after{
+  content:'الاختصارات (؟)';
+  position:absolute; bottom:50%; left:60px; transform:translateY(50%);
+  background:var(--bg2); color:var(--text);
+  border:1px solid var(--border2); border-radius:6px;
+  padding:5px 10px; font-size:11px; font-weight:600;
+  white-space:nowrap; opacity:0; pointer-events:none;
+  transition:opacity 0.15s ease;
+}
+.kbs-fab:hover::after{opacity:1;}
+/* Safe-area inset for iPhone home indicator (≤480px). */
+@media (max-width: 480px){
+  .kbs-fab{
+    bottom:max(20px, calc(env(safe-area-inset-bottom) + 12px));
+    left:16px;
+    /* Hide the tooltip on touch — no hover state on phones. */
+  }
+  .kbs-fab::after{display:none;}
+}
 
 /* ===== 5. a11y + MICROINTERACTIONS =================================
  * focus-visible: only show outlines for keyboard users (not mouse).
@@ -8931,10 +8954,10 @@ function rptFmtSypShort(n) {
 </script>
 
 <!-- ===================================================================
-     Phase X9 — Keyboard Shortcuts modal + onboarding chip
+     Phase X9 — Keyboard Shortcuts modal + always-visible FAB
      The modal is hidden by default and shown via `?` (Shift+/), via the
-     chip, or programmatically by openKbsModal(). The chip appears once
-     per device for 7 days unless dismissed sooner (localStorage flag).
+     FAB button, or programmatically by openKbsModal(). The FAB is
+     bottom-left, always visible (Material Design FAB pattern).
      =================================================================== -->
 <div class="kbs-modal-back" id="kbsModal" role="dialog" aria-modal="true" aria-labelledby="kbsModalTitle" onclick="if(event.target===this)closeKbsModal()">
   <div class="kbs-modal">
@@ -8972,15 +8995,11 @@ function rptFmtSypShort(n) {
   </div>
 </div>
 
-<div class="kbs-chip" id="kbsChip" role="button" tabindex="0"
-     onclick="openKbsModal();dismissKbsChip();"
-     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openKbsModal();dismissKbsChip();}"
-     aria-label="عرض اختصارات لوحة المفاتيح">
-  <span>اضغط</span>
-  <span class="kbs-key">?</span>
-  <span>للاختصارات</span>
-  <button type="button" class="kbs-chip-x" onclick="event.stopPropagation();dismissKbsChip();" aria-label="إخفاء">✕</button>
-</div>
+<button type="button" class="kbs-fab" id="kbsFab"
+        onclick="openKbsModal()"
+        aria-label="عرض اختصارات لوحة المفاتيح">
+  ؟
+</button>
 
 <!-- Screen-reader-only live region for async announcements (loading complete, etc). -->
 <div id="kbsSrAnnounce" class="sr-only" role="status" aria-live="polite"></div>
@@ -8989,7 +9008,7 @@ function rptFmtSypShort(n) {
 // ===========================================================================
 // Phase X9 — Keyboard Shortcuts + Polish helpers
 //
-// Single IIFE — exposes openKbsModal/closeKbsModal/dismissKbsChip on window so
+// Single IIFE — exposes openKbsModal/closeKbsModal on window so
 // inline onclick/onkeydown handlers above can reach them. Everything else
 // (the document-level keydown listener, sequence buffer, chip onboarding) is
 // scoped inside this closure.
@@ -8998,9 +9017,8 @@ function rptFmtSypShort(n) {
 //   - We ignore shortcuts when an input/textarea/contenteditable is focused
 //     (Linear / PostHog convention). The single exception is `Esc`, which
 //     should always blur + close, even while typing.
-//   - The chip uses localStorage for opt-out persistence. Re-shows after 7
-//     days only if the user never explicitly dismissed it (auto-hide path
-//     stores a softer "snoozed" flag).
+//   - The FAB (bottom-left) is always visible — Material Design FAB pattern.
+//     It exists in HTML and is shown by CSS only; no JS needed to toggle it.
 //   - We open Customer 360°-style drawers/modals through the same Esc
 //     handler the existing modal uses (line ~2887). The original handler
 //     remains in place for editModal; we add coverage for the new kbs modal
@@ -9035,41 +9053,6 @@ function rptFmtSypShort(n) {
   }
   window.openKbsModal  = openKbsModal;
   window.closeKbsModal = closeKbsModal;
-
-  // ---- Chip onboarding ------------------------------------------------------
-  // Three states stored in localStorage:
-  //   kbsChip_v1=dismissed  → never show again
-  //   kbsChip_v1=snoozed_<ts> → show again after 7 days
-  //   (unset)               → show on next admin load
-  var CHIP_KEY = 'kbsChip_v1';
-  var SNOOZE_DAYS = 7;
-  function chipState(){
-    try { return localStorage.getItem(CHIP_KEY) || ''; } catch(e){ return ''; }
-  }
-  function setChipState(v){
-    try { localStorage.setItem(CHIP_KEY, v); } catch(e){}
-  }
-  function dismissKbsChip(){
-    var c = document.getElementById('kbsChip');
-    if (c) c.classList.remove('show');
-    setChipState('dismissed');
-  }
-  window.dismissKbsChip = dismissKbsChip;
-  function maybeShowChip(){
-    var v = chipState();
-    if (v === 'dismissed') return;
-    if (v.indexOf('snoozed_') === 0){
-      var ts = parseInt(v.slice(8), 10);
-      if (!isNaN(ts) && (Date.now() - ts) < SNOOZE_DAYS * 86400000) return;
-    }
-    var c = document.getElementById('kbsChip');
-    if (!c) return;
-    // Delay show by 1.5s so it doesn't compete with loading skeletons for attention.
-    setTimeout(function(){
-      c.classList.add('show');
-      setChipState('snoozed_' + Date.now());
-    }, 1500);
-  }
 
   // ---- Shortcut helpers -----------------------------------------------------
   function isTypingTarget(t){
@@ -9278,9 +9261,9 @@ function rptFmtSypShort(n) {
   // ---- Boot ----------------------------------------------------------------
   // Run after DOM is ready. We don't gate on auth — if the user is on the
   // login screen, the shortcuts are harmless (most targets won't exist yet).
+  // The FAB is always visible (CSS-only, no JS needed to show it).
   function boot(){
     autoLabelButtons();
-    maybeShowChip();
   }
   if (document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', boot);
