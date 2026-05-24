@@ -8130,7 +8130,7 @@ async function rptLoad() {
     var rangeStart = months[0].start;
 
     var promises = [
-      window.sb.from('trial_requests').select('id, user_id, status, plan, trial_end, created_at, updated_at, price_paid').limit(5000),
+      window.sb.from('trial_requests').select('id, user_id, status, plan, trial_end, created_at, price_paid').limit(5000),
       // Note: no gte filter on created_at — we need full history so that
       // the "New vs Reactivation" classification at the start of the range
       // has correct prior-paid context (D8 fix).
