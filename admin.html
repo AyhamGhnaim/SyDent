@@ -1626,11 +1626,260 @@ header{
 }
 .flt-reset:hover{color:var(--text); border-color:var(--text2);}
 
+/* =====================================================================
+ * Phase X9 — Polish & UX Refinement (v44)
+ * ---------------------------------------------------------------------
+ * Five modules, all CSS-only here; JS lives in the script block below.
+ *
+ *   1. Skeleton loaders   (.sk-*)    — replace "⏳ جارٍ التحميل..."
+ *   2. Empty states v2    (.es-*)    — contextual, action-oriented
+ *   3. Mobile breakpoints            — sub-680px polish for X1–X8
+ *   4. Keyboard shortcuts (.kbs-*)   — help modal + footer chip
+ *   5. a11y + microinteractions      — focus-visible, reduced-motion
+ *
+ * Class prefixes are disjoint from every existing namespace
+ * (evf/tpl/c360/plan/flt/bk/rpt) — see قاعدة #58 (in-page sections),
+ * #34 (enterprise platform mindset).
+ * ===================================================================== */
+
+/* ===== 1. SKELETON LOADERS =========================================
+ * Use these in place of "⏳ جارٍ التحميل..." text. They communicate
+ * "content is coming, here is its shape" rather than "system is
+ * thinking" — Stripe / Linear / PostHog convention (Medium 2025 UX).
+ * The shimmer is suppressed under prefers-reduced-motion (a11y).
+ * =================================================================== */
+@keyframes sk-shimmer{
+  0%{background-position:200% 0;}
+  100%{background-position:-200% 0;}
+}
+.sk-base{
+  display:block; border-radius:6px;
+  background:linear-gradient(
+    90deg,
+    var(--bg3) 0%,
+    rgba(46,232,158,0.06) 50%,
+    var(--bg3) 100%
+  );
+  background-size:200% 100%;
+  animation:sk-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce){
+  .sk-base{animation:none; background:var(--bg3);}
+}
+/* Card skeleton — mirrors .req-card structure (top row + 3 info rows + actions). */
+.sk-card{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:16px; margin-bottom:12px;
+}
+.sk-card-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
+.sk-name{height:18px; width:140px;}
+.sk-badge{height:18px; width:60px; border-radius:5px;}
+.sk-info-row{height:13px; margin-bottom:6px;}
+.sk-info-row.w1{width:60%;}
+.sk-info-row.w2{width:75%;}
+.sk-info-row.w3{width:45%;}
+.sk-actions{display:flex; gap:8px; margin-top:14px;}
+.sk-btn{height:34px; flex:1 1 auto; min-width:90px; border-radius:8px;}
+/* Widget skeleton — mirrors .health-card (title + big value + sub). */
+.sk-widget{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:14px; min-height:96px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.sk-widget-title{height:12px; width:60%;}
+.sk-widget-value{height:26px; width:50%;}
+.sk-widget-sub{height:10px; width:80%;}
+/* Row skeleton — for events list / template list (one-liner). */
+.sk-row{
+  height:46px; margin-bottom:6px; border-radius:8px;
+  background:var(--bg2);
+}
+.sk-row.tall{height:56px;}
+.sk-row-inner{
+  height:100%; padding:12px 14px;
+  display:flex; align-items:center; gap:10px;
+}
+.sk-dot{width:8px; height:8px; border-radius:50%; flex-shrink:0;}
+.sk-line{flex:1 1 auto; height:12px;}
+/* Screen-reader-only announcement — pair with role="status" / aria-live. */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+/* ===== 2. EMPTY STATES v2 ==========================================
+ * Action-oriented empty states (Stripe pattern). The old .empty-state
+ * remains for "loading" / "error" inline messages; .es-* is the new
+ * library for "we have nothing to show — here's what you can do".
+ * =================================================================== */
+.es-box{
+  background:var(--bg2); border:1px dashed var(--border2);
+  border-radius:14px; padding:36px 24px; text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.es-icon{
+  font-size:42px; line-height:1; opacity:.85;
+  filter:drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+}
+.es-title{font-size:15px; font-weight:700; color:var(--text); margin-top:4px;}
+.es-msg{font-size:12px; color:var(--text2); max-width:340px; line-height:1.7;}
+.es-cta{
+  margin-top:8px; padding:8px 18px;
+  background:var(--green-dim); border:1px solid var(--border2);
+  border-radius:8px; color:var(--green);
+  font-family:'Cairo',sans-serif; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .15s;
+}
+.es-cta:hover{background:rgba(46,232,158,0.2);}
+.es-hint{font-size:10px; color:var(--text3); margin-top:6px;}
+
+/* ===== 3. MOBILE BREAKPOINTS =======================================
+ * Unified breakpoints across X1–X8 sections. The existing 9 media
+ * queries handled grid columns; these add safe-area, sticky-bar, and
+ * action-button wrapping fixes for ≤480px (phones, including iPhone
+ * notch). 680px is the standard table → card breakpoint.
+ * =================================================================== */
+@media (max-width: 680px){
+  .main{padding:14px;}
+  /* Health widgets: 1 column on phones for full readability. */
+  .health-row{grid-template-columns:1fr;}
+  /* Stats row: keep 3 col but shrink padding. */
+  .stats-row{gap:8px;}
+  .stat-card{padding:12px;}
+  .stat-num{font-size:22px;}
+  /* Filter tabs: smaller padding so all 4 tabs fit without scroll. */
+  .tab{padding:6px 12px; font-size:11px;}
+  /* Req-card actions: wrap to 2 columns instead of horizontal scroll. */
+  .req-actions{gap:6px;}
+  .req-actions > button, .req-actions > a{flex:1 1 calc(50% - 3px); min-width:0;}
+  /* Modal: nearly full-width on phones. */
+  .modal-card{max-width:92vw;}
+  /* Bulk bar: stack count + actions vertically when packed. */
+  .bk-bar{flex-direction:column; align-items:stretch; gap:8px;}
+  .bk-bar-count{text-align:center;}
+  .bk-bar-spacer{display:none;}
+  .bk-bar-actions{justify-content:center;}
+}
+/* iPhone-class viewports (≤480px) need the bulk-bar pinned above
+ * the home-indicator safe area, so swipe-up doesn't obscure it. */
+@media (max-width: 480px){
+  .bk-bar{padding-bottom:max(10px, env(safe-area-inset-bottom));}
+  /* Header: hide the long subtitle, keep just the logo + Admin badge. */
+  .header-logo > div{display:none;}
+}
+
+/* ===== 4. KEYBOARD SHORTCUTS UI ===================================
+ * Help modal triggered by `?`, plus a discreet footer chip that
+ * onboards new admins to the existence of shortcuts. Linear pattern.
+ * =================================================================== */
+.kbs-modal-back{
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  display:none; align-items:center; justify-content:center;
+  z-index:10000; padding:20px; backdrop-filter:blur(4px);
+}
+.kbs-modal-back.show{display:flex; animation:kbs-fade .15s ease-out;}
+@keyframes kbs-fade{from{opacity:0;}to{opacity:1;}}
+.kbs-modal{
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:14px; width:100%; max-width:520px;
+  max-height:85vh; overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.kbs-modal-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:16px 18px; border-bottom:1px solid var(--border);
+  position:sticky; top:0; background:var(--bg2); z-index:1;
+}
+.kbs-modal-title{font-size:15px; font-weight:800; color:var(--green);}
+.kbs-modal-close{
+  background:transparent; border:1px solid var(--border); color:var(--text2);
+  width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:14px;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.kbs-modal-close:hover{color:var(--text); border-color:var(--text2);}
+.kbs-modal-body{padding:14px 18px 18px;}
+.kbs-group{margin-bottom:18px;}
+.kbs-group:last-child{margin-bottom:0;}
+.kbs-group-title{
+  font-size:11px; font-weight:700; color:var(--text2);
+  text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;
+}
+.kbs-row{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:8px 0; border-bottom:1px solid var(--border);
+  gap:12px;
+}
+.kbs-row:last-child{border-bottom:none;}
+.kbs-row-desc{font-size:13px; color:var(--text); flex:1; min-width:0;}
+.kbs-keys{
+  display:inline-flex; align-items:center; gap:4px; flex-shrink:0;
+}
+.kbs-key{
+  display:inline-block; min-width:24px; padding:3px 7px;
+  background:var(--bg3); border:1px solid var(--border2);
+  border-radius:5px; color:var(--green);
+  font-family:'Courier New',monospace; font-size:11px; font-weight:700;
+  text-align:center; box-shadow:0 1px 0 rgba(0,0,0,0.25);
+  direction:ltr;
+}
+.kbs-key-plus{font-size:11px; color:var(--text3);}
+/* Footer chip — discreet onboarding hint, dismissible. */
+.kbs-chip{
+  position:fixed; bottom:16px; left:16px; z-index:80;
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:20px; padding:6px 12px 6px 8px;
+  display:none; align-items:center; gap:6px;
+  font-size:11px; color:var(--text2); cursor:pointer;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  transition:all .15s;
+}
+.kbs-chip.show{display:inline-flex;}
+.kbs-chip:hover{border-color:var(--green); color:var(--text);}
+.kbs-chip .kbs-key{font-size:10px; min-width:20px; padding:2px 5px;}
+.kbs-chip-x{
+  background:transparent; border:none; color:var(--text3);
+  cursor:pointer; padding:0 0 0 4px; font-size:13px;
+}
+.kbs-chip-x:hover{color:var(--red);}
+
+/* ===== 5. a11y + MICROINTERACTIONS =================================
+ * focus-visible: only show outlines for keyboard users (not mouse).
+ * Unified across all clickable elements. Pairs with the existing
+ * role="button" tabindex="0" pattern in widgets/headers.
+ * =================================================================== */
+:focus-visible{
+  outline:2px solid var(--green);
+  outline-offset:2px;
+  border-radius:6px;
+}
+/* Buttons get a slightly tighter offset since they already have padding. */
+button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
+.btn-whatsapp:focus-visible, .btn-logout:focus-visible, .btn-export-csv:focus-visible{
+  outline-offset:1px;
+}
+/* Subtle press feedback on actionable controls. */
+@media (hover: hover){
+  button:not(:disabled):active,
+  .health-card.clickable:active,
+  .alerts-banner:active{
+    transform:translateY(0.5px);
+  }
+}
+/* Suppress all transitions/animations for reduced-motion users. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:0.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260523a28"></script>
+<script src="supabase-init.js?v=20260523a29"></script>
 </head>
 <body>
 
@@ -2951,11 +3200,26 @@ async function loadAndRender() {
     return;
   }
   var list = document.getElementById('reqList');
-  list.innerHTML = '<div class="empty-state"><div>⏳</div>جارٍ التحميل...</div>';
+  // Phase X9: skeleton loaders replace the "⏳ جارٍ التحميل..." text.
+  // We render 3 placeholder cards that approximate the shape of req-cards
+  // so the layout doesn't jump when real data arrives.
+  list.innerHTML = (
+    '<div class="sk-card"><div class="sk-card-top"><span class="sk-base sk-name"></span><span class="sk-base sk-badge"></span></div>' +
+      '<div class="sk-base sk-info-row w1"></div><div class="sk-base sk-info-row w2"></div><div class="sk-base sk-info-row w3"></div>' +
+      '<div class="sk-actions"><span class="sk-base sk-btn"></span><span class="sk-base sk-btn"></span></div></div>' +
+    '<div class="sk-card"><div class="sk-card-top"><span class="sk-base sk-name"></span><span class="sk-base sk-badge"></span></div>' +
+      '<div class="sk-base sk-info-row w2"></div><div class="sk-base sk-info-row w1"></div><div class="sk-base sk-info-row w3"></div>' +
+      '<div class="sk-actions"><span class="sk-base sk-btn"></span><span class="sk-base sk-btn"></span></div></div>' +
+    '<div class="sk-card"><div class="sk-card-top"><span class="sk-base sk-name"></span><span class="sk-base sk-badge"></span></div>' +
+      '<div class="sk-base sk-info-row w1"></div><div class="sk-base sk-info-row w3"></div><div class="sk-base sk-info-row w2"></div>' +
+      '<div class="sk-actions"><span class="sk-base sk-btn"></span><span class="sk-base sk-btn"></span></div></div>'
+  );
+  list.setAttribute('aria-busy', 'true');
   var { data, error } = await window.sb.from('trial_requests')
     .select('*').order('created_at', { ascending: false });
   if (error) {
-    list.innerHTML = '<div class="empty-state"><div>⚠️</div>خطأ: ' + error.message + '</div>';
+    list.setAttribute('aria-busy', 'false');
+    list.innerHTML = '<div class="empty-state" role="alert"><div>⚠️</div>خطأ: ' + error.message + '</div>';
     return;
   }
   allRequests = data || [];
@@ -2964,6 +3228,7 @@ async function loadAndRender() {
   // Errors are swallowed inside fetchAdminUserIds (defensive — if the
   // doctors query fails, we render with no badges rather than crashing).
   await fetchAdminUserIds();
+  list.setAttribute('aria-busy', 'false');
   renderAll();
 }
 
@@ -5898,8 +6163,15 @@ async function evfLoadEvents(reset) {
   var myToken = ++evfLoadToken;  // D6 latest-wins guard
   if (reset) {
     evfAllEvents = [];
-    document.getElementById('evfList').innerHTML =
-      '<div class="evf-state"><span class="evf-state-icon">⏳</span><div>جارٍ التحميل...</div></div>';
+    // Phase X9: skeleton rows mirror the events-list row shape so the
+    // layout doesn't shift when real data arrives.
+    document.getElementById('evfList').innerHTML = (
+      '<div class="sk-row tall"><div class="sk-row-inner"><span class="sk-base sk-dot"></span><span class="sk-base sk-line"></span></div></div>' +
+      '<div class="sk-row tall"><div class="sk-row-inner"><span class="sk-base sk-dot"></span><span class="sk-base sk-line"></span></div></div>' +
+      '<div class="sk-row tall"><div class="sk-row-inner"><span class="sk-base sk-dot"></span><span class="sk-base sk-line"></span></div></div>' +
+      '<div class="sk-row tall"><div class="sk-row-inner"><span class="sk-base sk-dot"></span><span class="sk-base sk-line"></span></div></div>'
+    );
+    document.getElementById('evfList').setAttribute('aria-busy', 'true');
     document.getElementById('evfPaginationWrap').style.display = 'none';
   }
 
@@ -5985,12 +6257,16 @@ function evfRenderList() {
   }
 
   var listEl = document.getElementById('evfList');
+  listEl.setAttribute('aria-busy', 'false');
   if (filtered.length === 0) {
-    listEl.innerHTML =
-      '<div class="evf-state"><span class="evf-state-icon">🔍</span>' +
-      '<div>لا توجد أحداث تطابق الفلاتر الحالية.</div>' +
-      '<div style="font-size:11px;margin-top:6px;color:var(--text3);">' +
-      'جرّب توسيع نطاق التاريخ أو إلغاء تحديد نوع الحدث.</div></div>';
+    // Phase X9: action-oriented empty state with explicit hint.
+    listEl.innerHTML = (
+      '<div class="es-box" role="status">' +
+        '<div class="es-icon" aria-hidden="true">🔍</div>' +
+        '<div class="es-title">لا توجد أحداث تطابق الفلاتر</div>' +
+        '<div class="es-msg">جرّب توسيع نطاق التاريخ أو إلغاء تحديد بعض أنواع الأحداث من الـ chips أعلاه.</div>' +
+      '</div>'
+    );
   } else {
     var html = '';
     filtered.forEach(function(ev) { html += evfRenderCard(ev); });
@@ -6537,18 +6813,46 @@ function renderList() {
   if (selAllRow) selAllRow.style.display = filtered.length > 0 ? 'flex' : 'none';
 
   if (filtered.length === 0) {
-    var emptyMsg, emptyIcon;
+    // Phase X9: contextual empty states with action-oriented copy. The icon,
+    // title, message, and optional CTA depend on *why* the list is empty —
+    // a no-results-from-search reads very differently from a brand-new
+    // platform with zero signups (Stripe Stripe Apps empty-state guidance).
+    var esIcon, esTitle, esMsg, esCtaHtml = '';
     if (expiringFilterActive) {
-      emptyMsg = 'لا توجد حسابات تنتهي قريباً ضمن الفلتر الحالي';
-      emptyIcon = '⏰';
+      esIcon  = '⏰';
+      esTitle = 'لا توجد حسابات تنتهي قريباً';
+      esMsg   = 'كل اشتراكاتك النشطة لديها أكثر من 7 أيام متبقية. الوضع آمن حالياً.';
+      esCtaHtml = '<button type="button" class="es-cta" onclick="closeExpiringFilter(event)">إزالة فلتر الانتهاء القريب</button>';
     } else if (searchTerm) {
-      emptyMsg = 'لا توجد نتائج مطابقة للبحث';
-      emptyIcon = '🔍';
+      esIcon  = '🔍';
+      esTitle = 'لا توجد نتائج مطابقة';
+      esMsg   = 'جرّب كلمات أقل أو افحص التهجئة. البحث يشمل الاسم، الهاتف، الإيميل، المدينة، والملاحظات.';
+      esCtaHtml = '<button type="button" class="es-cta" onclick="clearSearch()">مسح البحث</button>';
+    } else if (currentFilter === 'new') {
+      esIcon  = '📭';
+      esTitle = 'لا توجد طلبات جديدة';
+      esMsg   = 'بمجرد أن يسجّل عميل جديد عبر صفحة الاشتراك، سيظهر طلبه هنا للمراجعة.';
+    } else if (currentFilter === 'accepted') {
+      esIcon  = '🟢';
+      esTitle = 'لا توجد حسابات مقبولة';
+      esMsg   = 'الحسابات التي تقبلها ستظهر هنا. يمكنك قبول طلبات من تبويب "الجديد".';
+    } else if (currentFilter === 'rejected') {
+      esIcon  = '🚫';
+      esTitle = 'لا توجد حسابات مرفوضة';
+      esMsg   = 'الحسابات التي ترفضها ستظهر هنا للأرشيف والمراجعة لاحقاً.';
     } else {
-      emptyMsg = 'لا توجد طلبات';
-      emptyIcon = '📭';
+      esIcon  = '🌱';
+      esTitle = 'لا توجد طلبات بعد';
+      esMsg   = 'بمجرد أن يبدأ المستخدمون بالتسجيل عبر landing page، ستظهر طلباتهم هنا. شارك رابط منصّتك للبدء.';
     }
-    list.innerHTML = '<div class="empty-state"><div>' + emptyIcon + '</div>' + emptyMsg + '</div>';
+    list.innerHTML = (
+      '<div class="es-box" role="status">' +
+        '<div class="es-icon" aria-hidden="true">' + esIcon + '</div>' +
+        '<div class="es-title">' + esTitle + '</div>' +
+        '<div class="es-msg">' + esMsg + '</div>' +
+        esCtaHtml +
+      '</div>'
+    );
     return;
   }
   list.innerHTML = filtered.map(function(r) {
@@ -8625,6 +8929,387 @@ function rptFmtSypShort(n) {
 
 // === End Phase X8 ===========================================================
 </script>
+
+<!-- ===================================================================
+     Phase X9 — Keyboard Shortcuts modal + onboarding chip
+     The modal is hidden by default and shown via `?` (Shift+/), via the
+     chip, or programmatically by openKbsModal(). The chip appears once
+     per device for 7 days unless dismissed sooner (localStorage flag).
+     =================================================================== -->
+<div class="kbs-modal-back" id="kbsModal" role="dialog" aria-modal="true" aria-labelledby="kbsModalTitle" onclick="if(event.target===this)closeKbsModal()">
+  <div class="kbs-modal">
+    <div class="kbs-modal-head">
+      <span class="kbs-modal-title" id="kbsModalTitle">⌨️ اختصارات لوحة المفاتيح</span>
+      <button type="button" class="kbs-modal-close" onclick="closeKbsModal()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="kbs-modal-body">
+      <div class="kbs-group">
+        <div class="kbs-group-title">عام</div>
+        <div class="kbs-row"><span class="kbs-row-desc">عرض هذه القائمة</span>     <span class="kbs-keys"><span class="kbs-key">?</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">إغلاق أي نافذة/قائمة</span>  <span class="kbs-keys"><span class="kbs-key">Esc</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">التركيز على البحث</span>     <span class="kbs-keys"><span class="kbs-key">/</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">إعادة تحميل القائمة</span>   <span class="kbs-keys"><span class="kbs-key">R</span></span></div>
+      </div>
+      <div class="kbs-group">
+        <div class="kbs-group-title">فلترة سريعة</div>
+        <div class="kbs-row"><span class="kbs-row-desc">عرض الكل</span>      <span class="kbs-keys"><span class="kbs-key">1</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">الجديد فقط</span>     <span class="kbs-keys"><span class="kbs-key">2</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">المقبول فقط</span>    <span class="kbs-keys"><span class="kbs-key">3</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">المرفوض فقط</span>    <span class="kbs-keys"><span class="kbs-key">4</span></span></div>
+      </div>
+      <div class="kbs-group">
+        <div class="kbs-group-title">أقسام المنصة</div>
+        <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق محرّر الخطط</span>       <span class="kbs-keys"><span class="kbs-key">P</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق محرّر القوالب</span>     <span class="kbs-keys"><span class="kbs-key">T</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق سجلّ الأحداث</span>      <span class="kbs-keys"><span class="kbs-key">E</span></span></div>
+      </div>
+      <div class="kbs-group">
+        <div class="kbs-group-title">تنقّل</div>
+        <div class="kbs-row"><span class="kbs-row-desc">الذهاب إلى الأعلى</span>   <span class="kbs-keys"><span class="kbs-key">G</span> <span class="kbs-key-plus">ثم</span> <span class="kbs-key">H</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">الذهاب إلى الأسفل</span>   <span class="kbs-keys"><span class="kbs-key">G</span> <span class="kbs-key-plus">ثم</span> <span class="kbs-key">B</span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="kbs-chip" id="kbsChip" role="button" tabindex="0"
+     onclick="openKbsModal();dismissKbsChip();"
+     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openKbsModal();dismissKbsChip();}"
+     aria-label="عرض اختصارات لوحة المفاتيح">
+  <span>اضغط</span>
+  <span class="kbs-key">?</span>
+  <span>للاختصارات</span>
+  <button type="button" class="kbs-chip-x" onclick="event.stopPropagation();dismissKbsChip();" aria-label="إخفاء">✕</button>
+</div>
+
+<!-- Screen-reader-only live region for async announcements (loading complete, etc). -->
+<div id="kbsSrAnnounce" class="sr-only" role="status" aria-live="polite"></div>
+
+<script>
+// ===========================================================================
+// Phase X9 — Keyboard Shortcuts + Polish helpers
+//
+// Single IIFE — exposes openKbsModal/closeKbsModal/dismissKbsChip on window so
+// inline onclick/onkeydown handlers above can reach them. Everything else
+// (the document-level keydown listener, sequence buffer, chip onboarding) is
+// scoped inside this closure.
+//
+// Design notes (قاعدة #34 — enterprise mindset):
+//   - We ignore shortcuts when an input/textarea/contenteditable is focused
+//     (Linear / PostHog convention). The single exception is `Esc`, which
+//     should always blur + close, even while typing.
+//   - The chip uses localStorage for opt-out persistence. Re-shows after 7
+//     days only if the user never explicitly dismissed it (auto-hide path
+//     stores a softer "snoozed" flag).
+//   - We open Customer 360°-style drawers/modals through the same Esc
+//     handler the existing modal uses (line ~2887). The original handler
+//     remains in place for editModal; we add coverage for the new kbs modal
+//     and any future drawers via document.querySelectorAll('.show').
+//   - All branches are no-ops if the target DOM node doesn't exist — so the
+//     same JS file is safe to load before the page settles (and survives
+//     incremental DOM changes from future phases).
+// ===========================================================================
+(function(){
+  'use strict';
+
+  // ---- Modal open/close -----------------------------------------------------
+  var lastFocusedBeforeKbs = null;
+  function openKbsModal(){
+    var m = document.getElementById('kbsModal');
+    if (!m) return;
+    lastFocusedBeforeKbs = document.activeElement;
+    m.classList.add('show');
+    // Move focus into the modal for keyboard users.
+    var closeBtn = m.querySelector('.kbs-modal-close');
+    if (closeBtn) setTimeout(function(){ closeBtn.focus(); }, 30);
+  }
+  function closeKbsModal(){
+    var m = document.getElementById('kbsModal');
+    if (!m) return;
+    m.classList.remove('show');
+    // Restore focus to wherever it was before — preserves keyboard flow.
+    if (lastFocusedBeforeKbs && typeof lastFocusedBeforeKbs.focus === 'function'){
+      try { lastFocusedBeforeKbs.focus(); } catch(e){}
+    }
+    lastFocusedBeforeKbs = null;
+  }
+  window.openKbsModal  = openKbsModal;
+  window.closeKbsModal = closeKbsModal;
+
+  // ---- Chip onboarding ------------------------------------------------------
+  // Three states stored in localStorage:
+  //   kbsChip_v1=dismissed  → never show again
+  //   kbsChip_v1=snoozed_<ts> → show again after 7 days
+  //   (unset)               → show on next admin load
+  var CHIP_KEY = 'kbsChip_v1';
+  var SNOOZE_DAYS = 7;
+  function chipState(){
+    try { return localStorage.getItem(CHIP_KEY) || ''; } catch(e){ return ''; }
+  }
+  function setChipState(v){
+    try { localStorage.setItem(CHIP_KEY, v); } catch(e){}
+  }
+  function dismissKbsChip(){
+    var c = document.getElementById('kbsChip');
+    if (c) c.classList.remove('show');
+    setChipState('dismissed');
+  }
+  window.dismissKbsChip = dismissKbsChip;
+  function maybeShowChip(){
+    var v = chipState();
+    if (v === 'dismissed') return;
+    if (v.indexOf('snoozed_') === 0){
+      var ts = parseInt(v.slice(8), 10);
+      if (!isNaN(ts) && (Date.now() - ts) < SNOOZE_DAYS * 86400000) return;
+    }
+    var c = document.getElementById('kbsChip');
+    if (!c) return;
+    // Delay show by 1.5s so it doesn't compete with loading skeletons for attention.
+    setTimeout(function(){
+      c.classList.add('show');
+      setChipState('snoozed_' + Date.now());
+    }, 1500);
+  }
+
+  // ---- Shortcut helpers -----------------------------------------------------
+  function isTypingTarget(t){
+    if (!t) return false;
+    var tag = (t.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (t.isContentEditable) return true;
+    return false;
+  }
+  function anyModalOrDrawerOpen(){
+    // Generic: detect any open overlay so single-letter shortcuts don't
+    // fire underneath an active dialog. We list known overlays explicitly,
+    // matching the class names each one actually uses to mean "open":
+    //   - kbs-modal-back .show     (this phase)
+    //   - editModal      .show     (Phase 7.6)
+    //   - evfModalOverlay .open    (Phase X4)
+    //   - c360-drawer    .open     (Phase X6)
+    //   - bk-progress-overlay .open (Phase X7)
+    var sels = [
+      '.kbs-modal-back.show',
+      '#editModal.show',
+      '#evfModalOverlay.open',
+      '.c360-drawer.open',
+      '.bk-progress-overlay.open'
+    ];
+    for (var i = 0; i < sels.length; i++){
+      if (document.querySelector(sels[i])) return true;
+    }
+    return false;
+  }
+  function closeTopmostOverlay(){
+    // Order matters: close the topmost overlay first. The kbs modal sits
+    // above everything (z-index 10000); then c360 drawer; then edit/evf
+    // modals. Bulk progress is not user-closable mid-flight so we don't
+    // wire Esc to it (the modal manages its own done-state).
+    var k = document.getElementById('kbsModal');
+    if (k && k.classList.contains('show')){ closeKbsModal(); return true; }
+    if (typeof window.closeCustomer360 === 'function'){
+      var d = document.querySelector('.c360-drawer.open');
+      if (d){ window.closeCustomer360(); return true; }
+    }
+    if (typeof window.evfCloseModal === 'function'){
+      var ev = document.getElementById('evfModalOverlay');
+      if (ev && ev.classList.contains('open')){ window.evfCloseModal(); return true; }
+    }
+    if (typeof window.closeEditModal === 'function'){
+      var em = document.getElementById('editModal');
+      if (em && em.classList.contains('show')){ window.closeEditModal(); return true; }
+    }
+    return false;
+  }
+  function focusSearch(){
+    var s = document.getElementById('searchInput');
+    if (s && typeof s.focus === 'function'){
+      s.focus();
+      try { s.select(); } catch(e){}
+    }
+  }
+  function triggerTab(filter){
+    // Programmatically activate one of the four tabs (all/new/accepted/rejected)
+    // by finding the .tab whose onclick references the matching filter literal.
+    // This is brittle to renames but cheap; if setFilter ever rewires, change here.
+    var tabs = document.querySelectorAll('.tab');
+    for (var i = 0; i < tabs.length; i++){
+      var oc = tabs[i].getAttribute('onclick') || '';
+      if (oc.indexOf("'" + filter + "'") !== -1 || oc.indexOf('"' + filter + '"') !== -1){
+        tabs[i].click();
+        return true;
+      }
+    }
+    return false;
+  }
+  function clickIfExists(id){
+    var el = document.getElementById(id);
+    if (el && typeof el.click === 'function'){ el.click(); return true; }
+    return false;
+  }
+  function toggleSection(toggleFnName){
+    if (typeof window[toggleFnName] === 'function'){
+      try { window[toggleFnName](); return true; } catch(e){}
+    }
+    return false;
+  }
+
+  // ---- Global keydown listener ---------------------------------------------
+  //
+  // Sequence buffer for "g h" / "g b" navigation. Cleared after 1.2s of
+  // inactivity to avoid stuck prefixes (Linear pattern).
+  var seqPrefix = '';
+  var seqTimer  = null;
+  function clearSeq(){ seqPrefix = ''; if (seqTimer){ clearTimeout(seqTimer); seqTimer = null; } }
+
+  document.addEventListener('keydown', function(e){
+    // Esc — always handle, even from inside inputs (with a blur first).
+    if (e.key === 'Escape'){
+      if (isTypingTarget(e.target)){
+        try { e.target.blur(); } catch(_){}
+      }
+      if (closeTopmostOverlay()){
+        e.preventDefault();
+        return;
+      }
+      // If nothing was open, fall through (existing handlers may want it).
+      return;
+    }
+
+    // From here on: ignore when typing OR when a modal is up (so shortcuts
+    // don't fire underneath an open dialog).
+    if (isTypingTarget(e.target)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return; // leave OS shortcuts alone
+    if (anyModalOrDrawerOpen()) return;
+
+    var key = e.key;
+
+    // `?` shows the shortcuts help. On most layouts that requires Shift+/.
+    if (key === '?'){
+      e.preventDefault();
+      openKbsModal();
+      clearSeq();
+      return;
+    }
+    // `/` jumps to the search field (GitHub / Slack convention).
+    if (key === '/'){
+      e.preventDefault();
+      focusSearch();
+      clearSeq();
+      return;
+    }
+
+    // Two-letter `g X` sequences.
+    if (seqPrefix === 'g'){
+      clearSeq();
+      if (key === 'h' || key === 'H'){
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      if (key === 'b' || key === 'B'){
+        e.preventDefault();
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+        return;
+      }
+      return; // unknown second letter — drop silently
+    }
+    if (key === 'g' || key === 'G'){
+      seqPrefix = 'g';
+      if (seqTimer) clearTimeout(seqTimer);
+      seqTimer = setTimeout(clearSeq, 1200);
+      return;
+    }
+
+    // Single-letter shortcuts.
+    switch (key){
+      case '1': e.preventDefault(); triggerTab('all');      break;
+      case '2': e.preventDefault(); triggerTab('new');      break;
+      case '3': e.preventDefault(); triggerTab('accepted'); break;
+      case '4': e.preventDefault(); triggerTab('rejected'); break;
+      case 'r': case 'R':
+        e.preventDefault();
+        if (typeof window.loadAndRender === 'function'){
+          window.loadAndRender();
+          announce('تم تحديث القائمة');
+        }
+        break;
+      case 'p': case 'P':
+        e.preventDefault();
+        toggleSection('togglePlanEditor');
+        break;
+      case 't': case 'T':
+        e.preventDefault();
+        toggleSection('toggleTplEditor');
+        break;
+      case 'e': case 'E':
+        e.preventDefault();
+        toggleSection('toggleEventsSection');
+        break;
+    }
+  });
+
+  // ---- Screen-reader announcer (for `r` / async actions) -------------------
+  function announce(msg){
+    var n = document.getElementById('kbsSrAnnounce');
+    if (!n) return;
+    n.textContent = '';
+    // Force re-announce by clearing then setting on next tick.
+    setTimeout(function(){ n.textContent = msg; }, 30);
+  }
+  window.kbsAnnounce = announce;
+
+  // ---- Auto-aria for buttons missing labels --------------------------------
+  // 89/95 buttons in admin.html had no aria-label at audit time. We derive
+  // one from the button's visible text content if absent — purely additive,
+  // never overrides an explicit aria-label.
+  function autoLabelButtons(){
+    var btns = document.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++){
+      var b = btns[i];
+      if (b.hasAttribute('aria-label')) continue;
+      var txt = (b.textContent || '').replace(/\s+/g, ' ').trim();
+      if (txt.length > 0 && txt.length < 80){
+        b.setAttribute('aria-label', txt);
+      }
+    }
+  }
+
+  // ---- Boot ----------------------------------------------------------------
+  // Run after DOM is ready. We don't gate on auth — if the user is on the
+  // login screen, the shortcuts are harmless (most targets won't exist yet).
+  function boot(){
+    autoLabelButtons();
+    maybeShowChip();
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+
+  // Re-run autoLabelButtons whenever the request list re-renders. This is
+  // best-effort — a MutationObserver on #reqList catches dynamically-added
+  // buttons without us touching every render path.
+  if (window.MutationObserver){
+    var target = document.getElementById('reqList');
+    if (target){
+      var mo = new MutationObserver(function(){ autoLabelButtons(); });
+      mo.observe(target, { childList: true, subtree: true });
+    } else {
+      // #reqList may not exist yet at script-parse time; retry once after boot.
+      setTimeout(function(){
+        var t2 = document.getElementById('reqList');
+        if (t2 && window.MutationObserver){
+          var mo2 = new MutationObserver(function(){ autoLabelButtons(); });
+          mo2.observe(t2, { childList: true, subtree: true });
+        }
+      }, 1500);
+    }
+  }
+})();
+</script>
+
 <script>
 (function(){
   if(!('ontouchstart' in window)) return;
