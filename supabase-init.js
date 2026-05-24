@@ -1770,6 +1770,155 @@
     buildLegacyRow: _apptBuildLegacyRow
   };
 
+  // ── Phase 7.6G: Tenant Onboarding State ──────────────────────────────
+  // Returns a snapshot of the new owner's onboarding progress. Used by
+  // index.html (welcome banner + checklist) and by individual tenant
+  // pages (empty states deciding whether to show first-time CTAs).
+  //
+  // Returns an object:
+  //   {
+  //     loaded:               boolean,  // false if user not logged in or query failed
+  //     dismissed:            boolean,  // banner was hidden by user
+  //     clinicNameConfirmed:  boolean,
+  //     clinicName:           string|null,
+  //     patientsCount:        number,
+  //     appointmentsCount:    number,
+  //     sessionsCount:        number,
+  //     // derived:
+  //     itemsDone:            number,   // 0..4
+  //     itemsTotal:           4,
+  //     allDone:              boolean,
+  //     shouldShowBanner:     boolean   // !dismissed && !allDone
+  //   }
+  //
+  // The four checklist items are intentionally computed (not stored) so
+  // they reflect reality without any sync bookkeeping. Adding a patient
+  // anywhere instantly bumps the count on the next render.
+  //
+  // Fault-tolerant: returns sensible defaults if any query fails or if
+  // Migration 29 hasn't been applied. Callers should check `loaded`.
+  async function getOnboardingState() {
+    var fallback = {
+      loaded: false,
+      dismissed: false,
+      clinicNameConfirmed: false,
+      clinicName: null,
+      patientsCount: 0,
+      appointmentsCount: 0,
+      sessionsCount: 0,
+      itemsDone: 0,
+      itemsTotal: 4,
+      allDone: false,
+      shouldShowBanner: false
+    };
+
+    try {
+      var sessRes = await window.sb.auth.getSession();
+      var u = sessRes && sessRes.data && sessRes.data.session && sessRes.data.session.user;
+      if (!u) return fallback;
+
+      // Parallel queries — much faster than serial chains. The counts are
+      // head:true (no row payload), so the wire cost is essentially zero.
+      var ownerId = u.id;
+      var p = window.sb.from('clinic_settings')
+        .select('clinic_name, onboarding_dismissed_at, clinic_name_confirmed_at')
+        .eq('owner_id', ownerId).maybeSingle();
+      var pp = window.sb.from('patients')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', ownerId);
+      var pa = window.sb.from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', ownerId);
+      var ps = window.sb.from('sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_id', ownerId);
+
+      var results = await Promise.all([p, pp, pa, ps]);
+      var settingsRes = results[0];
+      var patientsRes = results[1];
+      var apptsRes    = results[2];
+      var sessRes2    = results[3];
+
+      var st = (settingsRes && settingsRes.data) || {};
+      var dismissed           = !!st.onboarding_dismissed_at;
+      var clinicNameConfirmed = !!st.clinic_name_confirmed_at;
+      var clinicName          = st.clinic_name || null;
+      var patientsCount       = (patientsRes && typeof patientsRes.count === 'number') ? patientsRes.count : 0;
+      var appointmentsCount   = (apptsRes    && typeof apptsRes.count    === 'number') ? apptsRes.count    : 0;
+      var sessionsCount       = (sessRes2    && typeof sessRes2.count    === 'number') ? sessRes2.count    : 0;
+
+      var itemsDone =
+        (clinicNameConfirmed ? 1 : 0) +
+        (patientsCount     > 0 ? 1 : 0) +
+        (appointmentsCount > 0 ? 1 : 0) +
+        (sessionsCount     > 0 ? 1 : 0);
+      var allDone = itemsDone >= 4;
+
+      return {
+        loaded: true,
+        dismissed: dismissed,
+        clinicNameConfirmed: clinicNameConfirmed,
+        clinicName: clinicName,
+        patientsCount: patientsCount,
+        appointmentsCount: appointmentsCount,
+        sessionsCount: sessionsCount,
+        itemsDone: itemsDone,
+        itemsTotal: 4,
+        allDone: allDone,
+        shouldShowBanner: !dismissed && !allDone
+      };
+    } catch (e) {
+      console.warn('[onboarding] getOnboardingState failed:', e && e.message);
+      return fallback;
+    }
+  }
+
+  // Mark the welcome banner as dismissed. Best-effort: silently no-ops
+  // if Migration 29 isn't applied yet.
+  async function dismissOnboardingBanner() {
+    try {
+      var sessRes = await window.sb.auth.getSession();
+      var u = sessRes && sessRes.data && sessRes.data.session && sessRes.data.session.user;
+      if (!u) return false;
+      var res = await window.sb.from('clinic_settings')
+        .update({ onboarding_dismissed_at: new Date().toISOString() })
+        .eq('owner_id', u.id);
+      return !res.error;
+    } catch (e) {
+      console.warn('[onboarding] dismiss failed:', e && e.message);
+      return false;
+    }
+  }
+
+  // Mark the clinic_name as confirmed by the user. Called either after
+  // they tap "نعم احتفظ" on the inline prompt, or after they edit and
+  // save the name in settings.html. Idempotent.
+  async function confirmClinicName(newName) {
+    try {
+      var sessRes = await window.sb.auth.getSession();
+      var u = sessRes && sessRes.data && sessRes.data.session && sessRes.data.session.user;
+      if (!u) return false;
+      var payload = { clinic_name_confirmed_at: new Date().toISOString() };
+      if (typeof newName === 'string' && newName.trim()) {
+        payload.clinic_name = newName.trim();
+      }
+      var res = await window.sb.from('clinic_settings')
+        .update(payload)
+        .eq('owner_id', u.id);
+      return !res.error;
+    } catch (e) {
+      console.warn('[onboarding] confirmClinicName failed:', e && e.message);
+      return false;
+    }
+  }
+
+  window.SyDentOnboarding = {
+    getState:            getOnboardingState,
+    dismissBanner:       dismissOnboardingBanner,
+    confirmClinicName:   confirmClinicName
+  };
+
+
   // ── Public API ────────────────────────────────────────────────
   window.SyDentLock = {
     // state

@@ -555,7 +555,7 @@ tbody td {
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a32"></script>
+<script src="supabase-init.js?v=20260524a33"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -649,7 +649,12 @@ tbody td {
           </table>
           <div id="emptyState" class="empty" style="display:none;">
             <div class="empty-icon">💸</div>
-            <div class="empty-msg">لا توجد مصاريف مسجّلة بعد.<br>اضغط <b>+ مصروف جديد</b> لإضافة أول مصروف.</div>
+            <div class="empty-msg">لا توجد مصاريف مسجّلة بعد.<br>سجّل أول مصروف لتتبّع نفقات العيادة.</div>
+            <div style="margin-top:16px;">
+              <button type="button" class="btn-add" onclick="openExpenseModal()" style="font-size:13px;padding:9px 18px;">
+                ＋ مصروف جديد
+              </button>
+            </div>
           </div>
         </div>
       </div>

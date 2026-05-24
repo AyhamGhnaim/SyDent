@@ -477,7 +477,7 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a32"></script>
+<script src="supabase-init.js?v=20260524a33"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -572,9 +572,24 @@ textarea { resize: vertical; min-height: 80px; }
         <tbody id="tableBody"></tbody>
       </table>
       <div id="emptyState" class="empty" style="display:none">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-text">لا توجد نتائج</div>
-        <div class="empty-sub">جرّب كلمة بحث مختلفة أو أضف مريضاً جديداً</div>
+        <!-- Two variants chosen by JS:
+             - obFirstTime: patients table is truly empty (new tenant)
+             - obNoResults: search/filter returned nothing -->
+        <div id="obEmptyFirstTime" style="display:none">
+          <div class="empty-icon">🦷</div>
+          <div class="empty-text">لم تضف أي مريض بعد</div>
+          <div class="empty-sub">ابدأ بإضافة أول مريض الآن — لا يستغرق سوى 30 ثانية.</div>
+          <div style="margin-top:18px;">
+            <button type="button" class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block style="font-size:14px;padding:10px 20px;">
+              ＋ إضافة أول مريض
+            </button>
+          </div>
+        </div>
+        <div id="obEmptyNoResults">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-text">لا توجد نتائج</div>
+          <div class="empty-sub">جرّب كلمة بحث مختلفة أو أضف مريضاً جديداً</div>
+        </div>
       </div>
       <div class="pagination" id="pagination">
         <span id="pageInfo"></span>
@@ -734,6 +749,16 @@ function render() {
   if (slice.length === 0) {
     tbody.innerHTML = '';
     empty.style.display = 'block';
+    // Phase 7.6G: distinguish "first-time tenant (no patients at all)"
+    // from "search returned nothing". The first case gets a friendly
+    // CTA; the second gets the legacy "try a different search" message.
+    var firstTimeEl = document.getElementById('obEmptyFirstTime');
+    var noResultsEl = document.getElementById('obEmptyNoResults');
+    if (firstTimeEl && noResultsEl) {
+      var isTrulyEmpty = (patients.length === 0);
+      firstTimeEl.style.display = isTrulyEmpty ? 'block' : 'none';
+      noResultsEl.style.display = isTrulyEmpty ? 'none'  : 'block';
+    }
   } else {
     empty.style.display = 'none';
     const seqMap = {};

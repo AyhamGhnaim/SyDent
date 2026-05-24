@@ -383,9 +383,155 @@
     0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,0.4); }
     50%     { box-shadow: 0 0 0 4px rgba(239,83,80,0); }
   }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     Phase 7.6G — Tenant Onboarding Welcome Banner
+     ───────────────────────────────────────────────────────────────────
+     Persistent setup checklist patterned after Notion / Linear / Stripe.
+     Lives above .stats-grid on the dashboard. Dismissible (user agency
+     preserved — Notion principle). Auto-hides on completion. Each item
+     is computed from real data, so adding a patient anywhere flips the
+     corresponding checkmark on next dashboard load.
+     ═══════════════════════════════════════════════════════════════════ */
+  .ob-banner {
+    background: linear-gradient(135deg, rgba(46,232,158,0.10), rgba(46,232,158,0.04));
+    border: 1px solid rgba(46,232,158,0.25);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin: 0 0 18px 0;
+    position: relative;
+    direction: rtl;
+    font-family: 'Cairo', sans-serif;
+    display: none;  /* shown by JS once getOnboardingState resolves */
+  }
+  .ob-banner.show { display: block; }
+  .ob-banner-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    margin-bottom: 6px;
+  }
+  .ob-banner-title {
+    font-size: 17px; font-weight: 800; color: var(--accent, #2ee89e);
+    line-height: 1.5;
+  }
+  .ob-banner-sub {
+    font-size: 13px; color: var(--text-muted, #8a9ab5);
+    margin-bottom: 14px; line-height: 1.6;
+  }
+  .ob-dismiss {
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--text-muted, #8a9ab5);
+    font-size: 18px; line-height: 1; padding: 4px 8px;
+    border-radius: 6px; flex-shrink: 0;
+  }
+  .ob-dismiss:hover { background: rgba(255,255,255,0.06); color: var(--text, #e1f4ee); }
+  .ob-list {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .ob-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    text-decoration: none; color: var(--text, #e1f4ee);
+    transition: background .15s, border-color .15s;
+    cursor: pointer;
+  }
+  .ob-item:hover { background: rgba(46,232,158,0.06); border-color: rgba(46,232,158,0.20); }
+  .ob-item.done {
+    background: rgba(46,232,158,0.06); border-color: rgba(46,232,158,0.18);
+    color: var(--text-muted, #8a9ab5);
+  }
+  .ob-item.done .ob-item-label { text-decoration: line-through; opacity: 0.7; }
+  .ob-check {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.14);
+    color: var(--text-muted, #8a9ab5);
+  }
+  .ob-item.done .ob-check {
+    background: var(--accent, #2ee89e); color: #0a1628; border-color: var(--accent, #2ee89e);
+  }
+  .ob-item-label { flex: 1; font-size: 14px; font-weight: 600; }
+  .ob-item-hint  { font-size: 12px; color: var(--text-muted, #8a9ab5); font-weight: 500; }
+  .ob-arrow {
+    flex-shrink: 0;
+    color: var(--text-muted, #8a9ab5);
+    font-size: 14px;
+    transition: transform .15s, color .15s;
+  }
+  .ob-item:hover .ob-arrow { transform: translateX(-3px); color: var(--accent, #2ee89e); }
+  .ob-item.done .ob-arrow  { opacity: 0; }
+  .ob-progress {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 12px; color: var(--text-muted, #8a9ab5);
+    font-weight: 700;
+  }
+  .ob-progress-bar {
+    flex: 1; height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px; overflow: hidden;
+  }
+  .ob-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent, #2ee89e), #54f0b5);
+    border-radius: 3px;
+    transition: width .4s ease;
+  }
+  @media (max-width: 600px) {
+    .ob-banner { padding: 14px 16px; }
+    .ob-banner-title { font-size: 15px; }
+    .ob-banner-sub  { font-size: 12px; }
+    .ob-item { padding: 9px 10px; gap: 10px; }
+    .ob-item-label { font-size: 13px; }
+    .ob-item-hint  { display: none; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     Phase 7.6G — Inline clinic_name confirmation prompt
+     Shown only when clinic_name_confirmed_at IS NULL. One-time nudge.
+     ═══════════════════════════════════════════════════════════════════ */
+  .ob-clinic-prompt {
+    background: rgba(99,179,237,0.08);
+    border: 1px solid rgba(99,179,237,0.22);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 0 0 16px 0;
+    display: none;
+    direction: rtl;
+  }
+  .ob-clinic-prompt.show { display: block; }
+  .ob-clinic-prompt-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .ob-clinic-prompt-text {
+    flex: 1; min-width: 200px;
+    font-size: 13px; color: var(--text, #e1f4ee); font-weight: 600; line-height: 1.6;
+  }
+  .ob-clinic-prompt-text b { color: #63b3ed; font-weight: 800; }
+  .ob-clinic-prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ob-clinic-prompt-actions button {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.04);
+    color: var(--text, #e1f4ee);
+    font-family: 'Cairo', sans-serif;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .ob-clinic-prompt-actions button.primary {
+    background: var(--accent, #2ee89e); color: #0a1628; border-color: var(--accent, #2ee89e);
+  }
+  .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a32"></script>
+<script src="supabase-init.js?v=20260524a33"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -520,6 +666,69 @@
     <div class="header-actions">
       <input class="search-bar" placeholder="🔍  بحث عن مريض..." onclick="window.location.href='patients.html'" readonly />
       <a href="patients.html" class="btn btn-primary" data-doctor-inactive-block>＋ مريض جديد</a>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════
+       Phase 7.6G — Onboarding welcome banner + clinic_name prompt
+       Both are hidden by default; JS shows them based on getOnboardingState().
+       Banner stays visible until either:
+         (1) user dismisses it via ✕, or
+         (2) all 4 checklist items complete (auto-hide).
+       The clinic_name prompt appears once until the user confirms or edits.
+       =================================================================== -->
+  <div class="ob-clinic-prompt" id="obClinicPrompt" role="region" aria-label="تأكيد اسم العيادة">
+    <div class="ob-clinic-prompt-row">
+      <div class="ob-clinic-prompt-text">
+        💡 اسم عيادتك حالياً: <b id="obClinicNameDisplay">—</b>. هل هذا صحيح؟
+      </div>
+      <div class="ob-clinic-prompt-actions">
+        <button type="button" class="primary" onclick="obKeepClinicName()">نعم، احتفظ</button>
+        <button type="button" onclick="window.location.href='settings.html'">تعديل</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ob-banner" id="obBanner" role="region" aria-label="قائمة الإعداد الترحيبية">
+    <div class="ob-banner-head">
+      <div>
+        <div class="ob-banner-title" id="obBannerTitle">👋 أهلاً بك في SyDent!</div>
+        <div class="ob-banner-sub">أنت على بُعد دقائق من إدارة عيادتك بسهولة. دعنا نُجهّز كل شيء:</div>
+      </div>
+      <button type="button" class="ob-dismiss" onclick="obDismiss()" aria-label="إخفاء" title="إخفاء">✕</button>
+    </div>
+
+    <div class="ob-list">
+      <a class="ob-item" id="obItemClinic" href="settings.html">
+        <span class="ob-check" id="obCheckClinic">1</span>
+        <span class="ob-item-label">أضف اسم عيادتك</span>
+        <span class="ob-item-hint">دقيقة</span>
+        <span class="ob-arrow">←</span>
+      </a>
+      <a class="ob-item" id="obItemPatient" href="patients.html">
+        <span class="ob-check" id="obCheckPatient">2</span>
+        <span class="ob-item-label">أضف أول مريض</span>
+        <span class="ob-item-hint">30 ثانية</span>
+        <span class="ob-arrow">←</span>
+      </a>
+      <a class="ob-item" id="obItemAppt" href="appointments.html">
+        <span class="ob-check" id="obCheckAppt">3</span>
+        <span class="ob-item-label">احجز أول موعد</span>
+        <span class="ob-item-hint">30 ثانية</span>
+        <span class="ob-arrow">←</span>
+      </a>
+      <a class="ob-item" id="obItemSession" href="patients.html">
+        <span class="ob-check" id="obCheckSession">4</span>
+        <span class="ob-item-label">سجّل أول جلسة وفاتورة</span>
+        <span class="ob-item-hint">دقيقة</span>
+        <span class="ob-arrow">←</span>
+      </a>
+    </div>
+
+    <div class="ob-progress">
+      <span id="obProgressText">0 / 4</span>
+      <div class="ob-progress-bar"><div class="ob-progress-fill" id="obProgressFill" style="width:0%"></div></div>
+      <span id="obProgressPct">0%</span>
     </div>
   </div>
 
@@ -1377,7 +1586,114 @@ function startWaitingRoomAutoRefresh(uid) {
   });
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// Phase 7.6G — Onboarding banner wiring
+// ─────────────────────────────────────────────────────────────────────
+// Reads getOnboardingState() from window.SyDentOnboarding (exposed by
+// supabase-init.js), then either hides the banner entirely (dismissed
+// or all-done) or fills in the checklist and shows it. Runs in parallel
+// with loadDashboard() — never blocks the main dashboard render.
+// ═════════════════════════════════════════════════════════════════════
+async function obInit() {
+  try {
+    if (!window.SyDentOnboarding) return;  // pre-migration or script not loaded
+    var st = await window.SyDentOnboarding.getState();
+    if (!st || !st.loaded) return;         // not logged in or query failed → silent no-op
+
+    // ── Clinic name confirmation prompt ──
+    // Show only when the owner hasn't confirmed and the auto-generated
+    // name is still in place. If they've already typed their own name,
+    // confirmedAt is null but the name itself is meaningful — we still
+    // ask once for safety, but only on first visit.
+    if (!st.clinicNameConfirmed && st.clinicName) {
+      var displayEl = document.getElementById('obClinicNameDisplay');
+      if (displayEl) displayEl.textContent = st.clinicName;
+      var promptEl = document.getElementById('obClinicPrompt');
+      if (promptEl) promptEl.classList.add('show');
+    }
+
+    // ── Welcome banner + checklist ──
+    if (!st.shouldShowBanner) return;       // dismissed or all-done
+
+    var bannerEl = document.getElementById('obBanner');
+    if (!bannerEl) return;
+
+    // Mark each item done/undone based on derived state
+    obSetItemDone('Clinic',  st.clinicNameConfirmed);
+    obSetItemDone('Patient', st.patientsCount > 0);
+    obSetItemDone('Appt',    st.appointmentsCount > 0);
+    obSetItemDone('Session', st.sessionsCount > 0);
+
+    // Progress text + bar
+    var pct = Math.round((st.itemsDone / st.itemsTotal) * 100);
+    var pctEl   = document.getElementById('obProgressPct');
+    var textEl  = document.getElementById('obProgressText');
+    var fillEl  = document.getElementById('obProgressFill');
+    if (pctEl)  pctEl.textContent  = pct + '%';
+    if (textEl) textEl.textContent = st.itemsDone + ' / ' + st.itemsTotal;
+    if (fillEl) fillEl.style.width = pct + '%';
+
+    bannerEl.classList.add('show');
+  } catch (e) {
+    console.warn('[onboarding] obInit failed:', e && e.message);
+  }
+}
+
+function obSetItemDone(suffix, done) {
+  var itemEl  = document.getElementById('obItem'  + suffix);
+  var checkEl = document.getElementById('obCheck' + suffix);
+  if (!itemEl || !checkEl) return;
+  if (done) {
+    itemEl.classList.add('done');
+    checkEl.textContent = '✓';
+  } else {
+    itemEl.classList.remove('done');
+    // Keep the numeric placeholder (1/2/3/4) only on first render; if a
+    // user completes then somehow un-completes, the digit returns.
+  }
+}
+
+async function obDismiss() {
+  // Optimistic UI: hide immediately, then write to DB. Best-effort —
+  // if the write fails, the banner won't reappear in this session
+  // because the JS already removed the .show class.
+  var bannerEl = document.getElementById('obBanner');
+  if (bannerEl) bannerEl.classList.remove('show');
+  if (window.SyDentOnboarding) {
+    await window.SyDentOnboarding.dismissBanner();
+  }
+}
+
+async function obKeepClinicName() {
+  // Owner confirmed the auto-generated name is fine. Hide prompt + mark
+  // confirmed in DB (which also bumps the checklist item without reload).
+  var promptEl = document.getElementById('obClinicPrompt');
+  if (promptEl) promptEl.classList.remove('show');
+  if (window.SyDentOnboarding) {
+    var ok = await window.SyDentOnboarding.confirmClinicName();
+    if (ok) {
+      // Flip the corresponding checklist item without re-querying
+      obSetItemDone('Clinic', true);
+      // Update progress display
+      var checks = document.querySelectorAll('.ob-item.done').length;
+      var pct = Math.round((checks / 4) * 100);
+      var pctEl  = document.getElementById('obProgressPct');
+      var textEl = document.getElementById('obProgressText');
+      var fillEl = document.getElementById('obProgressFill');
+      if (pctEl)  pctEl.textContent  = pct + '%';
+      if (textEl) textEl.textContent = checks + ' / 4';
+      if (fillEl) fillEl.style.width = pct + '%';
+      // Auto-hide banner if everything is now done
+      if (checks >= 4) {
+        var bannerEl = document.getElementById('obBanner');
+        if (bannerEl) bannerEl.classList.remove('show');
+      }
+    }
+  }
+}
+
 loadDashboard();
+obInit();
 </script>
 
 <script>

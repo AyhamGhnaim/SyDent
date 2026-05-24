@@ -13,7 +13,7 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a32"></script>
+<script src="supabase-init.js?v=20260524a33"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -954,6 +954,14 @@ async function saveClinicSettings() {
     whatsapp_reminder_template: template,
     updated_at: new Date().toISOString()
   };
+
+  // Phase 7.6G: any save from settings.html counts as the owner
+  // explicitly confirming/editing their clinic_name — flip the
+  // confirmation timestamp so the dashboard inline prompt and the
+  // welcome-banner checklist item both reflect this.
+  if (clinicName) {
+    payload.clinic_name_confirmed_at = new Date().toISOString();
+  }
 
   const { data, error } = await window.sb.from('clinic_settings')
     .upsert(payload, { onConflict: 'owner_id' })

@@ -876,7 +876,7 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a32"></script>
+<script src="supabase-init.js?v=20260524a33"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -3331,7 +3331,18 @@ function renderDay() {
   var sorted = dayEvts.slice().sort(function(a,b){ return (a.time||'').localeCompare(b.time||''); });
   let html = '';
   if (sorted.length === 0) {
-    html = '<div style="text-align:center;padding:60px 20px;color:var(--text2);"><div style="font-size:48px;margin-bottom:12px;">📅</div><div>لا توجد مواعيد لهذا اليوم</div></div>';
+    // Phase 7.6G: improved empty state with CTA. The "+ موعد جديد"
+    // button below already exists in the header, but inline CTA on
+    // the empty state itself is the recommended pattern (Notion,
+    // Slack, Stripe — show one obvious next action).
+    html = '<div style="text-align:center;padding:50px 20px;color:var(--text2);">'
+         + '<div style="font-size:48px;margin-bottom:12px;">📅</div>'
+         + '<div style="font-size:15px;color:var(--text);margin-bottom:6px;font-weight:700;">لا توجد مواعيد لهذا اليوم</div>'
+         + '<div style="font-size:13px;margin-bottom:18px;">احجز موعداً جديداً بنقرة واحدة على أي وقت فارغ في الجدول.</div>'
+         + '<button type="button" class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block style="font-size:13px;padding:9px 18px;">'
+         + '＋ موعد جديد'
+         + '</button>'
+         + '</div>';
   } else {
     sorted.forEach(function(e){
       var _bc = getApptColor(e);
