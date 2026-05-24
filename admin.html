@@ -1160,6 +1160,191 @@ header{
   .stats-row{grid-template-columns:repeat(3,1fr);}
   .health-row{grid-template-columns:repeat(4, 1fr);}
 }
+/* ===== Phase X6: Customer 360° Drawer ===== */
+/* All class names prefixed with c360- to avoid collision with evf-*, tpl-*, plan-*. */
+.c360-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  z-index:1500; display:none; opacity:0; transition:opacity 0.18s ease;
+}
+.c360-overlay.open{display:block; opacity:1;}
+.c360-drawer{
+  position:fixed; top:0; bottom:0;
+  /* RTL: drawer slides from the RIGHT edge (visually leading edge in RTL).
+     Browser computes 'right' from the document edge regardless of dir, so we
+     use 'right' for the anchor and translateX for the slide animation. */
+  right:0; width:min(560px, 96vw); background:var(--bg);
+  border-left:1px solid var(--border); z-index:1501;
+  transform:translateX(100%); transition:transform 0.22s ease;
+  display:flex; flex-direction:column; box-shadow:-8px 0 24px rgba(0,0,0,0.35);
+}
+.c360-overlay.open ~ .c360-drawer, .c360-drawer.open{transform:translateX(0);}
+.c360-head{
+  padding:16px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:flex-start; gap:12px; flex-shrink:0;
+}
+.c360-avatar{
+  width:48px; height:48px; border-radius:50%; flex-shrink:0;
+  background:linear-gradient(135deg, var(--green), var(--blue));
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; font-weight:800; color:#fff;
+}
+.c360-headinfo{flex:1; min-width:0;}
+.c360-name{font-size:16px; font-weight:800; color:var(--text); margin-bottom:2px; word-break:break-word;}
+.c360-email{font-size:12px; color:var(--text2); word-break:break-all;}
+.c360-headbadges{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.c360-headbadges .req-state, .c360-headbadges .req-plan-pill, .c360-headbadges .req-admin-badge{
+  margin:0;
+}
+.c360-close{
+  background:transparent; border:1px solid var(--border); color:var(--text2);
+  width:32px; height:32px; border-radius:8px; cursor:pointer; font-size:18px;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  transition:all 0.15s;
+}
+.c360-close:hover{background:var(--bg3); color:var(--text);}
+.c360-tabs{
+  display:flex; gap:0; padding:0 12px; border-bottom:1px solid var(--border);
+  overflow-x:auto; flex-shrink:0;
+}
+.c360-tab{
+  background:transparent; border:none; color:var(--text2); cursor:pointer;
+  padding:12px 14px; font-size:13px; font-weight:600; white-space:nowrap;
+  border-bottom:2px solid transparent; transition:all 0.15s;
+}
+.c360-tab:hover{color:var(--text);}
+.c360-tab.active{color:var(--green); border-bottom-color:var(--green);}
+.c360-body{
+  flex:1; overflow-y:auto; padding:16px 18px;
+}
+.c360-footer{
+  padding:10px 18px; border-top:1px solid var(--border);
+  font-size:11px; color:var(--text2); flex-shrink:0;
+  display:flex; justify-content:space-between; align-items:center; gap:8px;
+}
+
+/* Section cards inside body */
+.c360-card{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:14px; margin-bottom:12px;
+}
+.c360-card-title{
+  font-size:11px; font-weight:700; color:var(--text2);
+  text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;
+  display:flex; align-items:center; gap:6px;
+}
+.c360-kpi-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px;}
+@media(min-width:768px){.c360-kpi-grid{grid-template-columns:repeat(3, 1fr);}}
+.c360-kpi{
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:10px; padding:10px;
+}
+.c360-kpi-label{font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.3px; margin-bottom:4px;}
+.c360-kpi-value{font-size:18px; font-weight:800; color:var(--green);}
+.c360-kpi-value.muted{color:var(--text3);}
+.c360-kpi-value.warn{color:#ffa726;}
+.c360-kpi-value.danger{color:#ef5350;}
+.c360-kpi-value.blue{color:#63b3ed;}
+.c360-kpi-sub{font-size:10px; color:var(--text2); margin-top:2px;}
+
+/* Data rows: label/value pairs */
+.c360-row{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:7px 0; border-bottom:1px solid var(--border); gap:10px;
+}
+.c360-row:last-child{border-bottom:none;}
+.c360-row-label{font-size:12px; color:var(--text2); flex-shrink:0;}
+.c360-row-value{font-size:13px; color:var(--text); font-weight:600; text-align:left; word-break:break-word; min-width:0;}
+
+/* Health score gauge — circular indicator */
+.c360-health{
+  display:flex; align-items:center; gap:14px;
+}
+.c360-health-ring{
+  width:72px; height:72px; flex-shrink:0; position:relative;
+  background:conic-gradient(var(--green) 0%, var(--bg3) 0%);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+}
+.c360-health-ring::before{
+  content:''; position:absolute; inset:8px; background:var(--bg2); border-radius:50%;
+}
+.c360-health-ring-text{
+  position:relative; font-size:18px; font-weight:800; color:var(--text);
+  z-index:1;
+}
+.c360-health-info{flex:1;}
+.c360-health-label{font-size:12px; color:var(--text2); margin-bottom:4px;}
+.c360-health-value{font-size:14px; font-weight:700; color:var(--text);}
+
+/* Timeline (events tab) */
+.c360-timeline{position:relative; padding-right:18px;}
+.c360-timeline::before{
+  content:''; position:absolute; top:0; bottom:0; right:7px;
+  width:2px; background:var(--border);
+}
+.c360-tl-item{position:relative; padding-bottom:14px;}
+.c360-tl-item::before{
+  content:''; position:absolute; top:6px; right:-15px;
+  width:10px; height:10px; border-radius:50%;
+  background:var(--green); border:2px solid var(--bg);
+}
+.c360-tl-item.event-suspend::before, .c360-tl-item.event-reject::before, .c360-tl-item.event-delete::before{background:#ef5350;}
+.c360-tl-item.event-extend::before, .c360-tl-item.event-renew::before{background:#2ee89e;}
+.c360-tl-item.event-shorten::before, .c360-tl-item.event-enter_grace::before{background:#ffa726;}
+.c360-tl-item.event-plan_updated::before, .c360-tl-item.event-template_updated::before{background:#ffc107;}
+.c360-tl-item.event-promote_to_admin::before, .c360-tl-item.event-demote_from_admin::before{background:#a78bfa;}
+.c360-tl-time{font-size:10px; color:var(--text2);}
+.c360-tl-title{font-size:13px; font-weight:700; color:var(--text); margin:2px 0;}
+.c360-tl-desc{font-size:11px; color:var(--text2);}
+
+/* Risk badges */
+.c360-risk{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
+.c360-risk-badge{
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 10px; border-radius:14px; font-size:11px; font-weight:700;
+  border:1px solid;
+}
+.c360-risk-low{background:rgba(46,232,158,0.12); border-color:rgba(46,232,158,0.3); color:#2ee89e;}
+.c360-risk-med{background:rgba(255,167,38,0.12); border-color:rgba(255,167,38,0.3); color:#ffa726;}
+.c360-risk-high{background:rgba(239,83,80,0.12); border-color:rgba(239,83,80,0.3); color:#ef5350;}
+
+/* Empty / loading / error states */
+.c360-empty{
+  padding:24px 12px; text-align:center; color:var(--text2);
+  font-size:12px;
+}
+.c360-empty-icon{font-size:32px; margin-bottom:8px; opacity:0.6;}
+.c360-loading{padding:24px 12px; text-align:center; color:var(--text2); font-size:12px;}
+
+/* Actions tab — re-style existing buttons into a tidy grid */
+.c360-actions{display:flex; flex-direction:column; gap:8px;}
+.c360-actions .c360-action-group{
+  background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  padding:10px;
+}
+.c360-actions .c360-action-group-title{
+  font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.3px;
+  margin-bottom:8px;
+}
+.c360-actions-row{display:flex; flex-wrap:wrap; gap:6px;}
+.c360-actions-row > *{min-width:0;}
+
+/* Communications placeholder */
+.c360-comm-placeholder{
+  background:var(--bg2); border:1px dashed var(--border); border-radius:12px;
+  padding:24px 14px; text-align:center;
+}
+.c360-comm-placeholder-icon{font-size:36px; margin-bottom:8px; opacity:0.5;}
+.c360-comm-placeholder-title{font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px;}
+.c360-comm-placeholder-sub{font-size:11px; color:var(--text2);}
+
+/* Trigger button in renderList card */
+.btn-c360{
+  background:rgba(167,139,250,0.12); border:1px solid rgba(167,139,250,0.35);
+  color:#a78bfa; font-weight:700;
+}
+.btn-c360:hover{background:rgba(167,139,250,0.22);}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260523a28"></script>
@@ -1486,6 +1671,33 @@ header{
     <div class="evf-modal-body" id="evfModalBody"></div>
   </div>
 </div>
+
+<!-- Phase X6: Customer 360° Drawer -->
+<div class="c360-overlay" id="c360Overlay" onclick="closeCustomer360()"></div>
+<aside class="c360-drawer" id="c360Drawer" role="dialog" aria-modal="true" aria-labelledby="c360Name">
+  <div class="c360-head">
+    <div class="c360-avatar" id="c360Avatar">?</div>
+    <div class="c360-headinfo">
+      <div class="c360-name" id="c360Name">—</div>
+      <div class="c360-email" id="c360Email">—</div>
+      <div class="c360-headbadges" id="c360Badges"></div>
+    </div>
+    <button type="button" class="c360-close" onclick="closeCustomer360()" aria-label="إغلاق">✕</button>
+  </div>
+  <div class="c360-tabs" id="c360Tabs" role="tablist">
+    <button type="button" class="c360-tab active" data-tab="overview" onclick="c360SwitchTab('overview')" role="tab">📊 نظرة عامة</button>
+    <button type="button" class="c360-tab" data-tab="timeline" onclick="c360SwitchTab('timeline')" role="tab">📜 السجل</button>
+    <button type="button" class="c360-tab" data-tab="risk" onclick="c360SwitchTab('risk')" role="tab">⚠️ المخاطر</button>
+    <button type="button" class="c360-tab" data-tab="actions" onclick="c360SwitchTab('actions')" role="tab">🔧 إجراءات</button>
+    <button type="button" class="c360-tab" data-tab="comm" onclick="c360SwitchTab('comm')" role="tab">💬 الاتصالات</button>
+  </div>
+  <div class="c360-body" id="c360Body"></div>
+  <div class="c360-footer">
+    <span id="c360Created">—</span>
+    <span id="c360UserId" style="font-family:monospace; opacity:0.6;"></span>
+  </div>
+</aside>
+
 
 <!-- Edit Modal -->
 <div class="modal-backdrop" id="editModal" onclick="onModalBackdropClick(event)">
@@ -5896,6 +6108,7 @@ function renderList() {
 
     // Shared buttons (used in multiple states)
     var editBtn = '<button class="btn-edit" onclick="openEditModal(\'' + id + '\')">✏️ تعديل</button>';
+    var c360Btn = '<button class="btn-c360" onclick="openCustomer360(\'' + id + '\')">👤 ملف العميل</button>';
     var deleteBtn = '<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')">🗑 حذف</button>';
     var suspendBtn = '<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\')" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>';
     var activityBtn = '<button class="btn-activity" onclick="toggleActivity(\'' + id + '\')">' +
@@ -5967,7 +6180,7 @@ function renderList() {
       case 'new':
         actions = '<button class="btn-accept" data-id="' + id + '" onclick="accept(\'' + id + '\')">✅ قبول وتفعيل التجربة</button>' +
                   '<button class="btn-reject" onclick="reject(\'' + id + '\')">❌ رفض</button>' +
-                  editBtn;
+                  editBtn + c360Btn;
         break;
       case 'trial':
         actions = '<button class="btn-upgrade" onclick="openConvertPicker(\'' + id + '\')">💎 ترقية إلى مدفوع</button>' +
@@ -5975,7 +6188,7 @@ function renderList() {
                   waReminderBtn +
                   waWelcomeBtn +
                   deleteBtn +
-                  editBtn +
+                  editBtn + c360Btn +
                   activityBtn;
         break;
       case 'paid':
@@ -5998,7 +6211,7 @@ function renderList() {
                     suspendBtn +
                     waWelcomeBtn +
                     deleteBtn +
-                    editBtn +
+                    editBtn + c360Btn +
                     activityBtn;
         } else {
           // Phase X3 محادثة 2: welcome + renewed buttons added. Order:
@@ -6011,7 +6224,7 @@ function renderList() {
                     waWelcomeBtn +
                     waRenewedBtn +
                     deleteBtn +
-                    editBtn +
+                    editBtn + c360Btn +
                     activityBtn;
         }
         break;
@@ -6021,7 +6234,7 @@ function renderList() {
                   suspendBtn +
                   waWelcomeBtn +
                   deleteBtn +
-                  editBtn +
+                  editBtn + c360Btn +
                   activityBtn;
         break;
       case 'expired':
@@ -6031,14 +6244,14 @@ function renderList() {
                   suspendBtn +
                   waWelcomeBtn +
                   deleteBtn +
-                  editBtn +
+                  editBtn + c360Btn +
                   activityBtn;
         break;
       case 'suspended':
         actions = '<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\')">✅ إعادة تفعيل</button>' +
                   waSuspendedBtn +
                   deleteBtn +
-                  editBtn;
+                  editBtn + c360Btn;
         break;
     }
 
@@ -6078,6 +6291,615 @@ function renderList() {
     '</div>';
   }).join('');
 }
+
+// === Phase X6 — Customer 360° Drawer ========================================
+//
+// Side drawer offering a deeper, organised view of a single tenant:
+//   - Overview tab   : KPIs, subscription summary, health score
+//   - Timeline tab   : subscription_events for this customer (paginated)
+//   - Risk tab       : derived churn signals (idle days, plan, sign-in age)
+//   - Actions tab    : re-grouped versions of existing renderList actions
+//   - Communications : Phase 8 placeholder
+//
+// The drawer is READ-MOSTLY. All mutating actions defer to the existing
+// renderList action functions (accept/reject/extend/suspend/promote/…) so
+// there's exactly one source of truth per mutation. This keeps the audit
+// surface small and the diff focused on UI composition rather than new DB
+// pathways.
+//
+// State model:
+//   c360State.requestId    — the trial_requests.id currently shown
+//   c360State.events       — cached events list (lazy-loaded on first tab visit)
+//   c360State.eventsLoaded — flag so we don't re-fetch on every tab switch
+//   c360State.activeTab    — 'overview' | 'timeline' | 'risk' | 'actions' | 'comm'
+//   c360State.escHandler   — bound Esc handler (so we can removeEventListener on close)
+//
+// Re-entry: closing & reopening for the SAME customer keeps the events
+// cache; switching to a DIFFERENT customer clears it. This mirrors the
+// per-customer cache strategy used by the Phase 7.6B activity panel.
+var c360State = {
+  requestId: null,
+  events: [],
+  eventsLoaded: false,
+  activeTab: 'overview',
+  escHandler: null,
+  // Token-based latest-wins guard (rule #55). Incremented on every events
+  // fetch; the resolver checks myToken === loadEventsToken before applying
+  // results. Protects against the user switching between customers while
+  // an earlier fetch is still in flight.
+  loadEventsToken: 0
+};
+
+// Open the drawer for a given trial_requests row id. Idempotent —
+// calling twice in a row with the same id is a no-op apart from rebinding
+// the body. Different ids clear the events cache.
+function openCustomer360(reqId) {
+  if (!reqId) return;
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r) {
+    alert('لم يتم العثور على بيانات العميل.');
+    return;
+  }
+  // Reset event cache only when switching customers.
+  if (c360State.requestId !== reqId) {
+    c360State.events = [];
+    c360State.eventsLoaded = false;
+  }
+  c360State.requestId = reqId;
+  c360State.activeTab = 'overview';
+
+  // Header
+  var nameEl    = document.getElementById('c360Name');
+  var emailEl   = document.getElementById('c360Email');
+  var avatarEl  = document.getElementById('c360Avatar');
+  var badgesEl  = document.getElementById('c360Badges');
+  var createdEl = document.getElementById('c360Created');
+  var userIdEl  = document.getElementById('c360UserId');
+  if (nameEl)   nameEl.textContent = r.name || '—';
+  if (emailEl)  emailEl.textContent = r.email || (r.phone ? ('📞 ' + r.phone) : '—');
+  if (avatarEl) avatarEl.textContent = c360AvatarInitial(r.name || r.email || '?');
+  if (createdEl) createdEl.textContent = r.created_at ? ('انضم: ' + evfFormatTimestamp(r.created_at)) : '';
+  if (userIdEl)  userIdEl.textContent = r.user_id ? ('uid: ' + String(r.user_id).slice(0, 8) + '…') : '';
+
+  // Header badges — mirror the renderList badges so the drawer header
+  // matches the card visually.
+  if (badgesEl) {
+    var s = computeAccountState(r);
+    var isAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
+    var html = '';
+    if (isAdmin) html += '<span class="req-admin-badge">👑 Admin</span>';
+    if ((s.state === 'paid' || s.state === 'grace') && !s.isPermanent) {
+      var planLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : c360EscapeHtml(s.plan || '');
+      html += '<span class="req-plan-pill">' + planLabel + '</span>';
+    }
+    html += '<span class="req-state ' + c360EscapeHtml(s.state) + '">' + c360EscapeHtml(s.label || '') + '</span>';
+    badgesEl.innerHTML = html;
+  }
+
+  // Tabs: reset active state to overview
+  var tabs = document.querySelectorAll('#c360Tabs .c360-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === 'overview');
+  }
+
+  // Render the overview tab body
+  c360RenderTab('overview');
+
+  // Open the drawer
+  var ov = document.getElementById('c360Overlay');
+  var dr = document.getElementById('c360Drawer');
+  if (ov) ov.classList.add('open');
+  if (dr) dr.classList.add('open');
+
+  // Bind Esc-to-close. Store the reference so we can detach on close.
+  if (!c360State.escHandler) {
+    c360State.escHandler = function(e) {
+      if (e.key === 'Escape') closeCustomer360();
+    };
+    document.addEventListener('keydown', c360State.escHandler);
+  }
+
+  // Lock body scroll while drawer is open (best-effort — won't break the
+  // page if anything goes wrong).
+  try { document.body.style.overflow = 'hidden'; } catch(e) {}
+}
+
+function closeCustomer360() {
+  var ov = document.getElementById('c360Overlay');
+  var dr = document.getElementById('c360Drawer');
+  if (ov) ov.classList.remove('open');
+  if (dr) dr.classList.remove('open');
+  if (c360State.escHandler) {
+    document.removeEventListener('keydown', c360State.escHandler);
+    c360State.escHandler = null;
+  }
+  try { document.body.style.overflow = ''; } catch(e) {}
+}
+
+function c360SwitchTab(tab) {
+  if (!tab) return;
+  c360State.activeTab = tab;
+  var tabs = document.querySelectorAll('#c360Tabs .c360-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab') === tab);
+  }
+  c360RenderTab(tab);
+}
+
+function c360RenderTab(tab) {
+  var body = document.getElementById('c360Body');
+  if (!body) return;
+  var r = allRequests.find(function(x){ return x.id === c360State.requestId; });
+  if (!r) { body.innerHTML = '<div class="c360-empty">⚠️ لم يتم العثور على البيانات</div>'; return; }
+
+  if (tab === 'overview') {
+    body.innerHTML = c360BuildOverview(r);
+  } else if (tab === 'timeline') {
+    body.innerHTML = c360BuildTimeline(r);
+    // Lazy-load events on first visit
+    if (!c360State.eventsLoaded) {
+      var currentReqId = c360State.requestId;
+      c360LoadEvents(r).then(function(){
+        // Re-render only if user is still on the timeline tab AND still
+        // looking at the same customer (rule #55).
+        if (c360State.activeTab === 'timeline' && c360State.requestId === currentReqId) {
+          var b = document.getElementById('c360Body');
+          if (b) b.innerHTML = c360BuildTimeline(r);
+        }
+      });
+    }
+  } else if (tab === 'risk') {
+    body.innerHTML = c360BuildRisk(r);
+  } else if (tab === 'actions') {
+    body.innerHTML = c360BuildActions(r);
+  } else if (tab === 'comm') {
+    body.innerHTML = c360BuildComm(r);
+  }
+}
+
+// ─── Tab builders ────────────────────────────────────────────────────────────
+
+function c360BuildOverview(r) {
+  var s = computeAccountState(r);
+  var health = c360ComputeHealth(r, s);
+  var act = activityCache[r.id]; // re-use Phase 7.6B cache when available
+  var mrr = c360ComputeMrrFor(r, s);
+
+  // Format helpers
+  var planLabel = s.isPermanent ? '♾️ دائم'
+                  : s.plan === 'yearly' ? 'سنوي'
+                  : s.plan === 'monthly' ? 'شهري'
+                  : s.plan === 'trial' ? 'تجربة' : (s.plan || '—');
+  var expiryText = !r.trial_end ? '—' : evfFormatTimestamp(r.trial_end);
+  var daysLeftText = s.daysLeft === null ? '—' : (s.daysLeft > 0 ? (s.daysLeft + ' يوم') : 'منتهي');
+  var priceText = (r.price_paid != null && Number(r.price_paid) > 0)
+    ? Math.round(Number(r.price_paid)).toLocaleString('en-US') + ' ل.س'
+    : '—';
+  var lastSignInText = act && act.lastSignIn ? evfFormatTimestamp(act.lastSignIn) : '—';
+  var patientsCount     = (act && typeof act.patients === 'number')     ? act.patients     : '—';
+  var appointmentsCount = (act && typeof act.appointments === 'number') ? act.appointments : '—';
+  var employeesCount    = (act && typeof act.employees === 'number')    ? act.employees    : '—';
+
+  // Health score ring (CSS variable for the conic-gradient sweep)
+  var healthPct = Math.max(0, Math.min(100, health.score));
+  var healthColor = healthPct >= 70 ? '#2ee89e' : healthPct >= 40 ? '#ffa726' : '#ef5350';
+
+  return ''
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">💚 صحة الحساب</div>'
+    +   '<div class="c360-health">'
+    +     '<div class="c360-health-ring" style="background: conic-gradient(' + healthColor + ' ' + healthPct + '%, var(--bg3) ' + healthPct + '%);">'
+    +       '<span class="c360-health-ring-text">' + healthPct + '</span>'
+    +     '</div>'
+    +     '<div class="c360-health-info">'
+    +       '<div class="c360-health-label">' + c360EscapeHtml(health.tier) + '</div>'
+    +       '<div class="c360-health-value">' + c360EscapeHtml(health.summary) + '</div>'
+    +     '</div>'
+    +   '</div>'
+    + '</div>'
+
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">📊 المؤشّرات</div>'
+    +   '<div class="c360-kpi-grid">'
+    +     c360Kpi('💰 الاشتراك الشهري', mrr.text, mrr.sub, mrr.color)
+    +     c360Kpi('👨‍⚕️ المرضى', patientsCount === '—' ? '—' : Number(patientsCount).toLocaleString('en-US'), 'إجمالي', 'blue')
+    +     c360Kpi('📅 المواعيد', appointmentsCount === '—' ? '—' : Number(appointmentsCount).toLocaleString('en-US'), 'إجمالي', 'blue')
+    +     c360Kpi('👥 الموظفون', employeesCount === '—' ? '—' : String(employeesCount), 'النشطون', 'blue')
+    +   '</div>'
+    + '</div>'
+
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">📋 الاشتراك</div>'
+    +   c360Row('الخطة', planLabel)
+    +   c360Row('السعر المدفوع', priceText)
+    +   c360Row('الحالة', c360EscapeHtml(s.label || '—'))
+    +   c360Row('ينتهي في', expiryText)
+    +   c360Row('متبقّي', daysLeftText)
+    + '</div>'
+
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">📞 الهوية والاتصال</div>'
+    +   c360Row('الاسم', c360EscapeHtml(r.name || '—'))
+    +   c360Row('البريد', c360EscapeHtml(r.email || '—'))
+    +   c360Row('الهاتف', c360EscapeHtml(r.phone || '—'))
+    +   c360Row('المدينة', c360EscapeHtml(r.city || '—'))
+    +   c360Row('آخر تسجيل دخول', lastSignInText)
+    + '</div>';
+}
+
+function c360BuildTimeline(r) {
+  if (!c360State.eventsLoaded) {
+    return '<div class="c360-loading">⏳ جارٍ تحميل السجل…</div>';
+  }
+  if (!c360State.events.length) {
+    return '<div class="c360-empty"><div class="c360-empty-icon">📜</div>لا يوجد سجل أحداث لهذا الحساب بعد.</div>';
+  }
+  // Reverse-chrono (events fetched ascending — display newest first)
+  var items = c360State.events.slice().reverse();
+  var html = '<div class="c360-timeline">';
+  for (var i = 0; i < items.length; i++) {
+    var ev = items[i];
+    var typeClass = 'event-' + c360EscapeHtml(ev.event_type || '');
+    var label = evfEventTypeLabel ? evfEventTypeLabel(ev.event_type) : (ev.event_type || '—');
+    var when = ev.created_at ? evfFormatTimestamp(ev.created_at) : '—';
+    var desc = c360EventShortDesc(ev);
+    html += '<div class="c360-tl-item ' + typeClass + '">'
+         +    '<div class="c360-tl-time">' + c360EscapeHtml(when) + '</div>'
+         +    '<div class="c360-tl-title">' + c360EscapeHtml(label) + '</div>'
+         +    (desc ? '<div class="c360-tl-desc">' + c360EscapeHtml(desc) + '</div>' : '')
+         + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function c360BuildRisk(r) {
+  var s = computeAccountState(r);
+  var risk = c360ComputeRisk(r, s);
+  var badges = risk.signals.map(function(sig){
+    var cls = sig.severity === 'high' ? 'c360-risk-high'
+            : sig.severity === 'med'  ? 'c360-risk-med'
+            : 'c360-risk-low';
+    return '<span class="c360-risk-badge ' + cls + '">' + c360EscapeHtml(sig.label) + '</span>';
+  }).join('');
+  var tierColor = risk.tier === 'high' ? 'danger' : risk.tier === 'med' ? 'warn' : 'green';
+  return ''
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">🎯 مستوى المخاطر</div>'
+    +   '<div class="c360-kpi-grid">'
+    +     c360Kpi('التقييم العام', c360EscapeHtml(risk.tierLabel), c360EscapeHtml(risk.summary), tierColor)
+    +   '</div>'
+    + '</div>'
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">⚠️ الإشارات النشطة</div>'
+    +   (badges
+        ? '<div class="c360-risk">' + badges + '</div>'
+        : '<div class="c360-empty" style="padding:12px 8px;">لا توجد إشارات سلبية حالياً — حساب صحّي ✓</div>')
+    + '</div>'
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">📈 المؤشرات التفصيلية</div>'
+    +   c360Row('أيام منذ التسجيل', risk.daysSinceSignup == null ? '—' : (risk.daysSinceSignup + ' يوم'))
+    +   c360Row('أيام منذ آخر دخول', risk.daysSinceSignIn == null ? '—' : (risk.daysSinceSignIn + ' يوم'))
+    +   c360Row('متبقّي على الاشتراك', s.daysLeft == null ? '—' : (s.daysLeft + ' يوم'))
+    +   c360Row('في فترة سماح', s.state === 'grace' ? 'نعم ⚠️' : 'لا')
+    + '</div>';
+}
+
+function c360BuildActions(r) {
+  var id = r.id;
+  var s = computeAccountState(r);
+  var isAdmin = !!(adminUserIdsCache && r.user_id && adminUserIdsCache.has(r.user_id));
+  var isCurrentAdmin = (r.user_id && r.user_id === currentAdminUserId);
+  var canPromote = (s.state === 'paid' && s.isPermanent && !isAdmin && !isCurrentAdmin && !!r.user_id);
+  var canDemote = (isAdmin && !isCurrentAdmin && !!r.user_id);
+
+  // We build groups of related actions. Each button calls the SAME existing
+  // function used by renderList — single source of truth (rule #11).
+  var groups = [];
+
+  // Lifecycle group
+  var lifecycle = [];
+  if (s.state === 'new') {
+    lifecycle.push('<button class="btn-accept" onclick="accept(\'' + id + '\'); closeCustomer360();">✅ قبول</button>');
+    lifecycle.push('<button class="btn-reject" onclick="reject(\'' + id + '\'); closeCustomer360();">❌ رفض</button>');
+  }
+  if (s.state === 'trial') {
+    lifecycle.push('<button class="btn-upgrade" onclick="openConvertPicker(\'' + id + '\'); closeCustomer360();">💎 ترقية إلى مدفوع</button>');
+  }
+  if (s.state === 'paid' || s.state === 'grace') {
+    lifecycle.push('<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\'); closeCustomer360();">💎 تغيير الخطة</button>');
+  }
+  if (s.state === 'paid' && !s.isPermanent) {
+    lifecycle.push('<button class="btn-renew" onclick="renewAccount(\'' + id + '\'); closeCustomer360();">🔄 تجديد</button>');
+  }
+  if (s.state === 'grace') {
+    lifecycle.push('<button class="btn-renew" onclick="renewAccount(\'' + id + '\'); closeCustomer360();">🔄 تجديد</button>');
+  }
+  if (s.state === 'expired') {
+    lifecycle.push('<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\'); closeCustomer360();">✅ إعادة تجربة 30 يوم</button>');
+    lifecycle.push('<button class="btn-grace" onclick="grantGrace(\'' + id + '\'); closeCustomer360();">⏰ فترة سماح</button>');
+    lifecycle.push('<button class="btn-upgrade" onclick="openUpgradePicker(\'' + id + '\'); closeCustomer360();">💎 ترقية/تجديد</button>');
+  }
+  if (s.state === 'suspended') {
+    lifecycle.push('<button class="btn-reactivate" onclick="reactivateAccount(\'' + id + '\'); closeCustomer360();">✅ إعادة تفعيل</button>');
+  }
+  if (lifecycle.length) groups.push({ title: '⚙️ دورة حياة الاشتراك', buttons: lifecycle });
+
+  // Admin role group (Phase X1)
+  var adminBtns = [];
+  if (canPromote) adminBtns.push('<button class="btn-promote" onclick="promoteToAdmin(\'' + id + '\'); closeCustomer360();">👑 ترقية إلى Admin</button>');
+  if (canDemote)  adminBtns.push('<button class="btn-demote"  onclick="demoteFromAdmin(\'' + id + '\'); closeCustomer360();">👤 إنزال من Admin</button>');
+  if (adminBtns.length) groups.push({ title: '🛡 صلاحيات Admin', buttons: adminBtns });
+
+  // Suspension / deletion group
+  var suspendDelete = [];
+  if (s.state !== 'suspended' && s.state !== 'new') {
+    suspendDelete.push('<button class="btn-reject" onclick="suspendAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\'); closeCustomer360();" style="background:rgba(255,167,38,0.1);border-color:rgba(255,167,38,0.3);color:#ffa726;">⏸ إيقاف</button>');
+  }
+  suspendDelete.push('<button class="btn-reject" onclick="deleteAccount(\'' + id + '\', \'' + jsAttr(r.email||'') + '\'); closeCustomer360();">🗑 حذف</button>');
+  if (suspendDelete.length) groups.push({ title: '⏸ إيقاف وحذف', buttons: suspendDelete });
+
+  // WhatsApp group
+  var waBtns = [];
+  var safePhone = jsAttr(r.phone || '');
+  var safeName  = jsAttr(r.name || '');
+  var safeEmail = jsAttr(r.email || '');
+  if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
+    var safeEnd = jsAttr(r.trial_end || '');
+    waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaReminder(\'' + safePhone + '\',\'' + safeName + '\',' + Number(s.daysLeft) + ',\'' + safeEnd + '\',event)">💬 تذكير</a>');
+  }
+  if (s.state !== 'new') {
+    waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaWelcome(\'' + safePhone + '\',\'' + safeName + '\',\'' + safeEmail + '\',event)">👋 ترحيب</a>');
+  }
+  if (s.state === 'paid' && !s.isPermanent) {
+    var planLabel = jsAttr(s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : (s.plan || ''));
+    var safeEnd2 = jsAttr(r.trial_end || '');
+    var pricePaid = (r.price_paid != null && Number(r.price_paid) > 0) ? Number(r.price_paid) : 'null';
+    waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaRenewed(\'' + safePhone + '\',\'' + safeName + '\',\'' + planLabel + '\',\'' + safeEnd2 + '\',' + pricePaid + ',event)">✅ تجديد</a>');
+  }
+  if (s.state === 'suspended') {
+    waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaSuspended(\'' + safePhone + '\',\'' + safeName + '\',event)">⏸ إيقاف</a>');
+  }
+  if (waBtns.length) groups.push({ title: '💬 رسائل واتساب', buttons: waBtns });
+
+  // Edit (always available)
+  groups.push({ title: '✏️ تحرير', buttons: [
+    '<button class="btn-edit" onclick="openEditModal(\'' + id + '\'); closeCustomer360();">✏️ تعديل البيانات</button>'
+  ]});
+
+  // Render
+  var html = '<div class="c360-actions">';
+  for (var g = 0; g < groups.length; g++) {
+    var grp = groups[g];
+    html += '<div class="c360-action-group">'
+         +    '<div class="c360-action-group-title">' + c360EscapeHtml(grp.title) + '</div>'
+         +    '<div class="c360-actions-row">' + grp.buttons.join('') + '</div>'
+         + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function c360BuildComm(r) {
+  // Phase 8 will hook in WhatsApp Business API send/receive logs here.
+  // Until then, we show a clear placeholder that's NOT mistaken for an
+  // error state.
+  return ''
+    + '<div class="c360-comm-placeholder">'
+    +   '<div class="c360-comm-placeholder-icon">💬</div>'
+    +   '<div class="c360-comm-placeholder-title">سجل الاتصالات قادم في Phase 8</div>'
+    +   '<div class="c360-comm-placeholder-sub">عند تفعيل WhatsApp Business API ستظهر هنا الرسائل المُرسلة والمستلمة مع timestamps وحالة التسليم.</div>'
+    + '</div>'
+    + '<div class="c360-card">'
+    +   '<div class="c360-card-title">📞 معلومات الاتصال الحالية</div>'
+    +   c360Row('رقم الواتساب', c360EscapeHtml(r.phone || '—'))
+    +   c360Row('البريد الإلكتروني', c360EscapeHtml(r.email || '—'))
+    + '</div>';
+}
+
+// ─── Data loaders ───────────────────────────────────────────────────────────
+
+// Load subscription_events for this customer. Filters by user_id when
+// available, falling back to trial_request_id (in case the event was
+// logged before user_id was attached). Caps at 200 rows to keep the
+// drawer responsive on heavy customers.
+//
+// Token-based latest-wins guard (rule #55): if the user switches customers
+// while a fetch is in flight, the resolver sees a stale token and discards
+// the result, preventing customer-B fetch from overwriting customer-A
+// state (or vice versa).
+async function c360LoadEvents(r) {
+  var myToken = ++c360State.loadEventsToken;
+  try {
+    var q = window.sb.from('subscription_events')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(200);
+    if (r.user_id) {
+      q = q.or('user_id.eq.' + r.user_id + ',trial_request_id.eq.' + r.id);
+    } else {
+      q = q.eq('trial_request_id', r.id);
+    }
+    var res = await q;
+    // Stale check — user has switched customers since this fetch started.
+    if (myToken !== c360State.loadEventsToken) return;
+    if (res.error) {
+      console.warn('c360LoadEvents: error loading events:', res.error);
+      c360State.events = [];
+    } else {
+      c360State.events = res.data || [];
+    }
+    c360State.eventsLoaded = true;
+  } catch (e) {
+    if (myToken !== c360State.loadEventsToken) return;
+    console.warn('c360LoadEvents threw:', e);
+    c360State.events = [];
+    c360State.eventsLoaded = true; // mark loaded so we don't retry indefinitely
+  }
+}
+
+// ─── Derived metrics ────────────────────────────────────────────────────────
+
+// Health score (0-100). A simple, defensible formula:
+//   suspended       → 5     (dead)
+//   expired         → 15    (lost, hopefully recoverable)
+//   new             → 50    (uncertain, awaiting decision)
+//   grace           → 35    (red flag)
+//   trial   ≤5d     → 45    (urgent attention)
+//   trial   >5d     → 70    (healthy onboarding)
+//   paid permanent  → 100   (best)
+//   paid yearly     → 90    (best repeating)
+//   paid monthly    → 80    (good)
+//   …adjusted -10 if last_sign_in_at is older than 30 days
+function c360ComputeHealth(r, s) {
+  var score, tier, summary, tierColor;
+  if (s.state === 'suspended') { score = 5;  tier = 'موقوف';  summary = 'حساب معطّل'; }
+  else if (s.state === 'expired') { score = 15; tier = 'منتهي'; summary = 'الاشتراك انتهى'; }
+  else if (s.state === 'new')     { score = 50; tier = 'جديد'; summary = 'بانتظار القرار'; }
+  else if (s.state === 'grace')   { score = 35; tier = 'فترة سماح'; summary = 'بحاجة للتجديد'; }
+  else if (s.state === 'trial')   {
+    if (s.daysLeft !== null && s.daysLeft <= 5) { score = 45; tier = 'تجربة على وشك الانتهاء'; summary = 'متبقّي ' + s.daysLeft + ' يوم'; }
+    else                                          { score = 70; tier = 'تجربة نشطة'; summary = 'في فترة التقييم'; }
+  } else if (s.state === 'paid' && s.isPermanent) { score = 100; tier = 'حساب دائم'; summary = 'العميل الأمثل ⭐'; }
+  else if (s.state === 'paid' && s.plan === 'yearly')  { score = 90; tier = 'مشترك سنوي'; summary = 'التزام طويل الأجل'; }
+  else if (s.state === 'paid' && s.plan === 'monthly') { score = 80; tier = 'مشترك شهري'; summary = 'اشتراك نشط'; }
+  else { score = 50; tier = 'غير محدّد'; summary = '—'; }
+
+  // Idle penalty: -10 if no sign-in within 30 days (where data exists)
+  var act = activityCache[r.id];
+  if (act && act.lastSignIn) {
+    var ageDays = Math.floor((Date.now() - new Date(act.lastSignIn).getTime()) / 86400000);
+    if (isFinite(ageDays) && ageDays > 30) score = Math.max(0, score - 10);
+  }
+  return { score: score, tier: tier, summary: summary };
+}
+
+// Risk signals → returns { tier, tierLabel, summary, signals[], daysSinceSignup, daysSinceSignIn }
+function c360ComputeRisk(r, s) {
+  var signals = [];
+  var daysSinceSignup = null, daysSinceSignIn = null;
+  var act = activityCache[r.id];
+
+  if (r.created_at) {
+    var dSU = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);
+    if (isFinite(dSU) && dSU >= 0) daysSinceSignup = dSU;
+  }
+  if (act && act.lastSignIn) {
+    var dSI = Math.floor((Date.now() - new Date(act.lastSignIn).getTime()) / 86400000);
+    if (isFinite(dSI) && dSI >= 0) daysSinceSignIn = dSI;
+  }
+
+  // Severity buckets per signal
+  if (s.state === 'suspended') signals.push({ label: '⛔ موقوف', severity: 'high' });
+  if (s.state === 'expired')   signals.push({ label: '⏰ منتهي', severity: 'high' });
+  if (s.state === 'grace')     signals.push({ label: '🟠 في فترة سماح', severity: 'high' });
+  if (s.state === 'trial' && s.daysLeft !== null && s.daysLeft <= 5)  signals.push({ label: '⏳ تجربة على وشك الانتهاء', severity: 'high' });
+  if (s.state === 'trial' && s.daysLeft !== null && s.daysLeft > 5 && s.daysLeft <= 10) signals.push({ label: '⏳ تجربة تنتهي قريباً', severity: 'med' });
+  if (s.state === 'paid' && !s.isPermanent && s.daysLeft !== null && s.daysLeft <= 7)  signals.push({ label: '💳 اشتراك ينتهي خلال أسبوع', severity: 'high' });
+  if (s.state === 'paid' && !s.isPermanent && s.daysLeft !== null && s.daysLeft > 7 && s.daysLeft <= 30) signals.push({ label: '💳 اشتراك ينتهي خلال شهر', severity: 'med' });
+  if (daysSinceSignIn !== null && daysSinceSignIn >= 30) signals.push({ label: '😴 لم يدخل منذ ' + daysSinceSignIn + ' يوم', severity: 'med' });
+  if (daysSinceSignIn !== null && daysSinceSignIn >= 90) signals.push({ label: '⚠️ خامل منذ ' + daysSinceSignIn + ' يوم', severity: 'high' });
+  // Healthy signals (only added when no negative signals exist)
+  if (s.state === 'paid' && s.isPermanent) signals.push({ label: '⭐ حساب دائم', severity: 'low' });
+  if (s.state === 'paid' && s.plan === 'yearly' && s.daysLeft !== null && s.daysLeft > 30) signals.push({ label: '🌟 سنوي مستقر', severity: 'low' });
+
+  // Tier = max severity present
+  var hasHigh = signals.some(function(x){ return x.severity === 'high'; });
+  var hasMed  = signals.some(function(x){ return x.severity === 'med'; });
+  var tier, tierLabel, summary;
+  if (hasHigh)      { tier = 'high'; tierLabel = '🔴 مرتفع'; summary = 'يحتاج تدخل فوري'; }
+  else if (hasMed)  { tier = 'med';  tierLabel = '🟠 متوسط'; summary = 'يحتاج متابعة'; }
+  else              { tier = 'low';  tierLabel = '🟢 منخفض'; summary = 'الحساب صحّي'; }
+
+  return {
+    tier: tier, tierLabel: tierLabel, summary: summary,
+    signals: signals,
+    daysSinceSignup: daysSinceSignup,
+    daysSinceSignIn: daysSinceSignIn
+  };
+}
+
+// MRR contribution for this single customer. Mirrors the X5 widget logic
+// for THIS row only.
+function c360ComputeMrrFor(r, s) {
+  if (s.state !== 'paid' || s.daysLeft === null || s.daysLeft <= 0) {
+    return { text: '—', sub: 'غير مساهم في MRR', color: 'muted' };
+  }
+  if (s.isPermanent) {
+    return { text: '—', sub: 'حساب دائم — لا يحسب في MRR', color: 'muted' };
+  }
+  var price = parseFloat(r.price_paid);
+  if (!isFinite(price) || price <= 0) {
+    return { text: '—', sub: 'لا توجد بيانات سعر', color: 'muted' };
+  }
+  var monthly;
+  if (s.plan === 'monthly') monthly = price;
+  else if (s.plan === 'yearly') monthly = price / 12;
+  else return { text: '—', sub: 'خطة غير معروفة', color: 'muted' };
+  return {
+    text: Math.round(monthly).toLocaleString('en-US') + ' ل.س',
+    sub: 'مساهمة شهرية',
+    color: 'green'
+  };
+}
+
+// ─── Small helpers ──────────────────────────────────────────────────────────
+
+function c360Kpi(label, value, sub, color) {
+  var valClass = color === 'muted' ? 'muted'
+               : color === 'warn'  ? 'warn'
+               : color === 'danger'? 'danger'
+               : color === 'blue'  ? 'blue'
+               : '';
+  return ''
+    + '<div class="c360-kpi">'
+    +   '<div class="c360-kpi-label">' + c360EscapeHtml(label) + '</div>'
+    +   '<div class="c360-kpi-value ' + valClass + '">' + c360EscapeHtml(value) + '</div>'
+    +   (sub ? '<div class="c360-kpi-sub">' + c360EscapeHtml(sub) + '</div>' : '')
+    + '</div>';
+}
+
+function c360Row(label, value) {
+  return ''
+    + '<div class="c360-row">'
+    +   '<span class="c360-row-label">' + c360EscapeHtml(label) + '</span>'
+    +   '<span class="c360-row-value">' + value + '</span>' // value is pre-escaped by caller
+    + '</div>';
+}
+
+// Short description for timeline items — reuses evfFormatDiff-ish shape
+// but condensed for the narrower drawer column.
+function c360EventShortDesc(ev) {
+  var parts = [];
+  if (ev.from_plan && ev.to_plan && ev.from_plan !== ev.to_plan) parts.push('الخطة: ' + ev.from_plan + ' → ' + ev.to_plan);
+  if (ev.from_status && ev.to_status && ev.from_status !== ev.to_status) parts.push('الحالة: ' + ev.from_status + ' → ' + ev.to_status);
+  if (ev.amount != null && Number(ev.amount) > 0) parts.push('المبلغ: ' + Number(ev.amount).toLocaleString('en-US') + ' ' + (ev.currency || 'SYP'));
+  if (ev.performed_by) parts.push('بواسطة: ' + ev.performed_by);
+  return parts.join(' • ');
+}
+
+// XSS-safe escape (defensive — events viewer has its own, this one is
+// drawer-local so we don't accidentally break if evf* is removed).
+function c360EscapeHtml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// First character for the avatar circle — strips honorifics and grabs
+// the first letter of the first word.
+function c360AvatarInitial(name) {
+  if (!name) return '?';
+  var s = String(name).trim().replace(/^د\.?\s*/i, '');
+  if (!s) return '?';
+  var first = s.split(/\s+/)[0] || s;
+  return first.charAt(0).toUpperCase();
+}
+// === End Phase X6 ===========================================================
 </script>
 <script>
 (function(){
