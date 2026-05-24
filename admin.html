@@ -1902,7 +1902,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260523a29"></script>
+<script src="supabase-init.js?v=20260524a30"></script>
 </head>
 <body>
 
@@ -3870,7 +3870,7 @@ var TPL_MOCK_VARS = {
   days_left:  5,
   trial_end:  '٢٧ مايو ٢٠٢٦',
   plan_name:  'سنوي',
-  login_url:  'https://ayhamghnaim.github.io/SyDent',
+  login_url:  'https://sydent.app',
   email:      '0991234567@sydent.com',
   price:      '150,000 SYP'
 };
@@ -5549,7 +5549,7 @@ async function waLink(phone, name, email) {
   var emailVal = email || (num + '@sydent.com');
   var body = await renderTemplate('wa_welcome', {
     name: name,
-    login_url: 'https://ayhamghnaim.github.io/SyDent',
+    login_url: 'https://sydent.app',
     email: emailVal
   });
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
@@ -5626,7 +5626,7 @@ async function waWelcomeLink(phone, name, email) {
   var emailVal = email || (num + '@sydent.com');
   var body = await renderTemplate('wa_welcome', {
     name: name,
-    login_url: 'https://ayhamghnaim.github.io/SyDent',
+    login_url: 'https://sydent.app',
     email: emailVal
   });
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);

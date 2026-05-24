@@ -1,0 +1,27 @@
+# SyDent — robots.txt
+# Public marketing + auth pages are indexable.
+# Authenticated/tenant pages (admin, patient, accounting, audit) are
+# not meant for search engines — they require login and contain PHI.
+
+User-agent: *
+Allow: /
+Allow: /landing.html
+Allow: /auth.html
+
+Disallow: /admin.html
+Disallow: /accounting.html
+Disallow: /appointments.html
+Disallow: /audit-log.html
+Disallow: /doctors.html
+Disallow: /employees.html
+Disallow: /expenses.html
+Disallow: /labs.html
+Disallow: /patient-profile.html
+Disallow: /patients.html
+Disallow: /payouts.html
+Disallow: /pending.html
+Disallow: /provider-reports.html
+Disallow: /settings.html
+Disallow: /treatments.html
+
+Sitemap: https://sydent.app/sitemap.xml
