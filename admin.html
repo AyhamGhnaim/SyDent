@@ -1345,6 +1345,167 @@ header{
 }
 .btn-c360:hover{background:rgba(167,139,250,0.22);}
 
+/* ===== Phase X7: Bulk Operations & Advanced Filters ===== */
+/* Class prefixes: bk-* for bulk, flt-* for filters. Disjoint from
+   evf-/tpl-/plan-/c360-. */
+
+/* — Checkbox on each card — */
+.bk-card-check{
+  position:absolute; top:12px; right:12px;
+  width:22px; height:22px; cursor:pointer;
+  accent-color:var(--green);
+  z-index:5;
+}
+.req-card{position:relative;}
+.req-card.bk-selected{
+  outline:2px solid var(--green);
+  outline-offset:-2px;
+}
+
+/* — Floating bulk action bar — */
+.bk-bar{
+  position:sticky; top:0; z-index:100;
+  background:var(--bg2); border:1px solid var(--green);
+  border-radius:12px; padding:10px 14px; margin-bottom:12px;
+  display:none; align-items:center; gap:10px; flex-wrap:wrap;
+  box-shadow:0 4px 12px rgba(46,232,158,0.15);
+}
+.bk-bar.active{display:flex;}
+.bk-bar-count{
+  font-size:13px; font-weight:700; color:var(--green);
+}
+.bk-bar-spacer{flex:1; min-width:0;}
+.bk-bar-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.bk-bar-actions > button, .bk-bar-actions > .bk-action{
+  font-size:12px; font-weight:600; padding:7px 11px;
+  border-radius:8px; cursor:pointer; border:1px solid var(--border);
+  background:var(--bg3); color:var(--text);
+  transition:all 0.15s;
+  display:inline-flex; align-items:center; gap:5px;
+  min-width:0;
+}
+.bk-action:hover{background:var(--bg); border-color:var(--green);}
+.bk-action.danger{
+  background:rgba(239,83,80,0.10); border-color:rgba(239,83,80,0.30); color:#ef5350;
+}
+.bk-action.danger:hover{background:rgba(239,83,80,0.20);}
+.bk-bar-clear{
+  background:transparent; border:1px solid var(--border); color:var(--text2);
+  padding:6px 10px; border-radius:8px; cursor:pointer; font-size:11px;
+}
+.bk-bar-clear:hover{color:var(--text); border-color:var(--text2);}
+
+/* — Select-all link (above the list, separate from the bulk bar) — */
+.bk-selectall-row{
+  display:flex; justify-content:flex-end; gap:8px;
+  margin-bottom:8px; font-size:11px;
+}
+.bk-selectall-link{
+  background:transparent; border:none; color:var(--text2);
+  cursor:pointer; padding:4px 8px; font-size:11px; font-weight:600;
+  text-decoration:underline; text-decoration-style:dashed; text-underline-offset:3px;
+}
+.bk-selectall-link:hover{color:var(--green);}
+
+/* — Bulk progress modal — */
+.bk-progress-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  z-index:2000; display:none; align-items:center; justify-content:center;
+}
+.bk-progress-overlay.open{display:flex;}
+.bk-progress-card{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:20px; min-width:260px; max-width:380px;
+  text-align:center;
+}
+.bk-progress-title{font-size:14px; font-weight:700; color:var(--text); margin-bottom:14px;}
+.bk-progress-bar{
+  background:var(--bg3); border-radius:6px; height:8px; overflow:hidden;
+  margin-bottom:10px;
+}
+.bk-progress-fill{
+  background:linear-gradient(90deg, var(--green), var(--blue));
+  height:100%; width:0%; transition:width 0.2s ease;
+}
+.bk-progress-text{font-size:12px; color:var(--text2);}
+.bk-progress-done{font-size:13px; color:var(--green); margin-top:10px; font-weight:700;}
+.bk-progress-errs{font-size:11px; color:#ef5350; margin-top:6px;}
+
+/* — Extend modal (bulk only) — */
+.bk-extend-overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  z-index:2000; display:none; align-items:center; justify-content:center;
+}
+.bk-extend-overlay.open{display:flex;}
+.bk-extend-card{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:18px; min-width:280px; max-width:400px;
+}
+.bk-extend-title{font-size:14px; font-weight:700; color:var(--text); margin-bottom:12px;}
+.bk-extend-hint{font-size:11px; color:var(--text2); margin-bottom:14px;}
+.bk-extend-input{
+  width:100%; padding:9px 12px; background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:14px; font-weight:600;
+  text-align:center; margin-bottom:12px;
+}
+.bk-extend-input:focus{border-color:var(--green);}
+.bk-extend-actions{display:flex; gap:8px; justify-content:flex-end;}
+
+/* — Advanced filters section — */
+.flt-section{
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; margin-bottom:12px;
+  overflow:hidden;
+}
+.flt-header{
+  padding:11px 14px; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  user-select:none;
+}
+.flt-header:hover{background:var(--bg3);}
+.flt-header-title{font-size:12px; font-weight:700; color:var(--text);}
+.flt-header-state{font-size:10px; color:var(--text2);}
+.flt-header-chevron{font-size:11px; color:var(--text2); transition:transform 0.18s;}
+.flt-section.open .flt-header-chevron{transform:rotate(180deg);}
+.flt-body{
+  display:none; padding:14px; border-top:1px solid var(--border);
+}
+.flt-section.open .flt-body{display:block;}
+.flt-row{
+  display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:10px;
+}
+@media(min-width:680px){.flt-row{grid-template-columns:1fr 1fr;}}
+.flt-field{display:flex; flex-direction:column; gap:5px;}
+.flt-field-label{font-size:10px; color:var(--text2); text-transform:uppercase; letter-spacing:0.3px;}
+.flt-field-select, .flt-field-input{
+  padding:7px 10px; background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; color:var(--text); font-size:12px;
+}
+.flt-field-select:focus, .flt-field-input:focus{border-color:var(--green); outline:none;}
+.flt-range-row{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+.flt-checks{display:flex; flex-wrap:wrap; gap:10px; margin-top:6px;}
+.flt-check{
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  font-size:11px; color:var(--text);
+  padding:6px 10px; border:1px solid var(--border); border-radius:14px;
+  background:var(--bg3); transition:all 0.15s;
+}
+.flt-check input{accent-color:var(--green); margin:0;}
+.flt-check:has(input:checked){
+  border-color:var(--green); background:rgba(46,232,158,0.12); color:var(--green);
+}
+.flt-actions{
+  display:flex; justify-content:space-between; align-items:center; gap:8px;
+  padding-top:10px; border-top:1px dashed var(--border);
+}
+.flt-active-count{font-size:11px; color:var(--green); font-weight:700;}
+.flt-active-count.none{color:var(--text2); font-weight:400;}
+.flt-reset{
+  background:transparent; border:1px solid var(--border); color:var(--text2);
+  padding:6px 12px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:600;
+}
+.flt-reset:hover{color:var(--text); border-color:var(--text2);}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260523a28"></script>
@@ -1656,8 +1817,110 @@ header{
       </div>
     </div>
 
+    <!-- Phase X7: Advanced Filters (collapsible) -->
+    <div class="flt-section" id="fltSection">
+      <div class="flt-header" onclick="fltToggle()">
+        <div>
+          <span class="flt-header-title">🔍 فلاتر متقدمة</span>
+          <span class="flt-header-state" id="fltHeaderState"></span>
+        </div>
+        <span class="flt-header-chevron">▼</span>
+      </div>
+      <div class="flt-body">
+        <div class="flt-row">
+          <div class="flt-field">
+            <span class="flt-field-label">الخطة</span>
+            <select class="flt-field-select" id="fltPlan" onchange="fltOnChange()">
+              <option value="">الكل</option>
+              <option value="trial">تجربة</option>
+              <option value="monthly">شهري</option>
+              <option value="yearly">سنوي</option>
+              <option value="permanent">دائم</option>
+            </select>
+          </div>
+          <div class="flt-field">
+            <span class="flt-field-label">حالة الانتهاء</span>
+            <select class="flt-field-select" id="fltExpiry" onchange="fltOnChange()">
+              <option value="">الكل</option>
+              <option value="lt7">ينتهي خلال 7 أيام</option>
+              <option value="lt30">ينتهي خلال 30 يوم</option>
+              <option value="expired">منتهٍ</option>
+              <option value="active">نشط</option>
+            </select>
+          </div>
+        </div>
+        <div class="flt-row">
+          <div class="flt-field">
+            <span class="flt-field-label">MRR (ل.س)</span>
+            <div class="flt-range-row">
+              <input type="number" class="flt-field-input" id="fltMrrMin" placeholder="من" min="0" oninput="fltOnChange()">
+              <input type="number" class="flt-field-input" id="fltMrrMax" placeholder="إلى" min="0" oninput="fltOnChange()">
+            </div>
+          </div>
+          <div class="flt-field">
+            <span class="flt-field-label">تاريخ التسجيل</span>
+            <div class="flt-range-row">
+              <input type="date" class="flt-field-input" id="fltSignupFrom" oninput="fltOnChange()">
+              <input type="date" class="flt-field-input" id="fltSignupTo" oninput="fltOnChange()">
+            </div>
+          </div>
+        </div>
+        <div class="flt-checks">
+          <label class="flt-check"><input type="checkbox" id="fltAdminOnly" onchange="fltOnChange()"> 👑 Admin فقط</label>
+          <label class="flt-check"><input type="checkbox" id="fltPermanentOnly" onchange="fltOnChange()"> ♾️ دائم فقط</label>
+        </div>
+        <div class="flt-actions">
+          <span class="flt-active-count none" id="fltActiveCount">لا فلاتر نشطة</span>
+          <button type="button" class="flt-reset" onclick="fltReset()">↻ إعادة تعيين</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase X7: Bulk action bar (appears when ≥1 card selected) -->
+    <div class="bk-bar" id="bkBar">
+      <span class="bk-bar-count" id="bkBarCount">0 محدّد</span>
+      <button type="button" class="bk-bar-clear" onclick="bkClearSelection()">↻ إلغاء التحديد</button>
+      <span class="bk-bar-spacer"></span>
+      <div class="bk-bar-actions">
+        <button type="button" class="bk-action" onclick="bkExtendOpen()">⏰ تمديد</button>
+        <button type="button" class="bk-action" onclick="bkSendReminders()">💬 تذكير WA</button>
+        <button type="button" class="bk-action" onclick="bkSendWelcomes()">👋 ترحيب WA</button>
+        <button type="button" class="bk-action" onclick="bkExportCsv()">📥 CSV</button>
+      </div>
+    </div>
+
+    <!-- Select-all link row -->
+    <div class="bk-selectall-row" id="bkSelectAllRow" style="display:none;">
+      <button type="button" class="bk-selectall-link" onclick="bkSelectAllVisible()">☑ تحديد كل الظاهر</button>
+      <button type="button" class="bk-selectall-link" onclick="bkClearSelection()">☐ إلغاء التحديد</button>
+    </div>
+
     <!-- List -->
     <div class="requests-list" id="reqList"></div>
+  </div>
+</div>
+
+<!-- Phase X7: Bulk progress modal -->
+<div class="bk-progress-overlay" id="bkProgressOverlay">
+  <div class="bk-progress-card">
+    <div class="bk-progress-title" id="bkProgressTitle">جارٍ المعالجة…</div>
+    <div class="bk-progress-bar"><div class="bk-progress-fill" id="bkProgressFill"></div></div>
+    <div class="bk-progress-text" id="bkProgressText">0 / 0</div>
+    <div class="bk-progress-done" id="bkProgressDone" style="display:none;"></div>
+    <div class="bk-progress-errs" id="bkProgressErrs" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- Phase X7: Bulk extend modal -->
+<div class="bk-extend-overlay" id="bkExtendOverlay" onclick="if(event.target===this)bkExtendClose()">
+  <div class="bk-extend-card" onclick="event.stopPropagation()">
+    <div class="bk-extend-title">⏰ تمديد جماعي</div>
+    <div class="bk-extend-hint" id="bkExtendHint">سيُمدَّد تاريخ انتهاء الاشتراك للحسابات المختارة بالعدد المُحدّد. الحسابات الدائمة لا تتأثر.</div>
+    <input type="number" class="bk-extend-input" id="bkExtendDays" min="1" max="365" step="1" value="30" placeholder="عدد الأيام (1-365)">
+    <div class="bk-extend-actions">
+      <button type="button" class="bk-bar-clear" onclick="bkExtendClose()">إلغاء</button>
+      <button type="button" class="bk-action" onclick="bkExtendConfirm()">✅ تمديد</button>
+    </div>
   </div>
 </div>
 
@@ -6042,8 +6305,23 @@ function renderList() {
     // survive. This is intentional: the banner activates a STRICTER view,
     // it doesn't replace the user's other filters.
     if (expiringFilterActive && !isExpiringSoon(r)) return false;
+    // Phase X7: advanced filters are layered last (strictest), so they
+    // intersect with all preceding filters (tab + search + expiring).
+    if (!applyAdvancedFilters(r)) return false;
     return true;
   });
+
+  // Phase X7: expose the filtered list to bulk operations so "select-all
+  // visible" can iterate without re-running the filter chain.
+  bulkState.lastFilteredIds = filtered.map(function(x){ return x.id; });
+  // Drop any selections that are no longer in the visible list (the user
+  // narrowed the filter — selected-but-hidden rows would be ambiguous to
+  // bulk-act on, so we deselect them silently).
+  bulkPruneHidden();
+  // Toggle the select-all row visibility (hidden when the list is empty).
+  var selAllRow = document.getElementById('bkSelectAllRow');
+  if (selAllRow) selAllRow.style.display = filtered.length > 0 ? 'flex' : 'none';
+
   if (filtered.length === 0) {
     var emptyMsg, emptyIcon;
     if (expiringFilterActive) {
@@ -6272,7 +6550,19 @@ function renderList() {
     // Suspended rows have no meaningful "last active" data exposed.
     var showActivityPanel = (s.state !== 'new' && s.state !== 'suspended');
 
-    return '<div class="req-card ' + cardStatusClass + '">' +
+    // Phase X7: bulk selection support. Each card carries a checkbox in
+    // the top-right corner. When the row's id is in bulkState.selected,
+    // the card gets the bk-selected outline class (visual confirmation
+    // without needing to scroll up to the bulk bar).
+    var isBulkSelected = bulkState.selected.has(id);
+    var bulkClass = isBulkSelected ? ' bk-selected' : '';
+    var bulkCheckHtml = '<input type="checkbox" class="bk-card-check"' +
+                       (isBulkSelected ? ' checked' : '') +
+                       ' onclick="bkToggleSelect(\'' + id + '\', event)" ' +
+                       'aria-label="تحديد للإجراء الجماعي">';
+
+    return '<div class="req-card ' + cardStatusClass + bulkClass + '">' +
+      bulkCheckHtml +
       '<div class="req-top">' +
         '<div class="req-name">' + (escapeHtml(r.name) || '—') + '</div>' +
         stateBadge +
@@ -7007,6 +7297,475 @@ function c360AvatarInitial(name) {
   return first.charAt(0).toUpperCase();
 }
 // === End Phase X6 ===========================================================
+
+// === Phase X7 — Bulk Operations & Advanced Filters ==========================
+//
+// Two independent concerns share this section because they both layer on top
+// of renderList:
+//
+//   1. Advanced Filters (flt-*): six new client-side filter dimensions
+//      (plan / expiry bucket / MRR range / signup date range / admin-only
+//      / permanent-only) that intersect with the existing tab + search +
+//      expiring filters. The flt body collapses by default to keep the
+//      header clean for users who don't need it.
+//
+//   2. Bulk Operations (bk-*): multi-select via per-card checkboxes plus a
+//      sticky action bar with 4 actions (extend / WA reminder / WA welcome
+//      / CSV export). Mutating actions iterate the existing single-row
+//      handlers (rule #20: single source of truth) with a 200ms gap
+//      between each to avoid hammering the DB, surfacing progress in a
+//      modal so the user knows it's working.
+//
+// Both pieces share the renderList integration point: applyAdvancedFilters
+// participates in the filter chain, and bulkState exposes the visible-id
+// list so "select-all visible" works without re-filtering.
+
+// — Advanced filters state ——————————————————————————————————————————————
+var advFilters = {
+  plan: '',         // '' | 'trial' | 'monthly' | 'yearly' | 'permanent'
+  expiry: '',       // '' | 'lt7' | 'lt30' | 'expired' | 'active'
+  mrrMin: null,     // number | null
+  mrrMax: null,     // number | null
+  signupFrom: '',   // 'YYYY-MM-DD' | ''
+  signupTo: '',     // 'YYYY-MM-DD' | ''
+  adminOnly: false,
+  permanentOnly: false
+};
+
+// Open/close the filters section. Side-effect-free except for the class
+// toggle on #fltSection.
+function fltToggle() {
+  var sec = document.getElementById('fltSection');
+  if (sec) sec.classList.toggle('open');
+}
+
+// Read every filter input back into advFilters, then re-render. Called
+// from every input/change handler on the filters panel.
+function fltOnChange() {
+  advFilters.plan          = (document.getElementById('fltPlan')          || {}).value || '';
+  advFilters.expiry        = (document.getElementById('fltExpiry')        || {}).value || '';
+  var mrrMinEl = document.getElementById('fltMrrMin');
+  var mrrMaxEl = document.getElementById('fltMrrMax');
+  advFilters.mrrMin = mrrMinEl && mrrMinEl.value !== '' ? Number(mrrMinEl.value) : null;
+  advFilters.mrrMax = mrrMaxEl && mrrMaxEl.value !== '' ? Number(mrrMaxEl.value) : null;
+  // NaN-guard — invalid input becomes null so we don't filter to zero rows.
+  if (!isFinite(advFilters.mrrMin)) advFilters.mrrMin = null;
+  if (!isFinite(advFilters.mrrMax)) advFilters.mrrMax = null;
+  advFilters.signupFrom    = (document.getElementById('fltSignupFrom')    || {}).value || '';
+  advFilters.signupTo      = (document.getElementById('fltSignupTo')      || {}).value || '';
+  advFilters.adminOnly     = !!(document.getElementById('fltAdminOnly')   && document.getElementById('fltAdminOnly').checked);
+  advFilters.permanentOnly = !!(document.getElementById('fltPermanentOnly') && document.getElementById('fltPermanentOnly').checked);
+  fltUpdateHeader();
+  renderList();
+}
+
+// Clear all filters back to defaults + re-render.
+function fltReset() {
+  var ids = ['fltPlan','fltExpiry','fltMrrMin','fltMrrMax','fltSignupFrom','fltSignupTo'];
+  ids.forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+  var c1 = document.getElementById('fltAdminOnly');     if (c1) c1.checked = false;
+  var c2 = document.getElementById('fltPermanentOnly'); if (c2) c2.checked = false;
+  advFilters = { plan:'', expiry:'', mrrMin:null, mrrMax:null,
+                 signupFrom:'', signupTo:'', adminOnly:false, permanentOnly:false };
+  fltUpdateHeader();
+  renderList();
+}
+
+// Show a compact "N فلتر نشط" hint in the section header. When no
+// filters are active, show a muted "لا فلاتر نشطة" instead.
+function fltUpdateHeader() {
+  var n = fltActiveCount();
+  var hdr = document.getElementById('fltHeaderState');
+  var cnt = document.getElementById('fltActiveCount');
+  if (hdr) hdr.textContent = n > 0 ? ('— ' + n + ' نشط') : '';
+  if (cnt) {
+    cnt.textContent = n > 0 ? (n + ' فلتر نشط') : 'لا فلاتر نشطة';
+    cnt.classList.toggle('none', n === 0);
+  }
+}
+
+function fltActiveCount() {
+  var n = 0;
+  if (advFilters.plan)          n++;
+  if (advFilters.expiry)        n++;
+  if (advFilters.mrrMin != null) n++;
+  if (advFilters.mrrMax != null) n++;
+  if (advFilters.signupFrom)    n++;
+  if (advFilters.signupTo)      n++;
+  if (advFilters.adminOnly)     n++;
+  if (advFilters.permanentOnly) n++;
+  return n;
+}
+
+// Pure predicate: returns true if the row survives every active filter.
+// Designed to short-circuit on the first failed check.
+function applyAdvancedFilters(r) {
+  if (!r) return false;
+  var s = computeAccountState(r);
+
+  // Plan filter
+  if (advFilters.plan) {
+    if (advFilters.plan === 'permanent') {
+      if (!s.isPermanent) return false;
+    } else {
+      // Match the request's plan value, not the state — a 'paid'/'yearly'
+      // row should match plan='yearly' even though its state is 'paid'.
+      var rPlan = (r.plan || 'trial');
+      if (rPlan !== advFilters.plan) return false;
+    }
+  }
+
+  // Expiry filter
+  if (advFilters.expiry) {
+    var dl = s.daysLeft;
+    if (advFilters.expiry === 'lt7') {
+      if (dl === null || dl <= 0 || dl > 7) return false;
+    } else if (advFilters.expiry === 'lt30') {
+      if (dl === null || dl <= 0 || dl > 30) return false;
+    } else if (advFilters.expiry === 'expired') {
+      if (dl === null || dl > 0) return false;
+    } else if (advFilters.expiry === 'active') {
+      if (dl !== null && dl <= 0) return false; // exclude expired
+      // permanent (daysLeft=null) counts as active
+    }
+  }
+
+  // MRR filter (per-row monthly contribution; matches Phase X5 formula)
+  if (advFilters.mrrMin != null || advFilters.mrrMax != null) {
+    var mrr = computeRowMrr(r, s);
+    if (advFilters.mrrMin != null && mrr < advFilters.mrrMin) return false;
+    if (advFilters.mrrMax != null && mrr > advFilters.mrrMax) return false;
+  }
+
+  // Signup date filter (YYYY-MM-DD string compare is lex-safe for ISO dates)
+  if (advFilters.signupFrom || advFilters.signupTo) {
+    var d = r.created_at ? String(r.created_at).slice(0, 10) : '';
+    if (advFilters.signupFrom && (!d || d < advFilters.signupFrom)) return false;
+    if (advFilters.signupTo   && (!d || d > advFilters.signupTo))   return false;
+  }
+
+  // Admin-only checkbox
+  if (advFilters.adminOnly) {
+    if (!adminUserIdsCache || !r.user_id || !adminUserIdsCache.has(r.user_id)) return false;
+  }
+
+  // Permanent-only checkbox
+  if (advFilters.permanentOnly && !s.isPermanent) return false;
+
+  return true;
+}
+
+// Per-row MRR contribution — single-row version of the Phase X5 widget
+// formula. Permanent and non-paid rows contribute 0. Used by both the
+// MRR filter and the CSV export.
+function computeRowMrr(r, s) {
+  if (!s) s = computeAccountState(r);
+  if (s.state !== 'paid' || s.isPermanent) return 0;
+  if (s.daysLeft !== null && s.daysLeft <= 0) return 0;
+  var price = parseFloat(r.price_paid);
+  if (!isFinite(price) || price <= 0) return 0;
+  if (s.plan === 'monthly') return Math.round(price);
+  if (s.plan === 'yearly')  return Math.round(price / 12);
+  return 0;
+}
+
+// — Bulk selection state ———————————————————————————————————————————————
+var bulkState = {
+  selected: new Set(),     // Set<requestId>
+  lastFilteredIds: [],     // string[] — IDs of currently visible cards
+  inFlight: false          // single-bulk-at-a-time guard
+};
+
+// Toggle a single card's selection. Bound via inline onclick on the card
+// checkbox. event.stopPropagation prevents the parent card from receiving
+// the click (no card-wide click handler exists today, but defensive).
+function bkToggleSelect(reqId, ev) {
+  if (ev) ev.stopPropagation();
+  if (!reqId) return;
+  if (bulkState.selected.has(reqId)) bulkState.selected.delete(reqId);
+  else bulkState.selected.add(reqId);
+  bkUpdateBar();
+  // Re-render only the affected card's outline by toggling the class
+  // directly — full renderList would be wasteful here.
+  var card = document.querySelector('.bk-card-check[onclick*="' + reqId + '"]');
+  if (card && card.parentElement) {
+    card.parentElement.classList.toggle('bk-selected', bulkState.selected.has(reqId));
+  }
+}
+
+// Select every currently visible (filtered) row.
+function bkSelectAllVisible() {
+  bulkState.lastFilteredIds.forEach(function(id){ bulkState.selected.add(id); });
+  bkUpdateBar();
+  renderList();
+}
+
+// Clear all selections.
+function bkClearSelection() {
+  bulkState.selected.clear();
+  bkUpdateBar();
+  renderList();
+}
+
+// After a filter change, the selected set may contain rows no longer
+// visible. Drop them silently so bulk actions only act on visible rows.
+function bulkPruneHidden() {
+  if (bulkState.selected.size === 0) return;
+  var visibleSet = new Set(bulkState.lastFilteredIds);
+  var toDrop = [];
+  bulkState.selected.forEach(function(id){
+    if (!visibleSet.has(id)) toDrop.push(id);
+  });
+  toDrop.forEach(function(id){ bulkState.selected.delete(id); });
+}
+
+// Sync the floating bulk bar visibility + count.
+function bkUpdateBar() {
+  var bar = document.getElementById('bkBar');
+  var cnt = document.getElementById('bkBarCount');
+  var n = bulkState.selected.size;
+  if (bar) bar.classList.toggle('active', n > 0);
+  if (cnt) cnt.textContent = n > 0 ? (n + ' محدّد') : '';
+}
+
+// Resolve the trial_requests rows behind the current selection. Returns
+// an array of row objects (NOT ids) for the bulk handlers to operate on.
+// Rows that no longer exist (deleted between selection and action) are
+// silently skipped — they're not an error condition.
+function bkSelectedRows() {
+  var out = [];
+  bulkState.selected.forEach(function(id){
+    var r = allRequests.find(function(x){ return x.id === id; });
+    if (r) out.push(r);
+  });
+  return out;
+}
+
+// — Bulk action: Extend trial ——————————————————————————————————————————
+// Opens a small modal where the admin picks a day-count, then iterates
+// every selected row through transitionAccount('extend', { days: N }).
+// Permanent rows are silently skipped (no trial_end to extend).
+function bkExtendOpen() {
+  if (bulkState.selected.size === 0) {
+    alert('لا توجد حسابات محدّدة.');
+    return;
+  }
+  if (bulkState.inFlight) {
+    alert('عملية جماعية أخرى قيد التنفيذ.');
+    return;
+  }
+  var ov = document.getElementById('bkExtendOverlay');
+  var inp = document.getElementById('bkExtendDays');
+  var hint = document.getElementById('bkExtendHint');
+  if (inp) inp.value = '30';
+  if (hint) {
+    var rows = bkSelectedRows();
+    var permCount = rows.filter(function(x){ var st = computeAccountState(x); return st.isPermanent; }).length;
+    var extendable = rows.length - permCount;
+    hint.textContent = 'سيُمدَّد ' + extendable + ' حساب' +
+      (permCount > 0 ? ' (' + permCount + ' حساب دائم سيُتجاوز)' : '') +
+      ' بالعدد المُحدّد.';
+  }
+  if (ov) ov.classList.add('open');
+}
+function bkExtendClose() {
+  var ov = document.getElementById('bkExtendOverlay');
+  if (ov) ov.classList.remove('open');
+}
+async function bkExtendConfirm() {
+  var inp = document.getElementById('bkExtendDays');
+  var days = inp ? parseInt(inp.value, 10) : NaN;
+  // transitionAccount('extend') itself caps at 365 days per call (see the
+  // 'extend' case in its switch). Honour the same upper bound here so the
+  // single-row writer never rejects what the modal accepted.
+  if (!isFinite(days) || days <= 0 || days > 365) {
+    alert('عدد الأيام يجب أن يكون بين 1 و 365.');
+    return;
+  }
+  bkExtendClose();
+  // Filter out permanent rows up-front (they have no trial_end).
+  var targets = bkSelectedRows().filter(function(x){
+    return !computeAccountState(x).isPermanent;
+  });
+  if (targets.length === 0) {
+    alert('كل الحسابات المحدّدة دائمة — لا يوجد ما يُمدَّد.');
+    return;
+  }
+  await bkRun('تمديد جماعي', targets, async function(r){
+    // Reuse the existing transitionAccount writer so the audit trail,
+    // ban-sync, and event logging all happen identically to single-row
+    // extends. Signature: transitionAccount(eventType, row, params).
+    // Returns: { ok, error, newRow }.
+    if (typeof transitionAccount !== 'function') {
+      throw new Error('transitionAccount غير متوفرة');
+    }
+    var result = await transitionAccount('extend', r, { days: days });
+    if (!result || !result.ok) {
+      throw new Error(result && result.error ? result.error : 'transition failed');
+    }
+  });
+}
+
+// — Bulk action: WhatsApp reminders (popup-blocker friendly) ——————————————
+// Opens up to MAX_TABS wa.me URLs in new tabs. More than 5 reliably trips
+// popup blockers on Safari/Chrome, so we cap it and tell the user.
+function bkSendReminders() {
+  bkOpenWaTabs('reminder');
+}
+function bkSendWelcomes() {
+  bkOpenWaTabs('welcome');
+}
+async function bkOpenWaTabs(kind) {
+  if (bulkState.selected.size === 0) { alert('لا توجد حسابات محدّدة.'); return; }
+  var MAX_TABS = 5;
+  var rows = bkSelectedRows();
+  // For reminders we further restrict to rows where a reminder is
+  // meaningful: trial or paid (non-permanent) with active days left.
+  // Welcome is meaningful for any non-'new' row.
+  rows = rows.filter(function(r){
+    if (!r.phone) return false;
+    var s = computeAccountState(r);
+    if (kind === 'reminder') {
+      return (s.state === 'trial' || s.state === 'paid') && !s.isPermanent
+             && r.trial_end && s.daysLeft !== null && s.daysLeft > 0;
+    }
+    // welcome
+    return s.state !== 'new';
+  });
+  if (rows.length === 0) {
+    alert(kind === 'reminder'
+      ? 'لا توجد حسابات قابلة للتذكير ضمن المحدّد (نحتاج اشتراك ساري وهاتف).'
+      : 'لا توجد حسابات قابلة للترحيب ضمن المحدّد (نحتاج هاتف).');
+    return;
+  }
+  var willOpen = Math.min(rows.length, MAX_TABS);
+  if (rows.length > MAX_TABS) {
+    if (!confirm('سيتم فتح ' + willOpen + ' نوافذ واتساب من أصل ' +
+                 rows.length + ' محدّد (حد أقصى ' + MAX_TABS +
+                 ' لتجنّب حجب المتصفّح). تابع؟')) return;
+  }
+  var batch = rows.slice(0, willOpen);
+  for (var i = 0; i < batch.length; i++) {
+    var r = batch[i];
+    var url;
+    try {
+      if (kind === 'reminder') {
+        var st = computeAccountState(r);
+        url = await waReminderLink(r.phone, r.name, st.daysLeft, r.trial_end);
+      } else {
+        url = await waWelcomeLink(r.phone, r.name, r.email);
+      }
+    } catch(e) {
+      console.warn('bulk WA link build failed for', r.id, e);
+      continue;
+    }
+    if (url) window.open(url, '_blank', 'noopener');
+    // Small gap so the browser registers each open as user-initiated
+    // (we already are inside a click handler chain).
+    await new Promise(function(res){ setTimeout(res, 150); });
+  }
+}
+
+// — Bulk action: CSV export ——————————————————————————————————————————————
+// RFC 4180 escaping. Same pattern as Phase X4 evfBuildCsvRow but with a
+// customer-centric column set instead of an event-centric one.
+function bkExportCsv() {
+  if (bulkState.selected.size === 0) { alert('لا توجد حسابات محدّدة.'); return; }
+  var rows = bkSelectedRows();
+  var headers = ['ID','Name','Email','Phone','City','Plan','State','Days Left','Price Paid','MRR (SYP)','Created','Trial End','User ID'];
+  var lines = [headers.join(',')];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var s = computeAccountState(r);
+    var mrr = computeRowMrr(r, s);
+    var planLabel = s.isPermanent ? 'permanent' : (s.plan || '');
+    var stateLabel = s.label || s.state || '';
+    var dl = (s.daysLeft === null) ? '' : String(s.daysLeft);
+    lines.push([
+      r.id, r.name || '', r.email || '', r.phone || '', r.city || '',
+      planLabel, stateLabel, dl,
+      r.price_paid == null ? '' : String(r.price_paid),
+      String(mrr),
+      r.created_at || '',
+      r.trial_end || '',
+      r.user_id || ''
+    ].map(bkCsvCell).join(','));
+  }
+  var csv = lines.join('\n');
+  var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var stamp = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = 'sydent-customers-' + stamp + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+function bkCsvCell(v) {
+  if (v == null) return '';
+  var s = String(v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+// — Bulk runner (progress + audit) —————————————————————————————————————
+// Generic loop with progress display + per-row error capture. Each step
+// waits 200ms before the next to keep the DB politely paced. Single-bulk
+// guard via bulkState.inFlight prevents two parallel runs from racing
+// over the same progress modal.
+async function bkRun(title, rows, perRowAsyncFn) {
+  if (bulkState.inFlight) { alert('عملية جماعية أخرى قيد التنفيذ.'); return; }
+  bulkState.inFlight = true;
+  var total = rows.length;
+  var done = 0, errs = 0, errMessages = [];
+  var ov = document.getElementById('bkProgressOverlay');
+  var titleEl = document.getElementById('bkProgressTitle');
+  var fillEl  = document.getElementById('bkProgressFill');
+  var textEl  = document.getElementById('bkProgressText');
+  var doneEl  = document.getElementById('bkProgressDone');
+  var errsEl  = document.getElementById('bkProgressErrs');
+  if (titleEl) titleEl.textContent = title + '…';
+  if (fillEl)  fillEl.style.width = '0%';
+  if (textEl)  textEl.textContent = '0 / ' + total;
+  if (doneEl)  { doneEl.style.display = 'none'; doneEl.textContent = ''; }
+  if (errsEl)  { errsEl.style.display = 'none'; errsEl.textContent = ''; }
+  if (ov) ov.classList.add('open');
+  try {
+    for (var i = 0; i < rows.length; i++) {
+      try {
+        await perRowAsyncFn(rows[i]);
+        done++;
+      } catch(e) {
+        errs++;
+        errMessages.push((rows[i].name || rows[i].id) + ': ' + (e && (e.message || e)));
+        console.warn('bulk per-row failure:', rows[i].id, e);
+      }
+      if (textEl) textEl.textContent = (i + 1) + ' / ' + total;
+      if (fillEl) fillEl.style.width = (((i + 1) / total) * 100) + '%';
+      // Politeness gap between rows.
+      await new Promise(function(res){ setTimeout(res, 200); });
+    }
+  } finally {
+    bulkState.inFlight = false;
+  }
+  if (doneEl) {
+    doneEl.style.display = 'block';
+    doneEl.textContent = '✅ نجح ' + done + ' من ' + total;
+  }
+  if (errs > 0 && errsEl) {
+    errsEl.style.display = 'block';
+    errsEl.textContent = '⚠️ فشل ' + errs + ' — انظر الـ console للتفاصيل';
+  }
+  // Refresh data + UI after a brief pause so the user reads the result.
+  setTimeout(function(){
+    if (ov) ov.classList.remove('open');
+    bulkState.selected.clear();
+    bkUpdateBar();
+    if (typeof loadAndRender === 'function') loadAndRender();
+    else renderList();
+  }, errs > 0 ? 3500 : 1800);
+}
+
+// === End Phase X7 ===========================================================
 </script>
 <script>
 (function(){
