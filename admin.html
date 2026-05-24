@@ -1154,6 +1154,126 @@ header{
   .evf-diff-row{grid-template-columns:1fr;gap:2px;}
 }
 
+/* ===== Phase X8: Reports Dashboard (rpt-* namespace) ===== */
+/* Disjoint from evf-*, tpl-*, c360-*, plan-*, flt-*, bk- prefixes. */
+.rpt-section{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:0; margin-top:18px; overflow:hidden;
+}
+.rpt-section-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px; cursor:pointer; user-select:none;
+  background:linear-gradient(135deg,rgba(56,189,248,0.08),rgba(168,85,247,0.06));
+  border-bottom:1px solid transparent; transition:border-color 0.2s ease;
+}
+.rpt-section.open .rpt-section-header{border-bottom-color:var(--border);}
+.rpt-section-title{font-size:15px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;}
+.rpt-section-toggle{font-size:13px; color:var(--text2); transition:transform 0.2s ease;}
+.rpt-section.open .rpt-section-toggle{transform:rotate(90deg);}
+.rpt-section-body{display:none; padding:16px 18px 20px;}
+.rpt-section.open .rpt-section-body{display:block;}
+
+.rpt-controls{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  padding-bottom:14px; border-bottom:1px dashed var(--border); margin-bottom:18px;
+}
+.rpt-range-label{font-size:13px; color:var(--text2); font-weight:600;}
+.rpt-range-group{display:flex; gap:4px; flex-wrap:wrap;}
+.rpt-range-btn{
+  padding:6px 12px; font-size:12px; font-weight:600;
+  background:var(--bg); color:var(--text2); border:1px solid var(--border);
+  border-radius:8px; cursor:pointer; font-family:inherit;
+  transition:all 0.15s ease; min-width:44px;
+}
+.rpt-range-btn:hover{background:rgba(56,189,248,0.08); color:var(--text); border-color:rgba(56,189,248,0.35);}
+.rpt-range-btn.active{
+  background:rgba(56,189,248,0.18); color:var(--blue);
+  border-color:rgba(56,189,248,0.55);
+}
+.rpt-btn-refresh, .rpt-btn-csv{
+  padding:6px 12px; font-size:12px; font-weight:600;
+  background:var(--bg); color:var(--text2); border:1px solid var(--border);
+  border-radius:8px; cursor:pointer; font-family:inherit;
+  transition:all 0.15s ease; margin-inline-start:auto;
+}
+.rpt-btn-refresh:hover{background:rgba(46,232,158,0.08); color:var(--green); border-color:rgba(46,232,158,0.35);}
+.rpt-btn-csv:hover{background:rgba(168,85,247,0.08); color:#c084fc; border-color:rgba(168,85,247,0.35);}
+.rpt-btn-refresh:disabled, .rpt-btn-csv:disabled{opacity:0.5; cursor:not-allowed;}
+
+.rpt-loading{
+  text-align:center; padding:40px 20px; color:var(--text2); font-size:13px;
+}
+.rpt-empty{
+  text-align:center; padding:30px 20px; color:var(--text2); font-size:13px;
+  background:var(--bg); border-radius:10px; border:1px dashed var(--border);
+}
+.rpt-error{
+  text-align:center; padding:18px; color:var(--red); font-size:13px;
+  background:rgba(239,68,68,0.06); border-radius:10px; border:1px solid rgba(239,68,68,0.25);
+}
+
+.rpt-grid{
+  display:grid; grid-template-columns:1fr; gap:16px;
+}
+@media(min-width:880px){
+  .rpt-grid{grid-template-columns:1fr 1fr;}
+  .rpt-card-wide{grid-column:1 / -1;}
+}
+
+.rpt-card{
+  background:var(--bg); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px 16px; display:flex; flex-direction:column;
+}
+.rpt-card-header{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:8px; gap:8px;
+}
+.rpt-card-title{
+  font-size:13px; font-weight:700; color:var(--text);
+  display:flex; align-items:center; gap:6px;
+}
+.rpt-card-subtitle{font-size:11px; color:var(--text2); font-weight:500;}
+.rpt-canvas-wrap{
+  position:relative; width:100%; min-height:220px; max-height:300px;
+  flex:1; padding-top:6px;
+}
+.rpt-canvas-wrap canvas{max-width:100%;}
+
+/* Funnel — bespoke, not chart.js (cleaner display) */
+.rpt-funnel{display:flex; flex-direction:column; gap:6px; padding:6px 0;}
+.rpt-funnel-stage{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.18);
+  border-radius:10px;
+}
+.rpt-funnel-stage[data-tier="accepted"]{
+  background:rgba(46,232,158,0.06); border-color:rgba(46,232,158,0.22);
+}
+.rpt-funnel-stage[data-tier="converted"]{
+  background:rgba(168,85,247,0.07); border-color:rgba(168,85,247,0.25);
+}
+.rpt-funnel-emoji{font-size:18px; flex-shrink:0;}
+.rpt-funnel-body{flex:1; min-width:0;}
+.rpt-funnel-label{font-size:12px; color:var(--text2); font-weight:600; margin-bottom:2px;}
+.rpt-funnel-value{font-size:18px; font-weight:800; color:var(--text); line-height:1.1;}
+.rpt-funnel-pct{
+  font-size:12px; font-weight:700; color:var(--text2);
+  white-space:nowrap; flex-shrink:0;
+}
+.rpt-funnel-pct.up{color:var(--green);}
+.rpt-funnel-pct.down{color:var(--red);}
+
+.rpt-summary-grid{
+  display:grid; grid-template-columns:repeat(2,1fr); gap:8px;
+  margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);
+}
+@media(min-width:520px){
+  .rpt-summary-grid{grid-template-columns:repeat(4,1fr);}
+}
+.rpt-summary-cell{text-align:center; padding:6px 4px;}
+.rpt-summary-cell-label{font-size:10.5px; color:var(--text2); font-weight:600; margin-bottom:2px;}
+.rpt-summary-cell-value{font-size:14px; font-weight:800; color:var(--text);}
+
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
   .main{padding:28px;max-width:800px;margin:0 auto;}
@@ -1508,6 +1628,8 @@ header{
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="supabase-init.js?v=20260523a28"></script>
 </head>
 <body>
@@ -1814,6 +1936,98 @@ header{
         <div class="evf-pagination" id="evfPaginationWrap" style="display:none;">
           <button type="button" class="evf-load-more" id="evfBtnLoadMore" onclick="evfLoadMore()">⬇ تحميل المزيد (50)</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Phase X8: Reports Dashboard (collapsible section) -->
+    <div class="rpt-section" id="rptSection">
+      <div class="rpt-section-header" onclick="rptToggle()" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rptToggle();}">
+        <span class="rpt-section-title">📊 التقارير</span>
+        <span class="rpt-section-toggle">▶</span>
+      </div>
+      <div class="rpt-section-body">
+
+        <!-- Controls: date range + refresh + CSV -->
+        <div class="rpt-controls">
+          <span class="rpt-range-label">📅 الفترة:</span>
+          <div class="rpt-range-group" id="rptRangeGroup">
+            <button type="button" class="rpt-range-btn"          data-range="3"  onclick="rptSetRange(3)">3 شهور</button>
+            <button type="button" class="rpt-range-btn active"   data-range="6"  onclick="rptSetRange(6)">6 شهور</button>
+            <button type="button" class="rpt-range-btn"          data-range="12" onclick="rptSetRange(12)">12 شهر</button>
+          </div>
+          <button type="button" class="rpt-btn-refresh" id="rptBtnRefresh" onclick="rptRefresh()">🔄 تحديث</button>
+          <button type="button" class="rpt-btn-csv"     id="rptBtnCsv"     onclick="rptExportCsv()">📥 CSV</button>
+        </div>
+
+        <!-- Loading / error / empty placeholders -->
+        <div class="rpt-loading" id="rptLoading" style="display:none;">جارٍ تحميل البيانات…</div>
+        <div class="rpt-error"   id="rptError"   style="display:none;"></div>
+
+        <!-- 4 chart cards -->
+        <div class="rpt-grid" id="rptGrid" style="display:none;">
+
+          <!-- Chart 1: MRR over time (line) — wide -->
+          <div class="rpt-card rpt-card-wide">
+            <div class="rpt-card-header">
+              <div class="rpt-card-title">💰 نمو الإيراد الشهري المتكرّر (MRR)</div>
+              <div class="rpt-card-subtitle" id="rptMrrSubtitle"></div>
+            </div>
+            <div class="rpt-canvas-wrap"><canvas id="rptChartMrr"></canvas></div>
+            <div class="rpt-summary-grid">
+              <div class="rpt-summary-cell">
+                <div class="rpt-summary-cell-label">MRR الحالي</div>
+                <div class="rpt-summary-cell-value" id="rptSumMrrCurrent">—</div>
+              </div>
+              <div class="rpt-summary-cell">
+                <div class="rpt-summary-cell-label">المتوسط</div>
+                <div class="rpt-summary-cell-value" id="rptSumMrrAvg">—</div>
+              </div>
+              <div class="rpt-summary-cell">
+                <div class="rpt-summary-cell-label">الأعلى</div>
+                <div class="rpt-summary-cell-value" id="rptSumMrrPeak">—</div>
+              </div>
+              <div class="rpt-summary-cell">
+                <div class="rpt-summary-cell-label">التغيّر %</div>
+                <div class="rpt-summary-cell-value" id="rptSumMrrDelta">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart 2: MRR movement (stacked bar) -->
+          <div class="rpt-card">
+            <div class="rpt-card-header">
+              <div class="rpt-card-title">📈 حركة الإيراد الشهرية</div>
+              <div class="rpt-card-subtitle">جديد / إعادة تفعيل / مفقود</div>
+            </div>
+            <div class="rpt-canvas-wrap"><canvas id="rptChartMovement"></canvas></div>
+          </div>
+
+          <!-- Chart 3: Plan distribution (donut) -->
+          <div class="rpt-card">
+            <div class="rpt-card-header">
+              <div class="rpt-card-title">📊 توزيع الخطط الحالية</div>
+              <div class="rpt-card-subtitle" id="rptPlanSubtitle"></div>
+            </div>
+            <div class="rpt-canvas-wrap"><canvas id="rptChartPlans"></canvas></div>
+          </div>
+
+          <!-- Chart 4: Conversion funnel (custom HTML) — wide -->
+          <div class="rpt-card rpt-card-wide">
+            <div class="rpt-card-header">
+              <div class="rpt-card-title">🎯 قمع التحويل</div>
+              <div class="rpt-card-subtitle" id="rptFunnelSubtitle"></div>
+            </div>
+            <div class="rpt-funnel" id="rptFunnel"></div>
+          </div>
+
+        </div>
+
+        <!-- Empty state (shown only if no data at all) -->
+        <div class="rpt-empty" id="rptEmpty" style="display:none;">
+          لا توجد بيانات كافية لعرض التقارير في الفترة المحدّدة.
+        </div>
+
       </div>
     </div>
 
@@ -7766,6 +7980,650 @@ async function bkRun(title, rows, perRowAsyncFn) {
 }
 
 // === End Phase X7 ===========================================================
+
+// === Phase X8: Reports Dashboard ============================================
+//
+// Read-only analytics over trial_requests + subscription_events + subscription_plans.
+// Lives in admin.html as an in-section collapsible (rule #58). No DB writes,
+// no migration. Uses Chart.js 4.4.0 (loaded via CDN with `defer` in <head>).
+//
+// Architecture decisions:
+//   • Lazy compute — runs on first open of section + on range/refresh
+//   • All math client-side from already-fetched data; nothing new from server
+//   • Range options: 3 / 6 / 12 months (Stripe Billing default = 6)
+//   • Chart.js for line + stacked bar + donut; bespoke HTML for funnel
+//   • Token guard (rule #55) prevents stale renders on rapid range switches
+//   • CSS scoped under rpt-* (disjoint from evf-, tpl-, c360-, plan-, flt-, bk-)
+//   • Phone normalization NOT relevant here (no WA actions in reports)
+//   • CSV export uses RFC 4180 (cell escape from Phase X4 evfCsvCell pattern)
+//
+// MRR formula (matches Phase X5 widget + Phase X6 customer per-row MRR):
+//   monthly plan: full price
+//   yearly  plan: price / 12  (ChartMogul standard normalization)
+//   permanent   : 0           (no recurring revenue)
+//   trial       : 0           (free tier)
+//
+// Movement semantics (ChartMogul SaaS metrics cheat sheet):
+//   New MRR          = first conversion to a paid plan (monthly/yearly)
+//   Reactivation MRR = paid plan after a previous suspend/reject
+//   Churned MRR      = previously paid plan, now suspended/rejected/deleted
+//   Net Movement     = New + Reactivation - Churned
+
+var rptState = {
+  range: 6,              // months
+  loaded: false,         // first compute done?
+  loading: false,        // in-flight guard
+  loadToken: 0,          // latest-wins (rule #55)
+  charts: {},            // { mrr: Chart, movement: Chart, plans: Chart }
+  data: null             // { months, mrrSeries, movementSeries, planDist, funnel }
+};
+
+// ───── Toggle the section ────────────────────────────────────────────────────
+function rptToggle() {
+  var sec = document.getElementById('rptSection');
+  if (!sec) return;
+  var willOpen = !sec.classList.contains('open');
+  sec.classList.toggle('open');
+  if (willOpen && !rptState.loaded && !rptState.loading) {
+    rptLoad();
+  }
+}
+
+// ───── Set the active range button ───────────────────────────────────────────
+function rptSetRange(months) {
+  var allowed = [3, 6, 12];
+  if (allowed.indexOf(months) === -1) return;
+  if (rptState.range === months && rptState.loaded) return;
+  rptState.range = months;
+  var group = document.getElementById('rptRangeGroup');
+  if (group) {
+    var btns = group.querySelectorAll('.rpt-range-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var r = parseInt(btns[i].getAttribute('data-range'), 10);
+      btns[i].classList.toggle('active', r === months);
+    }
+  }
+  rptLoad();
+}
+
+// ───── Manual refresh ────────────────────────────────────────────────────────
+function rptRefresh() {
+  if (rptState.loading) return;
+  rptLoad();
+}
+
+// ───── Build the months array for the range (ascending) ──────────────────────
+// Returns array of objects: { key: 'YYYY-MM', label: 'مم/yy', start: Date, end: Date }
+function rptBuildMonths(months) {
+  var arr = [];
+  var now = new Date();
+  // Anchor on first day of current month for stable boundaries.
+  var anchor = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  for (var i = months - 1; i >= 0; i--) {
+    var ms = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1, 0, 0, 0, 0);
+    var me = new Date(anchor.getFullYear(), anchor.getMonth() - i + 1, 1, 0, 0, 0, 0);
+    var key = ms.getFullYear() + '-' + String(ms.getMonth() + 1).padStart(2, '0');
+    var label = String(ms.getMonth() + 1).padStart(2, '0') + '/' + String(ms.getFullYear()).slice(-2);
+    arr.push({ key: key, label: label, start: ms, end: me });
+  }
+  return arr;
+}
+
+// ───── Normalize a plan price into monthly recurring SYP ────────────────────
+function rptPlanMrr(plan) {
+  if (!plan) return 0;
+  // subscription_plans.price is the actual column (not price_syp).
+  var price = Number(plan.price || 0);
+  if (!isFinite(price) || price <= 0) return 0;
+  var code = String(plan.code || '').toLowerCase();
+  if (code === 'yearly')  return Math.round(price / 12);
+  if (code === 'monthly') return Math.round(price);
+  // permanent / trial / unknown → 0 recurring
+  return 0;
+}
+
+// ───── Compute current state from a trial_request row ────────────────────────
+// Mirrors the public-facing logic of computeAccountState used elsewhere.
+// We keep this local to avoid coupling to internal field rename surprises.
+// Returns one of: 'trial' | 'monthly' | 'yearly' | 'permanent' | 'suspended' | 'rejected'
+function rptCurrentState(r) {
+  if (!r) return 'rejected';
+  var status = String(r.status || '').toLowerCase();
+  if (status === 'rejected') return 'rejected';
+  var planCode = String(r.plan || '').toLowerCase();
+  if (planCode === 'permanent' || (status === 'accepted' && !r.trial_end && planCode !== 'monthly' && planCode !== 'yearly')) return 'permanent';
+  if (planCode === 'yearly') return 'yearly';
+  if (planCode === 'monthly') return 'monthly';
+  // Trial logic
+  if (r.trial_end) {
+    var ends = new Date(r.trial_end);
+    if (isFinite(ends.getTime()) && ends.getTime() < Date.now()) return 'suspended';
+  }
+  return 'trial';
+}
+
+// ───── Map a plan code (case-insensitive) to a normalized bucket ─────────────
+// Actual values in DB columns (trial_requests.plan, subscription_events.to_plan,
+// subscription_plans.code) are: 'monthly' | 'yearly' | 'permanent' | 'trial' | NULL.
+function rptPlanBucket(planCode) {
+  var p = String(planCode || '').toLowerCase().trim();
+  if (!p) return null;
+  if (p === 'permanent') return 'permanent';
+  if (p === 'yearly')    return 'yearly';
+  if (p === 'monthly')   return 'monthly';
+  return null;
+}
+
+// ───── Main loader ───────────────────────────────────────────────────────────
+async function rptLoad() {
+  if (rptState.loading) return;
+  rptState.loading = true;
+  var myToken = ++rptState.loadToken;
+  rptShowLoading();
+
+  try {
+    // Pull all data we need in parallel.
+    // We pull the full trial_requests + subscription_events; both tables are
+    // small (admin platform layer) and the alternative — per-month server-side
+    // queries — would be much chattier without saving meaningful bandwidth.
+    var months = rptBuildMonths(rptState.range);
+    var rangeStart = months[0].start;
+
+    var promises = [
+      window.sb.from('trial_requests').select('id, user_id, status, plan, trial_end, created_at, updated_at, price_paid').limit(5000),
+      // Note: no gte filter on created_at — we need full history so that
+      // the "New vs Reactivation" classification at the start of the range
+      // has correct prior-paid context (D8 fix).
+      window.sb.from('subscription_events').select('user_id, event_type, from_plan, to_plan, created_at, notes').order('created_at', { ascending: true }).limit(20000),
+      window.sb.from('subscription_plans').select('code, price, duration_days, is_active').limit(50)
+    ];
+
+    var results = await Promise.all(promises);
+    if (myToken !== rptState.loadToken) return; // stale — newer load started
+
+    var reqErr = results[0].error;
+    var evErr  = results[1].error;
+    var plErr  = results[2].error;
+    if (reqErr || evErr || plErr) {
+      throw new Error((reqErr || evErr || plErr).message || 'fetch failed');
+    }
+
+    var requests = results[0].data || [];
+    var events   = results[1].data || [];
+    var plans    = results[2].data || [];
+
+    // Build plan lookup map.
+    var planMap = {};
+    plans.forEach(function(p) { planMap[String(p.code || '').toLowerCase()] = p; });
+
+    // ─── Series 1: MRR over time ─────────────────────────────────────────────
+    // For each month, MRR = Σ MRR of every tenant whose paid plan was active at month end.
+    // "Active at month end" = trial_requests row exists with created_at <= month end,
+    // status='accepted', and (trial_end IS NULL OR trial_end > month end OR plan is permanent).
+    //
+    // For historical accuracy we replay subscription_events up to month_end to
+    // determine each user's plan at that moment. If no events, fall back to the
+    // current row state.
+    var mrrSeries = months.map(function(m) {
+      // Walk through events to build a "current plan code" per user_id at m.end
+      var planAtEnd = {}; // user_id -> plan bucket ('monthly'/'yearly'/'permanent'/'trial') | null (suspended) | undefined (never seen)
+      events.forEach(function(ev) {
+        var t = new Date(ev.created_at);
+        if (!isFinite(t.getTime()) || t.getTime() >= m.end.getTime()) return;
+        var uid = ev.user_id;
+        if (!uid) return;
+        var type = String(ev.event_type || '').toLowerCase();
+        if (type === 'suspend' || type === 'reject' || type === 'delete') {
+          planAtEnd[uid] = null;
+        } else if (type === 'accept' || type === 'reactivate' || type === 'convert_monthly' || type === 'convert_yearly' || type === 'renew' || type === 'extend') {
+          // Use the event's to_plan if present, else derive from the event type itself.
+          var bucket = rptPlanBucket(ev.to_plan);
+          if (!bucket) {
+            if (type === 'convert_monthly') bucket = 'monthly';
+            else if (type === 'convert_yearly') bucket = 'yearly';
+          }
+          if (bucket) planAtEnd[uid] = bucket;
+          else if (type === 'accept' && !planAtEnd[uid]) planAtEnd[uid] = 'trial';
+        } else if (type === 'shorten' || type === 'enter_grace') {
+          // No plan change; keep current.
+        }
+      });
+      // Fall back to current state for users with no events in range.
+      requests.forEach(function(r) {
+        if (!r.user_id || planAtEnd[r.user_id] !== undefined) return;
+        var created = new Date(r.created_at);
+        if (!isFinite(created.getTime()) || created.getTime() >= m.end.getTime()) return;
+        var st = rptCurrentState(r);
+        if (st === 'suspended' || st === 'rejected') planAtEnd[r.user_id] = null;
+        else if (st === 'monthly') planAtEnd[r.user_id] = 'monthly';
+        else if (st === 'yearly')  planAtEnd[r.user_id] = 'yearly';
+        else if (st === 'permanent') planAtEnd[r.user_id] = 'permanent';
+        else if (st === 'trial')   planAtEnd[r.user_id] = 'trial';
+      });
+      var total = 0;
+      Object.keys(planAtEnd).forEach(function(uid) {
+        var p = planAtEnd[uid];
+        if (!p || p === 'trial' || p === 'permanent') return;
+        var planRow = planMap[p] || null;
+        if (!planRow) return;
+        total += rptPlanMrr(planRow);
+      });
+      return Math.round(total);
+    });
+
+    // ─── Series 2: MRR movement per month ────────────────────────────────────
+    // For each month: New (first time becoming paid in this month),
+    // Reactivation (paid again after suspend/reject), Churned (lost paid status).
+    var movementSeries = months.map(function(m) {
+      var newMrr = 0, reactMrr = 0, churnMrr = 0;
+      // Track "was-ever-paid" status as we walk events from the beginning of all events.
+      // For each month, derive what changes happened within [m.start, m.end).
+      // Build paid-history per user up to m.start so we know context.
+      var paidHistory = {}; // user_id -> { wasPaid: bool, currentlyPaid: bool, currentPlan: code }
+      events.forEach(function(ev) {
+        var t = new Date(ev.created_at);
+        if (!isFinite(t.getTime())) return;
+        if (t.getTime() >= m.start.getTime()) return; // history only up to m.start
+        var uid = ev.user_id;
+        if (!uid) return;
+        if (!paidHistory[uid]) paidHistory[uid] = { wasPaid: false, currentlyPaid: false, currentPlan: null };
+        var type = String(ev.event_type || '').toLowerCase();
+        var bucket = rptPlanBucket(ev.to_plan);
+        if (!bucket) {
+          if (type === 'convert_monthly') bucket = 'monthly';
+          else if (type === 'convert_yearly') bucket = 'yearly';
+        }
+        if (type === 'suspend' || type === 'reject' || type === 'delete') {
+          paidHistory[uid].currentlyPaid = false; paidHistory[uid].currentPlan = null;
+        } else if (bucket === 'monthly' || bucket === 'yearly') {
+          paidHistory[uid].wasPaid = true;
+          paidHistory[uid].currentlyPaid = true;
+          paidHistory[uid].currentPlan = bucket;
+        }
+      });
+      // Now process events within the month.
+      events.forEach(function(ev) {
+        var t = new Date(ev.created_at);
+        if (!isFinite(t.getTime())) return;
+        if (t.getTime() < m.start.getTime() || t.getTime() >= m.end.getTime()) return;
+        var uid = ev.user_id;
+        if (!uid) return;
+        if (!paidHistory[uid]) paidHistory[uid] = { wasPaid: false, currentlyPaid: false, currentPlan: null };
+        var type = String(ev.event_type || '').toLowerCase();
+        var bucket = rptPlanBucket(ev.to_plan);
+        if (!bucket) {
+          if (type === 'convert_monthly') bucket = 'monthly';
+          else if (type === 'convert_yearly') bucket = 'yearly';
+        }
+        if (type === 'suspend' || type === 'reject' || type === 'delete') {
+          if (paidHistory[uid].currentlyPaid && paidHistory[uid].currentPlan) {
+            var planRow = planMap[paidHistory[uid].currentPlan] || null;
+            if (planRow) churnMrr += rptPlanMrr(planRow);
+          }
+          paidHistory[uid].currentlyPaid = false;
+          paidHistory[uid].currentPlan = null;
+        } else if (bucket === 'monthly' || bucket === 'yearly') {
+          if (!paidHistory[uid].currentlyPaid) {
+            var planRow2 = planMap[bucket] || null;
+            if (planRow2) {
+              var amt = rptPlanMrr(planRow2);
+              if (paidHistory[uid].wasPaid) reactMrr += amt;
+              else                          newMrr   += amt;
+            }
+            paidHistory[uid].wasPaid = true;
+            paidHistory[uid].currentlyPaid = true;
+            paidHistory[uid].currentPlan = bucket;
+          }
+        }
+      });
+      return { newMrr: Math.round(newMrr), reactMrr: Math.round(reactMrr), churnMrr: Math.round(churnMrr) };
+    });
+
+    // ─── Series 3: Plan distribution (current snapshot) ──────────────────────
+    var planDist = { trial: 0, monthly: 0, yearly: 0, permanent: 0 };
+    requests.forEach(function(r) {
+      var st = rptCurrentState(r);
+      if (st === 'trial')     planDist.trial++;
+      else if (st === 'monthly')   planDist.monthly++;
+      else if (st === 'yearly')    planDist.yearly++;
+      else if (st === 'permanent') planDist.permanent++;
+      // suspended/rejected excluded from current distribution
+    });
+
+    // ─── Funnel: signups → accepted → converted (within range) ──────────────
+    var signupsInRange = 0, acceptedInRange = 0, convertedInRange = 0;
+    requests.forEach(function(r) {
+      var created = new Date(r.created_at);
+      if (!isFinite(created.getTime())) return;
+      if (created.getTime() < rangeStart.getTime()) return;
+      signupsInRange++;
+      // Was this tenant ever accepted in range? Easiest: current status accepted OR
+      // any 'accept' event for this user in range.
+      var st = String(r.status || '').toLowerCase();
+      if (st === 'accepted') acceptedInRange++;
+      var cur = rptCurrentState(r);
+      if (cur === 'monthly' || cur === 'yearly' || cur === 'permanent') convertedInRange++;
+    });
+
+    rptState.data = {
+      months: months,
+      mrrSeries: mrrSeries,
+      movementSeries: movementSeries,
+      planDist: planDist,
+      funnel: { signups: signupsInRange, accepted: acceptedInRange, converted: convertedInRange }
+    };
+
+    if (myToken !== rptState.loadToken) return;
+    rptState.loaded = true;
+    rptState.loading = false;
+    rptRender();
+  } catch (err) {
+    if (myToken !== rptState.loadToken) return;
+    rptState.loading = false;
+    console.warn('[rpt] load failed', err);
+    rptShowError((err && err.message) || 'فشل تحميل البيانات');
+  }
+}
+
+// ───── Show loading state ────────────────────────────────────────────────────
+function rptShowLoading() {
+  var l = document.getElementById('rptLoading');
+  var g = document.getElementById('rptGrid');
+  var e = document.getElementById('rptError');
+  var em = document.getElementById('rptEmpty');
+  if (l) l.style.display = 'block';
+  if (g) g.style.display = 'none';
+  if (e) e.style.display = 'none';
+  if (em) em.style.display = 'none';
+  var btn = document.getElementById('rptBtnRefresh');
+  if (btn) btn.disabled = true;
+}
+
+// ───── Show error state ──────────────────────────────────────────────────────
+function rptShowError(msg) {
+  var l = document.getElementById('rptLoading');
+  var g = document.getElementById('rptGrid');
+  var e = document.getElementById('rptError');
+  var em = document.getElementById('rptEmpty');
+  if (l) l.style.display = 'none';
+  if (g) g.style.display = 'none';
+  if (em) em.style.display = 'none';
+  if (e) { e.style.display = 'block'; e.textContent = '⚠️ ' + (msg || 'حدث خطأ'); }
+  var btn = document.getElementById('rptBtnRefresh');
+  if (btn) btn.disabled = false;
+}
+
+// ───── Render all charts ─────────────────────────────────────────────────────
+function rptRender() {
+  var d = rptState.data;
+  if (!d) return;
+
+  var l = document.getElementById('rptLoading');
+  var g = document.getElementById('rptGrid');
+  var e = document.getElementById('rptError');
+  var em = document.getElementById('rptEmpty');
+  if (l) l.style.display = 'none';
+  if (e) e.style.display = 'none';
+
+  // If everything is zero, show empty state.
+  var hasMrr = d.mrrSeries.some(function(v) { return v > 0; });
+  var hasMov = d.movementSeries.some(function(o) { return o.newMrr + o.reactMrr + o.churnMrr > 0; });
+  var hasPlans = d.planDist.trial + d.planDist.monthly + d.planDist.yearly + d.planDist.permanent > 0;
+  var hasFunnel = d.funnel.signups > 0;
+  if (!hasMrr && !hasMov && !hasPlans && !hasFunnel) {
+    if (g) g.style.display = 'none';
+    if (em) em.style.display = 'block';
+    var btn1 = document.getElementById('rptBtnRefresh');
+    if (btn1) btn1.disabled = false;
+    return;
+  }
+  if (em) em.style.display = 'none';
+  if (g) g.style.display = 'grid';
+
+  // Verify Chart.js available (defer-loaded; should be ready by user interaction)
+  if (typeof Chart === 'undefined') {
+    rptShowError('مكتبة الرسوم البيانية لم تُحمَّل بعد — حاول التحديث.');
+    return;
+  }
+
+  rptRenderMrrChart(d);
+  rptRenderMovementChart(d);
+  rptRenderPlansChart(d);
+  rptRenderFunnel(d);
+  rptRenderMrrSummary(d);
+
+  var btn = document.getElementById('rptBtnRefresh');
+  if (btn) btn.disabled = false;
+}
+
+// ───── Chart 1: MRR line ─────────────────────────────────────────────────────
+function rptRenderMrrChart(d) {
+  var canvas = document.getElementById('rptChartMrr');
+  if (!canvas) return;
+  if (rptState.charts.mrr) { rptState.charts.mrr.destroy(); rptState.charts.mrr = null; }
+  var ctx = canvas.getContext('2d');
+  var labels = d.months.map(function(m) { return m.label; });
+  rptState.charts.mrr = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'MRR (ل.س)',
+        data: d.mrrSeries,
+        borderColor: 'rgba(56,189,248,1)',
+        backgroundColor: 'rgba(56,189,248,0.12)',
+        fill: true, tension: 0.32, pointRadius: 3.5, pointHoverRadius: 6, borderWidth: 2.5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) { return rptFmtSyp(ctx.parsed.y) + ' ل.س'; }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#9ca3af', font: { family: 'Cairo' } }, grid: { color: 'rgba(156,163,175,0.08)' } },
+        y: { beginAtZero: true, ticks: { color: '#9ca3af', font: { family: 'Cairo' }, callback: function(v){ return rptFmtSypShort(v); } }, grid: { color: 'rgba(156,163,175,0.08)' } }
+      }
+    }
+  });
+  var sub = document.getElementById('rptMrrSubtitle');
+  if (sub) sub.textContent = 'آخر ' + d.months.length + ' أشهر';
+}
+
+// ───── Chart 2: Movement stacked bar ─────────────────────────────────────────
+function rptRenderMovementChart(d) {
+  var canvas = document.getElementById('rptChartMovement');
+  if (!canvas) return;
+  if (rptState.charts.movement) { rptState.charts.movement.destroy(); rptState.charts.movement = null; }
+  var ctx = canvas.getContext('2d');
+  var labels = d.months.map(function(m) { return m.label; });
+  var newArr   = d.movementSeries.map(function(o) { return o.newMrr; });
+  var reactArr = d.movementSeries.map(function(o) { return o.reactMrr; });
+  var churnArr = d.movementSeries.map(function(o) { return -Math.abs(o.churnMrr); }); // negative
+  rptState.charts.movement = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'جديد',        data: newArr,   backgroundColor: 'rgba(46,232,158,0.78)', stack: 'mov' },
+        { label: 'إعادة تفعيل', data: reactArr, backgroundColor: 'rgba(56,189,248,0.78)', stack: 'mov' },
+        { label: 'مفقود',       data: churnArr, backgroundColor: 'rgba(239,68,68,0.78)',  stack: 'mov' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Cairo', size: 11 }, boxWidth: 12, padding: 8 } },
+        tooltip: { callbacks: { label: function(c){ return c.dataset.label + ': ' + rptFmtSyp(Math.abs(c.parsed.y)) + ' ل.س'; } } }
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#9ca3af', font: { family: 'Cairo' } }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#9ca3af', font: { family: 'Cairo' }, callback: function(v){ return rptFmtSypShort(v); } }, grid: { color: 'rgba(156,163,175,0.08)' } }
+      }
+    }
+  });
+}
+
+// ───── Chart 3: Plans donut ──────────────────────────────────────────────────
+function rptRenderPlansChart(d) {
+  var canvas = document.getElementById('rptChartPlans');
+  if (!canvas) return;
+  if (rptState.charts.plans) { rptState.charts.plans.destroy(); rptState.charts.plans = null; }
+  var ctx = canvas.getContext('2d');
+  var values = [d.planDist.trial, d.planDist.monthly, d.planDist.yearly, d.planDist.permanent];
+  var labels = ['تجربة', 'شهري', 'سنوي', 'دائم'];
+  var total = values.reduce(function(a,b){return a+b;}, 0);
+  rptState.charts.plans = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: values,
+        backgroundColor: ['rgba(245,158,11,0.85)', 'rgba(56,189,248,0.85)', 'rgba(46,232,158,0.85)', 'rgba(168,85,247,0.85)'],
+        borderColor: 'rgba(15,23,42,0.9)', borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { family: 'Cairo', size: 11 }, boxWidth: 12, padding: 6 } },
+        tooltip: { callbacks: { label: function(c){
+          var pct = total > 0 ? Math.round((c.parsed / total) * 100) : 0;
+          return c.label + ': ' + c.parsed + ' (' + pct + '%)';
+        } } }
+      },
+      cutout: '62%'
+    }
+  });
+  var sub = document.getElementById('rptPlanSubtitle');
+  if (sub) sub.textContent = 'الإجمالي: ' + total;
+}
+
+// ───── Chart 4: Funnel (custom HTML — clearer than chart.js for 3-stage) ────
+function rptRenderFunnel(d) {
+  var wrap = document.getElementById('rptFunnel');
+  if (!wrap) return;
+  var f = d.funnel;
+  var pctAccepted  = f.signups   > 0 ? Math.round((f.accepted   / f.signups)   * 100) : 0;
+  var pctConverted = f.accepted  > 0 ? Math.round((f.converted  / f.accepted)  * 100) : 0;
+  var overall      = f.signups   > 0 ? Math.round((f.converted  / f.signups)   * 100) : 0;
+  var html = ''
+    + '<div class="rpt-funnel-stage" data-tier="signups">'
+    + '  <div class="rpt-funnel-emoji">📝</div>'
+    + '  <div class="rpt-funnel-body">'
+    + '    <div class="rpt-funnel-label">تسجيلات جديدة</div>'
+    + '    <div class="rpt-funnel-value">' + f.signups + '</div>'
+    + '  </div>'
+    + '  <div class="rpt-funnel-pct">100%</div>'
+    + '</div>'
+    + '<div class="rpt-funnel-stage" data-tier="accepted">'
+    + '  <div class="rpt-funnel-emoji">✅</div>'
+    + '  <div class="rpt-funnel-body">'
+    + '    <div class="rpt-funnel-label">قُبلت</div>'
+    + '    <div class="rpt-funnel-value">' + f.accepted + '</div>'
+    + '  </div>'
+    + '  <div class="rpt-funnel-pct ' + (pctAccepted >= 50 ? 'up' : '') + '">' + pctAccepted + '%</div>'
+    + '</div>'
+    + '<div class="rpt-funnel-stage" data-tier="converted">'
+    + '  <div class="rpt-funnel-emoji">💎</div>'
+    + '  <div class="rpt-funnel-body">'
+    + '    <div class="rpt-funnel-label">تحوّلت إلى مدفوعة</div>'
+    + '    <div class="rpt-funnel-value">' + f.converted + '</div>'
+    + '  </div>'
+    + '  <div class="rpt-funnel-pct ' + (pctConverted >= 30 ? 'up' : '') + '">' + pctConverted + '%</div>'
+    + '</div>';
+  wrap.innerHTML = html;
+  var sub = document.getElementById('rptFunnelSubtitle');
+  if (sub) sub.textContent = 'الإجمالي: ' + overall + '% من التسجيلات تحوّلت';
+}
+
+// ───── MRR summary cells ─────────────────────────────────────────────────────
+function rptRenderMrrSummary(d) {
+  var current = d.mrrSeries.length ? d.mrrSeries[d.mrrSeries.length - 1] : 0;
+  var first   = d.mrrSeries.length ? d.mrrSeries[0] : 0;
+  var sum     = d.mrrSeries.reduce(function(a,b){return a+b;}, 0);
+  var avg     = d.mrrSeries.length ? Math.round(sum / d.mrrSeries.length) : 0;
+  var peak    = d.mrrSeries.length ? d.mrrSeries.reduce(function(a,b){return Math.max(a,b);}, 0) : 0;
+  var deltaPct = first > 0 ? Math.round(((current - first) / first) * 100) : (current > 0 ? 100 : 0);
+  var setText = function(id, txt) { var n = document.getElementById(id); if (n) n.textContent = txt; };
+  setText('rptSumMrrCurrent', rptFmtSypShort(current) + ' ل.س');
+  setText('rptSumMrrAvg',     rptFmtSypShort(avg)     + ' ل.س');
+  setText('rptSumMrrPeak',    rptFmtSypShort(peak)    + ' ل.س');
+  var delta = (deltaPct >= 0 ? '+' : '') + deltaPct + '%';
+  setText('rptSumMrrDelta', delta);
+}
+
+// ───── CSV export ────────────────────────────────────────────────────────────
+function rptExportCsv() {
+  if (!rptState.data) return;
+  var d = rptState.data;
+  var rows = [];
+  // Header row
+  rows.push(['الشهر', 'MRR (ل.س)', 'جديد (ل.س)', 'إعادة تفعيل (ل.س)', 'مفقود (ل.س)']);
+  for (var i = 0; i < d.months.length; i++) {
+    rows.push([
+      d.months[i].label,
+      d.mrrSeries[i] || 0,
+      d.movementSeries[i] ? d.movementSeries[i].newMrr   : 0,
+      d.movementSeries[i] ? d.movementSeries[i].reactMrr : 0,
+      d.movementSeries[i] ? d.movementSeries[i].churnMrr : 0
+    ]);
+  }
+  rows.push([]); // blank separator
+  rows.push(['التوزيع الحالي للخطط', '', '', '', '']);
+  rows.push(['تجربة',  d.planDist.trial,     '', '', '']);
+  rows.push(['شهري',   d.planDist.monthly,   '', '', '']);
+  rows.push(['سنوي',   d.planDist.yearly,    '', '', '']);
+  rows.push(['دائم',   d.planDist.permanent, '', '', '']);
+  rows.push([]);
+  rows.push(['قمع التحويل', '', '', '', '']);
+  rows.push(['تسجيلات', d.funnel.signups,   '', '', '']);
+  rows.push(['قُبلت',    d.funnel.accepted,  '', '', '']);
+  rows.push(['تحوّلت',   d.funnel.converted, '', '', '']);
+  var csv = '\ufeff' + rows.map(function(row) {
+    return row.map(rptCsvCell).join(',');
+  }).join('\r\n');
+  var ts = new Date().toISOString().slice(0,10);
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'SyDent-reports-' + d.range + 'm-' + ts + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// RFC 4180 cell escape (mirrors Phase X4 evfCsvCell).
+function rptCsvCell(v) {
+  if (v === null || v === undefined) return '';
+  var s = String(v);
+  if (s.indexOf(',') !== -1 || s.indexOf('"') !== -1 || s.indexOf('\n') !== -1 || s.indexOf('\r') !== -1) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// ───── Number formatters ─────────────────────────────────────────────────────
+function rptFmtSyp(n) {
+  if (!isFinite(n)) return '0';
+  return Math.round(n).toLocaleString('en-US');
+}
+function rptFmtSypShort(n) {
+  if (!isFinite(n) || n === 0) return '0';
+  var abs = Math.abs(n);
+  if (abs >= 1000000) return (n / 1000000).toFixed(abs >= 10000000 ? 0 : 1) + 'M';
+  if (abs >= 1000)    return (n / 1000).toFixed(abs >= 10000 ? 0 : 1) + 'K';
+  return String(Math.round(n));
+}
+
+// === End Phase X8 ===========================================================
 </script>
 <script>
 (function(){
