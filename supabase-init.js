@@ -220,22 +220,33 @@
   //
   // Pages classified as "public":
   //   /                — apex (some browsers report "/" for root)
-  //   /index.html      — dashboard router (redirects based on auth)
-  //   /auth.html       — pre-auth login/signup
-  //   /landing.html    — pure marketing (anon access)
-  //   /pending.html    — post-signup waiting page (auth'd but no clinic yet)
-  //   /admin.html      — SaaS platform admin (cross-tenant, not a tenant)
+  //   /index           — dashboard router (redirects based on auth)
+  //   /auth            — pre-auth login/signup
+  //   /landing         — pure marketing (anon access)
+  //   /pending         — post-signup waiting page (auth'd but no clinic yet)
+  //   /admin           — SaaS platform admin (cross-tenant, not a tenant)
   //
-  // The regex strips an optional trailing slash to handle "/auth.html/"
-  // (rare but seen on some CDN edges) and uses an explicit leading slash
-  // boundary so partial matches like "myauth.html" don't false-positive.
+  // Phase X10.2 fix: Cloudflare Pages serves clean URLs by default —
+  // sydent.app/landing rewrites internally to landing.html but the
+  // browser's window.location.pathname stays as "/landing" (no .html).
+  // The first version of this helper required the ".html" suffix and
+  // therefore failed on Brave/Chrome desktop where Cloudflare clean URLs
+  // were the default rewrite mode. iPhone Safari still worked because
+  // when typing the URL directly the pathname kept ".html".
+  // The fix: treat ".html" as optional in the regex, so both
+  // "/landing" and "/landing.html" classify as public.
+  //
+  // We also strip an optional trailing slash to handle "/auth.html/"
+  // (rare but seen on some CDN edges) and use an explicit leading slash
+  // boundary so partial matches like "myauth" don't false-positive.
   function isPublicPage() {
     var path = (window.location.pathname || '').toLowerCase();
     if (path.length > 1 && path.charAt(path.length - 1) === '/') {
       path = path.slice(0, -1);
     }
-    return /(^\/$)|(\/index\.html$)|(\/auth\.html$)|(\/landing\.html$)|(\/pending\.html$)|(\/admin\.html$)/.test(path);
+    return /^\/$|^\/(index|auth|landing|pending|admin)(\.html)?$/.test(path);
   }
+
 
 
   // ── Cache (loaded once per page) ───────────────────────────────
