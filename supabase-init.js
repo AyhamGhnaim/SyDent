@@ -209,6 +209,35 @@
     secretary: { bg: 'rgba(255,167,38,0.14)',  border: 'rgba(255,167,38,0.40)',  text: '#ffa726' }
   };
 
+  // ── Public-page detection (Phase X10.1 fix) ─────────────────────────
+  // Single source of truth for "is this a pre-auth page that should not
+  // render tenant UI (role pill, inactive banner, sidebar)?". Used by
+  // injectHeaderButton, injectInactiveBanner, and autoInit as a defense-
+  // in-depth guard. Even if any of those is called directly (cached
+  // service worker, manual API call, future entry point), the public
+  // page check stops tenant UI from leaking onto auth/landing/index/
+  // pending/admin (platform layer).
+  //
+  // Pages classified as "public":
+  //   /                — apex (some browsers report "/" for root)
+  //   /index.html      — dashboard router (redirects based on auth)
+  //   /auth.html       — pre-auth login/signup
+  //   /landing.html    — pure marketing (anon access)
+  //   /pending.html    — post-signup waiting page (auth'd but no clinic yet)
+  //   /admin.html      — SaaS platform admin (cross-tenant, not a tenant)
+  //
+  // The regex strips an optional trailing slash to handle "/auth.html/"
+  // (rare but seen on some CDN edges) and uses an explicit leading slash
+  // boundary so partial matches like "myauth.html" don't false-positive.
+  function isPublicPage() {
+    var path = (window.location.pathname || '').toLowerCase();
+    if (path.length > 1 && path.charAt(path.length - 1) === '/') {
+      path = path.slice(0, -1);
+    }
+    return /(^\/$)|(\/index\.html$)|(\/auth\.html$)|(\/landing\.html$)|(\/pending\.html$)|(\/admin\.html$)/.test(path);
+  }
+
+
   // ── Cache (loaded once per page) ───────────────────────────────
   let _pinHashCache = null;       // SHA-256 hex من DB
   let _pinHashLoaded = false;
@@ -703,6 +732,12 @@
 
   // ── Inject header lock button into topbar (or fallback container) ──
   function injectHeaderButton() {
+    // Phase X10.1: defense-in-depth. The role pill ("المالك 👑"/"الطبيب"/
+    // "السكرتيرة") must NEVER render on public pages. Even if a stale
+    // cached supabase-init.js bypasses the autoInit() skip, or someone
+    // calls window.SyDentLock.injectHeaderButton() directly, this guard
+    // stops the leak at the source.
+    if (isPublicPage()) return;
     if (document.getElementById('sdLockBtn')) return; // already injected
     injectCSS();
     var role = getRole();
@@ -1410,6 +1445,11 @@
   }
 
   function injectInactiveBanner() {
+    // Phase X10.1: defense-in-depth. The "حسابك معطّل" banner is for
+    // clinic employees/doctors only — it has no meaning on public pages
+    // and would confuse visitors who never logged in. Mirror the guard
+    // in injectHeaderButton().
+    if (isPublicPage()) return;
     if (document.getElementById('sdInactiveBanner')) return;
     var banner = document.createElement('div');
     banner.id = 'sdInactiveBanner';
@@ -1481,8 +1521,13 @@
     // runs entirely outside the per-tenant SyDentLock system. See Rule #28 and
     // the SaaS multi-tenant best practice: keep the global/platform layer
     // distinct from the tenant layer.
-    var path = (window.location.pathname || '').toLowerCase();
-    if (/auth\.html$|landing\.html$|admin\.html$|^\/$/i.test(path)) return;
+    // Phase X10.1: use the canonical isPublicPage() helper instead of
+    // an inline regex. This guarantees consistency with the matching
+    // guards inside injectHeaderButton() and injectInactiveBanner() so
+    // all three skip the same set of pages. The helper also handles
+    // trailing-slash edge cases and includes /index.html + /pending.html
+    // which the old inline regex missed.
+    if (isPublicPage()) return;
 
     // Wait briefly for DOM
     if (document.readyState === 'loading') {
