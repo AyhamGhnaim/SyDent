@@ -1902,7 +1902,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260524a34"></script>
+<script src="supabase-init.js?v=20260524a35"></script>
 </head>
 <body>
 
@@ -4718,7 +4718,15 @@ async function transitionAccount(eventType, r, params) {
   if (upd.error) {
     return { ok:false, error:upd.error.message, newRow:null };
   }
-  var newRow = upd.data || Object.assign({}, r, updatePayload);
+  // Rule #51: update().maybeSingle() returns data:null on RLS denial or
+  // WHERE-no-match. Falling through to write audit events would corrupt
+  // the immutable subscription_events log AND mislead Phase X8 reports
+  // (MRR/conversion math) into showing transitions that never actually
+  // happened in the DB. Abort with an explicit error instead.
+  if (!upd.data) {
+    return { ok:false, error:'no_row_updated (RLS or WHERE mismatch)', newRow:null };
+  }
+  var newRow = upd.data;
 
   // ---- 4. Sync auth.users (best-effort; DB update is authoritative) ----
   if (newUserId && authAction !== 'noop') {

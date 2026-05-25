@@ -535,7 +535,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a35"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -1345,6 +1345,10 @@ async function editLabOrder(id) {
   openModal('labOrderModal');
 }
 
+// Phase post-X10 B1 fix: module-level in-flight flag prevents double-
+// submit on "حفظ" in the lab order modal.
+var _saveLabOrderInFlight = false;
+
 async function saveLabOrder() {
   var id = document.getElementById('labOrderId').value;
   // Phase 4.1: defense-in-depth — block CREATING new lab orders if doctor inactive.
@@ -1390,102 +1394,109 @@ async function saveLabOrder() {
     }
   }
 
-  var payload = {
-    doctor_id:      currentUser.id,
-    patient_id:     patientId,
-    appointment_id: apptId,
-    tooth_num:      toothRaw ? parseInt(toothRaw, 10) : null,
-    treatment_key:  workKey,
-    lab_id:         labId,
-    lab_name:       labName,
-    work_type:      workName,
-    shade:          shade || null,
-    cost:           cost,
-    notes:          notes || null,
-    date_sent:      dateSent,
-    date_due:       dateDue || null
-  };
+  // Critical section guard (after all validation)
+  if (_saveLabOrderInFlight) return;
+  _saveLabOrderInFlight = true;
+  try {
+    var payload = {
+      doctor_id:      currentUser.id,
+      patient_id:     patientId,
+      appointment_id: apptId,
+      tooth_num:      toothRaw ? parseInt(toothRaw, 10) : null,
+      treatment_key:  workKey,
+      lab_id:         labId,
+      lab_name:       labName,
+      work_type:      workName,
+      shade:          shade || null,
+      cost:           cost,
+      notes:          notes || null,
+      date_sent:      dateSent,
+      date_due:       dateDue || null
+    };
 
-  // Helper: detect "column doesn't exist" style errors from PostgREST/Postgres so we can
-  // gracefully fall back to a payload without appointment_id (pre-Migration-4 schema).
-  // Known signals:
-  //   - Postgres error code 42703 (undefined_column)
-  //   - PostgREST code PGRST204 (column not found in schema cache)
-  //   - Message text mentioning appointment_id + (column | schema cache | does not exist | not found)
-  function isMissingApptColumn(err) {
-    if (!err) return false;
-    if (err.code === '42703' || err.code === 'PGRST204') {
-      // Only treat as our problem if the message points at appointment_id (avoid masking other missing columns).
-      var msg = (err.message || '').toLowerCase();
-      return msg.indexOf('appointment_id') !== -1;
+    // Helper: detect "column doesn't exist" style errors from PostgREST/Postgres so we can
+    // gracefully fall back to a payload without appointment_id (pre-Migration-4 schema).
+    // Known signals:
+    //   - Postgres error code 42703 (undefined_column)
+    //   - PostgREST code PGRST204 (column not found in schema cache)
+    //   - Message text mentioning appointment_id + (column | schema cache | does not exist | not found)
+    function isMissingApptColumn(err) {
+      if (!err) return false;
+      if (err.code === '42703' || err.code === 'PGRST204') {
+        // Only treat as our problem if the message points at appointment_id (avoid masking other missing columns).
+        var msg = (err.message || '').toLowerCase();
+        return msg.indexOf('appointment_id') !== -1;
+      }
+      var m = (err.message || '').toLowerCase();
+      if (m.indexOf('appointment_id') === -1) return false;
+      return m.indexOf('column') !== -1
+          || m.indexOf('schema cache') !== -1
+          || m.indexOf('does not exist') !== -1
+          || m.indexOf('not found') !== -1;
     }
-    var m = (err.message || '').toLowerCase();
-    if (m.indexOf('appointment_id') === -1) return false;
-    return m.indexOf('column') !== -1
-        || m.indexOf('schema cache') !== -1
-        || m.indexOf('does not exist') !== -1
-        || m.indexOf('not found') !== -1;
+
+    if (id) {
+      var origLO = allOrders.find(function(x){ return x.id === id; });
+      var res = await window.sb.from('lab_orders')
+        .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+      if (res.error && isMissingApptColumn(res.error)) {
+        console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+        var legacyPayload = Object.assign({}, payload);
+        delete legacyPayload.appointment_id;
+        res = await window.sb.from('lab_orders')
+          .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+      }
+      if (res.error) { showToast('⚠️ فشل الحفظ: ' + res.error.message); return; }
+      if (res.data) {
+        var idx = allOrders.findIndex(function(x){ return x.id === id; });
+        if (idx !== -1) allOrders[idx] = res.data;
+      }
+      // Phase 5: audit log
+      if (window.logAudit) {
+        var pname = getPatientName(payload.patient_id);
+        window.logAudit('lab.edit', {
+          entityId: id,
+          patientId: payload.patient_id,
+          patientName: pname,
+          description: 'تعديل طلب مخبر للمريض: ' + pname,
+          oldValue: origLO ? { lab_id: origLO.lab_id, work_type: origLO.work_type, status: origLO.status } : null,
+          newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: payload.status }
+        });
+      }
+      showToast('✅ تم تحديث الطلب');
+    } else {
+      payload.status = 'sent';
+      var res2 = await window.sb.from('lab_orders')
+        .insert(payload).select().single();
+      if (res2.error && isMissingApptColumn(res2.error)) {
+        console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+        var legacyPayload2 = Object.assign({}, payload);
+        delete legacyPayload2.appointment_id;
+        res2 = await window.sb.from('lab_orders')
+          .insert(legacyPayload2).select().single();
+      }
+      if (res2.error) { showToast('⚠️ فشل الحفظ: ' + res2.error.message); return; }
+      if (res2.data) allOrders.unshift(res2.data);
+      // Phase 5: audit log
+      if (window.logAudit && res2.data) {
+        var pname2 = getPatientName(payload.patient_id);
+        window.logAudit('lab.create', {
+          entityId: res2.data.id,
+          patientId: payload.patient_id,
+          patientName: pname2,
+          description: 'إرسال طلب مخبر للمريض: ' + pname2 + ' — ' + (payload.work_type || ''),
+          newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: 'sent' }
+        });
+      }
+      showToast('✅ تم إرسال الطلب للمخبر');
+    }
+
+    renderStats();
+    renderTable();
+    closeModal('labOrderModal');
+  } finally {
+    _saveLabOrderInFlight = false;
   }
-
-  if (id) {
-    var origLO = allOrders.find(function(x){ return x.id === id; });
-    var res = await window.sb.from('lab_orders')
-      .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
-    if (res.error && isMissingApptColumn(res.error)) {
-      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
-      var legacyPayload = Object.assign({}, payload);
-      delete legacyPayload.appointment_id;
-      res = await window.sb.from('lab_orders')
-        .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
-    }
-    if (res.error) { showToast('⚠️ فشل الحفظ: ' + res.error.message); return; }
-    if (res.data) {
-      var idx = allOrders.findIndex(function(x){ return x.id === id; });
-      if (idx !== -1) allOrders[idx] = res.data;
-    }
-    // Phase 5: audit log
-    if (window.logAudit) {
-      var pname = getPatientName(payload.patient_id);
-      window.logAudit('lab.edit', {
-        entityId: id,
-        patientId: payload.patient_id,
-        patientName: pname,
-        description: 'تعديل طلب مخبر للمريض: ' + pname,
-        oldValue: origLO ? { lab_id: origLO.lab_id, work_type: origLO.work_type, status: origLO.status } : null,
-        newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: payload.status }
-      });
-    }
-    showToast('✅ تم تحديث الطلب');
-  } else {
-    payload.status = 'sent';
-    var res2 = await window.sb.from('lab_orders')
-      .insert(payload).select().single();
-    if (res2.error && isMissingApptColumn(res2.error)) {
-      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
-      var legacyPayload2 = Object.assign({}, payload);
-      delete legacyPayload2.appointment_id;
-      res2 = await window.sb.from('lab_orders')
-        .insert(legacyPayload2).select().single();
-    }
-    if (res2.error) { showToast('⚠️ فشل الحفظ: ' + res2.error.message); return; }
-    if (res2.data) allOrders.unshift(res2.data);
-    // Phase 5: audit log
-    if (window.logAudit && res2.data) {
-      var pname2 = getPatientName(payload.patient_id);
-      window.logAudit('lab.create', {
-        entityId: res2.data.id,
-        patientId: payload.patient_id,
-        patientName: pname2,
-        description: 'إرسال طلب مخبر للمريض: ' + pname2 + ' — ' + (payload.work_type || ''),
-        newValue: { lab_id: payload.lab_id, work_type: payload.work_type, status: 'sent' }
-      });
-    }
-    showToast('✅ تم إرسال الطلب للمخبر');
-  }
-
-  renderStats();
-  renderTable();
-  closeModal('labOrderModal');
 }
 
 async function advanceLabOrder(id) {

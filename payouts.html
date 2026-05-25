@@ -423,7 +423,7 @@ body {
 }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a35"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -1660,6 +1660,11 @@ function onAmountInput() {
 // ═══════════════════════════════════════════════════════════════════════════
 // SAVE / DELETE
 // ═══════════════════════════════════════════════════════════════════════════
+// Phase post-X10 B1 fix: module-level in-flight flag prevents double-
+// submit on "💾 حفظ". Without this, an insert path could create
+// duplicate provider_payouts rows (and double audit-log entries).
+var _savePayoutInFlight = false;
+
 async function savePayout() {
   var editingId = $('editingId').value;
   var provId    = $('fldProvider').value;
@@ -1672,182 +1677,189 @@ async function savePayout() {
   var share     = parseFloat($('fldShare').value) || 0;
   var bonus     = parseFloat($('fldBonus').value) || 0;
 
-  // Validation
+  // Validation (runs BEFORE in-flight flag so failures don't lock the form)
   if (!provId)              { showToast('⚠️ اختر الموظف', true); return; }
   if (!from || !to)         { showToast('⚠️ حدد فترة الدفعة', true); return; }
   if (from > to)            { showToast('⚠️ تاريخ البداية بعد النهاية', true); return; }
   if (!amount || amount<=0) { showToast('⚠️ أدخل مبلغاً صحيحاً', true); return; }
 
-  // Build payload. paid_at: combine date with current time (local) AND
-  // include the timezone offset so Postgres doesn't interpret as UTC and
-  // shift the displayed day for users in non-UTC zones (Syria = UTC+3).
-  // Without an offset, "2026-05-21T14:30:00" would be stored as UTC and
-  // could display as the wrong day for late-night entries.
-  var paidAtIso = null;
-  if (paidAt) {
-    var now = new Date();
-    var hh = String(now.getHours()).padStart(2, '0');
-    var mm = String(now.getMinutes()).padStart(2, '0');
-    var ss = String(now.getSeconds()).padStart(2, '0');
-    // Compute local timezone offset in ±HH:MM format
-    var tzMin = -now.getTimezoneOffset();          // positive east of UTC
-    var tzSign = tzMin >= 0 ? '+' : '-';
-    var tzAbs = Math.abs(tzMin);
-    var tzH = String(Math.floor(tzAbs / 60)).padStart(2, '0');
-    var tzM = String(tzAbs % 60).padStart(2, '0');
-    paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss + tzSign + tzH + ':' + tzM;
-  }
+  // Critical section guard
+  if (_savePayoutInFlight) return;
+  _savePayoutInFlight = true;
+  try {
+    // Build payload. paid_at: combine date with current time (local) AND
+    // include the timezone offset so Postgres doesn't interpret as UTC and
+    // shift the displayed day for users in non-UTC zones (Syria = UTC+3).
+    // Without an offset, "2026-05-21T14:30:00" would be stored as UTC and
+    // could display as the wrong day for late-night entries.
+    var paidAtIso = null;
+    if (paidAt) {
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2, '0');
+      var mm = String(now.getMinutes()).padStart(2, '0');
+      var ss = String(now.getSeconds()).padStart(2, '0');
+      // Compute local timezone offset in ±HH:MM format
+      var tzMin = -now.getTimezoneOffset();          // positive east of UTC
+      var tzSign = tzMin >= 0 ? '+' : '-';
+      var tzAbs = Math.abs(tzMin);
+      var tzH = String(Math.floor(tzAbs / 60)).padStart(2, '0');
+      var tzM = String(tzAbs % 60).padStart(2, '0');
+      paidAtIso = paidAt + 'T' + hh + ':' + mm + ':' + ss + tzSign + tzH + ':' + tzM;
+    }
 
-  // ── Phase 7.2: Resolve the selected entry → provider_id OR employee_id ──
-  //
-  // After Migration 18, provider_payouts has BOTH columns:
-  //   • provider_id (nullable, FK clinic_doctors) — for clinical staff
-  //   • employee_id (nullable, FK clinic_employees) — for non-clinical staff
-  // CHECK constraint payouts_has_target ensures at least one is set.
-  //
-  // The unified loadDoctors() builds entries with:
-  //   • _hasDoctorLink=true → clinical → save via provider_id = doctorId
-  //   • _hasDoctorLink=false → non-clinical → save via employee_id (no late
-  //     bootstrap, no clinic_doctors row pollution)
-  // Orphan legacy clinic_doctors rows (no employee link) also use provider_id.
-  var selectedEntry = doctors.find(function(d){ return d.id === provId; });
-  if (!selectedEntry) { showToast('⚠️ الموظف غير موجود', true); return; }
+    // ── Phase 7.2: Resolve the selected entry → provider_id OR employee_id ──
+    //
+    // After Migration 18, provider_payouts has BOTH columns:
+    //   • provider_id (nullable, FK clinic_doctors) — for clinical staff
+    //   • employee_id (nullable, FK clinic_employees) — for non-clinical staff
+    // CHECK constraint payouts_has_target ensures at least one is set.
+    //
+    // The unified loadDoctors() builds entries with:
+    //   • _hasDoctorLink=true → clinical → save via provider_id = doctorId
+    //   • _hasDoctorLink=false → non-clinical → save via employee_id (no late
+    //     bootstrap, no clinic_doctors row pollution)
+    // Orphan legacy clinic_doctors rows (no employee link) also use provider_id.
+    var selectedEntry = doctors.find(function(d){ return d.id === provId; });
+    if (!selectedEntry) { showToast('⚠️ الموظف غير موجود', true); return; }
 
-  var resolvedProviderId = selectedEntry._hasDoctorLink ? selectedEntry.doctorId : null;
-  var resolvedEmployeeId = (!selectedEntry._hasDoctorLink && selectedEntry.employeeId)
-                           ? selectedEntry.employeeId
-                           : null;
+    var resolvedProviderId = selectedEntry._hasDoctorLink ? selectedEntry.doctorId : null;
+    var resolvedEmployeeId = (!selectedEntry._hasDoctorLink && selectedEntry.employeeId)
+                             ? selectedEntry.employeeId
+                             : null;
 
-  // Sanity: at least one must be set (matches the DB CHECK constraint)
-  if (!resolvedProviderId && !resolvedEmployeeId) {
-    showToast('⚠️ تعذّر تحديد هوية الموظف للدفعة', true);
-    console.error('[payouts] save aborted: selectedEntry has neither doctorId nor employeeId', selectedEntry);
-    return;
-  }
-
-  var payload = {
-    owner_id:     currentUser.id,
-    provider_id:  resolvedProviderId,
-    employee_id:  resolvedEmployeeId,
-    period_start: from,
-    period_end:   to,
-    paid_at:      paidAtIso,  // null → DB default now()
-    amount:       Math.round(amount),
-    notes:        notes || null,
-    payment_method: modalMethod || null,
-    breakdown_salary: Math.round(salary) || 0,
-    breakdown_share:  Math.round(share)  || 0,
-    breakdown_bonus:  Math.round(bonus)  || 0
-  };
-
-  // Remove null paid_at so the DB default kicks in
-  if (!payload.paid_at) delete payload.paid_at;
-
-  var res;
-  if (editingId) {
-    res = await window.sb.from('provider_payouts')
-      .update(payload).eq('id', editingId).select().single();
-  } else {
-    res = await window.sb.from('provider_payouts')
-      .insert(payload).select().single();
-  }
-
-  // Pre-Migration-18 fallback: if INSERT fails because employee_id column
-  // doesn't exist, retry without it. This only matters for non-clinical staff;
-  // for clinical staff (provider_id set, employee_id null), the insert would
-  // succeed anyway because PostgREST drops null-valued columns from the body.
-  if (res.error && /42703|employee_id/i.test(
-      (res.error.message || '') + ' ' + (res.error.code || ''))) {
-    if (resolvedEmployeeId && !resolvedProviderId) {
-      // Non-clinical save on unmigrated DB — can't save without Migration 18
-      showToast('⚠️ شغّل Migration 18 في Supabase لحفظ دفعات الموظفين غير-السريريين', true);
+    // Sanity: at least one must be set (matches the DB CHECK constraint)
+    if (!resolvedProviderId && !resolvedEmployeeId) {
+      showToast('⚠️ تعذّر تحديد هوية الموظف للدفعة', true);
+      console.error('[payouts] save aborted: selectedEntry has neither doctorId nor employeeId', selectedEntry);
       return;
     }
-    // Clinical save: strip employee_id and retry
-    var noEmp = Object.assign({}, payload);
-    delete noEmp.employee_id;
-    if (editingId) {
-      res = await window.sb.from('provider_payouts')
-        .update(noEmp).eq('id', editingId).select().single();
-    } else {
-      res = await window.sb.from('provider_payouts')
-        .insert(noEmp).select().single();
-    }
-  }
 
-  // Pre-Migration-17 fallback: strip new columns and retry
-  if (res.error && /42703|payment_method|breakdown_/i.test(
-      (res.error.message || '') + ' ' + (res.error.code || ''))) {
-    var legacy = {
-      owner_id:     payload.owner_id,
-      provider_id:  payload.provider_id,
-      period_start: payload.period_start,
-      period_end:   payload.period_end,
-      amount:       payload.amount,
-      notes:        payload.notes
+    var payload = {
+      owner_id:     currentUser.id,
+      provider_id:  resolvedProviderId,
+      employee_id:  resolvedEmployeeId,
+      period_start: from,
+      period_end:   to,
+      paid_at:      paidAtIso,  // null → DB default now()
+      amount:       Math.round(amount),
+      notes:        notes || null,
+      payment_method: modalMethod || null,
+      breakdown_salary: Math.round(salary) || 0,
+      breakdown_share:  Math.round(share)  || 0,
+      breakdown_bonus:  Math.round(bonus)  || 0
     };
-    if (payload.paid_at) legacy.paid_at = payload.paid_at;
+
+    // Remove null paid_at so the DB default kicks in
+    if (!payload.paid_at) delete payload.paid_at;
+
+    var res;
     if (editingId) {
       res = await window.sb.from('provider_payouts')
-        .update(legacy).eq('id', editingId).select().single();
+        .update(payload).eq('id', editingId).select().single();
     } else {
       res = await window.sb.from('provider_payouts')
-        .insert(legacy).select().single();
+        .insert(payload).select().single();
     }
-    if (!res.error) {
-      showToast('⚠️ شُغّل Migration 17 لحفظ الطريقة والتفصيل', true);
-    }
-  }
 
-  if (res.error) {
-    if (isMigrationMissing(res.error)) {
-      showToast('⚠️ شغّل Migration 17 في Supabase أولاً', true);
+    // Pre-Migration-18 fallback: if INSERT fails because employee_id column
+    // doesn't exist, retry without it. This only matters for non-clinical staff;
+    // for clinical staff (provider_id set, employee_id null), the insert would
+    // succeed anyway because PostgREST drops null-valued columns from the body.
+    if (res.error && /42703|employee_id/i.test(
+        (res.error.message || '') + ' ' + (res.error.code || ''))) {
+      if (resolvedEmployeeId && !resolvedProviderId) {
+        // Non-clinical save on unmigrated DB — can't save without Migration 18
+        showToast('⚠️ شغّل Migration 18 في Supabase لحفظ دفعات الموظفين غير-السريريين', true);
+        return;
+      }
+      // Clinical save: strip employee_id and retry
+      var noEmp = Object.assign({}, payload);
+      delete noEmp.employee_id;
+      if (editingId) {
+        res = await window.sb.from('provider_payouts')
+          .update(noEmp).eq('id', editingId).select().single();
+      } else {
+        res = await window.sb.from('provider_payouts')
+          .insert(noEmp).select().single();
+      }
+    }
+
+    // Pre-Migration-17 fallback: strip new columns and retry
+    if (res.error && /42703|payment_method|breakdown_/i.test(
+        (res.error.message || '') + ' ' + (res.error.code || ''))) {
+      var legacy = {
+        owner_id:     payload.owner_id,
+        provider_id:  payload.provider_id,
+        period_start: payload.period_start,
+        period_end:   payload.period_end,
+        amount:       payload.amount,
+        notes:        payload.notes
+      };
+      if (payload.paid_at) legacy.paid_at = payload.paid_at;
+      if (editingId) {
+        res = await window.sb.from('provider_payouts')
+          .update(legacy).eq('id', editingId).select().single();
+      } else {
+        res = await window.sb.from('provider_payouts')
+          .insert(legacy).select().single();
+      }
+      if (!res.error) {
+        showToast('⚠️ شُغّل Migration 17 لحفظ الطريقة والتفصيل', true);
+      }
+    }
+
+    if (res.error) {
+      if (isMigrationMissing(res.error)) {
+        showToast('⚠️ شغّل Migration 17 في Supabase أولاً', true);
+      } else {
+        showToast('⚠️ فشل الحفظ: ' + res.error.message, true);
+      }
+      return;
+    }
+
+    // Audit log (fire-and-forget; قاعدة #11 single source of truth for payouts)
+    try {
+      if (window.logAudit) {
+        // selectedEntry is the unified employee/doctor record (set above).
+        // For employees without doctor link, resolvedProviderId is null,
+        // but the name is still in selectedEntry.name.
+        var docName = (selectedEntry && selectedEntry.name) || '—';
+        var actionType = editingId ? 'payout.edit' : 'payout.create';
+        var description = (editingId ? 'تعديل دفعة لـ ' : 'دفعة لـ ') + docName
+                        + ' (' + fmtSY(payload.amount) + ')';
+        window.logAudit(actionType, {
+          entity_type: 'payout',
+          entity_id: res.data ? res.data.id : editingId,
+          description: description,
+          new_value: {
+            provider_id: resolvedProviderId,    // matches DB (may be null)
+            provider_name: docName,
+            employee_id: selectedEntry ? selectedEntry.employeeId : null,
+            period_start: from,
+            period_end: to,
+            amount: payload.amount,
+            payment_method: payload.payment_method
+          }
+        });
+      }
+    } catch (e) { console.warn('audit log failed:', e); }
+
+    // Update local state + re-render
+    if (editingId) {
+      var idx = payouts.findIndex(function(p){ return p.id === editingId; });
+      if (idx >= 0 && res.data) payouts[idx] = res.data;
     } else {
-      showToast('⚠️ فشل الحفظ: ' + res.error.message, true);
+      if (res.data) payouts.unshift(res.data);
     }
-    return;
+
+    closeModal();
+    renderEmployeeFilters();
+    renderStats();
+    renderPayouts();
+    showToast(editingId ? '✅ تم تحديث الدفعة' : '✅ تم تسجيل الدفعة');
+  } finally {
+    _savePayoutInFlight = false;
   }
-
-  // Audit log (fire-and-forget; قاعدة #11 single source of truth for payouts)
-  try {
-    if (window.logAudit) {
-      // selectedEntry is the unified employee/doctor record (set above).
-      // For employees without doctor link, resolvedProviderId is null,
-      // but the name is still in selectedEntry.name.
-      var docName = (selectedEntry && selectedEntry.name) || '—';
-      var actionType = editingId ? 'payout.edit' : 'payout.create';
-      var description = (editingId ? 'تعديل دفعة لـ ' : 'دفعة لـ ') + docName
-                      + ' (' + fmtSY(payload.amount) + ')';
-      window.logAudit(actionType, {
-        entity_type: 'payout',
-        entity_id: res.data ? res.data.id : editingId,
-        description: description,
-        new_value: {
-          provider_id: resolvedProviderId,    // matches DB (may be null)
-          provider_name: docName,
-          employee_id: selectedEntry ? selectedEntry.employeeId : null,
-          period_start: from,
-          period_end: to,
-          amount: payload.amount,
-          payment_method: payload.payment_method
-        }
-      });
-    }
-  } catch (e) { console.warn('audit log failed:', e); }
-
-  // Update local state + re-render
-  if (editingId) {
-    var idx = payouts.findIndex(function(p){ return p.id === editingId; });
-    if (idx >= 0 && res.data) payouts[idx] = res.data;
-  } else {
-    if (res.data) payouts.unshift(res.data);
-  }
-
-  closeModal();
-  renderEmployeeFilters();
-  renderStats();
-  renderPayouts();
-  showToast(editingId ? '✅ تم تحديث الدفعة' : '✅ تم تسجيل الدفعة');
 }
 
 async function deleteCurrent() {

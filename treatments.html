@@ -13,7 +13,7 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a35"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -1265,6 +1265,12 @@ async function resetToDefaults() {
   showToast('↺ تم استعادة الافتراضي');
 }
 
+// Phase post-X10 B1 fix: module-level in-flight flag prevents double-
+// submit when user double-clicks "حفظ" in the treatment modal. Without
+// this, a duplicate treatments row (with the same custom_<timestamp> key)
+// could be inserted, and a duplicate price-history row could be written.
+var _saveTreatmentInFlight = false;
+
 async function saveTreatment() {
   var name  = document.getElementById('tName').value.trim();
   var price = parseFloat(document.getElementById('tPrice').value);
@@ -1279,71 +1285,78 @@ async function saveTreatment() {
   if (isNaN(price)||price<0) { showToast('⚠️ السعر غير صحيح'); return; }
   if (laymanName.length > 100) { showToast('⚠️ الاسم المبسّط طويل جداً (الحد 100 حرف)'); return; }
 
-  if (editingId) {
-    // Log price change to history (if price actually changed)
-    var existing = treatments.find(function(x){ return x.id === editingId; });
-    if (existing && Number(existing.price) !== Number(price)) {
-      try {
-        await window.sb.from('treatment_price_history').insert({
-          owner_id: currentDoctor.id,
-          treatment_id: editingId,
-          old_price: existing.price,
-          new_price: price,
-          doctor_id_override: null,  // null = global price change
-          changed_by: currentDoctor.id,
-          changed_at: new Date().toISOString()
-        });
-      } catch(e) { /* history table may not exist yet — silently ignore */ }
-    }
-    // UPDATE existing
-    var updatePayload = { name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, layman_name: laymanName || null, updated_at: new Date().toISOString() };
-    var updRes = await window.sb
-      .from('treatments')
-      .update(updatePayload)
-      .eq('id', editingId);
-    if (updRes.error && _isLaymanColMissing(updRes.error)) {
-      // Migration 7.1 not yet run — retry without layman_name
-      delete updatePayload.layman_name;
-      updRes = await window.sb
+  // Critical section guard (after validation)
+  if (_saveTreatmentInFlight) return;
+  _saveTreatmentInFlight = true;
+  try {
+    if (editingId) {
+      // Log price change to history (if price actually changed)
+      var existing = treatments.find(function(x){ return x.id === editingId; });
+      if (existing && Number(existing.price) !== Number(price)) {
+        try {
+          await window.sb.from('treatment_price_history').insert({
+            owner_id: currentDoctor.id,
+            treatment_id: editingId,
+            old_price: existing.price,
+            new_price: price,
+            doctor_id_override: null,  // null = global price change
+            changed_by: currentDoctor.id,
+            changed_at: new Date().toISOString()
+          });
+        } catch(e) { /* history table may not exist yet — silently ignore */ }
+      }
+      // UPDATE existing
+      var updatePayload = { name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, layman_name: laymanName || null, updated_at: new Date().toISOString() };
+      var updRes = await window.sb
         .from('treatments')
         .update(updatePayload)
         .eq('id', editingId);
-      if (!updRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
-    }
-    if (updRes.error) { showToast('⚠️ ' + updRes.error.message); return; }
-  } else {
-    // INSERT new
-    const key = 'custom_' + Date.now();
-    const maxOrder = treatments.length > 0 ? Math.max.apply(null, treatments.map(t=>t.sort_order||0)) : 0;
-    var insertPayload = {
-      doctor_id: currentDoctor.id,
-      treatment_key: key,
-      name: name, price: price, label: label,
-      fill: pickedFill, stroke: pickedStroke,
-      needs_lab: needsLab,
-      target_part: pickedTarget,
-      category: category,
-      default_note: defaultNote,
-      layman_name: laymanName || null,
-      builtin: false,
-      sort_order: maxOrder + 1
-    };
-    var insRes = await window.sb
-      .from('treatments')
-      .insert(insertPayload);
-    if (insRes.error && _isLaymanColMissing(insRes.error)) {
-      // Migration 7.1 not yet run — retry without layman_name
-      delete insertPayload.layman_name;
-      insRes = await window.sb
+      if (updRes.error && _isLaymanColMissing(updRes.error)) {
+        // Migration 7.1 not yet run — retry without layman_name
+        delete updatePayload.layman_name;
+        updRes = await window.sb
+          .from('treatments')
+          .update(updatePayload)
+          .eq('id', editingId);
+        if (!updRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
+      }
+      if (updRes.error) { showToast('⚠️ ' + updRes.error.message); return; }
+    } else {
+      // INSERT new
+      const key = 'custom_' + Date.now();
+      const maxOrder = treatments.length > 0 ? Math.max.apply(null, treatments.map(t=>t.sort_order||0)) : 0;
+      var insertPayload = {
+        doctor_id: currentDoctor.id,
+        treatment_key: key,
+        name: name, price: price, label: label,
+        fill: pickedFill, stroke: pickedStroke,
+        needs_lab: needsLab,
+        target_part: pickedTarget,
+        category: category,
+        default_note: defaultNote,
+        layman_name: laymanName || null,
+        builtin: false,
+        sort_order: maxOrder + 1
+      };
+      var insRes = await window.sb
         .from('treatments')
         .insert(insertPayload);
-      if (!insRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
+      if (insRes.error && _isLaymanColMissing(insRes.error)) {
+        // Migration 7.1 not yet run — retry without layman_name
+        delete insertPayload.layman_name;
+        insRes = await window.sb
+          .from('treatments')
+          .insert(insertPayload);
+        if (!insRes.error) showToast('⚠️ الاسم المبسّط لم يُحفظ — يلزم تشغيل Migration 7.1');
+      }
+      if (insRes.error) { showToast('⚠️ ' + insRes.error.message); return; }
     }
-    if (insRes.error) { showToast('⚠️ ' + insRes.error.message); return; }
+    closeModal();
+    await loadTreatments();
+    showToast(editingId ? '✅ تم التعديل' : '✅ تم إضافة العلاج');
+  } finally {
+    _saveTreatmentInFlight = false;
   }
-  closeModal();
-  await loadTreatments();
-  showToast(editingId ? '✅ تم التعديل' : '✅ تم إضافة العلاج');
 }
 
 // Detect "layman_name column doesn't exist" error (graceful fallback for pre-Migration 7.1 schema)

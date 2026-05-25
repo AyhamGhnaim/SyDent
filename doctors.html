@@ -20,7 +20,7 @@
 <title>أطباء العيادة — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a35"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -655,6 +655,11 @@ function closeModal() {
   document.getElementById('docModal').classList.remove('show');
 }
 
+// Phase post-X10 B1 fix: module-level in-flight flag prevents double-
+// submit when user double-clicks "💾 حفظ" before the await completes.
+// Without this, the insert path could create duplicate doctor rows.
+var _saveDocInFlight = false;
+
 async function saveDoctor() {
   var name = document.getElementById('dName').value.trim();
   if (!name) { showToast('⚠️ أدخل اسم الطبيب'); return; }
@@ -667,48 +672,56 @@ async function saveDoctor() {
   var hours = hoursRaw === '' ? null : parseFloat(hoursRaw);
   var notes = document.getElementById('dNotes').value.trim() || null;
 
-  if (editingId) {
-    var origDoc = doctors.find(function(x){ return x.id === editingId; });
-    var { error } = await window.sb.from('clinic_doctors')
-      .update({
+  // Critical section: guard against double-submit (after validation so a
+  // validation failure doesn't lock the form).
+  if (_saveDocInFlight) return;
+  _saveDocInFlight = true;
+  try {
+    if (editingId) {
+      var origDoc = doctors.find(function(x){ return x.id === editingId; });
+      var { error } = await window.sb.from('clinic_doctors')
+        .update({
+          name: name, role: role, phone: phone,
+          share_percent: share, weekly_hours: hours,
+          notes: notes, color: pickedColor,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingId);
+      if (error) { showToast('⚠️ فشل التعديل: ' + error.message); return; }
+      // Phase 5: audit log
+      if (window.logAudit) {
+        window.logAudit('doctor.edit', {
+          entityId: editingId,
+          description: 'تعديل بيانات الطبيب: ' + name,
+          oldValue: origDoc ? { name: origDoc.name, role: origDoc.role, share_percent: origDoc.share_percent } : null,
+          newValue: { name: name, role: role, share_percent: share }
+        });
+      }
+      showToast('✅ تم التعديل');
+    } else {
+      var { data: newDoc, error: insertErr } = await window.sb.from('clinic_doctors').insert({
+        owner_id: currentUser.id,
         name: name, role: role, phone: phone,
         share_percent: share, weekly_hours: hours,
         notes: notes, color: pickedColor,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', editingId);
-    if (error) { showToast('⚠️ فشل التعديل: ' + error.message); return; }
-    // Phase 5: audit log
-    if (window.logAudit) {
-      window.logAudit('doctor.edit', {
-        entityId: editingId,
-        description: 'تعديل بيانات الطبيب: ' + name,
-        oldValue: origDoc ? { name: origDoc.name, role: origDoc.role, share_percent: origDoc.share_percent } : null,
-        newValue: { name: name, role: role, share_percent: share }
-      });
+        is_owner: false, is_active: true
+      }).select().single();
+      if (insertErr) { showToast('⚠️ فشل الإضافة: ' + insertErr.message); return; }
+      // Phase 5: audit log
+      if (window.logAudit && newDoc) {
+        window.logAudit('doctor.create', {
+          entityId: newDoc.id,
+          description: 'إضافة طبيب جديد: ' + name,
+          newValue: { name: name, role: role, share_percent: share }
+        });
+      }
+      showToast('✅ تمت إضافة الطبيب');
     }
-    showToast('✅ تم التعديل');
-  } else {
-    var { data: newDoc, error: insertErr } = await window.sb.from('clinic_doctors').insert({
-      owner_id: currentUser.id,
-      name: name, role: role, phone: phone,
-      share_percent: share, weekly_hours: hours,
-      notes: notes, color: pickedColor,
-      is_owner: false, is_active: true
-    }).select().single();
-    if (insertErr) { showToast('⚠️ فشل الإضافة: ' + insertErr.message); return; }
-    // Phase 5: audit log
-    if (window.logAudit && newDoc) {
-      window.logAudit('doctor.create', {
-        entityId: newDoc.id,
-        description: 'إضافة طبيب جديد: ' + name,
-        newValue: { name: name, role: role, share_percent: share }
-      });
-    }
-    showToast('✅ تمت إضافة الطبيب');
+    closeModal();
+    await loadDoctors();
+  } finally {
+    _saveDocInFlight = false;
   }
-  closeModal();
-  await loadDoctors();
 }
 
 // ─────────────────────────────────────────────────────────────
