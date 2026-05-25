@@ -230,6 +230,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   .emp-grid{grid-template-columns:1fr;gap:12px;}
   .form-row{grid-template-columns:1fr;}
 }
+/* Password visibility toggle (👁 / 🙈) — RTL-safe via inset-inline-end */
+.pwd-wrap{position:relative;display:block;}
+.pwd-wrap > input{padding-inline-end:44px !important;}
+.pwd-toggle{
+  position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;border-radius:8px;
+  color:#8a9ab5;font-size:18px;line-height:1;cursor:pointer;padding:0;
+  transition:background .15s ease,color .15s ease;
+}
+.pwd-toggle:hover{background:rgba(255,255,255,0.06);color:#e6ecf5;}
+.pwd-toggle:focus-visible{outline:2px solid #2ee89e;outline-offset:2px;}
+.pwd-toggle:active{transform:translateY(-50%) scale(0.92);}
 </style>
 </head>
 <body>
@@ -2191,6 +2204,14 @@ document.addEventListener('DOMContentLoaded', function() {
   window._sbBtn = btn;
   var topbar = document.querySelector('.topbar');
   if (topbar) topbar.insertBefore(btn, topbar.firstChild);
+});
+</script>
+<script>
+// Phase: PIN Visibility Toggle (👁 / 🙈) — Tier 2 PIN inputs
+document.addEventListener('DOMContentLoaded', function(){
+  if (window.SyDentPwd && window.SyDentPwd.attachAll) {
+    window.SyDentPwd.attachAll(['ePin', 'ePinConfirm', 'oNewPin', 'oNewPinConfirm']);
+  }
 });
 </script>
 

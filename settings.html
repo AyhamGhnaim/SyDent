@@ -373,6 +373,19 @@ textarea::placeholder { color: var(--text2); }
   font-size: 10.5px; color: rgba(0,0,0,0.5);
   text-align: left; margin-top: 4px;
 }
+/* Password visibility toggle (👁 / 🙈) — RTL-safe via inset-inline-end */
+.pwd-wrap{position:relative;display:block;}
+.pwd-wrap > input{padding-inline-end:44px !important;}
+.pwd-toggle{
+  position:absolute;inset-inline-end:8px;top:50%;transform:translateY(-50%);
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;border-radius:8px;
+  color:#8a9ab5;font-size:18px;line-height:1;cursor:pointer;padding:0;
+  transition:background .15s ease,color .15s ease;
+}
+.pwd-toggle:hover{background:rgba(255,255,255,0.06);color:#e6ecf5;}
+.pwd-toggle:focus-visible{outline:2px solid #2ee89e;outline-offset:2px;}
+.pwd-toggle:active{transform:translateY(-50%) scale(0.92);}
 </style>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
@@ -2961,6 +2974,14 @@ document.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('touchmove',function(e){if(!active)return;if(window.scrollY>0){active=false;setState('hide');return;}cy=e.touches[0].clientY;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>4)setState('pull',pull);else setState('hide');},{passive:true});
   document.addEventListener('touchend',function(){if(!active)return;active=false;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>=THRESHOLD){setState('spin');setTimeout(function(){window.location.reload();},800);}else{setState('hide');}cy=0;});
 })();
+</script>
+<script>
+// Phase: Password Visibility Toggle (👁 / 🙈)
+document.addEventListener('DOMContentLoaded', function(){
+  if (window.SyDentPwd && window.SyDentPwd.attachAll) {
+    window.SyDentPwd.attachAll(['fPassNew', 'fPassConfirm', 'fDeletePass']);
+  }
+});
 </script>
 </body>
 </html>

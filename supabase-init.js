@@ -1968,6 +1968,107 @@
   };
 
 
+  // ───────────────────────────────────────────────────────────────
+  // Password Visibility Toggle (👁 / 🙈)
+  // ───────────────────────────────────────────────────────────────
+  // Industry pattern: Microsoft Edge + Stripe + GitHub.
+  //   • Auto-hide on blur (Edge pattern) — prevents accidental leak
+  //   • aria-pressed + dynamic aria-label (WCAG 4.1.2)
+  //   • Keyboard support (Enter / Space)
+  //   • Caret + value preservation across type swap
+  //   • RTL-safe positioning via inset-inline-end (logical property)
+  //   • Idempotent: re-calling attach() on the same input is a no-op
+  //
+  // Used by: auth.html (loginPass, regPass),
+  //          settings.html (fPassNew, fPassConfirm, fDeletePass),
+  //          employees.html (ePin, ePinConfirm, oNewPin, oNewPinConfirm)
+  function attachPwdToggle(inputId) {
+    try {
+      var input = document.getElementById(inputId);
+      if (!input) return false;
+      if (input.getAttribute('data-pwd-wired') === '1') return true; // idempotent
+      if (input.type !== 'password') return false; // safety guard
+
+      // Wrap the input in .pwd-wrap (if not already wrapped)
+      var parent = input.parentNode;
+      if (!parent) return false;
+      var wrap;
+      if (parent.classList && parent.classList.contains('pwd-wrap')) {
+        wrap = parent;
+      } else {
+        wrap = document.createElement('span');
+        wrap.className = 'pwd-wrap';
+        parent.insertBefore(wrap, input);
+        wrap.appendChild(input);
+      }
+
+      // Build the toggle button
+      var btn = document.createElement('button');
+      btn.type = 'button';                       // never submits the form
+      btn.className = 'pwd-toggle';
+      btn.tabIndex = 0;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', 'إظهار كلمة السر');
+      btn.setAttribute('aria-controls', inputId);
+      btn.textContent = '👁';
+      wrap.appendChild(btn);
+
+      function setRevealed(reveal) {
+        // Preserve caret position across the type swap
+        var pos = null, end = null;
+        try { pos = input.selectionStart; end = input.selectionEnd; } catch(_) {}
+        input.type = reveal ? 'text' : 'password';
+        btn.textContent = reveal ? '🙈' : '👁';
+        btn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+        btn.setAttribute('aria-label', reveal ? 'إخفاء كلمة السر' : 'إظهار كلمة السر');
+        // Restore caret (some browsers reset it on type change)
+        if (pos !== null) {
+          try { input.setSelectionRange(pos, end); } catch(_) {}
+        }
+      }
+
+      function toggle(e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        setRevealed(input.type === 'password');
+        // Keep focus on the input so typing continues naturally
+        try { input.focus(); } catch(_) {}
+      }
+
+      btn.addEventListener('click', toggle);
+
+      // Note: native <button> already handles Enter (keydown) and Space (keyup)
+      // by firing a click event, so no extra keydown handler is needed.
+
+      // Auto-hide on blur (Microsoft Edge security pattern).
+      // Use focusout on the wrap so moving focus between input and button
+      // does NOT count as leaving the field.
+      wrap.addEventListener('focusout', function(e){
+        var next = e.relatedTarget;
+        if (next && (next === input || next === btn || wrap.contains(next))) return;
+        if (input.type === 'text') setRevealed(false);
+      });
+
+      input.setAttribute('data-pwd-wired', '1');
+      return true;
+    } catch (err) {
+      console.warn('[pwd] attach failed for', inputId, err && err.message);
+      return false;
+    }
+  }
+
+  function attachAllPwdToggles(ids) {
+    if (!ids || !ids.length) return;
+    for (var i = 0; i < ids.length; i++) {
+      attachPwdToggle(ids[i]);
+    }
+  }
+
+  window.SyDentPwd = {
+    attach:    attachPwdToggle,
+    attachAll: attachAllPwdToggles
+  };
+
+
   // ── Public API ────────────────────────────────────────────────
   window.SyDentLock = {
     // state
