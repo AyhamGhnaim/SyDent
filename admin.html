@@ -1902,7 +1902,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a34"></script>
 </head>
 <body>
 
@@ -3866,7 +3866,11 @@ var tplEditorState = {
 };
 
 var TPL_MOCK_VARS = {
-  name:       'د. محمد العلي',
+  // name: post-stripDoctorHonorific value — what the template actually
+  // sees in the live render path. Showing 'د. محمد العلي' here would
+  // make the preview render "مرحباً د. د. محمد العلي،" for wa_welcome,
+  // misleading the admin into thinking the duplication still exists.
+  name:       'محمد العلي',
   days_left:  5,
   trial_end:  '٢٧ مايو ٢٠٢٦',
   plan_name:  'سنوي',
@@ -5489,6 +5493,26 @@ var FALLBACK_TEMPLATES = {
     'شكراً لاختيارك SyDent!'
 };
 
+// stripDoctorHonorific(name) — strips a leading Arabic 'د' / 'د.' honorific
+// (with whitespace) from a tenant name so templates like "مرحباً د. {name}"
+// don't render as "مرحباً د. د شذ المار،". Live tenant data shows names
+// already carry the honorific (verified: 'د شذ المار', 'د مجد شاكر').
+//
+// Regex /^د\s+|^د\.\s*/ requires:
+//   • 'د' + whitespace      (matches "د شذ المار")
+//   • 'د.' + optional space (matches "د. مجد شاكر" and "د.مجد")
+// This avoids false-positives on names that simply START with the letter
+// 'د' but are NOT honorifics: 'دلال', 'دانا', 'دعاء', 'دياب', etc.
+//
+// Empty / null / whitespace-only input → '' (callers decide fallback).
+//
+// Single source of truth — also used by c360AvatarInitial for the same
+// honorific-stripping concern.
+function stripDoctorHonorific(name) {
+  if (!name) return '';
+  return String(name).trim().replace(/^د\s+|^د\.\s*/, '');
+}
+
 // Cache populated by loadTplConfig() on init + invalidated after
 // saveTplEdits(). Keys are template codes, values are the body string.
 var NOTIFICATION_TEMPLATES_CACHE = null;
@@ -5548,7 +5572,7 @@ async function waLink(phone, name, email) {
   var num = normalizeWaPhone(phone);
   var emailVal = email || (num + '@sydent.com');
   var body = await renderTemplate('wa_welcome', {
-    name: name,
+    name: stripDoctorHonorific(name),
     login_url: 'https://sydent.app',
     email: emailVal
   });
@@ -5558,9 +5582,11 @@ async function waLink(phone, name, email) {
 // Trial-expiry reminder (Phase 7.6C-Step3 originally). Same async
 // upgrade pattern — was sync, now async, signature unchanged.
 //
-// Date formatting in Arabic-EG long form preserved verbatim. Name
-// already carries 'د'/'د.' honorific (verified live data) so the
-// template does NOT add another prefix — same as the original.
+// Name normalization: live data shows names carry the 'د'/'د.' honorific
+// inline (e.g., 'د شذ المار'). The default template body uses '{name}'
+// without an extra honorific prefix, but admins can edit the template to
+// add one — so we strip defensively at substitution time. Single source
+// of truth: stripDoctorHonorific().
 async function waReminderLink(phone, name, daysLeft, trialEndIso) {
   var num = normalizeWaPhone(phone);
   var dateStr;
@@ -5572,7 +5598,7 @@ async function waReminderLink(phone, name, daysLeft, trialEndIso) {
     dateStr = (trialEndIso || '').slice(0, 10);
   }
   var body = await renderTemplate('wa_reminder', {
-    name: name,
+    name: stripDoctorHonorific(name),
     days_left: daysLeft,
     trial_end: dateStr,
     plan_name: ''  // available but unused in default body
@@ -5625,7 +5651,7 @@ async function waWelcomeLink(phone, name, email) {
   var num = normalizeWaPhone(phone);
   var emailVal = email || (num + '@sydent.com');
   var body = await renderTemplate('wa_welcome', {
-    name: name,
+    name: stripDoctorHonorific(name),
     login_url: 'https://sydent.app',
     email: emailVal
   });
@@ -5650,7 +5676,7 @@ function openWaWelcome(phone, name, email, ev) {
 // nudge is just "we've paused your account, please reach out".
 async function waSuspendedLink(phone, name) {
   var num = normalizeWaPhone(phone);
-  var body = await renderTemplate('wa_suspended', { name: name });
+  var body = await renderTemplate('wa_suspended', { name: stripDoctorHonorific(name) });
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
@@ -5692,7 +5718,7 @@ async function waRenewedLink(phone, name, planName, trialEndIso, price) {
     priceStr = '—';
   }
   var body = await renderTemplate('wa_renewed', {
-    name: name,
+    name: stripDoctorHonorific(name),
     plan_name: planName || '',
     trial_end: dateStr,
     price: priceStr
@@ -7829,10 +7855,11 @@ function c360EscapeHtml(s) {
 }
 
 // First character for the avatar circle — strips honorifics and grabs
-// the first letter of the first word.
+// the first letter of the first word. Uses stripDoctorHonorific() so the
+// regex stays in one place (avoids false-positives on 'دلال', 'دانا', etc.).
 function c360AvatarInitial(name) {
   if (!name) return '?';
-  var s = String(name).trim().replace(/^د\.?\s*/i, '');
+  var s = stripDoctorHonorific(name);
   if (!s) return '?';
   var first = s.split(/\s+/)[0] || s;
   return first.charAt(0).toUpperCase();
