@@ -531,7 +531,7 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a36"></script>
 <script src="sidebar.js?v=20260524a04"></script>
 </head>
 <body>
@@ -545,15 +545,16 @@
     window.location.href = 'landing.html';
     return;
   }
-  // Fetch role from legacy doctors table (used to distinguish platform admin)
-  const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', session.user.id).maybeSingle();
+  // Phase F: switched from legacy doctors.role check to platform_admins helper.
+  // Routes platform admins to admin.html instead of rendering tenant UI for them.
+  const adminCheck = await window.SyDentAuth.isPlatformAdmin(session.user.id);
 
   // Platform admin — redirect to the platform control panel.
   // The admin user is not a tenant (no clinic_doctors / clinic_employees row),
   // so staying on index.html would render an empty 'Owner deleted' state with
   // a misleading 'account deactivated' banner (caused by per-tenant SyDentLock
   // checks finding no employee row). The admin belongs on admin.html.
-  if (roleData && roleData.role === 'admin') {
+  if (adminCheck.isAdmin) {
     window.location.replace('admin.html');
     return;
   }

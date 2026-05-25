@@ -13,7 +13,7 @@
 <title>SyDent — تسجيل الدخول</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a33"></script>
+<script src="supabase-init.js?v=20260524a36"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -186,8 +186,9 @@ body{
   }
   const user = await sbGetUser();
   if (user) {
-    const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', user.id).maybeSingle();
-    var dest = (roleData && roleData.role === 'admin') ? 'admin.html' : 'index.html';
+    // Phase F: switched from doctors.role check to platform_admins helper.
+    const adminCheck = await window.SyDentAuth.isPlatformAdmin(user.id);
+    var dest = adminCheck.isAdmin ? 'admin.html' : 'index.html';
     window.location.replace(dest);
   }
 })();
@@ -224,8 +225,9 @@ async function doLogin(e) {
     if (error) throw error;
 
     // Phase 7.6F: check admin role first (admins bypass the trial_request gate).
-    const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', data.user.id).maybeSingle();
-    var isAdmin = (roleData && roleData.role === 'admin');
+    // Phase F: switched from doctors.role check to platform_admins helper.
+    const adminCheck = await window.SyDentAuth.isPlatformAdmin(data.user.id);
+    var isAdmin = adminCheck.isAdmin;
 
     if (!isAdmin) {
       // Tenant path: check trial_request status before allowing in.

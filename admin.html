@@ -1902,7 +1902,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260524a35"></script>
+<script src="supabase-init.js?v=20260524a36"></script>
 </head>
 <body>
 
@@ -2543,7 +2543,7 @@ var activityExpanded = {};
 // self-lockout protection — UI layer; the action handlers also defend
 // against it). null until session resolves.
 var currentAdminUserId = null;
-// `adminUserIdsCache` is a Set of doctors.id values where role='admin'.
+// `adminUserIdsCache` is a Set of platform_admins.user_id values (Phase F).
 // Refreshed on every loadAndRender() so badges and button visibility
 // stay in sync with promote/demote actions. null until first load.
 var adminUserIdsCache = null;
@@ -3187,8 +3187,11 @@ window.addEventListener('DOMContentLoaded', async function() {
     window.location.replace('auth.html');
     return;
   }
-  const { data: roleData } = await window.sb.from('doctors').select('role').eq('id', session.user.id).maybeSingle();
-  if (!roleData || roleData.role !== 'admin') {
+  // Phase F: use SyDentAuth helper instead of direct doctors.role query.
+  // The helper reads from platform_admins (Migration 30) via the central
+  // window.SyDentAuth namespace defined in supabase-init.js.
+  var adminCheck = await window.SyDentAuth.isPlatformAdmin(session.user.id);
+  if (!adminCheck.isAdmin) {
     window.location.replace('index.html');
     return;
   }
@@ -4358,7 +4361,7 @@ async function saveTplEdits() {
     if (!upd.data) {
       alert('❌ لم يُحدَّث أي سطر — قد يكون قالب "' + tplCodeLabel(o.code) +
             '" غير موجود في DB (لم يُشغَّل seed)، أو الصلاحيات مرفوضة.\n\n' +
-            'تحقّق من تشغيل Migration 28.2 وأن دورك "admin" في الـ doctors table.');
+            'تحقّق من تشغيل Migration 28.2 وأن دورك "admin" في platform_admins.');
       return;
     }
 
@@ -5095,10 +5098,8 @@ async function suspendAccount(id, email) {
             'اطلب من admin آخر تنفيذ هذا الإجراء.');
       return;
     }
-    var { count: adminCount, error: cntErr } = await window.sb
-      .from('doctors')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'admin');
+    // Phase F: count via SyDentAuth helper (reads from platform_admins).
+    var { count: adminCount, error: cntErr } = await window.SyDentAuth.countPlatformAdmins();
     if (cntErr) {
       alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
       return;
@@ -5163,10 +5164,8 @@ async function deleteAccount(id, email) {
             'اطلب من admin آخر تنفيذ هذا الإجراء.');
       return;
     }
-    var { count: adminCount, error: cntErr } = await window.sb
-      .from('doctors')
-      .select('id', { count: 'exact', head: true })
-      .eq('role', 'admin');
+    // Phase F: count via SyDentAuth helper (reads from platform_admins).
+    var { count: adminCount, error: cntErr } = await window.SyDentAuth.countPlatformAdmins();
     if (cntErr) {
       alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
       return;
@@ -5263,14 +5262,16 @@ async function grantGrace(id) {
 // rather than crashing the page.
 async function fetchAdminUserIds() {
   if (!window.sb) { adminUserIdsCache = new Set(); return adminUserIdsCache; }
-  var { data, error } = await window.sb.from('doctors')
-    .select('id').eq('role', 'admin');
+  // Phase F: read from platform_admins instead of doctors.role='admin'.
+  // CRITICAL: the column is `user_id` (not `id` as in the legacy doctors table).
+  var { data, error } = await window.sb.from('platform_admins')
+    .select('user_id');
   if (error) {
-    console.warn('[Phase X1] fetchAdminUserIds failed:', error.message);
+    console.warn('[Phase F] fetchAdminUserIds failed:', error.message);
     adminUserIdsCache = new Set();
     return adminUserIdsCache;
   }
-  adminUserIdsCache = new Set((data || []).map(function(d){ return d.id; }));
+  adminUserIdsCache = new Set((data || []).map(function(d){ return d.user_id; }));
   return adminUserIdsCache;
 }
 
@@ -5305,10 +5306,9 @@ async function promoteToAdmin(reqId) {
     alert('⚠️ هذا الحساب admin بالفعل.');
     return;
   }
-  // Phase X1 hotfix: email is required for the UPSERT INSERT path
-  // (doctors.email is NOT NULL). The fix needs this column from
-  // trial_requests; bail out with a clear message if it's missing
-  // rather than producing the cryptic Postgres NULL violation.
+  // Phase F: r.email guard kept for data-integrity (used below in `name` fallback
+  // for the audit log + confirmation dialog). doctors.email NOT NULL constraint
+  // is no longer an issue since we write to platform_admins which has no email column.
   if (!r.email) {
     alert('⚠️ هذا الحساب بدون email في trial_requests — لا يمكن ترقيته.\n\n' +
           'حدّث الـ email من زر "✏️ تعديل" أولاً.');
@@ -5328,23 +5328,17 @@ async function promoteToAdmin(reqId) {
   );
   if (!ok) return;
 
-  // ---- 2. Mutate doctors.role ----
-  // UPSERT pattern: if the owner already has a doctors row (likely — owners
-  // have role=NULL by default), UPDATE; otherwise INSERT. The id IS the
-  // auth user_id by SyDent convention (see admin.html:821 comment).
-  //
-  // Phase X1 hotfix (live test 23 May 2026): doctors.email is NOT NULL.
-  // Legacy accounts (e.g. drayhamghnaim1) may have no doctors row at all,
-  // so the UPSERT falls into the INSERT path and would fail with "null
-  // value in column email" if we only sent {id, role}. We include the
-  // email from trial_requests (guarded above) so the INSERT succeeds.
-  // For the UPDATE path the email column is rewritten with the same
-  // value it already holds (both come from auth.users).
-  var { error: upErr } = await window.sb.from('doctors').upsert({
-    id: r.user_id,
-    email: r.email,
-    role: 'admin'
-  }, { onConflict: 'id' });
+  // ---- 2. Insert into platform_admins (Phase F) ----
+  // The user_id IS the auth user_id (and matches doctors.id by SyDent convention).
+  // granted_by records WHO performed the promotion (audit field). granted_at
+  // defaults to now() via the schema. ON CONFLICT DO NOTHING for idempotency
+  // — if somehow the row already exists (e.g. raced via parallel session),
+  // we treat that as success rather than throwing.
+  var { error: upErr } = await window.sb.from('platform_admins').upsert({
+    user_id: r.user_id,
+    granted_by: currentAdminUserId,
+    notes: 'Granted via admin.html UI'
+  }, { onConflict: 'user_id' });
 
   if (upErr) {
     alert('فشلت الترقية: ' + (upErr.message || 'خطأ غير معروف'));
@@ -5390,10 +5384,8 @@ async function demoteFromAdmin(reqId) {
   }
 
   // ---- 1. Last-admin guard (rule #39) ----
-  var { count: adminCount, error: cntErr } = await window.sb
-    .from('doctors')
-    .select('id', { count: 'exact', head: true })
-    .eq('role', 'admin');
+  // Phase F: count via SyDentAuth helper (reads from platform_admins).
+  var { count: adminCount, error: cntErr } = await window.SyDentAuth.countPlatformAdmins();
 
   if (cntErr) {
     alert('فشل التحقق من عدد الـ admins: ' + (cntErr.message || ''));
@@ -5418,12 +5410,15 @@ async function demoteFromAdmin(reqId) {
   );
   if (!ok) return;
 
-  // ---- 3. Mutate doctors.role → NULL ----
-  // We do NOT delete the row — owners need it for clinic_doctors linkage.
-  // Setting role=NULL strips admin privileges while preserving identity.
-  var { error: upErr } = await window.sb.from('doctors')
-    .update({ role: null })
-    .eq('id', r.user_id);
+  // ---- 3. Delete from platform_admins (Phase F) ----
+  // The row's only purpose is to mark this user as a platform admin;
+  // removal = no longer admin. Unlike the legacy doctors.role pattern,
+  // platform_admins has no other dependencies (FK CASCADE on auth.users
+  // handles user deletion). The user's tenant identity in `doctors` is
+  // completely untouched — they continue to own their clinic data.
+  var { error: upErr } = await window.sb.from('platform_admins')
+    .delete()
+    .eq('user_id', r.user_id);
 
   if (upErr) {
     alert('فشل الإنزال: ' + (upErr.message || 'خطأ غير معروف'));

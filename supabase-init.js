@@ -42,6 +42,56 @@
   };
 
   // ─────────────────────────────────────────────────────────
+  // Phase F — SyDentAuth namespace (platform admin checks)
+  // ─────────────────────────────────────────────────────────
+  // Single source of truth for "is this user a platform admin?".
+  // Reads from the platform_admins table (Phase F Migration 30) instead
+  // of the legacy doctors.role='admin' flag.
+  //
+  // Why a helper instead of inline queries:
+  //   • 12 sites used to inline the same pattern — moved them all here
+  //   • Easier to audit / change auth-source in future
+  //   • Returns a consistent { isAdmin, error } shape for caller logic
+  //
+  // Fail-closed semantics: any DB error → isAdmin=false. The caller treats
+  // this as "not an admin" rather than blocking — matches pre-Phase-F
+  // behavior where errors fell through to non-admin code paths.
+  window.SyDentAuth = window.SyDentAuth || {};
+
+  window.SyDentAuth.isPlatformAdmin = async function(userId) {
+    if (!userId || !window.sb) return { isAdmin: false, error: 'no_user_or_sb' };
+    try {
+      var res = await window.sb.from('platform_admins')
+        .select('user_id').eq('user_id', userId).maybeSingle();
+      if (res.error) {
+        console.warn('[SyDentAuth] isPlatformAdmin error:', res.error.message);
+        return { isAdmin: false, error: res.error.message };
+      }
+      return { isAdmin: !!res.data, error: null };
+    } catch (e) {
+      console.warn('[SyDentAuth] isPlatformAdmin exception:', e && e.message);
+      return { isAdmin: false, error: (e && e.message) || 'exception' };
+    }
+  };
+
+  // Count rows in platform_admins. Used by last-admin guards in admin.html
+  // (suspend/delete/demote workflows must ensure at least 1 admin remains
+  // after the operation, otherwise the platform locks itself out).
+  window.SyDentAuth.countPlatformAdmins = async function() {
+    if (!window.sb) return { count: 0, error: 'no_sb' };
+    try {
+      var res = await window.sb.from('platform_admins')
+        .select('user_id', { count: 'exact', head: true });
+      if (res.error) {
+        return { count: 0, error: res.error.message };
+      }
+      return { count: res.count || 0, error: null };
+    } catch (e) {
+      return { count: 0, error: (e && e.message) || 'exception' };
+    }
+  };
+
+  // ─────────────────────────────────────────────────────────
   // Phase 7.6F — ensureAccountAccessible
   // ─────────────────────────────────────────────────────────
   // Called by tenant pages AFTER authentication (sbGetUser / sbRequireAuth).
@@ -52,7 +102,7 @@
   // For 'accepted' (incl. trial/monthly/yearly/permanent) the gate is a pass-through.
   //
   // Skip rules:
-  //   • Admin users (doctors.role='admin') always bypass — they manage the platform
+  //   • Admin users (platform_admins) always bypass — they manage the platform
   //     and don't have a tenant trial_request.
   //   • The grandfathered pre-Phase 7.6E owners with NULL trial_request also bypass
   //     (treated as legacy 'accepted' — Migration 22 backfilled them anyway).
@@ -69,11 +119,9 @@
       if (!user) return false; // shouldn't get here — caller should auth-check first
 
       // Admin bypass: platform users have no tenant subscription.
-      try {
-        var roleRes = await window.sb.from('doctors')
-          .select('role').eq('id', user.id).maybeSingle();
-        if (roleRes && roleRes.data && roleRes.data.role === 'admin') return true;
-      } catch(roleErr) { /* fall through — non-admin path is the safe default */ }
+      // Phase F: switched from doctors.role='admin' to platform_admins table.
+      var adminCheck = await window.SyDentAuth.isPlatformAdmin(user.id);
+      if (adminCheck.isAdmin) return true;
 
       // Read the trial_request for this user.
       var trRes = await window.sb.from('trial_requests')
@@ -1528,7 +1576,7 @@
     //      (designed for clinic employees, not the platform admin)
     //   3. Inject sidebar header buttons / role guards that don't apply to
     //      the platform-level admin role
-    // The admin page has its own auth guard (doctors.role='admin' check) and
+    // The admin page has its own auth guard (platform_admins check) and
     // runs entirely outside the per-tenant SyDentLock system. See Rule #28 and
     // the SaaS multi-tenant best practice: keep the global/platform layer
     // distinct from the tenant layer.
@@ -1555,14 +1603,15 @@
     // deactivated" banner since they have no clinic_employees row.
     //
     // We use a deliberately-cheap check: only fire the query if there's a
-    // session at all. Errors are non-fatal — if the doctors table query
+    // session at all. Errors are non-fatal — if the platform_admins query
     // fails, we let the page proceed (graceful degradation; admins are rare).
+    // Phase F: switched from doctors.role='admin' to platform_admins table.
     try {
       var sessRes = await window.sb.auth.getSession();
       var sUser = sessRes && sessRes.data && sessRes.data.session && sessRes.data.session.user;
       if (sUser) {
-        var roleRes = await window.sb.from('doctors').select('role').eq('id', sUser.id).maybeSingle();
-        if (roleRes && roleRes.data && roleRes.data.role === 'admin') {
+        var adminCheck = await window.SyDentAuth.isPlatformAdmin(sUser.id);
+        if (adminCheck.isAdmin) {
           window.location.replace('admin.html');
           return;
         }
