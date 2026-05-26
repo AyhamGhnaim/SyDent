@@ -1876,15 +1876,23 @@
       var p = window.sb.from('clinic_settings')
         .select('clinic_name, onboarding_dismissed_at, clinic_name_confirmed_at')
         .eq('owner_id', ownerId).maybeSingle();
+      // Tenant tables (patients/appointments/ledger_sessions) use the legacy
+      // column name `doctor_id` for the tenant identity (originally there was
+      // only one doctor per tenant — Phase 1 naming). Only platform-aware
+      // tables (clinic_settings, clinic_employees, clinic_doctors) use
+      // `owner_id`. Phase 7.6G initially used `owner_id` here, which raised
+      // 400 (Bad Request) on patients/appointments + 404 (Not Found) on
+      // 'sessions' (the real table is `ledger_sessions`). Onboarding state
+      // silently defaulted to 0/4 — banner stayed up forever for every tenant.
       var pp = window.sb.from('patients')
         .select('id', { count: 'exact', head: true })
-        .eq('owner_id', ownerId);
+        .eq('doctor_id', ownerId);
       var pa = window.sb.from('appointments')
         .select('id', { count: 'exact', head: true })
-        .eq('owner_id', ownerId);
-      var ps = window.sb.from('sessions')
+        .eq('doctor_id', ownerId);
+      var ps = window.sb.from('ledger_sessions')
         .select('id', { count: 'exact', head: true })
-        .eq('owner_id', ownerId);
+        .eq('doctor_id', ownerId);
 
       var results = await Promise.all([p, pp, pa, ps]);
       var settingsRes = results[0];
