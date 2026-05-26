@@ -13,7 +13,7 @@
 <title>سجل النشاطات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a38"></script>
+<script src="supabase-init.js?v=20260526a39"></script>
 <script src="sidebar.js?v=20260526a39"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -407,7 +407,7 @@ var ACTION_TYPES_BY_PREFIX = {
   patient:     ['patient.create', 'patient.edit', 'patient.delete'],
   appointment: ['appointment.create', 'appointment.edit', 'appointment.status_change', 'appointment.bulk_complete', 'appointment.delete'],
   appointment_type: ['appointment_type.create', 'appointment_type.edit', 'appointment_type.delete'],
-  session:     ['session.create', 'session.delete'],
+  session:     ['session.create', 'session.complete', 'session.delete'],
   payment:     ['payment.create', 'payment.edit_splits', 'payment.delete'],
   lab:         ['lab.create', 'lab.edit', 'lab.delete'],
   doctor:      ['doctor.create', 'doctor.edit', 'doctor.delete'],
@@ -470,7 +470,7 @@ function actionTypeLabel(t) {
   var opMap = {
     create:'إضافة', edit:'تعديل', delete:'حذف',
     status_change:'تغيير حالة', toggle_active:'تبديل حالة',
-    bulk_complete:'إكمال جماعي', edit_splits:'تعديل توزيع',
+    bulk_complete:'إكمال جماعي', complete:'إكمال', edit_splits:'تعديل توزيع',
     archive_audit:'أرشفة سجل', change_pin:'تغيير PIN',
     role_switch:'تبديل دور', pin_clear:'حذف PIN',
     view_accounting:'فتح المحاسبة'
