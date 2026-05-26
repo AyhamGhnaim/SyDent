@@ -618,34 +618,32 @@ body {
   line-height: 1;
 }
 
-/* Phase 8C: dismissed-completion modal checkboxes. The global `input { width:100%;
-   appearance:none }` rule above completely breaks native checkboxes (zero-size,
-   no glyph, no click). We restore them with the same high-contrast pattern as
-   .planned-toggle but greener (matches the modal's confirm button accent). */
+/* Phase 8C: dismissed-completion modal "fake checkbox". We tried a real
+   <input type=checkbox> but the global `input { appearance:none; width:100% }`
+   reset on this page makes them unreliable across browsers (zero hit-area
+   on some, no glyph on others). Implementation here is a styled <span>
+   with click handling delegated to the parent .dcm-row (onclick →
+   dcmToggleRow). State tracked via data-checked="1"|"0" + .dcm-chk-checked
+   class for styling. */
 .dcm-chk {
-  -webkit-appearance: none !important;
-  -moz-appearance: none !important;
-  appearance: none !important;
-  width: 22px !important;
-  height: 22px !important;
-  padding: 0 !important;
-  border: 2px solid #2ee89e !important;
-  border-radius: 6px !important;
-  background: transparent !important;
-  cursor: pointer !important;
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #2ee89e;
+  border-radius: 6px;
+  background: transparent;
   position: relative;
   flex-shrink: 0;
-  margin: 0;
   transition: all .15s;
+  /* pointer-events:none on the span so clicks always reach the parent .dcm-row
+     and aren't swallowed mid-element. The visual is still rendered. */
+  pointer-events: none;
 }
-.dcm-chk:hover {
-  background: rgba(46,232,158,0.14) !important;
+.dcm-chk.dcm-chk-checked {
+  background: #2ee89e;
+  border-color: #2ee89e;
 }
-.dcm-chk:checked {
-  background: #2ee89e !important;
-  border-color: #2ee89e !important;
-}
-.dcm-chk:checked::after {
+.dcm-chk.dcm-chk-checked::after {
   content: '✓';
   position: absolute;
   top: 50%; left: 50%;
@@ -655,6 +653,9 @@ body {
   font-weight: 900;
   line-height: 1;
 }
+.dcm-row:hover { background: rgba(46,232,158,0.06); }
+.dcm-row:hover .dcm-chk { border-color: #2ee89e; background: rgba(46,232,158,0.14); }
+.dcm-row:hover .dcm-chk.dcm-chk-checked { background: #2ee89e; }
 .planned-toggle.is-checked {
   background: rgba(99,179,237,0.18);
   border-color: rgba(99,179,237,0.6);
@@ -917,8 +918,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a48"></script>
-<script src="sidebar.js?v=20260526a48"></script>
+<script src="supabase-init.js?v=20260526a49"></script>
+<script src="sidebar.js?v=20260526a49"></script>
 </head>
 <body>
 <script>
@@ -2997,13 +2998,13 @@ function openDismissedCompleteModal(apptId, btnEl) {
         var pr = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
         if (pr) provName = pr.name;
       }
-      rows += '<label style="display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;" for="dcmChk_' + idx + '">'
-            +   '<input type="checkbox" class="dcm-chk" id="dcmChk_' + idx + '" data-session-id="' + escapeHtml(s.id) + '" checked>'
-            +   '<div style="flex:1;min-width:0;">'
+      rows += '<div class="dcm-row" data-idx="' + idx + '" data-session-id="' + escapeHtml(s.id) + '" onclick="dcmToggleRow(this, event)" style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;user-select:none;">'
+            +   '<span class="dcm-chk dcm-chk-checked" data-checked="1" style="flex-shrink:0;"></span>'
+            +   '<div style="flex:1;min-width:0;pointer-events:none;">'
             +     '<div style="font-size:13px;color:var(--text);font-weight:600;">' + escapeHtml(s.type || s.description || 'علاج') + escapeHtml(area) + '</div>'
             +     '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + fmtCost(s.cost) + ' ل.س' + (provName ? ' • ' + escapeHtml(provName) : '') + '</div>'
             +   '</div>'
-            + '</label>';
+            + '</div>';
     });
     listEl.innerHTML = rows;
     sectionEl.style.display = 'block';
@@ -3069,6 +3070,28 @@ function closeDismissedCompleteModal() {
   _phase8cState = null;
 }
 
+// Phase 8C: toggle a fake-checkbox row in the dismissed-completion modal.
+// We use a custom div+span UI instead of native <input type=checkbox> because
+// the global `input { appearance:none; width:100% }` reset on this page makes
+// native checkboxes unreliable (zero hit-area, missing glyph). Each .dcm-row
+// owns its own data-checked attribute ("0" or "1"); the visual ✓ comes from
+// the .dcm-chk-checked class on the inner span.
+function dcmToggleRow(rowEl, ev) {
+  if (!rowEl) return;
+  // Stop propagation so clicking inside doesn't bubble to .modal-overlay
+  // (which would close the modal when event.target === overlay — guarded but
+  // belt-and-suspenders).
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  var current = rowEl.getAttribute('data-checked');
+  var next = (current === '1') ? '0' : '1';
+  rowEl.setAttribute('data-checked', next);
+  var chk = rowEl.querySelector('.dcm-chk');
+  if (chk) {
+    if (next === '1') chk.classList.add('dcm-chk-checked');
+    else chk.classList.remove('dcm-chk-checked');
+  }
+}
+
 // User chose "⏸️ فقط تسجيل الخروج" — stamp dismissed_at but do not complete sessions.
 async function dismissedSkipComplete() {
   if (!_phase8cState || !_phase8cState.apptId) { closeDismissedCompleteModal(); return; }
@@ -3089,12 +3112,15 @@ async function dismissedSkipComplete() {
 async function dismissedConfirmComplete() {
   if (!_phase8cState || !_phase8cState.apptId) { closeDismissedCompleteModal(); return; }
   if (_phase8cInFlight) return;
-  // Collect checked session IDs from the modal DOM (snapshot now — modal will close).
-  var checks = document.querySelectorAll('#dcmPlannedList input[type="checkbox"]');
+  // Collect selected session IDs from the modal DOM (snapshot now — modal will close).
+  // Phase 8C: we use a fake-checkbox UI (div with data-checked, not <input>)
+  // because native checkboxes break under the global input reset on this page.
+  // Each .dcm-row owns its own data-checked + data-session-id.
+  var rows = document.querySelectorAll('#dcmPlannedList .dcm-row');
   var selectedIds = [];
-  for (var i = 0; i < checks.length; i++) {
-    if (checks[i].checked) {
-      var sid = checks[i].getAttribute('data-session-id');
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].getAttribute('data-checked') === '1') {
+      var sid = rows[i].getAttribute('data-session-id');
       if (sid) selectedIds.push(sid);
     }
   }
