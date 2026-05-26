@@ -918,8 +918,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a50"></script>
-<script src="sidebar.js?v=20260526a50"></script>
+<script src="supabase-init.js?v=20260526a51"></script>
+<script src="sidebar.js?v=20260526a51"></script>
 </head>
 <body>
 <script>
@@ -2998,8 +2998,8 @@ function openDismissedCompleteModal(apptId, btnEl) {
         var pr = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
         if (pr) provName = pr.name;
       }
-      rows += '<div class="dcm-row" data-idx="' + idx + '" data-session-id="' + escapeHtml(s.id) + '" onclick="dcmToggleRow(this, event)" style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;user-select:none;">'
-            +   '<span class="dcm-chk dcm-chk-checked" data-checked="1" style="flex-shrink:0;"></span>'
+      rows += '<div class="dcm-row" data-idx="' + idx + '" data-session-id="' + escapeHtml(s.id) + '" data-checked="1" onclick="dcmToggleRow(this, event)" style="display:flex;align-items:center;gap:8px;padding:10px 8px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;user-select:none;">'
+            +   '<span class="dcm-chk dcm-chk-checked" style="flex-shrink:0;"></span>'
             +   '<div style="flex:1;min-width:0;pointer-events:none;">'
             +     '<div style="font-size:13px;color:var(--text);font-weight:600;">' + escapeHtml(s.type || s.description || 'علاج') + escapeHtml(area) + '</div>'
             +     '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + fmtCost(s.cost) + ' ل.س' + (provName ? ' • ' + escapeHtml(provName) : '') + '</div>'
@@ -3090,7 +3090,6 @@ function dcmToggleRow(rowEl, ev) {
     if (next === '1') chk.classList.add('dcm-chk-checked');
     else chk.classList.remove('dcm-chk-checked');
   }
-  console.log('[Phase 8C] toggle row', { sessionId: rowEl.getAttribute('data-session-id'), checked: next });
 }
 
 // User chose "⏸️ فقط تسجيل الخروج" — stamp dismissed_at but do not complete sessions.
@@ -3111,20 +3110,8 @@ async function dismissedSkipComplete() {
 
 // User chose "✅ خرج + إكمال المحدد" — complete the checked sessions, then stamp dismissed_at.
 async function dismissedConfirmComplete() {
-  console.log('[Phase 8C] dismissedConfirmComplete: ENTER', {
-    state: _phase8cState,
-    inFlight: _phase8cInFlight
-  });
-  if (!_phase8cState || !_phase8cState.apptId) {
-    console.warn('[Phase 8C] aborting: no _phase8cState/apptId');
-    alert('⚠️ Phase 8C error: state lost. أعد المحاولة (state lost)');
-    closeDismissedCompleteModal();
-    return;
-  }
-  if (_phase8cInFlight) {
-    console.warn('[Phase 8C] aborting: already in flight');
-    return;
-  }
+  if (!_phase8cState || !_phase8cState.apptId) { closeDismissedCompleteModal(); return; }
+  if (_phase8cInFlight) return;
   // Collect selected session IDs from the modal DOM (snapshot now — modal will close).
   // Phase 8C: we use a fake-checkbox UI (div with data-checked, not <input>)
   // because native checkboxes break under the global input reset on this page.
@@ -3137,7 +3124,6 @@ async function dismissedConfirmComplete() {
       if (sid) selectedIds.push(sid);
     }
   }
-  console.log('[Phase 8C] selectedIds:', selectedIds, 'rows found:', rows.length);
   _phase8cInFlight = true;
   var apptId = _phase8cState.apptId;
   // Close modal immediately so the user sees responsive feedback.
@@ -3150,12 +3136,8 @@ async function dismissedConfirmComplete() {
       // Phase 8C audit #15: function returns false when user cancels a mid-flow
       // prompt (e.g. provider mismatch second prompt). In that case, do NOT stamp
       // dismissed_at — leave the appointment exactly where it was.
-      console.log('[Phase 8C] calling completeApptWithProcedures', { apptId, selectedIds });
       var ret = await completeApptWithProcedures(apptId, selectedIds);
-      console.log('[Phase 8C] completeApptWithProcedures returned:', ret);
       completionSucceeded = (ret !== false);
-    } else {
-      console.log('[Phase 8C] selectedIds empty — skipping completion');
     }
     // Only stamp dismissed_at when the completion attempt wasn't cancelled.
     // Note: completeApptWithProcedures may have already set appointment.status='completed'
@@ -3163,13 +3145,10 @@ async function dismissedConfirmComplete() {
     // we use the same-path stamp here for symmetry with the skip-flow and for the case
     // where appointment.status was NOT updated (partial subset).
     if (completionSucceeded) {
-      console.log('[Phase 8C] stamping dismissed_at');
       await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
     }
-    console.log('[Phase 8C] flow finished successfully');
   } catch (e) {
-    console.error('[Phase 8C] dismissedConfirmComplete error:', e);
-    alert('⚠️ Phase 8C error: ' + (e.message || e) + ' — راجع console');
+    console.error('dismissedConfirmComplete error:', e);
     showToast('⚠️ تعذّر إكمال الموعد بالكامل — راجع console');
   }
   _phase8cInFlight = false;
