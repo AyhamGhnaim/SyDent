@@ -879,8 +879,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a43"></script>
-<script src="sidebar.js?v=20260526a43"></script>
+<script src="supabase-init.js?v=20260526a44"></script>
+<script src="sidebar.js?v=20260526a44"></script>
 </head>
 <body>
 <script>
@@ -1088,14 +1088,23 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
       </div>
 
-      <!-- 🦷 Procedures section (visible only when editing an existing appointment) -->
+      <!-- 🦷 Procedures section. Shown in two modes:
+           • Edit mode: full functionality (list, attach, complete buttons)
+           • New-appointment mode: pending hint shown; save first to enable -->
       <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
           <div id="apptProcStats" style="font-size:12px;color:var(--text2);"></div>
         </div>
+        <!-- Pending hint: visible only in NEW-appointment mode before first save.
+             editAppt() and submitAppt-success-then-reload both hide this and show the
+             real controls below. Keep wording action-oriented. -->
+        <div id="apptProcPendingHint" style="display:none;padding:14px;text-align:center;background:rgba(99,179,237,0.08);border:1px dashed rgba(99,179,237,0.3);border-radius:10px;color:var(--text2);font-size:13px;line-height:1.6;">
+          💾 احفظ الموعد أولاً لتتمكن من ربط العلاجات المخطّطة به.<br>
+          <span style="font-size:11px;opacity:0.75;">بعد الحفظ ستفتح أدوات الربط هنا تلقائياً.</span>
+        </div>
         <div id="apptProcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <div id="apptProcControls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
           <button type="button" id="addPlannedBtn" onclick="attachPlannedToAppt()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ ربط بالموعد</button>
         </div>
@@ -2122,6 +2131,15 @@ function onPlannedToggle() {
   // with no way to commit changes via the schedule button. The button matters
   // only in edit mode AND when the current state is planned.
   var schedBtn = document.getElementById('scheduleNowBtn');
+  // Workflow A polish: in CREATE mode (editingId is null), hide the procedures
+  // section entirely while planned is checked — there's no point inviting the
+  // user to attach procedures to a date-less appointment. Restore the pending
+  // hint when they uncheck. We touch the section only in create mode; edit
+  // mode is already handled by editAppt's isPlanned branch.
+  if (!editingId) {
+    var _procSec = document.getElementById('apptProcSection');
+    if (_procSec) _procSec.style.display = planned ? 'none' : 'block';
+  }
   if (schedBtn) {
     // editingId is the appointments.html-level state; if we're editing an existing
     // row AND the toggle is currently planned, the button is meaningful.
@@ -4133,8 +4151,23 @@ async function openModal(prefillDate) {
   document.getElementById('fNotes').value    = '';
   // إخفاء زر الحذف عند إضافة موعد جديد
   document.getElementById('deleteApptBtn').style.display = 'none';
-  // إخفاء قسم العلاجات (يظهر فقط في وضع التعديل)
-  document.getElementById('apptProcSection').style.display = 'none';
+  // Show procedures section in PENDING state — the section is visible but the
+  // attach controls and stats are swapped for a "save first" hint. This makes
+  // the future workflow discoverable: the user sees the section while creating
+  // the appointment, learns it exists, and after saving the modal stays open
+  // with the controls now active (submitAppt → editAppt re-entry).
+  var procSec = document.getElementById('apptProcSection');
+  var procHint = document.getElementById('apptProcPendingHint');
+  var procList = document.getElementById('apptProcList');
+  var procCtrls = document.getElementById('apptProcControls');
+  var procStats = document.getElementById('apptProcStats');
+  var procComplete = document.getElementById('completeApptBtn');
+  if (procSec) procSec.style.display = 'block';
+  if (procHint) procHint.style.display = 'block';
+  if (procList) procList.style.display = 'none';
+  if (procCtrls) procCtrls.style.display = 'none';
+  if (procStats) procStats.textContent = '';
+  if (procComplete) procComplete.style.display = 'none';
   // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
   document.getElementById('apptLabSection').style.display = 'none';
   // إخفاء زر "تطبيق رسم عدم الحضور" (يظهر فقط في التعديل عند الحاجة)
@@ -4241,6 +4274,15 @@ async function editAppt(id) {
   // no date yet, so attaching procedures + "Set Complete" don't make sense.
   // User must schedule first, then manage procedures.
   document.getElementById('apptProcSection').style.display = isPlanned ? 'none' : 'block';
+  // Workflow A: hide the "save first" pending hint (this is edit mode, the
+  // appointment row already exists in DB → controls can operate). Show the
+  // list + attach controls that the hint replaced in create mode.
+  var _procHint = document.getElementById('apptProcPendingHint');
+  var _procList = document.getElementById('apptProcList');
+  var _procCtrls = document.getElementById('apptProcControls');
+  if (_procHint) _procHint.style.display = 'none';
+  if (_procList) _procList.style.display = 'flex';
+  if (_procCtrls) _procCtrls.style.display = 'flex';
   if (!isPlanned) renderApptProcedures(a);
 
   // Show lab orders section (if any orders are linked to this appointment)
@@ -5516,10 +5558,34 @@ async function submitAppt(e) {
         selectedDate = new Date(apptData.date + 'T12:00:00');
         currentDate  = new Date(apptData.date + 'T12:00:00');
       }
-      closeModal();
+      // Workflow A: instead of closing the modal, reload appointments so the
+      // freshly-inserted row populates sessionsByAppt/plannedSessionsByPatient,
+      // then re-open the same modal in edit mode. The procedures section
+      // now has a real appointment_id to attach to, so the user can link
+      // planned sessions immediately without losing their flow.
+      // Skip the re-open if it's a planned appointment (no chair-side reality
+      // → procedures attachment is intentionally blocked for planned in editAppt).
+      var _newApptId = (ins.data && ins.data.id) ? ins.data.id : null;
+      var _shouldReopenForProcedures = !!_newApptId && !isPlannedNow;
+      if (!_shouldReopenForProcedures) {
+        closeModal();
+      }
       // Gap 7: after adding a planned appt, jump straight to planned tab
       if (isPlannedNow) setMainTab('planned');
       await loadAppointments();
+      if (_shouldReopenForProcedures) {
+        // editAppt expects the row to exist in the in-memory `appointments`
+        // array (loadAppointments above just populated it). Re-enter the
+        // modal — same form, now with editingId set and the procedures
+        // section in active mode. The user can attach planned sessions
+        // immediately, then click "حفظ التعديلات" or just close.
+        try {
+          await editAppt(_newApptId);
+        } catch (reopenErr) {
+          console.warn('Workflow A: re-open in edit mode failed, falling back to close:', reopenErr);
+          closeModal();
+        }
+      }
       // H3 fix: refresh phone cache if patient was newly added in another tab
       if (_needsPatientCacheRefresh) await loadPatientPhones();
       // Phase 5: audit log (after insert success, after reload)

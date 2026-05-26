@@ -13,8 +13,8 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a43"></script>
-<script src="sidebar.js?v=20260526a43"></script>
+<script src="supabase-init.js?v=20260526a44"></script>
+<script src="sidebar.js?v=20260526a44"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -896,6 +896,32 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
       <div class="form-group"><label>ملاحظات</label><textarea id="aNotes" placeholder="أي ملاحظات…"></textarea></div>
+
+      <!-- 🦷 Procedures section — Workflow A (Phase 8 follow-up).
+           Visible in TWO states:
+             • New-appointment: shows the "save first" hint (controls disabled)
+             • Edit mode (after first save OR opened via edit/quick-schedule):
+               shows the list of attached planned/completed sessions and the
+               attach picker for unattached planned sessions of this patient.
+           The list reads from the page-scoped `sessions` array; the picker
+           reads planned sessions where appointment_id IS NULL. -->
+      <div id="appProcSectionPP" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
+          <div id="appProcStatsPP" style="font-size:12px;color:var(--text2);"></div>
+        </div>
+        <!-- Pending hint: visible only when creating a brand-new appointment -->
+        <div id="appProcPendingHintPP" style="display:none;padding:14px;text-align:center;background:rgba(99,179,237,0.08);border:1px dashed rgba(99,179,237,0.3);border-radius:10px;color:var(--text2);font-size:13px;line-height:1.6;">
+          💾 احفظ الموعد أولاً لتتمكن من ربط العلاجات المخطّطة به.<br>
+          <span style="font-size:11px;opacity:0.75;">بعد الحفظ ستفتح أدوات الربط هنا تلقائياً.</span>
+        </div>
+        <!-- Active controls: shown only in edit mode (editingApptId set) -->
+        <div id="appProcListPP" style="display:none;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
+        <div id="appProcControlsPP" style="display:none;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="appAddPlannedSelectPP" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
+          <button type="button" id="appAddPlannedBtnPP" onclick="attachPlannedToApptPP()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ ربط بالموعد</button>
+        </div>
+      </div>
     </div>
     <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('apptModal')">إلغاء</button><button class="btn-save-m" id="aSaveBtn" onclick="saveAppt()">حفظ الموعد</button></div>
   </div>
@@ -6752,6 +6778,275 @@ async function saveAppt() {
   } else {
     showToast('✅ تم حفظ الموعد في التقويم');
   }
+
+  // Workflow A: after a brand-new (non-planned, non-edit) appointment is
+  // inserted, re-open the modal in edit mode so the user can attach planned
+  // procedures without losing their place. We deliberately do this AFTER the
+  // toast + state cleanup above so the visual sequence is:
+  //   close → "✅ تم حفظ الموعد" toast → re-open in edit mode (modal stays)
+  // For planned/edit/quick-schedule paths we don't re-open — those flows
+  // already had editingApptId set, and the procedures section was either
+  // hidden (planned) or shown in active mode (quickSchedule, scheduled).
+  if (!wasEditing && !isPlannedNow && savedRow && savedRow.id) {
+    try {
+      // Reload sessions so the picker can see the latest unattached planned
+      // rows (a session may have been added in another tab between page
+      // load and now). Best-effort — if it fails the picker still works
+      // from whatever sessions array currently holds.
+      try {
+        const { data: sd2 } = await window.sb.from('ledger_sessions').select('*')
+          .eq('patient_id', patientId)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false });
+        if (sd2) sessions = sd2;
+      } catch (sloadErr) { console.warn('saveAppt: post-save sessions reload failed:', sloadErr); }
+      // Set editing state so attach/unlink calls and the toast on next save
+      // see this as an edit. Title and save button change too.
+      editingApptId = savedRow.id;
+      var _t = document.getElementById('apptModalTitle');
+      if (_t) _t.textContent = '✏️ تعديل الموعد';
+      var _saveBtn = document.getElementById('aSaveBtn');
+      if (_saveBtn) _saveBtn.textContent = 'حفظ التعديلات';
+      // Pre-fill the form with the inserted row's data so the user sees what
+      // was saved (the modal was just closed → it would re-open with default
+      // field values otherwise).
+      var _foundT2 = null;
+      for (var i = 0; i < TREATMENTS.length; i++) if (TREATMENTS[i].name === savedRow.type) { _foundT2 = TREATMENTS[i]; break; }
+      if (_foundT2) document.getElementById('aType').value = _foundT2.id;
+      if (savedRow.duration) document.getElementById('aDur').value = String(savedRow.duration);
+      if (savedRow.date) document.getElementById('aDate').value = savedRow.date;
+      if (savedRow.time) document.getElementById('aTime').value = savedRow.time;
+      var _statusForUiAfter = (savedRow.status === 'broken') ? 'no_show' : (savedRow.status || 'confirmed');
+      document.getElementById('aStatus').value = _statusForUiAfter;
+      document.getElementById('aNotes').value = savedRow.notes || '';
+      // Activate the procedures section + render the (initially empty)
+      // attached list and the picker of unattached planned sessions for
+      // this patient.
+      if (typeof setApptProcSectionMode === 'function') setApptProcSectionMode('active');
+      if (typeof renderApptProceduresPP === 'function') renderApptProceduresPP(savedRow.id);
+      // Re-open the modal. openModal() just toggles the overlay class so
+      // this is a cheap reopen — no DB calls beyond what we already did.
+      openModal('apptModal');
+    } catch (reopenErr) {
+      console.warn('Workflow A (patient-profile): re-open in edit mode failed:', reopenErr);
+      // Failure here is non-fatal — the appointment was already saved.
+      // The user just won't see the procedures section auto-open. They can
+      // still attach procedures later via editPlannedFromProfile or by
+      // navigating to the appointments page.
+    }
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Workflow A — "علاجات هذا الموعد" section inside the apptModal.
+
+   The section has two visual states:
+     • Pending (create mode, editingApptId === null):
+       hint visible, list/controls hidden. No DB writes possible.
+     • Active (edit mode, editingApptId set to a real appointment id):
+       hint hidden, list shows attached sessions, picker shows planned
+       sessions for THIS patient that are not yet attached to any appt.
+
+   We deliberately do NOT duplicate the full appointments.html helpers
+   (renderApptProcedures, attachPlannedToAppt, unlinkSessionFromAppt) — that
+   page maintains rich caches (sessionsByAppt, plannedSessionsByPatient,
+   labOrdersByAppt) keyed across all appointments. Here we only need data
+   for the current patient, which is already in the page-scoped `sessions`
+   array. So these helpers are minimal, patient-scoped variants.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Switch the procedures section between pending and active states.
+   Called from openApptModal (always pending) and from the save-success path
+   in saveAppt (always active, with the freshly-inserted/updated appt id). */
+function setApptProcSectionMode(mode) {
+  // mode: 'pending' | 'active' | 'hidden'
+  var sec   = document.getElementById('appProcSectionPP');
+  var hint  = document.getElementById('appProcPendingHintPP');
+  var list  = document.getElementById('appProcListPP');
+  var ctrls = document.getElementById('appProcControlsPP');
+  var stats = document.getElementById('appProcStatsPP');
+  if (!sec) return;
+  if (mode === 'hidden') {
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = 'block';
+  if (mode === 'pending') {
+    if (hint)  hint.style.display  = 'block';
+    if (list)  list.style.display  = 'none';
+    if (ctrls) ctrls.style.display = 'none';
+    if (stats) stats.textContent   = '';
+    return;
+  }
+  // 'active'
+  if (hint)  hint.style.display  = 'none';
+  if (list)  list.style.display  = 'flex';
+  if (ctrls) ctrls.style.display = 'flex';
+}
+
+/* Render the list of sessions attached to the appointment + the picker of
+   attachable planned sessions. Reads from the page-scoped `sessions` array
+   (loaded by loadData → ledger_sessions for this patient). */
+function renderApptProceduresPP(apptId) {
+  var listEl  = document.getElementById('appProcListPP');
+  var statsEl = document.getElementById('appProcStatsPP');
+  var selEl   = document.getElementById('appAddPlannedSelectPP');
+  var addBtn  = document.getElementById('appAddPlannedBtnPP');
+  if (!listEl || !selEl) return;
+  if (!apptId) {
+    listEl.innerHTML = '';
+    if (statsEl) statsEl.textContent = '';
+    return;
+  }
+
+  // 1) Attached sessions (this appointment, any status).
+  var attached = (sessions || []).filter(function(s){ return s.appointment_id === apptId; });
+  if (attached.length) {
+    var html = '';
+    attached.forEach(function(s){
+      var statusBadge;
+      if (s.status === 'planned') {
+        statusBadge = '<span style="background:#ef444422;color:#ef4444;border:1px solid #ef444455;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
+      } else if (s.status === 'completed') {
+        statusBadge = '<span style="background:#3b82f622;color:#3b82f6;border:1px solid #3b82f655;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
+      } else {
+        statusBadge = '<span style="background:rgba(255,255,255,0.06);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;">' + escapeHtml(s.status || '—') + '</span>';
+      }
+      var toothPart = '';
+      if (s.tooth_num) {
+        toothPart = ' • السن ' + escapeHtml(String(s.tooth_num)) + (s.surface && s.surface !== 'WHOLE' ? '/' + escapeHtml(s.surface) : '');
+      } else if (s.quadrant) {
+        var QLBL = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+        toothPart = ' • ' + (QLBL[s.quadrant] || escapeHtml(s.quadrant));
+      } else if (s.arch) {
+        var ALBL = {'U':'الفك العلوي','L':'الفك السفلي'};
+        toothPart = ' • ' + (ALBL[s.arch] || escapeHtml(s.arch));
+      }
+      var costStr = (typeof fmt === 'function') ? fmt(s.cost) : String(s.cost || 0);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
+        + '<div style="font-size:12px;color:var(--text2);">' + costStr + ' ل.س</div>'
+        + statusBadge
+        + '<button type="button" onclick="unlinkSessionFromApptPP(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="فصل عن الموعد">✕</button>'
+        + '</div>';
+    });
+    listEl.innerHTML = html;
+    var totalC = attached.reduce(function(acc, x){ return acc + (parseFloat(x.cost) || 0); }, 0);
+    var plannedC   = attached.filter(function(x){ return x.status === 'planned'; }).length;
+    var completedC = attached.filter(function(x){ return x.status === 'completed'; }).length;
+    var totalStr = (typeof fmt === 'function') ? fmt(totalC) : String(totalC);
+    if (statsEl) statsEl.textContent = attached.length + ' علاج • ' + totalStr + ' ل.س • مخطّط ' + plannedC + ' / منجز ' + completedC;
+  } else {
+    listEl.innerHTML = '<div style="padding:8px;color:var(--text2);font-size:12px;text-align:center;">لا توجد علاجات مرتبطة بهذا الموعد بعد</div>';
+    if (statsEl) statsEl.textContent = '';
+  }
+
+  // 2) Attachable picker: planned sessions for this patient where
+  //    appointment_id IS NULL (unattached).
+  var unattachedPlanned = (sessions || []).filter(function(s){
+    return s.status === 'planned' && !s.appointment_id;
+  });
+  selEl.innerHTML = '';
+  if (!unattachedPlanned.length) {
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— لا توجد علاجات مخطّطة غير مرتبطة لهذا المريض —';
+    selEl.appendChild(opt0);
+    if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.4'; }
+    return;
+  }
+  var placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— اختر علاجاً مخطّطاً —';
+  selEl.appendChild(placeholder);
+  unattachedPlanned.forEach(function(s){
+    var toothPart;
+    if (s.tooth_num) {
+      toothPart = ' (سن ' + s.tooth_num + ')';
+    } else if (s.quadrant) {
+      var QLBL2 = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+      toothPart = ' (' + (QLBL2[s.quadrant] || s.quadrant) + ')';
+    } else if (s.arch) {
+      var ALBL2 = {'U':'الفك العلوي','L':'الفك السفلي'};
+      toothPart = ' (' + (ALBL2[s.arch] || s.arch) + ')';
+    } else {
+      toothPart = '';
+    }
+    var costStr2 = (typeof fmt === 'function') ? fmt(s.cost) : String(s.cost || 0);
+    var opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = (s.type || s.description || 'علاج') + toothPart + ' — ' + costStr2 + ' ل.س';
+    selEl.appendChild(opt);
+  });
+  if (addBtn) { addBtn.disabled = false; addBtn.style.opacity = '1'; }
+}
+
+/* Attach the picker-selected planned session to the current editing appointment.
+   editingApptId must be set (active mode invariant). */
+async function attachPlannedToApptPP() {
+  if (!editingApptId) { showToast('⚠️ احفظ الموعد أولاً'); return; }
+  // Phase 4.1: defense-in-depth — block if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن ربط العلاجات');
+    return;
+  }
+  var sel = document.getElementById('appAddPlannedSelectPP');
+  var sessId = sel ? sel.value : '';
+  if (!sessId) { showToast('⚠️ اختر علاجاً'); return; }
+  const { error } = await window.sb.from('ledger_sessions')
+    .update({ appointment_id: editingApptId })
+    .eq('id', sessId).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الربط: ' + error.message); return; }
+  // Update local sessions array so re-render reflects the change without
+  // a full reload (matches the pattern used in completeSessionFromProfile).
+  var local = (sessions || []).find(function(x){ return x.id === sessId; });
+  if (local) local.appointment_id = editingApptId;
+  showToast('✅ تم ربط العلاج بالموعد');
+  renderApptProceduresPP(editingApptId);
+  // Phase 5 audit log: lightweight — single action, no diff needed since
+  // appointment_id transition is captured in oldValue/newValue.
+  if (window.logAudit) {
+    try {
+      window.logAudit('session.edit', {
+        entityId: sessId,
+        patientId: patientId,
+        patientName: (patient && patient.name) || '',
+        description: 'ربط علاج مخطّط بموعد من ملف المريض',
+        oldValue: { appointment_id: null },
+        newValue: { appointment_id: editingApptId }
+      });
+    } catch (e) { console.warn('attachPlannedToApptPP: audit log failed:', e); }
+  }
+}
+
+/* Unlink (sets appointment_id = NULL). The session itself is not deleted. */
+async function unlinkSessionFromApptPP(sessId) {
+  if (!sessId) return;
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن فصل العلاجات');
+    return;
+  }
+  if (!confirm('فصل هذا العلاج عن الموعد؟ (لن يُحذف العلاج نفسه)')) return;
+  const { error } = await window.sb.from('ledger_sessions')
+    .update({ appointment_id: null })
+    .eq('id', sessId).eq('doctor_id', currentUser.id);
+  if (error) { showToast('❌ خطأ في الفصل: ' + error.message); return; }
+  var local = (sessions || []).find(function(x){ return x.id === sessId; });
+  if (local) local.appointment_id = null;
+  showToast('✅ تم فصل العلاج عن الموعد');
+  if (editingApptId) renderApptProceduresPP(editingApptId);
+  if (window.logAudit) {
+    try {
+      window.logAudit('session.edit', {
+        entityId: sessId,
+        patientId: patientId,
+        patientName: (patient && patient.name) || '',
+        description: 'فصل علاج عن موعد من ملف المريض',
+        oldValue: { appointment_id: editingApptId },
+        newValue: { appointment_id: null }
+      });
+    } catch (e) { console.warn('unlinkSessionFromApptPP: audit log failed:', e); }
+  }
 }
 
 /* ─── Gap 7: Planned-appointments UI in patient profile ───────────────────── */
@@ -6844,6 +7139,10 @@ function editPlannedFromProfile(id) {
   if (chk) { chk.checked = true; }
   setupApptProviderPicker(p.provider_id || null);
   onApptPlannedToggle();
+  // Workflow A: planned appointments have no date/chair-side reality so
+  // attaching procedures is intentionally blocked here (mirrors the rule
+  // in appointments.html editAppt isPlanned branch). Hide the section.
+  if (typeof setApptProcSectionMode === 'function') setApptProcSectionMode('hidden');
   openModal('apptModal');
 }
 
@@ -6874,6 +7173,12 @@ function quickSchedulePlannedFromProfile(id) {
   if (chk) { chk.checked = false; }
   setupApptProviderPicker(p.provider_id || null);
   onApptPlannedToggle();
+  // Workflow A: this is the "schedule a planned appointment" flow. The appt
+  // row exists in DB (editingApptId set), so the procedures section can be
+  // active. After this save the appt becomes scheduled (non-planned) → user
+  // can immediately link planned sessions to it.
+  if (typeof setApptProcSectionMode === 'function') setApptProcSectionMode('active');
+  if (typeof renderApptProceduresPP === 'function') renderApptProceduresPP(id);
   openModal('apptModal');
   showToast('✏️ أدخل التاريخ والوقت ثم اضغط "جدولة الموعد"');
 }
@@ -6922,6 +7227,16 @@ function onApptPlannedToggle() {
   if (dateRow)   dateRow.style.display   = planned ? 'none' : '';
   if (reasonGrp) reasonGrp.style.display = planned ? 'block' : 'none';
   if (note)      note.style.display      = planned ? 'block' : 'none';
+  // Workflow A polish: hide the procedures section while planned is checked
+  // in CREATE mode. No point inviting attachment to a date-less appointment.
+  // In edit mode, editPlannedFromProfile already calls setApptProcSectionMode
+  // explicitly so we don't fight with it here. editingApptId distinguishes:
+  // null = create mode (we own the section state); non-null = edit/schedule
+  // mode (those entry points already set their preferred mode).
+  if (!editingApptId) {
+    var _sec = document.getElementById('appProcSectionPP');
+    if (_sec) _sec.style.display = planned ? 'none' : 'block';
+  }
 }
 
 /* Provider picker setup, extracted so openApptModal/openPlannedApptModal/
@@ -7791,6 +8106,9 @@ function openApptModal() {
   onApptPlannedToggle();   // make sure date/time row is visible, reason hidden
   // Provider picker (OpenDental-style default: user-link → owner → first active)
   setupApptProviderPicker(null);
+  // Workflow A: show procedures section in pending state so the user discovers
+  // it during creation. After save, saveAppt() transitions it to active.
+  if (typeof setApptProcSectionMode === 'function') setApptProcSectionMode('pending');
   openModal('apptModal');
 }
 
