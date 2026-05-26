@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a41"></script>
-<script src="sidebar.js?v=20260526a41"></script>
+<script src="supabase-init.js?v=20260526a42"></script>
+<script src="sidebar.js?v=20260526a42"></script>
 </head>
 <body>
 <script>
@@ -1459,48 +1459,94 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
   }
 
   // ── Phase 8C intercept (dashboard variant) ─────────────────────────────
-  // The dismissed_at stamp on the dashboard's quick-action button must NOT
-  // silently fire when the appointment has planned attached sessions —
-  // otherwise the doctor/secretary loses the chance to record what was
-  // actually done in the chair. The full Phase 8C picker modal lives in
-  // appointments.html (which already has the sessionsByAppt / labOrdersByAppt
-  // caches and the modal HTML). Here we just detect-and-redirect so the
-  // workflow is completed there. Lab orders are NOT checked at this layer —
-  // in the appointments.html modal they're informational only (no separate
-  // user confirmation), so an appt with only lab-orders-and-no-planned isn't
-  // worth a redirect.
+  // When the user clicks 'خرج' on a dashboard appointment with planned
+  // attached sessions, we MUST ask the right question — not "go open
+  // another page" — because that doesn't reflect the actual decision in
+  // the doctor's head. The decision is binary: "did I complete the
+  // treatment or not?". We ask that directly, then route based on the
+  // answer:
+  //   • YES, completed → redirect to appointments.html where the full
+  //     Phase 8C modal (with checkboxes for multi-session, provider
+  //     mismatch detection, lab order auto-completion, FIFO reallocation,
+  //     and audit logging) is already implemented. We DO NOT duplicate
+  //     that 200+ line workflow here.
+  //   • NO, not completed → confirm once more (safety net for misclicks
+  //     since this is the "abandon work" path), then stamp dismissed_at
+  //     and leave the planned sessions exactly as they are.
   //
-  // Uses HEAD + count:exact (zero wire cost — no row payload). Fails open:
-  // if the count query errors out we proceed with the stamp rather than
-  // blocking the secretary completely.
+  // For multi-session appointments we fetch the names so the prompt can
+  // list what's actually attached (one tool call — fetches up to ~10).
+  // Uses head:false here (we need the rows, not just the count) — still
+  // small payload because there are usually 1-3 planned sessions per appt.
+  //
+  // Scoped by doctor_id explicitly (defense-in-depth — RLS already
+  // enforces this but appointments.html does the same belt-and-braces).
+  // Fails open: if the fetch errors out, we proceed with the stamp
+  // rather than blocking the secretary entirely.
   if (fieldKey === 'dismissed_at') {
     try {
-      // Scope by doctor_id explicitly (defense-in-depth — RLS already enforces this
-      // but appointments.html does the same belt-and-braces and we mirror it).
-      // _dashUid is set during dashboard init; fall through gracefully if missing.
-      var checkQuery = window.sb.from('ledger_sessions')
-        .select('id', { count: 'exact', head: true })
+      var qPlanned = window.sb.from('ledger_sessions')
+        .select('id, type, tooth_num, surface, cost')
         .eq('appointment_id', apptId)
         .eq('status', 'planned');
-      if (_dashUid) checkQuery = checkQuery.eq('doctor_id', _dashUid);
-      var checkRes = await checkQuery;
-      var plannedCount = (checkRes && typeof checkRes.count === 'number') ? checkRes.count : 0;
-      if (plannedCount > 0) {
-        var msg = '⚠️ هذا الموعد عليه ' + plannedCount + ' علاج مخطّط لم يُكمَل بعد.\n\n'
-                + 'انتقل إلى صفحة المواعيد لاختيار العلاجات التي تم إنجازها قبل تسجيل الخروج.\n\n'
-                + 'موافق → فتح صفحة المواعيد\n'
-                + 'إلغاء → البقاء هنا (لن يُسجَّل الخروج)';
-        if (confirm(msg)) {
-          window.location.href = 'appointments.html';
+      if (_dashUid) qPlanned = qPlanned.eq('doctor_id', _dashUid);
+      var plannedRes = await qPlanned;
+      var plannedList = (plannedRes && plannedRes.data) || [];
+
+      if (plannedList.length > 0) {
+        // Build the human-readable summary of what's still planned.
+        // For 1 session: full detail inline. For 2+: bullet list (RTL).
+        var summary;
+        if (plannedList.length === 1) {
+          var s = plannedList[0];
+          var area = '';
+          if (s.tooth_num) {
+            area = ' — السن ' + s.tooth_num + (s.surface && s.surface !== 'WHOLE' ? '/' + s.surface : '');
+          }
+          var costPart = (typeof s.cost === 'number' || (typeof s.cost === 'string' && s.cost !== ''))
+            ? ' — ' + (parseFloat(s.cost) || 0).toLocaleString('en-US') + ' ل.س'
+            : '';
+          summary = '«' + (s.type || 'علاج') + area + costPart + '»';
+        } else {
+          var lines = plannedList.slice(0, 5).map(function(s){
+            var area = s.tooth_num ? ' (السن ' + s.tooth_num + ')' : '';
+            return '• ' + (s.type || 'علاج') + area;
+          });
+          if (plannedList.length > 5) lines.push('• ... و' + (plannedList.length - 5) + ' علاج آخر');
+          summary = lines.join('\n');
         }
-        return;  // intercepted — no stamp written from the dashboard widget
+
+        // Question 1 — the real chair-side question, asked plainly.
+        var q1 = '🦷 هل تم إنجاز العلاج المخطّط؟\n\n'
+               + summary + '\n\n'
+               + 'موافق → نعم، تم الإنجاز (انتقال لصفحة المواعيد لتأكيد الإكمال)\n'
+               + 'إلغاء → لا، لم يُنجَز';
+
+        if (confirm(q1)) {
+          // YES → route to appointments.html where the full Phase 8C
+          // modal handles completion + dismissed_at stamping atomically.
+          window.location.href = 'appointments.html';
+          return;
+        }
+
+        // NO → safety-net confirm before we stamp dismissed without
+        // completing anything. Misclicks on the dashboard widget are
+        // common (the buttons are small and the secretary may scroll).
+        var q2 = '⚠️ هل تريد تسجيل خروج المريض بدون إكمال العلاج؟\n\n'
+               + 'العلاج المخطّط سيبقى كما هو ويمكن إكماله لاحقاً من ملف المريض.\n\n'
+               + 'موافق → تسجيل الخروج فقط\n'
+               + 'إلغاء → عودة (لن يُسجَّل أي شيء)';
+        if (!confirm(q2)) {
+          return;  // user backed out — leave everything untouched
+        }
+        // Fall through to the normal stamp flow below (no completion).
       }
     } catch (e) {
       console.warn('recordDashApptTime: Phase 8C planned-sessions check failed (proceeding with stamp):', e);
-      // Fail-open: if the check itself errors out we don't want to block the
-      // secretary from stamping at all. Worst case they miss the Phase 8C
-      // prompt for this one appointment — they can still complete sessions
-      // manually from the patient profile.
+      // Fail-open: if the fetch itself errors out we don't want to block
+      // the secretary from stamping at all. Worst case they miss the
+      // Phase 8C prompt for this one appointment — they can still
+      // complete sessions manually from the patient profile (Phase 8A).
     }
   }
 
