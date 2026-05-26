@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a42"></script>
-<script src="sidebar.js?v=20260526a42"></script>
+<script src="supabase-init.js?v=20260526a43"></script>
+<script src="sidebar.js?v=20260526a43"></script>
 </head>
 <body>
 <script>
@@ -1460,33 +1460,34 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
 
   // ── Phase 8C intercept (dashboard variant) ─────────────────────────────
   // When the user clicks 'خرج' on a dashboard appointment with planned
-  // attached sessions, we MUST ask the right question — not "go open
-  // another page" — because that doesn't reflect the actual decision in
-  // the doctor's head. The decision is binary: "did I complete the
-  // treatment or not?". We ask that directly, then route based on the
-  // answer:
-  //   • YES, completed → redirect to appointments.html where the full
-  //     Phase 8C modal (with checkboxes for multi-session, provider
-  //     mismatch detection, lab order auto-completion, FIFO reallocation,
-  //     and audit logging) is already implemented. We DO NOT duplicate
-  //     that 200+ line workflow here.
-  //   • NO, not completed → confirm once more (safety net for misclicks
-  //     since this is the "abandon work" path), then stamp dismissed_at
-  //     and leave the planned sessions exactly as they are.
+  // attached sessions, we ask the right clinical question and act on the
+  // answer in-place when possible. The doctor's expectation is direct:
+  // 'I just clicked YES → finish this for me, don't navigate me away'.
   //
-  // For multi-session appointments we fetch the names so the prompt can
-  // list what's actually attached (one tool call — fetches up to ~10).
-  // Uses head:false here (we need the rows, not just the count) — still
-  // small payload because there are usually 1-3 planned sessions per appt.
+  // Routing by complexity:
+  //   • Single planned session + YES  → inline complete (UPDATE
+  //     ledger_sessions + teeth_status + audit + auto-complete the
+  //     appointment row + stamp dismissed_at) — all in one click.
+  //     We skip the FIFO reallocation here (it requires the patient-
+  //     profile-scoped reallocatePatientFunds helper which isn't loaded
+  //     on the dashboard); it self-heals next time the user opens the
+  //     patient profile.
+  //   • Single planned session + NO   → Q2 safety-net + plain stamp.
+  //   • Multi-session + YES           → redirect to appointments.html
+  //     (the user MUST pick which procedures were actually done with
+  //     checkboxes — that workflow only exists there). The full Phase 8C
+  //     modal lives in appointments.html and handles provider mismatch,
+  //     lab order auto-delivery, FIFO reallocation, and audit logging.
+  //   • Multi-session + NO            → Q2 safety-net + plain stamp.
   //
-  // Scoped by doctor_id explicitly (defense-in-depth — RLS already
-  // enforces this but appointments.html does the same belt-and-braces).
-  // Fails open: if the fetch errors out, we proceed with the stamp
-  // rather than blocking the secretary entirely.
+  // Fetch payload includes patient_id (needed for teeth_status scoping)
+  // alongside the display columns. Scoped by doctor_id for defense-in-
+  // depth even though RLS enforces it. Fails open: any error skips the
+  // intercept entirely so the secretary can still record the timestamp.
   if (fieldKey === 'dismissed_at') {
     try {
       var qPlanned = window.sb.from('ledger_sessions')
-        .select('id, type, tooth_num, surface, cost')
+        .select('id, type, tooth_num, surface, cost, patient_id')
         .eq('appointment_id', apptId)
         .eq('status', 'planned');
       if (_dashUid) qPlanned = qPlanned.eq('doctor_id', _dashUid);
@@ -1508,38 +1509,147 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
             : '';
           summary = '«' + (s.type || 'علاج') + area + costPart + '»';
         } else {
-          var lines = plannedList.slice(0, 5).map(function(s){
-            var area = s.tooth_num ? ' (السن ' + s.tooth_num + ')' : '';
-            return '• ' + (s.type || 'علاج') + area;
+          var lines = plannedList.slice(0, 5).map(function(ps){
+            var ar = ps.tooth_num ? ' (السن ' + ps.tooth_num + ')' : '';
+            return '• ' + (ps.type || 'علاج') + ar;
           });
           if (plannedList.length > 5) lines.push('• ... و' + (plannedList.length - 5) + ' علاج آخر');
           summary = lines.join('\n');
         }
 
         // Question 1 — the real chair-side question, asked plainly.
+        // Different action label depending on count so the user knows what
+        // OK will actually do (inline complete vs. open the picker page).
+        var q1ActionLabel = (plannedList.length === 1)
+          ? 'موافق → نعم، تم الإنجاز (إكمال العلاج + تسجيل الخروج)'
+          : 'موافق → نعم، تم الإنجاز (انتقال لصفحة المواعيد لاختيار العلاجات)';
         var q1 = '🦷 هل تم إنجاز العلاج المخطّط؟\n\n'
                + summary + '\n\n'
-               + 'موافق → نعم، تم الإنجاز (انتقال لصفحة المواعيد لتأكيد الإكمال)\n'
+               + q1ActionLabel + '\n'
                + 'إلغاء → لا، لم يُنجَز';
 
         if (confirm(q1)) {
-          // YES → route to appointments.html where the full Phase 8C
-          // modal handles completion + dismissed_at stamping atomically.
-          window.location.href = 'appointments.html';
-          return;
-        }
+          // YES path
+          if (plannedList.length > 1) {
+            // Multi-session: redirect to appointments.html where the full
+            // Phase 8C modal (with checkboxes for partial completion) lives.
+            window.location.href = 'appointments.html';
+            return;
+          }
 
-        // NO → safety-net confirm before we stamp dismissed without
-        // completing anything. Misclicks on the dashboard widget are
-        // common (the buttons are small and the secretary may scroll).
-        var q2 = '⚠️ هل تريد تسجيل خروج المريض بدون إكمال العلاج؟\n\n'
-               + 'العلاج المخطّط سيبقى كما هو ويمكن إكماله لاحقاً من ملف المريض.\n\n'
-               + 'موافق → تسجيل الخروج فقط\n'
-               + 'إلغاء → عودة (لن يُسجَّل أي شيء)';
-        if (!confirm(q2)) {
-          return;  // user backed out — leave everything untouched
+          // Single-session inline complete. Run the writes in the same
+          // order completeSessionFromProfile uses (patient-profile.html)
+          // and let any failure surface clearly via console + alert so the
+          // secretary knows the stamp ALSO didn't happen.
+          if (btnEl) btnEl.disabled = true;
+          var single = plannedList[0];
+
+          try {
+            // 1) Flip the session status. This is the keystone — if it
+            //    fails, abort the whole flow (don't stamp dismissed_at on
+            //    a state that doesn't reflect what was actually done).
+            var sessUpd = await window.sb.from('ledger_sessions')
+              .update({ status: 'completed' })
+              .eq('id', single.id);
+            if (sessUpd.error) {
+              console.error('Phase 8C inline complete: session update failed:', sessUpd.error);
+              alert('⚠️ فشل تحديث حالة الجلسة — لم يُسجَّل أي شيء.');
+              if (btnEl) btnEl.disabled = false;
+              return;
+            }
+
+            // 2) Mirror in teeth_status if the session has a tooth.
+            //    Matches the same filter pattern completeSessionFromProfile
+            //    uses: tooth_num + planned status, surface only if present.
+            //    Non-fatal — the session flip is what matters for billing.
+            if (single.tooth_num && single.patient_id) {
+              try {
+                var tq = window.sb.from('teeth_status').update({ status: 'completed' })
+                  .eq('patient_id', single.patient_id)
+                  .eq('tooth_num', String(single.tooth_num))
+                  .eq('status', 'planned');
+                if (single.surface) tq = tq.eq('surface', single.surface);
+                if (_dashUid) tq = tq.eq('doctor_id', _dashUid);
+                var tRes = await tq;
+                if (tRes.error) console.warn('Phase 8C inline: teeth_status update warn:', tRes.error);
+              } catch (te) { console.warn('Phase 8C inline: teeth_status throw:', te); }
+            }
+
+            // 3) Auto-flip the appointment status. Since we know there's
+            //    only ONE planned session and we just flipped it, all
+            //    sessions are now complete. Fall back to 'confirmed' on
+            //    check-constraint rejection (pre-Phase 2 servers).
+            try {
+              var apptUpd = await window.sb.from('appointments')
+                .update({ status: 'completed' })
+                .eq('id', apptId);
+              if (apptUpd.error) {
+                var errStr = (apptUpd.error.message || '') + ' ' + (apptUpd.error.code || '');
+                if (/check constraint|23514|appointments_status_check/i.test(errStr)) {
+                  await window.sb.from('appointments')
+                    .update({ status: 'confirmed' })
+                    .eq('id', apptId);
+                } else {
+                  console.warn('Phase 8C inline: appt status update warn:', apptUpd.error);
+                }
+              }
+            } catch (ae) { console.warn('Phase 8C inline: appt status throw:', ae); }
+
+            // 4) Phase 5 audit trail. Same action_type as
+            //    completeSessionFromProfile uses (session.complete) so
+            //    audit-log.html renders it the same way.
+            try {
+              if (window.logAudit) {
+                window.logAudit('session.complete', {
+                  entityId: single.id,
+                  patientId: single.patient_id || null,
+                  description: 'إكمال علاج مفرد من لوحة التحكم: ' + (single.type || '')
+                             + ((typeof single.cost === 'number' || typeof single.cost === 'string')
+                                 ? ' — ' + (parseFloat(single.cost) || 0).toLocaleString('en-US') + ' ل.س'
+                                 : ''),
+                  oldValue: { status: 'planned' },
+                  newValue: {
+                    status: 'completed',
+                    tooth_num: single.tooth_num || null,
+                    surface: single.surface || null,
+                    source: 'dashboard_dismissed_trigger'
+                  }
+                });
+              }
+            } catch (le) { console.warn('Phase 8C inline: audit log throw:', le); }
+
+            // 5) Note: FIFO payment reallocation is deferred. It depends
+            //    on reallocatePatientFunds() which only loads inside
+            //    patient-profile.html. Allocations self-heal next time the
+            //    user opens the patient profile (loadPayments runs FIFO).
+            //    This is acceptable degradation for the dashboard quick-
+            //    action — the ledger/financial truth is preserved (session
+            //    is completed; what shifts is just which payment row each
+            //    paysplit points to).
+          } catch (workflowErr) {
+            console.error('Phase 8C inline workflow error:', workflowErr);
+            alert('⚠️ حدث خطأ أثناء إكمال العلاج. حالة الجلسة قد لا تكون متطابقة — راجع صفحة المواعيد.');
+            if (btnEl) btnEl.disabled = false;
+            return;
+          }
+
+          // Fall through to the normal stamp flow (dismissed_at) below.
+          // The button is already disabled from step 1; the original code
+          // would have done that too. Mutating _dashApptsToday + re-render
+          // + waiting-room refresh all happen in the unmodified tail.
+        } else {
+          // NO path → safety-net confirm before stamping dismissed without
+          // completing anything. Misclicks on the dashboard widget are
+          // common (the buttons are small and the secretary may scroll).
+          var q2 = '⚠️ هل تريد تسجيل خروج المريض بدون إكمال العلاج؟\n\n'
+                 + 'العلاج المخطّط سيبقى كما هو ويمكن إكماله لاحقاً من ملف المريض.\n\n'
+                 + 'موافق → تسجيل الخروج فقط\n'
+                 + 'إلغاء → عودة (لن يُسجَّل أي شيء)';
+          if (!confirm(q2)) {
+            return;  // user backed out — leave everything untouched
+          }
+          // Fall through to the normal stamp flow below (no completion).
         }
-        // Fall through to the normal stamp flow below (no completion).
       }
     } catch (e) {
       console.warn('recordDashApptTime: Phase 8C planned-sessions check failed (proceeding with stamp):', e);
