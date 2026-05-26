@@ -918,8 +918,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a51"></script>
-<script src="sidebar.js?v=20260526a51"></script>
+<script src="supabase-init.js?v=20260526a52"></script>
+<script src="sidebar.js?v=20260526a52"></script>
 </head>
 <body>
 <script>
@@ -3101,6 +3101,28 @@ async function dismissedSkipComplete() {
   // Close the modal first to avoid double-clicks on its buttons during the await.
   document.getElementById('dismissedCompleteModal').classList.remove('open');
   try {
+    // OpenDental-pattern: when the user dismisses without completing ANY of
+    // the planned procedures, detach all of them from this appointment so
+    // they're available for a follow-up appointment. Without this, the
+    // planned sessions stay welded to the old (now-dismissed) appointment
+    // and don't appear in "علاجات مخططة متاحة للربط" when the patient is
+    // rescheduled. Silent — any error logs to console but doesn't block the stamp.
+    try {
+      var attached = sessionsByAppt[apptId] || [];
+      var plannedIds = attached
+        .filter(function(s){ return s.status === 'planned'; })
+        .map(function(s){ return s.id; });
+      if (plannedIds.length > 0) {
+        var detachRes = await window.sb.from('ledger_sessions')
+          .update({ appointment_id: null })
+          .in('id', plannedIds)
+          .eq('doctor_id', currentUser.id)
+          .eq('status', 'planned');
+        if (detachRes.error) {
+          console.warn('Phase 8C skip-detach planned sessions warn:', detachRes.error);
+        }
+      }
+    } catch (de) { console.warn('Phase 8C skip-detach exception:', de); }
     // Use the sentinel so recordApptTime skips the interception logic and just stamps.
     await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
   } catch (e) { console.error('dismissedSkipComplete error:', e); }
@@ -3118,12 +3140,20 @@ async function dismissedConfirmComplete() {
   // Each .dcm-row owns its own data-checked + data-session-id.
   var rows = document.querySelectorAll('#dcmPlannedList .dcm-row');
   var selectedIds = [];
+  var allRowIds = [];
   for (var i = 0; i < rows.length; i++) {
+    var rowSid = rows[i].getAttribute('data-session-id');
+    if (rowSid) allRowIds.push(rowSid);
     if (rows[i].getAttribute('data-checked') === '1') {
-      var sid = rows[i].getAttribute('data-session-id');
-      if (sid) selectedIds.push(sid);
+      if (rowSid) selectedIds.push(rowSid);
     }
   }
+  // Sessions the user unchecked = planned procedures they did NOT do today.
+  // OpenDental-pattern: detach these from the dismissed appointment so they
+  // appear again in "علاجات مخططة متاحة للربط" when a follow-up appointment
+  // is booked. Without this, the planned sessions stay welded to the old
+  // (now-dismissed) appointment and the user thinks they've vanished.
+  var unselectedIds = allRowIds.filter(function(id){ return selectedIds.indexOf(id) === -1; });
   _phase8cInFlight = true;
   var apptId = _phase8cState.apptId;
   // Close modal immediately so the user sees responsive feedback.
@@ -3145,6 +3175,22 @@ async function dismissedConfirmComplete() {
     // we use the same-path stamp here for symmetry with the skip-flow and for the case
     // where appointment.status was NOT updated (partial subset).
     if (completionSucceeded) {
+      // Detach unfinished planned sessions BEFORE stamping dismissed_at so a
+      // failure here doesn't leave the appointment in an inconsistent state
+      // (stamped dismissed but procedures still linked). Silent operation —
+      // any error logs to console but doesn't block the dismiss flow.
+      if (unselectedIds.length > 0) {
+        try {
+          var detachRes = await window.sb.from('ledger_sessions')
+            .update({ appointment_id: null })
+            .in('id', unselectedIds)
+            .eq('doctor_id', currentUser.id)
+            .eq('status', 'planned');
+          if (detachRes.error) {
+            console.warn('Phase 8C detach unfinished planned sessions warn:', detachRes.error);
+          }
+        } catch (de) { console.warn('Phase 8C detach exception:', de); }
+      }
       await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
     }
   } catch (e) {
