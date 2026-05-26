@@ -879,7 +879,7 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a38"></script>
+<script src="supabase-init.js?v=20260526a39"></script>
 <script src="sidebar.js?v=20260526a39"></script>
 </head>
 <body>
@@ -1156,6 +1156,41 @@ textarea { resize: vertical; min-height: 72px; }
       <button type="button" class="wa-send-btn" id="waSendBtn" onclick="sendWaReminder()">
         <span>📱</span> <span>فتح WhatsApp وإرسال</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Phase 8C: Dismissed-trigger modal — invoked when the user clicks "🚪 خرج" on an
+     appointment that still has planned sessions / unfinished labs. Lets the user
+     pick which planned items to complete now vs. defer. -->
+<div class="modal-overlay" id="dismissedCompleteModal" onclick="if(event.target===this) closeDismissedCompleteModal()">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2 class="modal-title">🚪 إنهاء الموعد + إكمال العلاجات</h2>
+      <button class="modal-close" type="button" onclick="closeDismissedCompleteModal()">✕</button>
+    </div>
+    <div style="padding:0 4px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">المريض:</div>
+      <div id="dcmPatient" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px;">—</div>
+
+      <div id="dcmPlannedSection" style="display:none;">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">📋 علاجات مخطّطة لهذا الموعد:</div>
+        <div id="dcmPlannedList" style="max-height:200px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px;margin-bottom:14px;"></div>
+      </div>
+
+      <div id="dcmLabsSection" style="display:none;">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">🔬 طلبات مخبر مرتبطة (ستُسجَّل كـ "تم التركيب"):</div>
+        <div id="dcmLabsList" style="border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;margin-bottom:14px;font-size:12px;color:var(--text2);"></div>
+      </div>
+
+      <div id="dcmEmptyHint" style="display:none;padding:10px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.3);border-radius:8px;color:#f5c842;font-size:12px;margin-bottom:14px;">
+        لا توجد علاجات مخطّطة لهذا الموعد. سيتم فقط تسجيل وقت الخروج.
+      </div>
+    </div>
+    <div class="modal-footer" style="gap:10px;">
+      <button type="button" class="btn-cancel" onclick="closeDismissedCompleteModal()">إلغاء</button>
+      <button type="button" id="dcmSkipBtn" onclick="dismissedSkipComplete()" style="background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:600;">⏸️ فقط تسجيل الخروج</button>
+      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:#2ee89e;color:#0a1628;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
     </div>
   </div>
 </div>
@@ -2774,8 +2809,37 @@ async function recordApptTime(apptId, fieldKey, btnEl) {
     console.error('recordApptTime: invalid field key', fieldKey);
     return false;
   }
+
+  // Phase 8C: when the user clicks "🚪 خرج" (dismissed) and this appointment still has
+  // planned attached sessions, intercept the flow and show the completion modal first.
+  // The modal handlers then call back into recordApptTime via the special internal
+  // marker '__fromDismissedModal' so we don't loop. If no planned sessions exist,
+  // skip the modal entirely and stamp as before.
+  if (fieldKey === 'dismissed_at' && btnEl !== '__fromDismissedModal') {
+    var _apptForCheck = appointments.find(function(a){ return a.id === apptId; });
+    if (_apptForCheck && _apptForCheck.dismissed_at) {
+      // Already dismissed → nothing to intercept. Let the original flow be a no-op
+      // (the original code below also handles this defensively).
+    } else if (_apptForCheck) {
+      var _attached = sessionsByAppt[apptId] || [];
+      var _hasPlanned = _attached.some(function(s){ return s.status === 'planned'; });
+      var _linkedLabsCheck = (labOrdersByAppt[apptId] || []).filter(function(o){
+        return o.status === 'sent' || o.status === 'received' || o.status === 'checked';
+      });
+      if (_hasPlanned || _linkedLabsCheck.length) {
+        // Open the picker modal instead of stamping immediately. btnEl is captured
+        // so the modal handlers can re-enable it on cancel.
+        if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
+        openDismissedCompleteModal(apptId, btnEl);
+        return true;  // intercepted — modal handlers will continue the workflow
+      }
+    }
+  }
+
   // Disable the button while the update is in flight to prevent double-clicks.
-  if (btnEl) { btnEl.disabled = true; }
+  // Phase 8C: btnEl is a DOM node in the normal flow; the dismissed-modal callback
+  // passes the sentinel string '__fromDismissedModal' instead, which we should skip.
+  if (btnEl && typeof btnEl === 'object') { btnEl.disabled = true; }
 
   var patch = {};
   patch[fieldKey] = new Date().toISOString();
@@ -2792,17 +2856,17 @@ async function recordApptTime(apptId, fieldKey, btnEl) {
         if (retry.error) {
           if (isMissingTimeColumnError(retry.error)) warnTimeTrackingMigrationOnce();
           else console.error('recordApptTime retry failed:', retry.error);
-          if (btnEl) btnEl.disabled = false;
+          if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
           return false;
         }
         warnTimeTrackingMigrationOnce();
       } else if (isMissingTimeColumnError(res.error)) {
         warnTimeTrackingMigrationOnce();
-        if (btnEl) btnEl.disabled = false;
+        if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
         return false;
       } else {
         console.error('recordApptTime failed:', res.error);
-        if (btnEl) btnEl.disabled = false;
+        if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
         return false;
       }
     }
@@ -2816,9 +2880,197 @@ async function recordApptTime(apptId, fieldKey, btnEl) {
     return true;
   } catch (e) {
     console.error('recordApptTime exception:', e);
-    if (btnEl) btnEl.disabled = false;
+    if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
     return false;
   }
+}
+
+// ─── Phase 8C: Dismissed-Trigger Completion Modal Handlers ───────────────────
+// When the user clicks "🚪 خرج" on an appointment with planned sessions/labs,
+// recordApptTime() intercepts and routes here. This module owns:
+//   • state: which appt is being dismissed + the source button to re-enable
+//   • UI: builds the checkbox list of planned sessions + lab orders
+//   • flow: confirm → completeApptWithProcedures(subset) → stamp dismissed_at
+// State is kept module-level (not on window) to prevent cross-tab contamination.
+
+// Snapshot captured when the modal opens — needed by the OK/skip handlers.
+var _phase8cState = null;     // { apptId, btnEl }
+var _phase8cInFlight = false; // double-click guard across the whole flow
+
+function openDismissedCompleteModal(apptId, btnEl) {
+  if (_phase8cInFlight) return;  // already running — ignore extra clicks
+  // Phase 8C audit R21: defense-in-depth — block if locked doctor is inactive.
+  // recordApptTime (the original timestamp path) doesn't enforce this, but the
+  // dismissed-trigger flow goes much further (completes sessions → ledger writes →
+  // FIFO reallocation → audit log). Inactive accounts shouldn't trigger any of that.
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إنهاء المواعيد');
+    if (btnEl && typeof btnEl === 'object') btnEl.disabled = false;
+    return;
+  }
+  var appt = appointments.find(function(a){ return a.id === apptId; });
+  if (!appt) { showToast('⚠️ الموعد غير موجود'); return; }
+
+  _phase8cState = { apptId: apptId, btnEl: btnEl || null };
+
+  // Build planned-session checkboxes. Pre-checked by default (the common case is
+  // "yes, complete everything"). User unchecks anything that didn't actually happen.
+  var attached = sessionsByAppt[apptId] || [];
+  var planned = attached.filter(function(s){ return s.status === 'planned'; });
+  var listEl = document.getElementById('dcmPlannedList');
+  var sectionEl = document.getElementById('dcmPlannedSection');
+  var emptyHintEl = document.getElementById('dcmEmptyHint');
+  var confirmBtn = document.getElementById('dcmConfirmBtn');
+
+  if (planned.length) {
+    var QLBL = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+    var ALBL = {'U':'الفك العلوي','L':'الفك السفلي'};
+    var rows = '';
+    planned.forEach(function(s, idx){
+      var area = '';
+      if (s.tooth_num) {
+        area = ' • السن ' + s.tooth_num + (s.surface && s.surface !== 'WHOLE' ? '/' + s.surface : '');
+      } else if (s.quadrant && QLBL[s.quadrant]) {
+        area = ' • ' + QLBL[s.quadrant];
+      } else if (s.arch && ALBL[s.arch]) {
+        area = ' • ' + ALBL[s.arch];
+      }
+      // Resolve provider name for clarity (uses CLINIC_DOCTORS already loaded in this page)
+      var provName = '';
+      if (s.provider_id && Array.isArray(CLINIC_DOCTORS)) {
+        var pr = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
+        if (pr) provName = pr.name;
+      }
+      rows += '<label style="display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;" for="dcmChk_' + idx + '">'
+            +   '<input type="checkbox" id="dcmChk_' + idx + '" data-session-id="' + escapeHtml(s.id) + '" checked style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">'
+            +   '<div style="flex:1;min-width:0;">'
+            +     '<div style="font-size:13px;color:var(--text);font-weight:600;">' + escapeHtml(s.type || s.description || 'علاج') + escapeHtml(area) + '</div>'
+            +     '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + fmtCost(s.cost) + ' ل.س' + (provName ? ' • ' + escapeHtml(provName) : '') + '</div>'
+            +   '</div>'
+            + '</label>';
+    });
+    listEl.innerHTML = rows;
+    sectionEl.style.display = 'block';
+  } else {
+    listEl.innerHTML = '';
+    sectionEl.style.display = 'none';
+  }
+
+  // Linked labs: show as informational (no checkboxes — completeApptWithProcedures
+  // updates labs as a side-effect of completing the appointment, only when subset
+  // covers ALL planned sessions). For the dismissed-trigger flow, this matches
+  // the original "Set Complete" semantics from the in-modal button.
+  var linkedLabs = (labOrdersByAppt[apptId] || []).filter(function(o){
+    return o.status === 'sent' || o.status === 'received' || o.status === 'checked';
+  });
+  var labsListEl = document.getElementById('dcmLabsList');
+  var labsSectionEl = document.getElementById('dcmLabsSection');
+  if (linkedLabs.length) {
+    var labRows = linkedLabs.map(function(o){
+      var statusLbl = (o.status === 'received') ? 'تم الاستلام' : (o.status === 'checked' ? 'مراجَع' : 'مُرسل');
+      var toothPart = o.tooth_num ? ' — السن ' + o.tooth_num : '';
+      return '• ' + escapeHtml(o.work_type || 'طلب مخبر') + toothPart + ' (' + statusLbl + ')';
+    }).join('<br>');
+    labsListEl.innerHTML = labRows;
+    labsSectionEl.style.display = 'block';
+  } else {
+    labsListEl.innerHTML = '';
+    labsSectionEl.style.display = 'none';
+  }
+
+  // Empty hint shown when neither planned sessions nor pending labs are present.
+  // (recordApptTime won't open the modal in that case — but defense-in-depth.)
+  if (!planned.length && !linkedLabs.length) {
+    emptyHintEl.style.display = 'block';
+    if (confirmBtn) confirmBtn.style.display = 'none';
+  } else {
+    emptyHintEl.style.display = 'none';
+    if (confirmBtn) confirmBtn.style.display = '';
+  }
+
+  // Patient name in header
+  var pname = '—';
+  try {
+    if (appt.patient_id && patientsCache && patientsCache[appt.patient_id]) {
+      pname = patientsCache[appt.patient_id].name || appt.patient_name || '—';
+    } else if (appt.patient_name) {
+      pname = appt.patient_name;
+    }
+  } catch (e) {}
+  document.getElementById('dcmPatient').textContent = pname;
+
+  document.getElementById('dismissedCompleteModal').classList.add('open');
+}
+
+function closeDismissedCompleteModal() {
+  document.getElementById('dismissedCompleteModal').classList.remove('open');
+  // Re-enable the source button (the "🚪 خرج" button in the list/day view) so
+  // the user can retry. If the modal completed successfully, the list will be
+  // re-rendered anyway and the button will be replaced by the next stage badge.
+  if (_phase8cState && _phase8cState.btnEl && typeof _phase8cState.btnEl === 'object') {
+    _phase8cState.btnEl.disabled = false;
+  }
+  _phase8cState = null;
+}
+
+// User chose "⏸️ فقط تسجيل الخروج" — stamp dismissed_at but do not complete sessions.
+async function dismissedSkipComplete() {
+  if (!_phase8cState || !_phase8cState.apptId) { closeDismissedCompleteModal(); return; }
+  if (_phase8cInFlight) return;
+  _phase8cInFlight = true;
+  var apptId = _phase8cState.apptId;
+  // Close the modal first to avoid double-clicks on its buttons during the await.
+  document.getElementById('dismissedCompleteModal').classList.remove('open');
+  try {
+    // Use the sentinel so recordApptTime skips the interception logic and just stamps.
+    await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
+  } catch (e) { console.error('dismissedSkipComplete error:', e); }
+  _phase8cInFlight = false;
+  _phase8cState = null;
+}
+
+// User chose "✅ خرج + إكمال المحدد" — complete the checked sessions, then stamp dismissed_at.
+async function dismissedConfirmComplete() {
+  if (!_phase8cState || !_phase8cState.apptId) { closeDismissedCompleteModal(); return; }
+  if (_phase8cInFlight) return;
+  // Collect checked session IDs from the modal DOM (snapshot now — modal will close).
+  var checks = document.querySelectorAll('#dcmPlannedList input[type="checkbox"]');
+  var selectedIds = [];
+  for (var i = 0; i < checks.length; i++) {
+    if (checks[i].checked) {
+      var sid = checks[i].getAttribute('data-session-id');
+      if (sid) selectedIds.push(sid);
+    }
+  }
+  _phase8cInFlight = true;
+  var apptId = _phase8cState.apptId;
+  // Close modal immediately so the user sees responsive feedback.
+  document.getElementById('dismissedCompleteModal').classList.remove('open');
+  try {
+    var completionSucceeded = true;
+    if (selectedIds.length > 0) {
+      // Reuse the unified completion flow. Provider-mismatch and lab-sync prompts
+      // inside completeApptWithProcedures will fire as usual.
+      // Phase 8C audit #15: function returns false when user cancels a mid-flow
+      // prompt (e.g. provider mismatch second prompt). In that case, do NOT stamp
+      // dismissed_at — leave the appointment exactly where it was.
+      var ret = await completeApptWithProcedures(apptId, selectedIds);
+      completionSucceeded = (ret !== false);
+    }
+    // Only stamp dismissed_at when the completion attempt wasn't cancelled.
+    // Note: completeApptWithProcedures may have already set appointment.status='completed'
+    // in the full-set case, which auto-stamps dismissed_at via submitAppt's logic. But
+    // we use the same-path stamp here for symmetry with the skip-flow and for the case
+    // where appointment.status was NOT updated (partial subset).
+    if (completionSucceeded) {
+      await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
+    }
+  } catch (e) {
+    console.error('dismissedConfirmComplete error:', e);
+    showToast('⚠️ تعذّر إكمال الموعد بالكامل — راجع console');
+  }
+  _phase8cInFlight = false;
+  _phase8cState = null;
 }
 
 // Manual override of a timestamp via double-click on its stamp. Accepts
@@ -4341,23 +4593,35 @@ async function unlinkSessionFromAppt(sessId) {
      - Cancel         (do nothing)
    Mirrors OpenDental: "If the appointment provider does not match the provider on
    at least one attached procedure, there is a prompt." */
-async function completeApptWithProcedures() {
-  if (!editingId) return;
+async function completeApptWithProcedures(apptIdParam, sessionIdsFilter) {
+  // Phase 8C: accept an optional apptId (for dismissed-trigger callsite that doesn't
+  // open the edit modal) and an optional sessionIdsFilter (subset of planned sessions
+  // to complete, default = all). When called with no args (the original Set-Complete
+  // button inside the edit modal), behavior matches the pre-refactor function exactly.
+  var apptId = apptIdParam || editingId;
+  if (!apptId) return false;
   // Phase 4.1: defense-in-depth — block production-creating ops if locked doctor is inactive
   if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
     showToast('🔒 حسابك غير نشط — لا يمكن إكمال المواعيد');
-    return;
+    return false;
   }
   // Gap 7: Set Complete is meaningless on a planned appointment — it has no
   // date, no time, no chair-side reality. Force the user to schedule it first.
-  var _curAppt = appointments.find(function(a){ return a.id === editingId; });
+  var _curAppt = appointments.find(function(a){ return a.id === apptId; });
   if (_curAppt && isPlannedAppt(_curAppt)) {
     showToast('⚠️ يجب جدولة الموعد أولاً قبل إكماله');
-    return;
+    return false;
   }
-  var attached = sessionsByAppt[editingId] || [];
+  var attached = sessionsByAppt[apptId] || [];
   var plannedOnes = attached.filter(function(s){ return s.status === 'planned'; });
-  if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return; }
+  // Apply session-subset filter when provided (Phase 8C dismissed-trigger flow lets
+  // the user uncheck specific sessions in the modal — only the checked subset arrives here).
+  if (Array.isArray(sessionIdsFilter) && sessionIdsFilter.length) {
+    var _allow = {};
+    sessionIdsFilter.forEach(function(id){ _allow[id] = true; });
+    plannedOnes = plannedOnes.filter(function(s){ return _allow[s.id]; });
+  }
+  if (!plannedOnes.length) { showToast('⚠️ لا توجد علاجات مخطّطة'); return false; }
 
   // Guard: refuse to silently flip a no_show / cancelled / (legacy) broken
   // appointment to 'completed'. If the doctor reached this button on such
@@ -4373,14 +4637,14 @@ async function completeApptWithProcedures() {
                     + 'هل تريد فعلاً تحويله إلى "مكتمل" وإكمال العلاجات المخطّطة؟\n\n'
                     + '• موافق → تحويل الحالة + إكمال العلاجات\n'
                     + '• إلغاء → إبقاء الموعد كما هو';
-    if (!confirm(overrideMsg)) return;
+    if (!confirm(overrideMsg)) return false;
   }
 
   // ── Gap 2: provider-mismatch check ────────────────────────────────────────
   // The appointment's provider is the source of truth. Only flag mismatches
   // when the procedure has an explicit provider that differs (NULL means
   // "use the appointment's provider" → not a mismatch).
-  var apptObj = appointments.find(function(a){ return a.id === editingId; });
+  var apptObj = appointments.find(function(a){ return a.id === apptId; });
   var apptProviderId = apptObj ? (apptObj.provider_id || null) : null;
   var mismatched = plannedOnes.filter(function(s){
     return s.provider_id && apptProviderId && s.provider_id !== apptProviderId;
@@ -4410,24 +4674,30 @@ async function completeApptWithProcedures() {
                + '• موافق  → متابعة كما هو\n'
                + '• إلغاء → إلغاء العملية';
       if (!confirm(msg2)) {
-        return;  // user aborted
+        return false;  // user aborted
       }
       // else: proceed as-is
     }
   }
 
   // Build confirmation message that also mentions lab orders that will be auto-completed.
-  var linkedLabsForPrompt = (labOrdersByAppt[editingId] || []).filter(function(o){
+  // Phase 8C: when called from the dismissed-trigger modal (sessionIdsFilter present),
+  // the user already made an explicit, item-level choice — skip this second confirm.
+  // The provider-mismatch prompt above still fires (it's safety-critical, not a generic confirm).
+  var linkedLabsForPrompt = (labOrdersByAppt[apptId] || []).filter(function(o){
     return o.status === 'sent' || o.status === 'received' || o.status === 'checked';
   });
-  var promptMsg = 'إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟';
-  if (unifyProviders) {
-    promptMsg += '\n\nسيتم أيضاً توحيد طبيب جميع العلاجات لطبيب الموعد.';
+  var _calledFromSubsetUI = Array.isArray(sessionIdsFilter) && sessionIdsFilter.length > 0;
+  if (!_calledFromSubsetUI) {
+    var promptMsg = 'إكمال ' + plannedOnes.length + ' علاج مخطّط دفعة واحدة؟';
+    if (unifyProviders) {
+      promptMsg += '\n\nسيتم أيضاً توحيد طبيب جميع العلاجات لطبيب الموعد.';
+    }
+    if (linkedLabsForPrompt.length) {
+      promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "تم التركيب".';
+    }
+    if (!confirm(promptMsg)) return false;
   }
-  if (linkedLabsForPrompt.length) {
-    promptMsg += '\n\nسيتم أيضاً تسجيل ' + linkedLabsForPrompt.length + ' طلب مخبر كـ "تم التركيب".';
-  }
-  if (!confirm(promptMsg)) return;
 
   var btn = document.getElementById('completeApptBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإكمال…'; }
@@ -4460,22 +4730,32 @@ async function completeApptWithProcedures() {
   // 3) Mark appointment as 'completed' (Gap 1).
   //    If the DB constraint hasn't been migrated yet, the UPDATE will fail —
   //    fall back to 'confirmed' so the rest of the workflow keeps working.
-  var u3 = await window.sb.from('appointments')
-    .update({ status: 'completed' })
-    .eq('id', editingId).eq('doctor_id', currentUser.id);
+  // Phase 8C: when called with a subset filter that doesn't cover ALL planned
+  // sessions on this appointment, leave appointment.status alone. The user
+  // explicitly chose to defer some sessions — flipping the appointment to
+  // 'completed' would be misleading.
+  var _allPlannedAttached = (sessionsByAppt[apptId] || []).filter(function(s){ return s.status === 'planned'; });
+  var _isFullSet = !Array.isArray(sessionIdsFilter) || sessionIdsFilter.length === 0
+                || plannedOnes.length >= _allPlannedAttached.length;
   var migrationMissing = false;
-  if (u3.error) {
-    // 23514 = check_violation (PostgreSQL); also handle the generic message.
-    var errMsg = (u3.error.message || '') + ' ' + (u3.error.code || '');
-    if (/check constraint|23514|appointments_status_check/i.test(errMsg)) {
-      migrationMissing = true;
-      console.warn("appointments.status='completed' rejected — falling back to 'confirmed'. Run Migration: ALTER TABLE appointments DROP CONSTRAINT appointments_status_check; ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','pending','completed','cancelled','broken','no_show'));");
-      var u3b = await window.sb.from('appointments')
-        .update({ status: 'confirmed' })
-        .eq('id', editingId).eq('doctor_id', currentUser.id);
-      if (u3b.error) console.warn('appt update fallback warn:', u3b.error);
-    } else {
-      console.warn('appt update warn:', u3.error);
+  var u3 = { error: null };
+  if (_isFullSet) {
+    u3 = await window.sb.from('appointments')
+      .update({ status: 'completed' })
+      .eq('id', apptId).eq('doctor_id', currentUser.id);
+    if (u3.error) {
+      // 23514 = check_violation (PostgreSQL); also handle the generic message.
+      var errMsg = (u3.error.message || '') + ' ' + (u3.error.code || '');
+      if (/check constraint|23514|appointments_status_check/i.test(errMsg)) {
+        migrationMissing = true;
+        console.warn("appointments.status='completed' rejected — falling back to 'confirmed'. Run Migration: ALTER TABLE appointments DROP CONSTRAINT appointments_status_check; ALTER TABLE appointments ADD CONSTRAINT appointments_status_check CHECK (status IN ('scheduled','confirmed','pending','completed','cancelled','broken','no_show'));");
+        var u3b = await window.sb.from('appointments')
+          .update({ status: 'confirmed' })
+          .eq('id', apptId).eq('doctor_id', currentUser.id);
+        if (u3b.error) console.warn('appt update fallback warn:', u3b.error);
+      } else {
+        console.warn('appt update warn:', u3.error);
+      }
     }
   }
 
@@ -4485,7 +4765,9 @@ async function completeApptWithProcedures() {
   //    the patient is leaving the chair with the work done.
   //    We use the same column names labs.html already writes (date_delivered) and
   //    guard against missing column / missing migration silently.
-  var linkedLabs = labOrdersByAppt[editingId] || [];
+  // Phase 8C: skip lab auto-completion when only a subset of planned sessions was
+  // selected — the lab work hasn't been seated if half the procedures are deferred.
+  var linkedLabs = _isFullSet ? (labOrdersByAppt[apptId] || []) : [];
   var labFailed = 0;
   var labUpdated = 0;
   for (var k=0; k<linkedLabs.length; k++) {
@@ -4519,31 +4801,48 @@ async function completeApptWithProcedures() {
   // appointment.bulk_complete to distinguish from a single appointment.status_change.)
   if (window.logAudit) {
     var pname = '';
-    var apptObjForAudit = appointments.find(function(a){ return a.id === editingId; });
+    var apptObjForAudit = appointments.find(function(a){ return a.id === apptId; });
     var pid = apptObjForAudit ? apptObjForAudit.patient_id : null;
     try {
       if (pid && patientsCache && patientsCache[pid]) pname = patientsCache[pid].name || '';
     } catch (e) {}
+    // Phase 8C: when subset selected and appointment status NOT updated, reflect that
+    // in new_status — describes the actual write that happened, not the default.
+    var _newStatusForAudit = _isFullSet ? (migrationMissing ? 'confirmed' : 'completed') : (apptObjForAudit ? apptObjForAudit.status : null);
     window.logAudit('appointment.bulk_complete', {
-      entityId: editingId,
+      entityId: apptId,
       patientId: pid,
       patientName: pname,
       description: 'إكمال موعد جماعي: ' + (plannedOnes.length - failed) + '/' + plannedOnes.length + ' علاج'
                    + (labUpdated ? ' + ' + labUpdated + ' طلب مخبر' : '')
-                   + (unifyProviders ? ' (مع توحيد الأطباء)' : ''),
+                   + (unifyProviders ? ' (مع توحيد الأطباء)' : '')
+                   + (_isFullSet ? '' : ' — جزئي (الموعد لم يُكمل)'),
       oldValue: { sessions_planned: plannedOnes.length, appointment_status: apptObjForAudit ? apptObjForAudit.status : null },
-      newValue: { sessions_completed: plannedOnes.length - failed, sessions_failed: failed, labs_completed: labUpdated, labs_failed: labFailed, unified_providers: unifyProviders, new_status: migrationMissing ? 'confirmed' : 'completed' }
+      newValue: { sessions_completed: plannedOnes.length - failed, sessions_failed: failed, labs_completed: labUpdated, labs_failed: labFailed, unified_providers: unifyProviders, new_status: _newStatusForAudit, subset_complete: !_isFullSet }
     });
   }
 
   await loadAppointments();
-  var appt = appointments.find(function(a){ return a.id === editingId; });
+  var appt = appointments.find(function(a){ return a.id === apptId; });
   if (appt) {
-    renderApptProcedures(appt);
-    renderApptLabOrders(appt);
-    document.getElementById('fStatus').value = appt.status;
+    // Only refresh the in-modal panels when the user is actually editing this appointment.
+    // Phase 8C: when invoked from the dismissed-trigger flow, the modal is closed —
+    // attempting to re-render its panels would throw on missing DOM. Guard explicitly.
+    if (editingId === apptId) {
+      renderApptProcedures(appt);
+      renderApptLabOrders(appt);
+      var fStatusEl = document.getElementById('fStatus');
+      if (fStatusEl) fStatusEl.value = appt.status;
+    } else {
+      // Still rebuild the day/list view caches so the dismissed-trigger flow shows
+      // up-to-date badges (completed count, planned count, etc.) without a manual reload.
+      if (typeof render === 'function') render();
+    }
   }
   if (btn) { btn.disabled = false; btn.textContent = '✅ إكمال الموعد + كل العلاجات المخطّطة'; }
+  // Phase 8C: callers (dismissedConfirmComplete) need to know whether the user
+  // cancelled mid-flow (provider mismatch second prompt → cancel) vs. completed.
+  return true;
 }
 
 // ─── Gap 5: explicit "Apply No-Show Fee" button handler ──────────────────────
