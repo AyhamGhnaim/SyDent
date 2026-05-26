@@ -1645,6 +1645,22 @@ function refreshDebugPanel() {
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────
+// زر hamburger للـ page-header (Phase 7.6H follow-up: live test كشف أن
+// accounting.html ينقصها hamburger. الصفحة تستعمل .page-header بدلاً من
+// .topbar، لذا تطلّب canonical pattern معدّل: querySelector('.page-header').
+// كل صفحات tenant الأخرى تستعمل .topbar — لكن accounting.html design مختلف.)
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.createElement('button');
+  btn.className = 'sb-hamburger';
+  btn.id = 'sbHamburgerBtn';
+  btn.setAttribute('aria-label', 'القائمة');
+  btn.innerHTML = '<span></span><span></span><span></span>';
+  btn.onclick = function() { window.sbToggle(); };
+  window._sbBtn = btn;
+  var header = document.querySelector('.page-header');
+  if (header) header.insertBefore(btn, header.firstChild);
+});
+
 init();
 </script>
 
