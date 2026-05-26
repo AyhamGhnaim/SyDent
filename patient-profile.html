@@ -13,7 +13,7 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a38"></script>
+<script src="supabase-init.js?v=20260526a39"></script>
 <script src="sidebar.js?v=20260526a39"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -183,6 +183,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .empty-icon{font-size:40px;margin-bottom:10px;}
 .del-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;transition:all .15s;}
 .del-btn:hover{color:var(--red);background:rgba(239,83,80,.1);}
+/* Phase 8A: complete session button — same shape as del-btn but green semantic.
+   Distinct class so :hover doesn't paint it red on mouseover. */
+.complete-btn{background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:4px;}
+.complete-btn:hover{background:rgba(46,232,158,0.28);border-color:rgba(46,232,158,0.6);}
 
 /* ── Bug #3: Payment Split Editor (manual allocation override) ── */
 .split-edit-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:2px;}
@@ -954,6 +958,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-body">
       <!-- Step 1: choose treatment (populated dynamically) -->
       <div id="toothStep1">
+        <!-- Phase 8B: planned-session shortcut banner (populated when this tooth+surface has a planned session) -->
+        <div id="toothPlannedBanner" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.35);border-radius:8px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">⚠️ يوجد علاج مخطّط على هذا السن:</div>
+          <div id="toothPlannedInfo" style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:8px;"></div>
+          <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:#2ee89e;color:#0a1628;border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✅ تم إنجاز العلاج المخطّط</button>
+        </div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
           <span>اختر نوع العلاج:</span>
           <a href="treatments.html" data-role-block="doctor secretary" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
@@ -4557,6 +4567,45 @@ async function openToothModal(n, surface) {
   document.getElementById('toothModalTitle').textContent =
     'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
 
+  // Phase 8B: detect if there's a planned ledger_session on this exact tooth+surface,
+  // and if so show the "أكمل العلاج المخطّط" shortcut banner at the top of Step 1.
+  // Match logic: same tooth_num + (same surface OR session.surface is null/empty
+  // when the user clicked the center/default surface). Pick the most recent.
+  // Hidden by default — only the planned-row banner needs surfacing.
+  var _b = document.getElementById('toothPlannedBanner');
+  var _bInfo = document.getElementById('toothPlannedInfo');
+  if (_b && _bInfo) {
+    _b.style.display = 'none';
+    _bInfo.textContent = '';
+    window.__toothPlannedSession = null;
+    try {
+      var _ctr = (typeof centerSurface === 'function') ? centerSurface(n) : 'O';
+      var _candidates = (sessions || []).filter(function(x){
+        if (!x || x.status !== 'planned') return false;
+        if (String(x.tooth_num || '') !== String(n)) return false;
+        var xSurf = x.surface || _ctr;
+        return xSurf === currentSurface;
+      });
+      if (_candidates.length) {
+        // Most recent by created_at (DESC) — matches typical UI expectation
+        _candidates.sort(function(a, b){
+          var ac = String(a.created_at || '');
+          var bc = String(b.created_at || '');
+          return bc.localeCompare(ac);
+        });
+        var _picked = _candidates[0];
+        window.__toothPlannedSession = _picked;
+        var _surfLbl = (_picked.surface && _picked.surface !== 'WHOLE')
+          ? ' / ' + (SURFACE_LABELS[_picked.surface] || _picked.surface)
+          : '';
+        _bInfo.textContent = (_picked.type || _picked.description || '—')
+          + ' — السن ' + _picked.tooth_num + _surfLbl
+          + ' • ' + fmt(_picked.cost) + ' ل.س';
+        _b.style.display = 'block';
+      }
+    } catch (e) { console.warn('toothPlannedBanner detect error:', e); }
+  }
+
   // Detect tooth states for the picker
   var isAlreadyExtracted = isExtracted(n);
   var isAlreadyBridgeAbut = isBridgeAbut(n);   // bridge abutment (not pontic)
@@ -5533,7 +5582,12 @@ function renderSessions() {
       + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
       + '<td style="' + costStyle + '">' + fmt(s.cost) + ' ل.س</td>'
-      + '<td><button class="del-btn" onclick="delSession(\'' + s.id + '\')">🗑</button></td>'
+      + '<td style="white-space:nowrap;">'
+      +   (s.status === 'planned'
+          ? '<button class="complete-btn" onclick="completeSessionFromProfile(\'' + s.id + '\')" title="إكمال هذا العلاج (تحويل من مخطّط إلى منجز)">✅</button>'
+          : '')
+      +   '<button class="del-btn" onclick="delSession(\'' + s.id + '\')">🗑</button>'
+      + '</td>'
       + '</tr>';
   });
   el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>التفاصيل</th><th>ملاحظات</th><th style="text-align:left;">التكلفة</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -5761,6 +5815,154 @@ async function delSession(id) {
   await syncPaymentStatus();
   renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
   showToast('🗑️ تم حذف الجلسة');
+}
+
+/* Phase 8A: Convert a single planned session to completed from patient-profile.
+   Mirrors completeApptWithProcedures() in appointments.html but scoped to ONE session.
+   Workflow:
+     1. Lock guard (Phase 4.1) — blocks if doctor account inactive
+     2. Confirm modal — shows treatment, cost, tooth, surface
+     3. UPDATE ledger_sessions.status = 'completed'
+     4. UPDATE teeth_status (if tooth_num) — matches tooth + surface + status='planned'
+     5. logAudit('session.complete') — Phase 5 audit trail
+     6. reallocatePatientFunds() + syncPaymentStatus() — FIFO splits may shift
+        (completed sessions sort before planned in buildFifoSplits)
+     7. Auto-complete linked appointment IF: session.appointment_id is set AND
+        all other sessions for that appointment are completed. Silent toast.
+     8. Re-render all panels. */
+async function completeSessionFromProfile(sessionId) {
+  // Phase 4.1: defense-in-depth — block production-changing ops if locked doctor is inactive
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إكمال العلاجات');
+    return;
+  }
+  var sess = sessions.find(function(s){ return s.id === sessionId; });
+  if (!sess) { showToast('⚠️ الجلسة غير موجودة'); return; }
+  if (sess.status !== 'planned') {
+    showToast('⚠️ هذه الجلسة ليست مخطّطة (الحالة: ' + (STATUS_LABELS[sess.status] || sess.status) + ')');
+    return;
+  }
+  // Build confirmation message — show treatment name, tooth, surface, cost.
+  // Matches the verbose style used in completeApptWithProcedures bulk prompt.
+  var toothPart = '';
+  if (sess.tooth_num) {
+    var surfLbl = (sess.surface && sess.surface !== 'WHOLE') ? ' / ' + (SURFACE_LABELS[sess.surface] || sess.surface) : '';
+    toothPart = '\nالسن: ' + sess.tooth_num + surfLbl;
+  } else if (sess.quadrant && QUADRANT_LABELS[sess.quadrant]) {
+    toothPart = '\nالنطاق: ' + QUADRANT_LABELS[sess.quadrant];
+  } else if (sess.arch && ARCH_LABELS[sess.arch]) {
+    toothPart = '\nالنطاق: ' + ARCH_LABELS[sess.arch];
+  }
+  var msg = 'تأكيد إكمال العلاج\n\n'
+          + 'العلاج: ' + (sess.type || sess.description || '—')
+          + toothPart
+          + '\nالتكلفة: ' + fmt(sess.cost) + ' ل.س'
+          + '\n\nسيتم تحويل الحالة من "مخطّط" إلى "منجز".\nمتابعة؟';
+  if (!confirm(msg)) return;
+
+  // 1) UPDATE ledger_sessions — flip status to completed.
+  var u1 = await window.sb.from('ledger_sessions')
+    .update({ status: 'completed' })
+    .eq('id', sessionId).eq('doctor_id', currentUser.id);
+  if (u1.error) {
+    console.warn('completeSessionFromProfile: session update failed:', u1.error);
+    showToast('⚠️ فشل تحديث حالة الجلسة');
+    return;
+  }
+  // Reflect locally so re-renders pick it up before the next loadData.
+  sess.status = 'completed';
+
+  // 2) UPDATE teeth_status — only if session has a tooth + matching planned row.
+  //    Surface filter: omit if session has no surface (legacy data).
+  //    Same logic as completeApptWithProcedures (appointments.html) for consistency.
+  if (sess.tooth_num) {
+    var q = window.sb.from('teeth_status').update({ status: 'completed' })
+      .eq('doctor_id', currentUser.id)
+      .eq('patient_id', sess.patient_id || patientId)
+      .eq('tooth_num', String(sess.tooth_num))
+      .eq('status', 'planned');
+    if (sess.surface) q = q.eq('surface', sess.surface);
+    var u2 = await q;
+    if (u2.error) console.warn('completeSessionFromProfile: teeth_status update warn:', u2.error);
+    // Reflect locally — teethMap.__status[surface] is what renderTeeth reads
+    // via getDominantStatus. Without this, the tooth would still appear as
+    // 'planned' (faded + red badge) until the next full profile reload.
+    // Use centerSurface fallback to mirror loadTeethStatus default (line 2676).
+    var _tn = String(sess.tooth_num);
+    var _sf = sess.surface || (typeof centerSurface === 'function' ? centerSurface(sess.tooth_num) : 'O');
+    if (teethMap[_tn] && teethMap[_tn].__status && teethMap[_tn].__status[_sf] === 'planned') {
+      teethMap[_tn].__status[_sf] = 'completed';
+    }
+  }
+
+  // 3) Phase 5 audit log
+  if (window.logAudit) {
+    window.logAudit('session.complete', {
+      entityId: sessionId,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'إكمال علاج مفرد: ' + (sess.type || '') + ' — ' + fmt(sess.cost) + ' ل.س',
+      oldValue: { status: 'planned' },
+      newValue: { status: 'completed', tooth_num: sess.tooth_num || null, surface: sess.surface || null }
+    });
+  }
+
+  // 4) FIFO reallocation — completed sessions sort before planned in buildFifoSplits,
+  //    so flipping status can shift payment allocations. Same pattern as delSession.
+  await reallocatePatientFunds();
+  await syncPaymentStatus();
+
+  // 5) Auto-complete linked appointment if ALL its sessions are now completed.
+  //    Reads back from `sessions` (already updated locally above).
+  var apptCompleted = false;
+  if (sess.appointment_id) {
+    var siblings = sessions.filter(function(x){ return x.appointment_id === sess.appointment_id; });
+    var anyStillPlanned = siblings.some(function(x){ return x.status === 'planned'; });
+    if (!anyStillPlanned && siblings.length > 0) {
+      // Auto-flip appointment.status to 'completed'. Migration may not be applied
+      // (pre-Phase 2 servers reject 'completed') — fall back to 'confirmed' on
+      // constraint violation, matching completeApptWithProcedures behavior.
+      var u3 = await window.sb.from('appointments')
+        .update({ status: 'completed' })
+        .eq('id', sess.appointment_id).eq('doctor_id', currentUser.id);
+      if (u3.error) {
+        var errMsg = (u3.error.message || '') + ' ' + (u3.error.code || '');
+        if (/check constraint|23514|appointments_status_check/i.test(errMsg)) {
+          await window.sb.from('appointments')
+            .update({ status: 'confirmed' })
+            .eq('id', sess.appointment_id).eq('doctor_id', currentUser.id);
+        } else {
+          console.warn('auto-complete linked appt warn:', u3.error);
+        }
+      } else {
+        apptCompleted = true;
+      }
+    }
+  }
+
+  // 6) Re-render every panel that depends on session/tooth state.
+  //    teethMap was set via loadTeethStatus on profile open — it doesn't auto-track
+  //    the planned→completed flip, so call renderTeeth() to refresh badge opacity.
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
+
+  var toastMsg = '✅ تم إكمال العلاج';
+  if (apptCompleted) toastMsg += ' • وأُكمل الموعد المرتبط تلقائياً';
+  showToast(toastMsg);
+}
+
+/* Phase 8B: Tooth-chart shortcut. When openToothModal detects a planned session on
+   the current tooth+surface, it surfaces a banner button. Pressing it closes the
+   modal and runs the same completeSessionFromProfile flow as the table-row button.
+   Single source of truth for the underlying logic — no duplicated DB writes. */
+async function completeToothPlannedFromModal() {
+  var picked = window.__toothPlannedSession;
+  if (!picked || !picked.id) {
+    showToast('⚠️ لم يتم تحديد العلاج');
+    return;
+  }
+  closeModal('toothModal');
+  // Defer briefly so the modal's close transition doesn't fight the next confirm()
+  setTimeout(function(){ completeSessionFromProfile(picked.id); }, 50);
 }
 
 async function delPayment(id) {
