@@ -617,6 +617,44 @@ body {
   font-weight: 900;
   line-height: 1;
 }
+
+/* Phase 8C: dismissed-completion modal checkboxes. The global `input { width:100%;
+   appearance:none }` rule above completely breaks native checkboxes (zero-size,
+   no glyph, no click). We restore them with the same high-contrast pattern as
+   .planned-toggle but greener (matches the modal's confirm button accent). */
+.dcm-chk {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  border: 2px solid #2ee89e !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  position: relative;
+  flex-shrink: 0;
+  margin: 0;
+  transition: all .15s;
+}
+.dcm-chk:hover {
+  background: rgba(46,232,158,0.14) !important;
+}
+.dcm-chk:checked {
+  background: #2ee89e !important;
+  border-color: #2ee89e !important;
+}
+.dcm-chk:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -55%);
+  color: #0a1628;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
 .planned-toggle.is-checked {
   background: rgba(99,179,237,0.18);
   border-color: rgba(99,179,237,0.6);
@@ -879,8 +917,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a47"></script>
-<script src="sidebar.js?v=20260526a47"></script>
+<script src="supabase-init.js?v=20260526a48"></script>
+<script src="sidebar.js?v=20260526a48"></script>
 </head>
 <body>
 <script>
@@ -2960,7 +2998,7 @@ function openDismissedCompleteModal(apptId, btnEl) {
         if (pr) provName = pr.name;
       }
       rows += '<label style="display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;" for="dcmChk_' + idx + '">'
-            +   '<input type="checkbox" id="dcmChk_' + idx + '" data-session-id="' + escapeHtml(s.id) + '" checked style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">'
+            +   '<input type="checkbox" class="dcm-chk" id="dcmChk_' + idx + '" data-session-id="' + escapeHtml(s.id) + '" checked>'
             +   '<div style="flex:1;min-width:0;">'
             +     '<div style="font-size:13px;color:var(--text);font-weight:600;">' + escapeHtml(s.type || s.description || 'علاج') + escapeHtml(area) + '</div>'
             +     '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + fmtCost(s.cost) + ' ل.س' + (provName ? ' • ' + escapeHtml(provName) : '') + '</div>'
