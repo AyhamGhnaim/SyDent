@@ -13,7 +13,7 @@
 <title>SyDent — تسجيل الدخول</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260524a37"></script>
+<script src="supabase-init.js?v=20260526a38"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -103,6 +103,60 @@ body{
 .pwd-toggle:focus-visible{outline:2px solid #2ee89e;outline-offset:2px;}
 .pwd-toggle:active{transform:translateY(-50%) scale(0.92);}
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
+
+/* Forgot password link + modal (Phase Email Part 3b) */
+.forgot-link{
+  background:none;border:none;padding:0;
+  font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;
+  color:var(--green);cursor:pointer;
+  text-decoration:none;transition:opacity .2s;
+}
+.forgot-link:hover{opacity:.75;text-decoration:underline;}
+.forgot-link:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:4px;}
+.modal-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,0.65);
+  display:none;align-items:center;justify-content:center;
+  z-index:1000;padding:20px;
+  backdrop-filter:blur(4px);
+  animation:fadeIn .2s ease;
+}
+.modal-overlay.show{display:flex;}
+@keyframes fadeIn{from{opacity:0;}}
+.modal-card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:18px;
+  width:100%;max-width:400px;
+  padding:28px 24px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  animation:fadeUp .25s ease;
+}
+.modal-card h3{
+  font-size:18px;font-weight:800;color:var(--text);
+  margin-bottom:8px;text-align:center;
+}
+.modal-hint{
+  font-size:13px;color:var(--text2);
+  line-height:1.6;margin-bottom:18px;text-align:center;
+}
+.modal-actions{
+  display:flex;gap:10px;margin-top:14px;
+}
+.modal-actions .btn-submit{margin-top:0;flex:1;}
+.btn-secondary{
+  flex:1;padding:13px;
+  background:transparent;border:1px solid var(--border);
+  color:var(--text);border-radius:10px;
+  font-family:'Cairo',sans-serif;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+}
+.btn-secondary:hover{background:var(--bg3);}
+.btn-secondary:disabled{opacity:.5;cursor:not-allowed;}
+.support-hint{
+  font-size:11px;color:var(--text2);
+  display:block;margin-top:8px;line-height:1.5;
+}
 </style>
 </head>
 <body>
@@ -132,6 +186,9 @@ body{
     <div class="form-group">
       <label>كلمة المرور</label>
       <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" required>
+    </div>
+    <div style="margin:-4px 0 14px;text-align:left;">
+      <button type="button" class="forgot-link" onclick="openForgotModal()">نسيت كلمة المرور؟</button>
     </div>
     <button type="submit" class="btn-submit" id="loginBtn">دخول</button>
   </form>
@@ -168,6 +225,23 @@ body{
   </form>
 </div>
 
+<!-- Phase Email Part 3b: Forgot Password Modal -->
+<div id="forgotModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="forgotModalTitle">
+  <div class="modal-card">
+    <h3 id="forgotModalTitle">إعادة تعيين كلمة المرور</h3>
+    <p class="modal-hint">أدخل بريدك الإلكتروني وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.</p>
+    <div class="form-group">
+      <label for="forgotEmail">البريد الإلكتروني</label>
+      <input type="email" id="forgotEmail" placeholder="doctor@example.com" autocomplete="email">
+    </div>
+    <div id="forgotMsg" class="msg"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="forgotCancelBtn" onclick="closeForgotModal()">إلغاء</button>
+      <button type="button" class="btn-submit" id="forgotBtn" onclick="sendResetEmail()">إرسال الرابط</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // إذا الدكتور مسجّل دخول مسبقاً، انقله للـ dashboard
 // إلا إذا جاء من تسجيل خروج (logged_out=1)
@@ -188,6 +262,10 @@ body{
       showMsg('❌ تم رفض طلب التجربة. تواصل مع الدعم.', 'error');
     } else if (denied === 'suspended') {
       showMsg('⏸ حسابك موقوف حالياً. تواصل مع الدعم لإعادة التفعيل.', 'error');
+    }
+    // Phase Email Part 3b: surface success after password reset
+    if (qs.get('reset') === 'success') {
+      showMsg('✓ تم تحديث كلمة المرور بنجاح. سجّل دخولك بكلمة المرور الجديدة.', 'success');
     }
   } catch(e) { /* URLSearchParams missing or other — safe fallback to default login tab */ }
 
@@ -223,6 +301,133 @@ function showMsg(text, type) {
 function hideMsg() {
   document.getElementById('msg').classList.remove('show');
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Phase Email Part 3b — Forgot Password Modal
+// ═══════════════════════════════════════════════════════════════════
+// Industry-standard email enumeration prevention (OWASP):
+//   • Always shows same success message regardless of email validity
+//   • Client-side blocks @sydent.com (phone-based accounts) with clear support hint
+//   • Single in-flight guard prevents double-submit / rate-limit spam
+//   • After 30s, surfaces "didn't arrive?" support hint (Stripe pattern)
+function openForgotModal() {
+  hideMsg();
+  var loginEmail = document.getElementById('loginEmail').value.trim();
+  // Pre-fill from login field if it looks like an email (skip phone numbers)
+  if (loginEmail && loginEmail.indexOf('@') !== -1 && !/^[\d]+$/.test(loginEmail.replace(/\s/g,''))) {
+    document.getElementById('forgotEmail').value = loginEmail;
+  } else {
+    document.getElementById('forgotEmail').value = '';
+  }
+  hideForgotMsg();
+  // Reset button state in case modal was closed mid-flight
+  var btn = document.getElementById('forgotBtn');
+  btn.disabled = false;
+  btn.textContent = 'إرسال الرابط';
+  document.getElementById('forgotCancelBtn').disabled = false;
+  document.getElementById('forgotModalOverlay').classList.add('show');
+  setTimeout(function(){
+    try { document.getElementById('forgotEmail').focus(); } catch(e){}
+  }, 60);
+}
+
+function closeForgotModal() {
+  document.getElementById('forgotModalOverlay').classList.remove('show');
+  hideForgotMsg();
+}
+
+function showForgotMsg(text, type) {
+  var m = document.getElementById('forgotMsg');
+  m.textContent = text;
+  m.className = 'msg show ' + type;
+}
+
+function hideForgotMsg() {
+  var m = document.getElementById('forgotMsg');
+  m.className = 'msg';
+  m.textContent = '';
+}
+
+var _forgotInFlight = false;
+var _forgotHintTimer = null;
+
+async function sendResetEmail() {
+  if (_forgotInFlight) return;
+
+  var email = (document.getElementById('forgotEmail').value || '').trim().toLowerCase();
+
+  // Basic email format validation
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showForgotMsg('يرجى إدخال بريد إلكتروني صحيح.', 'error');
+    return;
+  }
+
+  // Block phone-based accounts client-side (Risk 4 mitigation)
+  // @sydent.com is the internal phone→email transform (rule #62)
+  if (email.endsWith('@sydent.com')) {
+    showForgotMsg('هذا الحساب مسجَّل برقم هاتف. تواصل مع الدعم لاستعادة الحساب.', 'error');
+    return;
+  }
+
+  _forgotInFlight = true;
+  hideForgotMsg();
+  var btn = document.getElementById('forgotBtn');
+  var cancelBtn = document.getElementById('forgotCancelBtn');
+  btn.disabled = true;
+  cancelBtn.disabled = true;
+  btn.innerHTML = 'جارٍ الإرسال<span class="spinner"></span>';
+
+  // Fire the reset request — but ALWAYS show same message regardless of outcome.
+  // This prevents email enumeration (OWASP). Errors are logged to console only.
+  try {
+    await window.sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password.html'
+    });
+  } catch (err) {
+    // Log silently — do NOT surface to user (would reveal email existence)
+    console.warn('[forgot-password] request error:', err);
+  }
+
+  // Anti-enumeration: same success message for every email (existent or not)
+  showForgotMsg('✓ إذا كان البريد مسجَّلاً، فقد أرسلنا رابط إعادة التعيين. تحقّق من بريدك (وقد يكون في spam).', 'success');
+  btn.textContent = 'إرسال الرابط';
+
+  // Stripe pattern: after 30s, surface "didn't arrive?" hint + re-enable retry.
+  // Clear any previous hint timer (rapid open/close).
+  if (_forgotHintTimer) { clearTimeout(_forgotHintTimer); _forgotHintTimer = null; }
+  _forgotHintTimer = setTimeout(function(){
+    try {
+      btn.disabled = false;
+      cancelBtn.disabled = false;
+      _forgotInFlight = false;
+      var m = document.getElementById('forgotMsg');
+      // Only add hint if message still showing (user hasn't closed modal)
+      if (m && m.classList.contains('show')) {
+        // Use safe innerHTML (no user-controlled content interpolated)
+        m.innerHTML = '✓ إذا كان البريد مسجَّلاً، فقد أرسلنا رابط إعادة التعيين. تحقّق من بريدك (وقد يكون في spam).' +
+          '<span class="support-hint">لم يصلك الرابط؟ تحقّق من spam أو تواصل مع الدعم.</span>';
+      }
+    } catch(e){}
+  }, 30000);
+}
+
+// Close modal on Escape key (a11y)
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') {
+    var ov = document.getElementById('forgotModalOverlay');
+    if (ov && ov.classList.contains('show') && !_forgotInFlight) {
+      closeForgotModal();
+    }
+  }
+});
+
+// Close modal on overlay click (click outside card)
+document.addEventListener('click', function(e){
+  var ov = document.getElementById('forgotModalOverlay');
+  if (e.target === ov && !_forgotInFlight) {
+    closeForgotModal();
+  }
+});
 
 async function doLogin(e) {
   e.preventDefault();

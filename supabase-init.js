@@ -180,7 +180,11 @@
     try {
       var path = (window.location.pathname || '').toLowerCase();
       var page = path.split('/').pop() || 'index.html';
-      var skip = { 'auth.html':1, 'landing.html':1, 'pending.html':1, 'admin.html':1 };
+      // Phase Email Part 3b: Cloudflare Pages serves clean URLs (no .html).
+      // Normalize so both '/reset-password' and '/reset-password.html' skip alike.
+      // Rule #63 applied to autoGate skip (was already applied to isPublicPage).
+      if (page && page.indexOf('.') === -1) page = page + '.html';
+      var skip = { 'auth.html':1, 'landing.html':1, 'pending.html':1, 'admin.html':1, 'reset-password.html':1 };
       if (skip[page]) return;
 
       var gateRan = false;
@@ -292,7 +296,7 @@
     if (path.length > 1 && path.charAt(path.length - 1) === '/') {
       path = path.slice(0, -1);
     }
-    return /^\/$|^\/(index|auth|landing|pending|admin)(\.html)?$/.test(path);
+    return /^\/$|^\/(index|auth|landing|pending|admin|reset-password)(\.html)?$/.test(path);
   }
 
 
