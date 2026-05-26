@@ -879,8 +879,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a44"></script>
-<script src="sidebar.js?v=20260526a44"></script>
+<script src="supabase-init.js?v=20260526a45"></script>
+<script src="sidebar.js?v=20260526a45"></script>
 </head>
 <body>
 <script>
@@ -1027,7 +1027,7 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group full">
           <label>اسم المريض *</label>
-          <input type="text" id="fPatient" placeholder="ابحث أو اكتب الاسم…" list="patientsList" required>
+          <input type="text" id="fPatient" placeholder="ابحث أو اكتب الاسم…" list="patientsList" required oninput="onFPatientInput()" onchange="onFPatientInput()">
           <datalist id="patientsList"></datalist>
         </div>
         <div class="form-group" id="fDateGroup">
@@ -1088,25 +1088,25 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
       </div>
 
-      <!-- 🦷 Procedures section. Shown in two modes:
-           • Edit mode: full functionality (list, attach, complete buttons)
-           • New-appointment mode: pending hint shown; save first to enable -->
+      <!-- 🦷 Procedures section — Workflow B (Phase 8 follow-up).
+           Three modes via setApptProcSectionModeA():
+             • 'create' — new appointment, pending buffer + atomic commit on save
+             • 'active' — edit mode, live DB writes (renderApptProcedures runs)
+             • 'hidden' — planned appointment
+           In 'active' mode the existing renderApptProcedures function paints
+           apptProcList directly. In 'create' mode our render paints pending
+           items into the same DOM node. -->
       <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
           <div id="apptProcStats" style="font-size:12px;color:var(--text2);"></div>
         </div>
-        <!-- Pending hint: visible only in NEW-appointment mode before first save.
-             editAppt() and submitAppt-success-then-reload both hide this and show the
-             real controls below. Keep wording action-oriented. -->
-        <div id="apptProcPendingHint" style="display:none;padding:14px;text-align:center;background:rgba(99,179,237,0.08);border:1px dashed rgba(99,179,237,0.3);border-radius:10px;color:var(--text2);font-size:13px;line-height:1.6;">
-          💾 احفظ الموعد أولاً لتتمكن من ربط العلاجات المخطّطة به.<br>
-          <span style="font-size:11px;opacity:0.75;">بعد الحفظ ستفتح أدوات الربط هنا تلقائياً.</span>
-        </div>
+        <!-- Mode-specific hint. Different copy for 'create' vs 'active'. -->
+        <div id="apptProcModeHint" style="display:none;font-size:11px;color:var(--text2);opacity:0.8;margin-bottom:8px;line-height:1.5;"></div>
         <div id="apptProcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
         <div id="apptProcControls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
-          <button type="button" id="addPlannedBtn" onclick="attachPlannedToAppt()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ ربط بالموعد</button>
+          <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
         </div>
         <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
@@ -2131,14 +2131,14 @@ function onPlannedToggle() {
   // with no way to commit changes via the schedule button. The button matters
   // only in edit mode AND when the current state is planned.
   var schedBtn = document.getElementById('scheduleNowBtn');
-  // Workflow A polish: in CREATE mode (editingId is null), hide the procedures
-  // section entirely while planned is checked — there's no point inviting the
-  // user to attach procedures to a date-less appointment. Restore the pending
-  // hint when they uncheck. We touch the section only in create mode; edit
-  // mode is already handled by editAppt's isPlanned branch.
+  // Workflow B polish: in CREATE mode, planned has no chair-side reality so
+  // hide the section while planned is checked. On uncheck, restore create
+  // mode. Edit mode is handled by editAppt's isPlanned branch (already
+  // calls setApptProcSectionModeA('hidden') for planned).
   if (!editingId) {
-    var _procSec = document.getElementById('apptProcSection');
-    if (_procSec) _procSec.style.display = planned ? 'none' : 'block';
+    if (typeof setApptProcSectionModeA === 'function') {
+      setApptProcSectionModeA(planned ? 'hidden' : 'create');
+    }
   }
   if (schedBtn) {
     // editingId is the appointments.html-level state; if we're editing an existing
@@ -4151,23 +4151,11 @@ async function openModal(prefillDate) {
   document.getElementById('fNotes').value    = '';
   // إخفاء زر الحذف عند إضافة موعد جديد
   document.getElementById('deleteApptBtn').style.display = 'none';
-  // Show procedures section in PENDING state — the section is visible but the
-  // attach controls and stats are swapped for a "save first" hint. This makes
-  // the future workflow discoverable: the user sees the section while creating
-  // the appointment, learns it exists, and after saving the modal stays open
-  // with the controls now active (submitAppt → editAppt re-entry).
-  var procSec = document.getElementById('apptProcSection');
-  var procHint = document.getElementById('apptProcPendingHint');
-  var procList = document.getElementById('apptProcList');
-  var procCtrls = document.getElementById('apptProcControls');
-  var procStats = document.getElementById('apptProcStats');
-  var procComplete = document.getElementById('completeApptBtn');
-  if (procSec) procSec.style.display = 'block';
-  if (procHint) procHint.style.display = 'block';
-  if (procList) procList.style.display = 'none';
-  if (procCtrls) procCtrls.style.display = 'none';
-  if (procStats) procStats.textContent = '';
-  if (procComplete) procComplete.style.display = 'none';
+  // Workflow B: clear any stale pending buffer + switch section to create
+  // mode. The user can pick planned procedures NOW; they'll be linked
+  // atomically when "حفظ الموعد" is clicked.
+  if (typeof clearPendingA === 'function') clearPendingA();
+  if (typeof setApptProcSectionModeA === 'function') setApptProcSectionModeA('create');
   // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
   document.getElementById('apptLabSection').style.display = 'none';
   // إخفاء زر "تطبيق رسم عدم الحضور" (يظهر فقط في التعديل عند الحاجة)
@@ -4273,16 +4261,13 @@ async function editAppt(id) {
   // Gap 7: hide the procedures section for planned appointments — they have
   // no date yet, so attaching procedures + "Set Complete" don't make sense.
   // User must schedule first, then manage procedures.
-  document.getElementById('apptProcSection').style.display = isPlanned ? 'none' : 'block';
-  // Workflow A: hide the "save first" pending hint (this is edit mode, the
-  // appointment row already exists in DB → controls can operate). Show the
-  // list + attach controls that the hint replaced in create mode.
-  var _procHint = document.getElementById('apptProcPendingHint');
-  var _procList = document.getElementById('apptProcList');
-  var _procCtrls = document.getElementById('apptProcControls');
-  if (_procHint) _procHint.style.display = 'none';
-  if (_procList) _procList.style.display = 'flex';
-  if (_procCtrls) _procCtrls.style.display = 'flex';
+  // Workflow B: route through setApptProcSectionModeA so the create/active
+  // mode + hint state are managed consistently. planned → hidden; otherwise
+  // active. renderApptProcedures runs in 'active' branch below.
+  if (typeof clearPendingA === 'function') clearPendingA();
+  if (typeof setApptProcSectionModeA === 'function') {
+    setApptProcSectionModeA(isPlanned ? 'hidden' : 'active');
+  }
   if (!isPlanned) renderApptProcedures(a);
 
   // Show lab orders section (if any orders are linked to this appointment)
@@ -4440,6 +4425,14 @@ function onOperatoryChange() {
 
 /* Render attached procedures + the dropdown of planned procedures available to attach. */
 function renderApptProcedures(appt) {
+  // Workflow B: in 'create' mode this function is bypassed — the pending
+  // buffer drives the list. Calling renderApptProcedures from editAppt is
+  // explicit and only runs in 'active' mode. Guard defensively in case
+  // some external caller forgets to switch mode first.
+  if (_appProcModeA === 'create') {
+    renderPendingPP_A();
+    return;
+  }
   var listEl = document.getElementById('apptProcList');
   var statsEl = document.getElementById('apptProcStats');
   var selEl = document.getElementById('addPlannedSelect');
@@ -4595,6 +4588,304 @@ function renderApptLabOrders(appt) {
       + '</div>';
   });
   listEl.innerHTML = html;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Workflow B — "علاجات هذا الموعد" section. Same three-mode model as
+   patient-profile.html, but routed through this file's caches:
+     • create  → uses local _pendingAttachmentsA buffer (no DB writes)
+     • active  → live DB writes via attachPlannedToAppt (existing function)
+     • hidden  → planned appointments
+
+   Naming convention: the patient-profile copy suffixes everything with PP;
+   this file uses A (appointments). The two are never loaded together so
+   the suffix is more cosmetic than necessary, but it keeps grep clean.
+   ───────────────────────────────────────────────────────────────────────── */
+
+// Pending buffer for create mode. Each entry is a full session row.
+var _pendingAttachmentsA = [];
+var _appProcModeA = 'hidden';
+// R7 fix: track the patient_id that the current pending buffer was built
+// for. When fPatient changes to a different resolved id, the pending list
+// belongs to the previous patient and MUST be cleared — otherwise we'd
+// link one patient's sessions to another patient's appointment, corrupting
+// data integrity. null = no patient yet OR buffer is empty.
+var _pendingPatientIdA = null;
+
+/* Mode switcher. Toggles section visibility + adjusts the add-button label
+   + mode hint. The actual list paint happens in renderPendingPP_A (create)
+   or renderApptProcedures (active). */
+function setApptProcSectionModeA(mode) {
+  _appProcModeA = mode;
+  var sec  = document.getElementById('apptProcSection');
+  var hint = document.getElementById('apptProcModeHint');
+  var btn  = document.getElementById('addPlannedBtn');
+  var complBtn = document.getElementById('completeApptBtn');
+  if (!sec) return;
+  if (mode === 'hidden') {
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = 'block';
+  if (hint) {
+    if (mode === 'create') {
+      hint.style.display = 'block';
+      hint.textContent   = 'ⓘ اختر العلاجات المخطّطة لربطها بالموعد. الربط يحدث تلقائياً عند الضغط على "حفظ الموعد".';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
+  if (btn) btn.textContent = (mode === 'create') ? '➕ إضافة' : '➕ ربط بالموعد';
+  // In create mode, hide the "Set Complete" button — there's no DB row yet.
+  if (complBtn && mode === 'create') complBtn.style.display = 'none';
+  if (mode === 'create') {
+    renderPendingPP_A();
+  }
+  // 'active' is painted by renderApptProcedures when editAppt calls it.
+}
+
+/* Resolve the patient_id from the fPatient input, using the same lookup
+   logic that submitAppt eventually applies. Used by the picker to decide
+   which planned sessions to offer. Returns null if no match. */
+function resolveCurrentPatientIdA() {
+  var input = document.getElementById('fPatient');
+  if (!input) return null;
+  var name = (input.value || '').trim();
+  if (!name) return null;
+  var cached = patientsCache['__name__' + name];
+  if (cached && cached.id) return cached.id;
+  // Fallback: scan loaded patients list for exact name match.
+  for (var key in patientsCache) {
+    var p = patientsCache[key];
+    if (p && p.name === name && p.id) return p.id;
+  }
+  return null;
+}
+
+/* Populate the picker. Filters by resolveCurrentPatientIdA + plannedSessionsByPatient,
+   minus any session ids already in _pendingAttachmentsA (create mode). */
+function populateAddPlannedSelectA() {
+  var selEl = document.getElementById('addPlannedSelect');
+  var addBtn = document.getElementById('addPlannedBtn');
+  if (!selEl) return;
+  selEl.innerHTML = '';
+
+  var pid = resolveCurrentPatientIdA();
+  if (!pid) {
+    var opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— اكتب اسم المريض أولاً —';
+    selEl.appendChild(opt);
+    if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.4'; }
+    return;
+  }
+  var planned = (plannedSessionsByPatient[pid] || []).slice();
+  if (_appProcModeA === 'create') {
+    var pendingIds = {};
+    _pendingAttachmentsA.forEach(function(p){ pendingIds[p.id] = true; });
+    planned = planned.filter(function(s){ return !pendingIds[s.id]; });
+  }
+  if (!planned.length) {
+    var opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = '— لا توجد علاجات مخطّطة متاحة لهذا المريض —';
+    selEl.appendChild(opt0);
+    if (addBtn) { addBtn.disabled = true; addBtn.style.opacity = '0.4'; }
+    return;
+  }
+  var placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— اختر علاجاً مخطّطاً —';
+  selEl.appendChild(placeholder);
+  planned.forEach(function(s){
+    var toothPart;
+    if (s.tooth_num) {
+      toothPart = ' (سن ' + s.tooth_num + ')';
+    } else if (s.quadrant) {
+      var QLBL2 = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+      toothPart = ' (' + (QLBL2[s.quadrant] || s.quadrant) + ')';
+    } else if (s.arch) {
+      var ALBL2 = {'U':'الفك العلوي','L':'الفك السفلي'};
+      toothPart = ' (' + (ALBL2[s.arch] || s.arch) + ')';
+    } else {
+      toothPart = '';
+    }
+    var opt2 = document.createElement('option');
+    opt2.value = s.id;
+    opt2.textContent = (s.type || s.description || 'علاج') + toothPart + ' — ' + fmtCost(s.cost) + ' ل.س';
+    selEl.appendChild(opt2);
+  });
+  if (addBtn) { addBtn.disabled = false; addBtn.style.opacity = '1'; }
+}
+
+/* Paint the pending list (create mode). Same row structure as
+   renderApptProcedures' attached list but with a "سيُربط" badge and a
+   ✕ button that removes from _pendingAttachmentsA only (no DB). */
+function renderPendingPP_A() {
+  var listEl  = document.getElementById('apptProcList');
+  var statsEl = document.getElementById('apptProcStats');
+  if (!listEl) return;
+  var items = _pendingAttachmentsA;
+  if (!items.length) {
+    listEl.innerHTML = '<div style="padding:8px;color:var(--text2);font-size:12px;text-align:center;opacity:0.7;">لم تُضف علاجات بعد — اختر من القائمة أدناه واضغط "إضافة"</div>';
+    if (statsEl) statsEl.textContent = '';
+  } else {
+    var html = '';
+    items.forEach(function(s){
+      var toothPart = '';
+      if (s.tooth_num) {
+        toothPart = ' • السن ' + escapeHtml(String(s.tooth_num)) + (s.surface && s.surface !== 'WHOLE' ? '/' + escapeHtml(s.surface) : '');
+      } else if (s.quadrant) {
+        var QLBL = {'UR':'الربع العلوي الأيمن','UL':'الربع العلوي الأيسر','LL':'الربع السفلي الأيسر','LR':'الربع السفلي الأيمن'};
+        toothPart = ' • ' + (QLBL[s.quadrant] || escapeHtml(s.quadrant));
+      } else if (s.arch) {
+        var ALBL = {'U':'الفك العلوي','L':'الفك السفلي'};
+        toothPart = ' • ' + (ALBL[s.arch] || escapeHtml(s.arch));
+      }
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(46,232,158,0.05);border-radius:8px;border:1px solid rgba(46,232,158,0.2);flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
+        + '<div style="font-size:12px;color:var(--text2);">' + fmtCost(s.cost) + ' ل.س</div>'
+        + '<span style="background:#fb923c22;color:#fb923c;border:1px solid #fb923c55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
+        + '<button type="button" onclick="removePendingA(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="إزالة من القائمة">✕</button>'
+        + '</div>';
+    });
+    listEl.innerHTML = html;
+    var totalC = items.reduce(function(acc, x){ return acc + (parseFloat(x.cost) || 0); }, 0);
+    if (statsEl) statsEl.textContent = items.length + ' علاج سيُربط • ' + fmtCost(totalC) + ' ل.س';
+  }
+  populateAddPlannedSelectA();
+}
+
+/* Unified add-button click handler. */
+function onAddPlannedClickA() {
+  if (_appProcModeA === 'create') {
+    addToPendingA();
+  } else if (_appProcModeA === 'active') {
+    attachPlannedToAppt();
+  }
+}
+
+function addToPendingA() {
+  var sel = document.getElementById('addPlannedSelect');
+  var sessId = sel ? sel.value : '';
+  if (!sessId) { showToast('⚠️ اختر علاجاً'); return; }
+  var pid = resolveCurrentPatientIdA();
+  if (!pid) { showToast('⚠️ اكتب اسم المريض أولاً'); return; }
+  var pool = plannedSessionsByPatient[pid] || [];
+  var row = pool.find(function(x){ return x.id === sessId; });
+  if (!row) { showToast('⚠️ العلاج غير موجود — أعد فتح المودال'); return; }
+  for (var i = 0; i < _pendingAttachmentsA.length; i++) {
+    if (_pendingAttachmentsA[i].id === sessId) return;
+  }
+  _pendingAttachmentsA.push(row);
+  _pendingPatientIdA = pid;  // mark this buffer as belonging to this patient
+  renderPendingPP_A();
+}
+
+function removePendingA(sessId) {
+  _pendingAttachmentsA = _pendingAttachmentsA.filter(function(p){ return p.id !== sessId; });
+  renderPendingPP_A();
+}
+
+function clearPendingA() {
+  _pendingAttachmentsA = [];
+  _pendingPatientIdA = null;
+}
+
+/* Called by fPatient oninput/onchange. Refreshes the picker so it reflects
+   the newly-typed patient. Only meaningful in create mode (the picker is
+   tied to the patient name there); active mode uses an already-known appt.
+
+   R7 fix: when the user switches to a DIFFERENT resolved patient mid-flow,
+   the pending buffer (which holds sessions for the previous patient) must
+   be cleared. Otherwise we'd link one patient's sessions to another
+   patient's appointment, corrupting data integrity. The check uses the
+   resolved patient_id — partial typing (e.g. "أحمد" while completing the
+   surname) doesn't trigger a clear because resolveCurrentPatientIdA
+   returns null for unmatched names. */
+function onFPatientInput() {
+  if (_appProcModeA !== 'create') return;
+  var currentPid = resolveCurrentPatientIdA();
+  // Detect patient switch:
+  //   • _pendingPatientIdA is set (buffer belongs to a specific patient)
+  //   • currentPid is non-null AND different
+  // We DO clear when currentPid becomes null too — the user just typed a
+  // garbage name and we want to invalidate the buffer until they pick a
+  // valid patient again. But ONLY if the buffer is non-empty (no point
+  // showing a "cleared" toast for an already-empty list).
+  if (_pendingPatientIdA && _pendingAttachmentsA.length > 0) {
+    if (!currentPid || currentPid !== _pendingPatientIdA) {
+      _pendingAttachmentsA = [];
+      _pendingPatientIdA = null;
+      showToast('ⓘ تم مسح قائمة العلاجات المعلّقة (تغيّر المريض)');
+      renderPendingPP_A();
+      return;
+    }
+  }
+  // No mismatch — just refresh the picker to reflect the new patient's
+  // unattached planned sessions.
+  populateAddPlannedSelectA();
+}
+
+/* Commit pending attachments after a successful INSERT in submitAppt. */
+async function commitPendingAttachmentsA(apptId, expectedPatientId) {
+  var result = { ok: 0, failed: 0, errors: [] };
+  if (!apptId || !_pendingAttachmentsA.length) return result;
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    result.failed = _pendingAttachmentsA.length;
+    result.errors.push('حسابك غير نشط — لم تُربط العلاجات');
+    return result;
+  }
+  // R7 defense-in-depth: every pending session must belong to the SAME
+  // patient as the newly-inserted appointment. The race we're defending
+  // against is: user adds session X for patient A → switches patient field
+  // to B → submits → INSERT goes to B → would-be attachment X → A's data
+  // attached to B's appointment. onFPatientInput catches this client-side
+  // but a malicious/buggy caller could skip that handler entirely.
+  if (expectedPatientId) {
+    var mismatch = _pendingAttachmentsA.filter(function(p){
+      return p.patient_id && p.patient_id !== expectedPatientId;
+    });
+    if (mismatch.length) {
+      console.warn('commitPendingAttachmentsA: aborting — patient_id mismatch detected', mismatch);
+      result.failed = _pendingAttachmentsA.length;
+      result.errors.push('تطابق المريض فشل — تم رفض ربط جميع العلاجات لحماية البيانات');
+      return result;
+    }
+  }
+  for (var i = 0; i < _pendingAttachmentsA.length; i++) {
+    var p = _pendingAttachmentsA[i];
+    try {
+      const { error } = await window.sb.from('ledger_sessions')
+        .update({ appointment_id: apptId })
+        .eq('id', p.id).eq('doctor_id', currentUser.id);
+      if (error) {
+        result.failed++;
+        result.errors.push((p.type || 'علاج') + ': ' + error.message);
+        console.warn('commitPendingAttachmentsA: session', p.id, 'failed:', error);
+      } else {
+        result.ok++;
+        if (window.logAudit) {
+          try {
+            var _pname = patientsCache[p.patient_id] ? (patientsCache[p.patient_id].name || '') : '';
+            window.logAudit('session.edit', {
+              entityId: p.id,
+              patientId: p.patient_id,
+              patientName: _pname,
+              description: 'ربط علاج مخطّط بموعد جديد (Workflow B)',
+              oldValue: { appointment_id: null },
+              newValue: { appointment_id: apptId }
+            });
+          } catch (e) { console.warn('commitPendingAttachmentsA: audit failed:', e); }
+        }
+      }
+    } catch (e) {
+      result.failed++;
+      result.errors.push((p.type || 'علاج') + ': استثناء');
+      console.warn('commitPendingAttachmentsA: session', p.id, 'threw:', e);
+    }
+  }
+  return result;
 }
 
 /* Attach a planned session to the currently-open appointment. */
@@ -5558,33 +5849,40 @@ async function submitAppt(e) {
         selectedDate = new Date(apptData.date + 'T12:00:00');
         currentDate  = new Date(apptData.date + 'T12:00:00');
       }
-      // Workflow A: instead of closing the modal, reload appointments so the
-      // freshly-inserted row populates sessionsByAppt/plannedSessionsByPatient,
-      // then re-open the same modal in edit mode. The procedures section
-      // now has a real appointment_id to attach to, so the user can link
-      // planned sessions immediately without losing their flow.
-      // Skip the re-open if it's a planned appointment (no chair-side reality
-      // → procedures attachment is intentionally blocked for planned in editAppt).
+      // Workflow B: close the modal and commit pending attachments (if any).
+      // Replaced the Workflow A re-open logic — users found the "save then
+      // attach in edit mode" flow confusing. Now attachment happens
+      // atomically as part of the save action.
       var _newApptId = (ins.data && ins.data.id) ? ins.data.id : null;
-      var _shouldReopenForProcedures = !!_newApptId && !isPlannedNow;
-      if (!_shouldReopenForProcedures) {
-        closeModal();
-      }
+      closeModal();
       // Gap 7: after adding a planned appt, jump straight to planned tab
       if (isPlannedNow) setMainTab('planned');
       await loadAppointments();
-      if (_shouldReopenForProcedures) {
-        // editAppt expects the row to exist in the in-memory `appointments`
-        // array (loadAppointments above just populated it). Re-enter the
-        // modal — same form, now with editingId set and the procedures
-        // section in active mode. The user can attach planned sessions
-        // immediately, then click "حفظ التعديلات" or just close.
-        try {
-          await editAppt(_newApptId);
-        } catch (reopenErr) {
-          console.warn('Workflow A: re-open in edit mode failed, falling back to close:', reopenErr);
-          closeModal();
+      // Commit Workflow B pending attachments. Only meaningful for brand-new
+      // non-planned saves (planned has no date so attachment doesn't apply).
+      var attachResultA = null;
+      if (_newApptId && !isPlannedNow && typeof commitPendingAttachmentsA === 'function') {
+        attachResultA = await commitPendingAttachmentsA(_newApptId, patientId);
+        // Refresh the in-memory caches so future actions on this appt
+        // see the new attachments (e.g. re-opening it for edit later).
+        if (attachResultA.ok > 0) {
+          try { await loadAppointments(); } catch (e) { console.warn('reload after attachments:', e); }
         }
+        clearPendingA();
+        // Override the prior generic success toast with an attachment-aware one.
+        if (attachResultA.ok > 0 || attachResultA.failed > 0) {
+          if (attachResultA.failed === 0) {
+            showToast('✅ تم حفظ الموعد + ربط ' + attachResultA.ok + ' علاج');
+          } else if (attachResultA.ok === 0) {
+            showToast('⚠️ تم حفظ الموعد لكن تعذّر ربط أي علاج (' + attachResultA.failed + ' فشل) — راجع وحدة التحكم');
+            console.warn('Workflow B attachment errors:', attachResultA.errors);
+          } else {
+            showToast('⚠️ تم حفظ الموعد — رُبط ' + attachResultA.ok + ' علاج، تعذّر ربط ' + attachResultA.failed);
+            console.warn('Workflow B partial attachment errors:', attachResultA.errors);
+          }
+        }
+      } else {
+        if (typeof clearPendingA === 'function') clearPendingA();
       }
       // H3 fix: refresh phone cache if patient was newly added in another tab
       if (_needsPatientCacheRefresh) await loadPatientPhones();
