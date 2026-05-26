@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a40"></script>
-<script src="sidebar.js?v=20260526a40"></script>
+<script src="supabase-init.js?v=20260526a41"></script>
+<script src="sidebar.js?v=20260526a41"></script>
 </head>
 <body>
 <script>
@@ -1457,6 +1457,53 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
     console.error('recordDashApptTime: invalid key', fieldKey);
     return;
   }
+
+  // ── Phase 8C intercept (dashboard variant) ─────────────────────────────
+  // The dismissed_at stamp on the dashboard's quick-action button must NOT
+  // silently fire when the appointment has planned attached sessions —
+  // otherwise the doctor/secretary loses the chance to record what was
+  // actually done in the chair. The full Phase 8C picker modal lives in
+  // appointments.html (which already has the sessionsByAppt / labOrdersByAppt
+  // caches and the modal HTML). Here we just detect-and-redirect so the
+  // workflow is completed there. Lab orders are NOT checked at this layer —
+  // in the appointments.html modal they're informational only (no separate
+  // user confirmation), so an appt with only lab-orders-and-no-planned isn't
+  // worth a redirect.
+  //
+  // Uses HEAD + count:exact (zero wire cost — no row payload). Fails open:
+  // if the count query errors out we proceed with the stamp rather than
+  // blocking the secretary completely.
+  if (fieldKey === 'dismissed_at') {
+    try {
+      // Scope by doctor_id explicitly (defense-in-depth — RLS already enforces this
+      // but appointments.html does the same belt-and-braces and we mirror it).
+      // _dashUid is set during dashboard init; fall through gracefully if missing.
+      var checkQuery = window.sb.from('ledger_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('appointment_id', apptId)
+        .eq('status', 'planned');
+      if (_dashUid) checkQuery = checkQuery.eq('doctor_id', _dashUid);
+      var checkRes = await checkQuery;
+      var plannedCount = (checkRes && typeof checkRes.count === 'number') ? checkRes.count : 0;
+      if (plannedCount > 0) {
+        var msg = '⚠️ هذا الموعد عليه ' + plannedCount + ' علاج مخطّط لم يُكمَل بعد.\n\n'
+                + 'انتقل إلى صفحة المواعيد لاختيار العلاجات التي تم إنجازها قبل تسجيل الخروج.\n\n'
+                + 'موافق → فتح صفحة المواعيد\n'
+                + 'إلغاء → البقاء هنا (لن يُسجَّل الخروج)';
+        if (confirm(msg)) {
+          window.location.href = 'appointments.html';
+        }
+        return;  // intercepted — no stamp written from the dashboard widget
+      }
+    } catch (e) {
+      console.warn('recordDashApptTime: Phase 8C planned-sessions check failed (proceeding with stamp):', e);
+      // Fail-open: if the check itself errors out we don't want to block the
+      // secretary from stamping at all. Worst case they miss the Phase 8C
+      // prompt for this one appointment — they can still complete sessions
+      // manually from the patient profile.
+    }
+  }
+
   if (btnEl) btnEl.disabled = true;
 
   var nowIso = new Date().toISOString();
