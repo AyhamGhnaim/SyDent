@@ -771,7 +771,10 @@ textarea { resize: vertical; min-height: 72px; }
     width: 6px; height: 6px; border-radius: 50%;
     display: inline-block;
   }
-  .topbar { padding: 12px 14px; }
+  .topbar { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+  .topbar-title { flex: 1 1 auto; }
+  .view-toggle { order: 3; flex: 1 1 100%; justify-content: stretch; }
+  .view-toggle .view-btn { flex: 1 1 auto; }
   .modal-overlay { align-items: flex-end; }
   .modal {
     border-radius: 20px 20px 0 0;
@@ -877,7 +880,7 @@ textarea { resize: vertical; min-height: 72px; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260526a38"></script>
-<script src="sidebar.js?v=20260524a04"></script>
+<script src="sidebar.js?v=20260526a39"></script>
 </head>
 <body>
 <script>

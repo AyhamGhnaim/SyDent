@@ -158,8 +158,6 @@ const navItems = [
   { icon: '📊', label: 'المحاسبة',       href: 'accounting.html', id: 'accounting' },
   { icon: '📊', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
   { icon: '📋', label: 'سجل النشاطات', href: 'audit-log.html', id: 'audit-log' },
-  { icon: '📈', label: 'التقارير',    href: '#',             id: 'reports'   },
-  { icon: '📋', label: 'السجلات',     href: '#',             id: 'logs'      },
   { section: 'النظام' },
   { icon: '⚙️', label: 'الإعدادات',  href: 'settings.html', id: 'settings'  },
   { icon: '🚪', label: 'تسجيل خروج', href: '#',             id: 'logout', onClick: 'doLogout' },
