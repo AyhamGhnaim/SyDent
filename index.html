@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a45"></script>
-<script src="sidebar.js?v=20260526a45"></script>
+<script src="supabase-init.js?v=20260526a46"></script>
+<script src="sidebar.js?v=20260526a46"></script>
 </head>
 <body>
 <script>
@@ -1533,7 +1533,12 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
           if (plannedList.length > 1) {
             // Multi-session: redirect to appointments.html where the full
             // Phase 8C modal (with checkboxes for partial completion) lives.
-            window.location.href = 'appointments.html';
+            // Pass apptId via URL hash so the destination page can auto-open
+            // the dismissed-completion modal for THIS specific appointment —
+            // otherwise the secretary lands on a generic list and has to
+            // hunt for the right row. The hash is consumed and cleared via
+            // history.replaceState on the receiving side (no cache pollution).
+            window.location.href = 'appointments.html#dismiss=' + encodeURIComponent(apptId);
             return;
           }
 

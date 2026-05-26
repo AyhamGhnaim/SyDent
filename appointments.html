@@ -879,8 +879,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a45"></script>
-<script src="sidebar.js?v=20260526a45"></script>
+<script src="supabase-init.js?v=20260526a46"></script>
+<script src="sidebar.js?v=20260526a46"></script>
 </head>
 <body>
 <script>
@@ -6061,6 +6061,45 @@ function showToast(msg) {
       var url3 = new URL(window.location.href);
       url3.searchParams.delete('newWithTemplate');
       window.history.replaceState({}, '', url3.toString());
+    }
+
+    // Phase 8C fix: dashboard widget (index.html) routes multi-session
+    // dismissals here via the URL hash #dismiss=<apptId>. Match → switch
+    // to list view + open the Phase 8C completion modal for that exact
+    // appointment, then clean the hash so a refresh doesn't re-open it.
+    // We use a hash (not a query param) because the dashboard already uses
+    // ? for editAppt/wa/newWithTemplate and we want the routing surfaces
+    // separate (hash = "transient action", query = "resource identity").
+    var hashMatch = (window.location.hash || '').match(/^#dismiss=([^&]+)$/);
+    if (hashMatch && hashMatch[1]) {
+      var dismissApptId = decodeURIComponent(hashMatch[1]);
+      // Validate that the appointment exists in the freshly-loaded cache.
+      // If it was deleted between the dashboard click and now, fail open
+      // with a toast — the dashboard's confirm() already showed the user
+      // what they were committing to; a silent skip would be confusing.
+      var matchedDismiss = appointments.find(function(a){ return a.id === dismissApptId; });
+      if (matchedDismiss) {
+        if (typeof setView === 'function') setView('list');
+        // 200ms matches the wa/editAppt patterns above. Phase 8C modal
+        // depends on sessionsByAppt + labOrdersByAppt, both populated by
+        // loadAppointments() which we awaited above. btnEl is null because
+        // there's no source DOM button to re-enable on cancel — the user
+        // came from another page.
+        setTimeout(function(){
+          if (typeof openDismissedCompleteModal === 'function') {
+            openDismissedCompleteModal(dismissApptId, null);
+          } else {
+            console.warn('Phase 8C: openDismissedCompleteModal not defined');
+            showToast('⚠️ تعذّر فتح نافذة الإكمال — أعد تحميل الصفحة');
+          }
+        }, 200);
+      } else {
+        showToast('⚠️ الموعد لم يعد موجوداً — قد يكون محذوفاً');
+      }
+      // Clean the hash unconditionally — even when the appt was missing,
+      // we don't want a refresh to keep trying. replaceState avoids adding
+      // a history entry (matches the query-param cleanup pattern above).
+      window.history.replaceState({}, '', window.location.pathname + window.location.search);
     }
   } catch(e) { console.warn('deep-link:', e); }
 })();
