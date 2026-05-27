@@ -86,6 +86,60 @@ const css = `
     font-family: 'Cairo', sans-serif;
   }
 
+  /* ─── Theme toggle row (above footer) ─── */
+  .sb-theme-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'Cairo', sans-serif;
+    font-size: 13px;
+    color: var(--text2);
+    font-weight: 600;
+  }
+  .sb-theme-row-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sb-theme-row-label svg {
+    width: 16px;
+    height: 16px;
+    color: var(--green);
+  }
+  .sb-theme-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background .2s, border-color .2s;
+  }
+  .sb-theme-switch:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+  .sb-theme-switch-knob {
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transform: translateY(-50%);
+    transition: right .22s ease, left .22s ease;
+  }
+  /* RTL: in light mode knob to the right (sun side); in dark knob to the left (moon side) */
+  :root[data-theme="light"] .sb-theme-switch-knob { right: 2px; }
+  :root[data-theme="dark"]  .sb-theme-switch-knob { right: calc(100% - 20px); }
+  :root[data-theme="dark"]  .sb-theme-switch       { background: #2a3f5f; }
+
   /* ─── Overlay ─── */
   .sb-overlay {
     display: none;
@@ -222,6 +276,15 @@ function buildHTML(activeId) {
         </div>
       </a>
       <nav class="sb-nav">${navHTML}</nav>
+      <div class="sb-theme-row" id="sbThemeRow">
+        <span class="sb-theme-row-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <span>الوضع</span>
+        </span>
+        <button type="button" class="sb-theme-switch" id="sbThemeSwitch" role="switch" aria-label="تبديل الوضع الفاتح/الداكن" title="تبديل الوضع الفاتح/الداكن">
+          <span class="sb-theme-switch-knob" aria-hidden="true"></span>
+        </button>
+      </div>
       <div class="sb-footer" id="sbDoctorFooter">جارٍ التحميل…</div>
     </aside>`;
 }
@@ -319,6 +382,61 @@ function initSidebar(activeId) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = buildHTML(activeId);
   document.body.insertBefore(wrapper, document.body.firstChild);
+
+  // 2.5. Wire theme toggle — self-contained (works whether theme.js is loaded or not).
+  //  Uses the same localStorage key 'sydent_theme' as theme.js for cross-page persistence.
+  //  IMPORTANT: hide the toggle on pages that don't ship theme.css (Tier B/C pages
+  //  not yet migrated) — otherwise the knob moves but the page doesn't change,
+  //  which is confusing. Detection: theme.css presence in document.styleSheets,
+  //  OR window.SyDentTheme (loaded via theme.js, which always accompanies theme.css).
+  try {
+    const row = document.getElementById('sbThemeRow');
+    const sw  = document.getElementById('sbThemeSwitch');
+    const themeCssLoaded = !!(window.SyDentTheme) ||
+      Array.from(document.styleSheets || []).some(function(s){
+        try { return (s.href || '').indexOf('theme.css') !== -1; } catch(e) { return false; }
+      });
+    if (row && !themeCssLoaded) {
+      row.style.display = 'none';
+    }
+    if (sw && themeCssLoaded) {
+      const KEY = 'sydent_theme';
+      const VALID = { light: 1, dark: 1 };
+      const readMode = function() {
+        try {
+          const v = localStorage.getItem(KEY);
+          return (v && VALID[v]) ? v : 'light';
+        } catch (e) { return 'light'; }
+      };
+      const writeMode = function(m) {
+        try { localStorage.setItem(KEY, m); } catch (e) {}
+      };
+      const applyMode = function(m) {
+        if (!VALID[m]) m = 'light';
+        document.documentElement.setAttribute('data-theme', m);
+        sw.setAttribute('aria-checked', m === 'dark' ? 'true' : 'false');
+        // Update mobile status bar tint if a theme-color meta exists
+        try {
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', m === 'dark' ? '#0a1628' : '#fafaf7');
+        } catch (e) {}
+        // Notify other widgets (e.g. Chart.js) — same event name as theme.js
+        try {
+          window.dispatchEvent(new CustomEvent('sydent:themechange', { detail: { mode: m } }));
+        } catch (e) {}
+      };
+      // Initial sync: read stored or default, then apply (ensures sidebar + page agree)
+      const initial = readMode();
+      applyMode(initial);
+      // Click handler — toggles + persists
+      sw.addEventListener('click', function(e) {
+        e.preventDefault();
+        const next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+        writeMode(next);
+        applyMode(next);
+      });
+    }
+  } catch (e) { /* non-fatal */ }
 
   // 3. Wrap main content
   const mainEl = document.getElementById('sbMainContent') ||
