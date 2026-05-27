@@ -835,6 +835,40 @@ header{
 .tpl-editor-section.open .tpl-editor-toggle{transform:rotate(90deg);}
 .tpl-editor-body{display:none;padding:18px;border-top:1px solid var(--border);}
 .tpl-editor-section.open .tpl-editor-body{display:block;}
+/* Phase X3 محادثة 3: platform-wide settings (above the per-template tabs).
+   Mirrors the visual weight of .tpl-tab but lives outside the tabs row so
+   it's clearly NOT tied to any single template — it applies to all four. */
+.tpl-platform-settings{
+  background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:14px;margin-bottom:18px;
+}
+.tpl-platform-settings-label{
+  font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;
+}
+.tpl-platform-settings-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tpl-platform-settings-row label{
+  font-size:13px;color:var(--text2);min-width:130px;
+}
+.tpl-platform-settings-row input{
+  flex:1;min-width:180px;padding:8px 12px;font-size:13px;font-family:'Cairo',sans-serif;
+  background:var(--bg);color:var(--text);
+  border:1px solid var(--border);border-radius:8px;
+}
+.tpl-platform-settings-row input:focus{outline:none;border-color:var(--green);}
+.btn-save-support{
+  padding:8px 14px;font-size:12px;font-weight:600;font-family:'Cairo',sans-serif;
+  background:var(--green);color:#0a1628;
+  border:none;border-radius:8px;cursor:pointer;transition:all .15s;
+}
+.btn-save-support:hover:not(:disabled){background:var(--green2);}
+.btn-save-support:disabled{background:var(--bg);color:var(--text3);cursor:not-allowed;}
+.tpl-platform-settings-hint{
+  font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5;
+}
+.tpl-platform-settings-hint code{
+  background:var(--bg);padding:1px 6px;border-radius:4px;
+  color:var(--green);font-family:monospace;
+}
 .tpl-dirty-indicator{
   display:inline-block;width:8px;height:8px;border-radius:50%;
   background:#ffa726;margin-right:6px;vertical-align:middle;
@@ -1902,7 +1936,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260527a60"></script>
+<script src="supabase-init.js?v=20260527a61"></script>
 </head>
 <body>
 
@@ -2100,6 +2134,16 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
         <span class="tpl-editor-toggle">▶</span>
       </div>
       <div class="tpl-editor-body">
+        <!-- Phase X3 محادثة 3: Platform-wide settings (apply to ALL templates) -->
+        <div class="tpl-platform-settings">
+          <div class="tpl-platform-settings-label">⚙️ إعدادات عامة (تنطبق على جميع القوالب)</div>
+          <div class="tpl-platform-settings-row">
+            <label for="fSupportPhone">📞 رقم الدعم الفني</label>
+            <input type="tel" id="fSupportPhone" placeholder="مثلاً 0991234567" autocomplete="off" oninput="onSupportPhoneInput()">
+            <button type="button" class="btn-save-support" id="btnSaveSupport" onclick="saveSupportPhone()" disabled>💾 حفظ</button>
+          </div>
+          <div class="tpl-platform-settings-hint">يظهر داخل نصوص الرسائل عبر المتغيّر <code>{support_phone}</code>. عند تركه فارغاً، يبقى المتغيّر كما هو في النص (تنبيه مرئي للإدارة).</div>
+        </div>
         <div class="tpl-tabs-wrap" id="tplTabsWrap">
           <button type="button" class="tpl-tab active" data-tpl-code="wa_welcome"   onclick="selectTplTab('wa_welcome',this)">👋 ترحيب</button>
           <button type="button" class="tpl-tab"        data-tpl-code="wa_reminder"  onclick="selectTplTab('wa_reminder',this)">⏰ تذكير</button>
@@ -3217,6 +3261,10 @@ window.addEventListener('DOMContentLoaded', async function() {
   // render. We also populate planEditorState's sibling template state
   // here (tplEditorState.config map by code) — see loadTplConfig below.
   loadTplConfig();
+  // Phase X3 محادثة 3: warm up PLATFORM_SETTINGS_CACHE so the first
+  // template send (💬 تذكير / 👋 ترحيب / etc.) renders with the saved
+  // support_phone without waiting on a DB round trip mid-build.
+  loadPlatformSettings();
   loadAndRender();
 });
 
@@ -3873,13 +3921,17 @@ var TPL_MOCK_VARS = {
   // sees in the live render path. Showing 'د. محمد العلي' here would
   // make the preview render "مرحباً د. د. محمد العلي،" for wa_welcome,
   // misleading the admin into thinking the duplication still exists.
-  name:       'محمد العلي',
-  days_left:  5,
-  trial_end:  '٢٧ مايو ٢٠٢٦',
-  plan_name:  'سنوي',
-  login_url:  'https://sydent.app',
-  email:      '0991234567@sydent.com',
-  price:      '150,000 SYP'
+  name:          'محمد العلي',
+  days_left:     5,
+  trial_end:     '٢٧ مايو ٢٠٢٦',
+  plan_name:     'سنوي',
+  login_url:     'https://sydent.app',
+  email:         '0991234567@sydent.com',
+  price:         '150,000 SYP',
+  // Phase X3 محادثة 3: mock value for preview only. Live render uses
+  // PLATFORM_SETTINGS_CACHE.support_phone; if empty, the live code
+  // intentionally leaves {support_phone} in the body as a visible TODO.
+  support_phone: '0991234567'
 };
 
 // Variable definitions per template — keeps the chip list inside the
@@ -3888,24 +3940,28 @@ var TPL_MOCK_VARS = {
 // in the client too so we don't depend on DB roundtrip to render chips.
 var TPL_VAR_DEFS = {
   wa_welcome: [
-    { key:'name',      desc:'اسم الطبيب' },
-    { key:'login_url', desc:'رابط الموقع' },
-    { key:'email',     desc:'البريد المُسجَّل' }
+    { key:'name',          desc:'اسم الطبيب' },
+    { key:'login_url',     desc:'رابط الموقع' },
+    { key:'email',         desc:'البريد المُسجَّل' },
+    { key:'support_phone', desc:'رقم الدعم الفني لـ SyDent' }
   ],
   wa_reminder: [
-    { key:'name',       desc:'اسم الطبيب (يحتوي اللقب)' },
-    { key:'days_left',  desc:'الأيام المتبقّية' },
-    { key:'trial_end',  desc:'تاريخ نهاية التجربة (عربي طويل)' },
-    { key:'plan_name',  desc:'اسم الخطة (متاح، غير مستخدم)' }
+    { key:'name',          desc:'اسم الطبيب (يحتوي اللقب)' },
+    { key:'days_left',     desc:'الأيام المتبقّية' },
+    { key:'trial_end',     desc:'تاريخ نهاية التجربة (عربي طويل)' },
+    { key:'plan_name',     desc:'اسم الخطة (متاح، غير مستخدم)' },
+    { key:'support_phone', desc:'رقم الدعم الفني لـ SyDent' }
   ],
   wa_suspended: [
-    { key:'name', desc:'اسم الطبيب' }
+    { key:'name',          desc:'اسم الطبيب' },
+    { key:'support_phone', desc:'رقم الدعم الفني لـ SyDent' }
   ],
   wa_renewed: [
-    { key:'name',      desc:'اسم الطبيب' },
-    { key:'plan_name', desc:'اسم الخطة' },
-    { key:'trial_end', desc:'تاريخ نهاية الاشتراك' },
-    { key:'price',     desc:'المبلغ المدفوع' }
+    { key:'name',          desc:'اسم الطبيب' },
+    { key:'plan_name',     desc:'اسم الخطة' },
+    { key:'trial_end',     desc:'تاريخ نهاية الاشتراك' },
+    { key:'price',         desc:'المبلغ المدفوع' },
+    { key:'support_phone', desc:'رقم الدعم الفني لـ SyDent' }
   ]
 };
 
@@ -5464,8 +5520,110 @@ function normalizeWaPhone(phone) {
   return num;
 }
 
-// Fallbacks must match Migration 28.2 seed strings exactly so that a
+// === Phase X3 محادثة 3 — Platform-wide settings (e.g. support_phone) ===
+//
+// One key/value table (platform_settings, Migration 33) stores vendor-level
+// config that appears inside admin WhatsApp templates. Cache pattern matches
+// NOTIFICATION_TEMPLATES_CACHE — warmed on init (loadPlatformSettings), read
+// by every wa*Link helper, invalidated + reloaded after saveSupportPhone.
+//
+// Empty-value contract: if support_phone is empty (no admin entry yet), we
+// DO NOT pass it to renderTemplate. That leaves the literal {support_phone}
+// in the message body so admin sees a visible reminder in wa.me preview.
+// This is deliberate UX — replacing with '' produces a confusing "للدعم: "
+// dangling colon. See supportPhoneVars() helper below.
+
+var PLATFORM_SETTINGS_CACHE = { support_phone: '' };
+var _saveSupportPhoneInFlight = false;
+
+async function loadPlatformSettings() {
+  try {
+    if (!window.sb) return;
+    var res = await window.sb.from('platform_settings').select('key, value');
+    if (res.error) { console.warn('loadPlatformSettings: query error', res.error); return; }
+    (res.data || []).forEach(function(r){
+      PLATFORM_SETTINGS_CACHE[r.key] = (r.value == null) ? '' : String(r.value);
+    });
+    // Sync UI input if the editor section is already rendered.
+    var inp = document.getElementById('fSupportPhone');
+    if (inp && document.activeElement !== inp) {
+      inp.value = PLATFORM_SETTINGS_CACHE.support_phone || '';
+      // After (re)load, the input matches DB → save button disabled.
+      var btn = document.getElementById('btnSaveSupport');
+      if (btn) btn.disabled = true;
+    }
+  } catch(e) { console.warn('loadPlatformSettings error:', e); }
+}
+
+// Dirty-detector: enables save button only when the typed value differs
+// from the cached (saved) value. Mirrors the dirty-tracking pattern used
+// by the template editor (computeTplDirty / updateTplDirtyUI).
+function onSupportPhoneInput() {
+  var inp = document.getElementById('fSupportPhone');
+  var btn = document.getElementById('btnSaveSupport');
+  if (!inp || !btn) return;
+  var current = (PLATFORM_SETTINGS_CACHE.support_phone || '').trim();
+  var typed   = (inp.value || '').trim();
+  btn.disabled = (typed === current);
+}
+
+async function saveSupportPhone() {
+  if (_saveSupportPhoneInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+  var inp = document.getElementById('fSupportPhone');
+  var btn = document.getElementById('btnSaveSupport');
+  if (!inp) return;
+  var val = (inp.value || '').trim();
+  _saveSupportPhoneInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    var payload = { key: 'support_phone', value: val };
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        payload.updated_by = sess.data.session.user.email || 'admin';
+      }
+    } catch(_){}
+    var res = await window.sb.from('platform_settings')
+      .upsert(payload, { onConflict: 'key' })
+      .select()
+      .maybeSingle();
+    if (res.error) {
+      console.error('saveSupportPhone error:', res.error);
+      alert('❌ فشل الحفظ: ' + (res.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    if (!res.data) {
+      // RLS denial or missing seed — same maybeSingle() null pattern as saveTplEdits.
+      alert('❌ لم يُحفَظ السطر — قد تكون الصلاحيات مرفوضة.\n\n' +
+            'تحقّق من تشغيل Migration 33 وأن دورك "admin" في platform_admins.');
+      return;
+    }
+    PLATFORM_SETTINGS_CACHE.support_phone = val;
+    alert('✅ تم حفظ رقم الدعم الفني.');
+  } catch(ex) {
+    console.error('saveSupportPhone exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    _saveSupportPhoneInFlight = false;
+    if (btn) { btn.textContent = '💾 حفظ'; btn.disabled = true; }
+  }
+}
+
+// supportPhoneVars() — returns a partial vars object to merge into the
+// vars passed to renderTemplate. Empty support_phone → empty object so
+// renderTemplate leaves {support_phone} literal in the body. Non-empty
+// → { support_phone: '<value>' } so it substitutes normally. Single
+// source of truth — every wa*Link helper calls this.
+function supportPhoneVars() {
+  var v = (PLATFORM_SETTINGS_CACHE.support_phone || '').trim();
+  return v ? { support_phone: v } : {};
+}
+
+// Fallbacks must match Migration 33.1 seed strings exactly so that a
 // DB-down render produces the same wa.me URL as a DB-up render.
+// (Updated from Migration 28.2 baseline to include {support_phone} —
+// see Migration 33.1 for the upgrade rationale.)
 var FALLBACK_TEMPLATES = {
   wa_welcome:
     'مرحباً د. {name}،\n' +
@@ -5475,17 +5633,18 @@ var FALLBACK_TEMPLATES = {
     '👤 البريد: {email}\n' +
     '🔑 كلمة المرور: 0000\n\n' +
     '⚠️ يمكنك تغيير كلمة المرور من صفحة الإعدادات.\n\n' +
+    '📞 للدعم الفني: {support_phone}\n\n' +
     'شكراً لاختيارك SyDent!',
   wa_reminder:
     'مرحباً {name} 👋\n\n' +
     'هذه رسالة تذكير ودّية من SyDent 🦷\n\n' +
     '⏰ تجربتك المجانية تنتهي خلال {days_left} يوم بتاريخ {trial_end}.\n\n' +
-    'للتمديد أو الاستفسار، يرجى التواصل معنا.\n\n' +
+    'للتمديد أو الاستفسار: {support_phone}\n\n' +
     'شكراً لاختيارك SyDent!',
   wa_suspended:
     'مرحباً {name} 👋\n\n' +
     'نودّ إعلامك بأن حسابك في SyDent مُعلَّق مؤقتاً.\n\n' +
-    'للاستفسار أو إعادة التفعيل، يرجى التواصل معنا.\n\n' +
+    'للاستفسار أو إعادة التفعيل: {support_phone}\n\n' +
     'شكراً لتفهّمك.',
   wa_renewed:
     'مرحباً د. {name} 👋\n\n' +
@@ -5493,6 +5652,7 @@ var FALLBACK_TEMPLATES = {
     '📋 الخطة: {plan_name}\n' +
     '📅 صالح حتى: {trial_end}\n' +
     '💰 المبلغ: {price}\n\n' +
+    '📞 للدعم الفني: {support_phone}\n\n' +
     'شكراً لاختيارك SyDent!'
 };
 
@@ -5574,11 +5734,16 @@ async function renderTemplate(code, vars) {
 async function waLink(phone, name, email) {
   var num = normalizeWaPhone(phone);
   var emailVal = email || (num + '@sydent.com');
-  var body = await renderTemplate('wa_welcome', {
+  // Phase X3 محادثة 3: merge support_phone if non-empty (empty leaves
+  // {support_phone} literal in body as a visible TODO — see supportPhoneVars).
+  var vars = {
     name: stripDoctorHonorific(name),
     login_url: 'https://sydent.app',
     email: emailVal
-  });
+  };
+  var sp = supportPhoneVars();
+  if (sp.support_phone) vars.support_phone = sp.support_phone;
+  var body = await renderTemplate('wa_welcome', vars);
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
@@ -5600,12 +5765,16 @@ async function waReminderLink(phone, name, daysLeft, trialEndIso) {
   } catch (e) {
     dateStr = (trialEndIso || '').slice(0, 10);
   }
-  var body = await renderTemplate('wa_reminder', {
+  // Phase X3 محادثة 3: support_phone merged conditionally — see waLink.
+  var vars = {
     name: stripDoctorHonorific(name),
     days_left: daysLeft,
     trial_end: dateStr,
     plan_name: ''  // available but unused in default body
-  });
+  };
+  var sp = supportPhoneVars();
+  if (sp.support_phone) vars.support_phone = sp.support_phone;
+  var body = await renderTemplate('wa_reminder', vars);
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
@@ -5653,11 +5822,15 @@ function openWaReminder(phone, name, daysLeft, trialEndIso, ev) {
 async function waWelcomeLink(phone, name, email) {
   var num = normalizeWaPhone(phone);
   var emailVal = email || (num + '@sydent.com');
-  var body = await renderTemplate('wa_welcome', {
+  // Phase X3 محادثة 3: support_phone merged conditionally — see waLink.
+  var vars = {
     name: stripDoctorHonorific(name),
     login_url: 'https://sydent.app',
     email: emailVal
-  });
+  };
+  var sp = supportPhoneVars();
+  if (sp.support_phone) vars.support_phone = sp.support_phone;
+  var body = await renderTemplate('wa_welcome', vars);
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
@@ -5679,7 +5852,11 @@ function openWaWelcome(phone, name, email, ev) {
 // nudge is just "we've paused your account, please reach out".
 async function waSuspendedLink(phone, name) {
   var num = normalizeWaPhone(phone);
-  var body = await renderTemplate('wa_suspended', { name: stripDoctorHonorific(name) });
+  // Phase X3 محادثة 3: support_phone merged conditionally — see waLink.
+  var vars = { name: stripDoctorHonorific(name) };
+  var sp = supportPhoneVars();
+  if (sp.support_phone) vars.support_phone = sp.support_phone;
+  var body = await renderTemplate('wa_suspended', vars);
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
@@ -5720,12 +5897,16 @@ async function waRenewedLink(phone, name, planName, trialEndIso, price) {
   } else {
     priceStr = '—';
   }
-  var body = await renderTemplate('wa_renewed', {
+  // Phase X3 محادثة 3: support_phone merged conditionally — see waLink.
+  var vars = {
     name: stripDoctorHonorific(name),
     plan_name: planName || '',
     trial_end: dateStr,
     price: priceStr
-  });
+  };
+  var sp = supportPhoneVars();
+  if (sp.support_phone) vars.support_phone = sp.support_phone;
+  var body = await renderTemplate('wa_renewed', vars);
   return 'https://wa.me/' + num + '?text=' + encodeURIComponent(body);
 }
 
