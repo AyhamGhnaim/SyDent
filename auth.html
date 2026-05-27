@@ -12,6 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — تسجيل الدخول</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260527a03"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260527a61"></script>
 <style>
@@ -158,6 +160,8 @@ body{
   display:block;margin-top:8px;line-height:1.5;
 }
 </style>
+<!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
+<link rel="stylesheet" href="theme.css?v=20260527a03">
 </head>
 <body>
 
@@ -170,6 +174,8 @@ body{
   <div style="text-align:center;margin-bottom:16px;">
     <a href="landing.html" style="font-size:12px;color:var(--text2);text-decoration:none;">← العودة للصفحة الرئيسية</a>
   </div>
+  <!-- Theme toggle mount point (Stage 2A — populated by SyDentTheme.mount() in inline JS) -->
+  <div id="authThemeMount" style="display:flex;justify-content:center;margin-bottom:16px;"></div>
 
   <div class="tabs">
     <button class="tab active" id="tabLogin"    onclick="switchTab('login')">تسجيل دخول</button>
@@ -621,6 +627,10 @@ async function doRegister(e) {
 document.addEventListener('DOMContentLoaded', function(){
   if (window.SyDentPwd && window.SyDentPwd.attachAll) {
     window.SyDentPwd.attachAll(['loginPass', 'regPass']);
+  }
+  // Stage 2A: mount theme toggle in auth-card (above tabs)
+  if (window.SyDentTheme && window.SyDentTheme.mount) {
+    window.SyDentTheme.mount('#authThemeMount', { title: 'تبديل الوضع الفاتح/الداكن' });
   }
 });
 </script>

@@ -12,6 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — طلبك قيد المراجعة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260527a03"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -106,6 +108,8 @@ h1{font-size:22px;font-weight:800;color:var(--text);margin-bottom:10px;}
   h1{font-size:19px;}
 }
 </style>
+<!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
+<link rel="stylesheet" href="theme.css?v=20260527a03">
 </head>
 <body>
 

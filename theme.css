@@ -292,3 +292,57 @@
   background: #fafaf7;
 }
 
+/* ========================================================================== */
+/*  Tier A — Auth flow pages (Stage 2A)                                       */
+/*  Applies to: auth.html, pending.html, reset-password.html                  */
+/* ========================================================================== */
+
+/* Hard-coded body gradient (#0a1628 → #0f2038) in all three Tier A pages */
+:root[data-theme="light"] body {
+  background: linear-gradient(135deg, #fafaf7 0%, #ffffff 50%, #fafaf7 100%);
+}
+
+/* Card containers — dark navy box-shadow looks like a halo on white bg */
+:root[data-theme="light"] .auth-card,
+:root[data-theme="light"] .modal-card,
+:root[data-theme="light"] .pending-card {
+  box-shadow: 0 20px 60px rgba(28,25,23,0.08);
+  border-color: var(--border);
+}
+
+/* Primary CTA text on green — in dark, color:var(--bg) = #0a1628 (dark on green ✓);
+   in light, var(--bg) = #fafaf7 which has poor contrast on #16a085. Force white. */
+:root[data-theme="light"] .btn-submit,
+:root[data-theme="light"] .btn-primary,
+:root[data-theme="light"] .tab.active {
+  color: #ffffff;
+}
+
+/* Spinner inside green button — border-top-color was hard-coded #0a1628 (dark) */
+:root[data-theme="light"] .spinner {
+  border-color: rgba(255,255,255,0.4);
+  border-top-color: #ffffff;
+}
+
+/* Password visibility toggle — hard-coded color #8a9ab5 + hover rgba(255,255,255) */
+:root[data-theme="light"] .pwd-toggle {
+  color: var(--text2);
+}
+:root[data-theme="light"] .pwd-toggle:hover {
+  background: rgba(28,25,23,0.05);
+  color: var(--text);
+}
+
+/* auth.html .ptr-bar (pull-to-refresh) — injected inline by JS with
+   hard-coded background:#0a1628 + color:#2ee89e. Override defensively with
+   !important since the inline style block is generated at runtime. */
+:root[data-theme="light"] .ptr-bar {
+  background: #ffffff !important;
+  color: var(--green) !important;
+  border-bottom-color: rgba(22,160,133,0.2) !important;
+}
+:root[data-theme="light"] .ptr-ring {
+  border-color: rgba(22,160,133,0.25) !important;
+  border-top-color: var(--green) !important;
+}
+
