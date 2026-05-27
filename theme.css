@@ -1,0 +1,202 @@
+/* ============================================================================
+   SyDent Theme System — Phase Theme v1 (27 May 2026)
+   ----------------------------------------------------------------------------
+   Light mode is the DEFAULT (matches user preference: "خلي ال لايت مود هو الاساسي").
+   Dark mode = the existing platform look, preserved exactly (--bg:#0a1628 etc.).
+
+   Loaded AFTER each page's existing inline <style>, so cascade order is:
+     1. inline :root           → page sets its own dark variables
+     2. theme.css :root        → overrides to Light defaults
+     3. theme.css [data-theme="dark"] → restores Dark when toggled
+
+   No inline color literals are touched in Phase 1; aliases cover both naming
+   conventions found in the codebase (standard --bg/--text and index.html's
+   --bg-primary/--text-primary).
+   ============================================================================ */
+
+/* ---------- LIGHT MODE (default — Soft warm, Stripe-inspired) -------------- */
+:root,
+:root[data-theme="light"] {
+  /* Standard naming (landing/admin/most pages) */
+  --bg:        #fafaf7;       /* page bg — warm off-white */
+  --bg2:       #ffffff;       /* card bg — pure white */
+  --bg3:       #f4f4ef;       /* hover / subtle bg */
+  --bg4:       #f8f8f3;       /* nested bg */
+
+  --text:      #1c1917;       /* primary text — warm near-black */
+  --text2:     #57534e;       /* secondary text — warm gray */
+  --text3:     #78716c;       /* tertiary / muted */
+
+  --border:    rgba(28,25,23,0.10);   /* subtle hairline */
+  --border2:   rgba(28,25,23,0.18);
+
+  /* Semantic colors — slightly toned for light backgrounds */
+  --green:     #16a085;       /* primary action — readable on white */
+  --green2:    #138a72;
+  --green-dim: rgba(22,160,133,0.10);
+
+  --red:       #dc2626;
+  --red-dim:   rgba(220,38,38,0.10);
+
+  --yellow:    #ca8a04;
+  --yellow-dim:rgba(202,138,4,0.12);
+
+  --blue:      #2563eb;
+  --orange:    #ea580c;
+  --purple:    #7c3aed;
+  --amber:     #d97706;
+
+  /* index.html alias naming */
+  --bg-primary:    var(--bg);
+  --bg-secondary:  var(--bg2);
+  --bg-card:       var(--bg2);
+  --accent:        var(--green);
+  --accent2:       var(--green2);
+  --text-primary:  var(--text);
+  --text-secondary:var(--text2);
+  --text-muted:    var(--text3);
+
+  /* Surface shadow — softer in light mode */
+  --shadow-card:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-modal:  0 20px 50px rgba(0,0,0,0.15);
+}
+
+/* ---------- DARK MODE (existing platform look, preserved) ------------------ */
+:root[data-theme="dark"] {
+  /* Standard naming */
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --bg4:       #0d1e33;
+
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --text3:     #5a7090;
+
+  --border:    rgba(46,232,158,0.15);
+  --border2:   rgba(46,232,158,0.28);
+
+  --green:     #2ee89e;
+  --green2:    #26d48e;
+  --green-dim: rgba(46,232,158,0.10);
+
+  --red:       #ef5350;
+  --red-dim:   rgba(239,83,80,0.10);
+
+  --yellow:    #f5c842;
+  --yellow-dim:rgba(245,200,66,0.12);
+
+  --blue:      #63b3ed;
+  --orange:    #ffa726;
+  --purple:    #a78bfa;
+  --amber:     #ffc107;
+
+  /* index.html alias naming */
+  --bg-primary:    var(--bg);
+  --bg-secondary:  var(--bg2);
+  --bg-card:       var(--bg3);
+  --accent:        var(--green);
+  --accent2:       #1ac5a8;
+  --text-primary:  var(--text);
+  --text-secondary:#8ab9a5;
+  --text-muted:    #607b8d;
+
+  /* Shadow stronger on dark */
+  --shadow-card:   0 4px 12px rgba(0,0,0,0.25);
+  --shadow-modal:  0 20px 60px rgba(0,0,0,0.4);
+}
+
+/* ---------- TOGGLE SWITCH (iOS-style) -------------------------------------- */
+.sydent-theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+}
+.sydent-theme-toggle:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.sydent-theme-toggle .stt-knob {
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transform: translateY(-50%);
+  transition: right 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.22s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+}
+/* RTL: in light mode knob sits on the right (sun side); in dark on the left */
+:root[data-theme="light"] .sydent-theme-toggle .stt-knob { right: 2px; }
+:root[data-theme="dark"]  .sydent-theme-toggle .stt-knob { right: calc(100% - 26px); }
+:root[data-theme="dark"]  .sydent-theme-toggle           { background: #1e3556; }
+
+.sydent-theme-toggle .stt-icon-sun,
+.sydent-theme-toggle .stt-icon-moon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.sydent-theme-toggle .stt-icon-sun  { right: 7px;  color: #f59e0b; }
+.sydent-theme-toggle .stt-icon-moon { left:  7px;  color: #818cf8; }
+:root[data-theme="light"] .sydent-theme-toggle .stt-icon-sun  { opacity: 1; }
+:root[data-theme="dark"]  .sydent-theme-toggle .stt-icon-moon { opacity: 1; }
+
+/* Label variant — pairs the toggle with a text label */
+.sydent-theme-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+/* Sidebar variant — appears above the logout item in sidebar.js */
+.sb-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin: 0 12px 6px;
+  border-radius: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.sb-theme-row .sb-theme-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Prevent FOUC: smooth theme swap when toggling AFTER initial paint */
+:root[data-theme-ready] body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}

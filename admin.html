@@ -12,6 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260527a01"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1933,6 +1935,8 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 }
 
 </style>
+<!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
+<link rel="stylesheet" href="theme.css?v=20260527a01">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1953,7 +1957,8 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
       </div>
       <span class="badge">Admin</span>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="themeToggleMount" style="display:inline-flex;align-items:center;margin-left:4px"></span>
       <button type="button" class="btn-logout" onclick="toggleEventsSection()" title="سجلّ أحداث الاشتراكات">📋 السجلّ</button>
       <button class="btn-logout" onclick="doLogout()">خروج</button>
     </div>
@@ -9527,6 +9532,20 @@ function rptFmtSypShort(n) {
   document.addEventListener('touchstart',function(e){if(window.scrollY>0)return;sy=cy=e.touches[0].clientY;active=true;},{passive:true});
   document.addEventListener('touchmove',function(e){if(!active)return;if(window.scrollY>0){active=false;setState('hide');return;}cy=e.touches[0].clientY;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>4)setState('pull',pull);else setState('hide');},{passive:true});
   document.addEventListener('touchend',function(){if(!active)return;active=false;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>=THRESHOLD){setState('spin');setTimeout(function(){window.location.reload();},800);}else{setState('hide');}cy=0;});
+})();
+</script>
+
+<script>
+/* Mount theme toggle into admin header. Runs after DOMContentLoaded. */
+(function(){
+  function mount(){
+    if (window.SyDentTheme && typeof window.SyDentTheme.mount === 'function') {
+      window.SyDentTheme.mount('#themeToggleMount');
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount, { once: true });
+  } else { mount(); }
 })();
 </script>
 </body>

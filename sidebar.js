@@ -1,17 +1,14 @@
 (function() {
 
 // ─── CSS ───
+// Theme variables (--bg, --bg2, --bg3, --green, --text, --text2, --border)
+// are owned by theme.css. We only define --sb-width here (sidebar-local) and
+// fallback values via var(...,fallback) for any rare case where theme.css
+// hasn't loaded yet (e.g. file:// preview). Removing the duplicate :root
+// block here lets the light/dark theme cascade work for the sidebar.
 const css = `
   :root {
     --sb-width: 240px;
-    --bg:    #0a1628;
-    --bg2:   #0f2038;
-    --bg3:   #132840;
-    --green: #2ee89e;
-    --green-dim: rgba(46,232,158,0.12);
-    --text:  #e1f4ee;
-    --text2: #8a9ab5;
-    --border: rgba(46,232,158,0.15);
   }
 
   /* ─── Sidebar ─── */
@@ -64,10 +61,10 @@ const css = `
     font-family: 'Cairo', sans-serif;
     position: relative;
   }
-  .sb-item:hover { color: var(--text); background: var(--green-dim); }
+  .sb-item:hover { color: var(--text); background: var(--green-dim, rgba(46,232,158,0.12)); }
   .sb-item.active {
     color: var(--green);
-    background: var(--green-dim);
+    background: var(--green-dim, rgba(46,232,158,0.12));
     border-right-color: var(--green);
   }
   .sb-icon { font-size: 16px; width: 20px; text-align: center; }
@@ -225,6 +222,7 @@ function buildHTML(activeId) {
         </div>
       </a>
       <nav class="sb-nav">${navHTML}</nav>
+      <div id="sbThemeMount" class="sb-theme-mount"></div>
       <div class="sb-footer" id="sbDoctorFooter">جارٍ التحميل…</div>
     </aside>`;
 }
@@ -322,6 +320,14 @@ function initSidebar(activeId) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = buildHTML(activeId);
   document.body.insertBefore(wrapper, document.body.firstChild);
+
+  // 2.5. Mount theme toggle (skips silently if SyDentTheme missing)
+  try {
+    var mount = document.getElementById('sbThemeMount');
+    if (mount && window.SyDentTheme && typeof window.SyDentTheme.buildSidebarRow === 'function') {
+      mount.appendChild(window.SyDentTheme.buildSidebarRow());
+    }
+  } catch (e) { /* non-fatal */ }
 
   // 3. Wrap main content
   const mainEl = document.getElementById('sbMainContent') ||

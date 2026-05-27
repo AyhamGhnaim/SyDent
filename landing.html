@@ -33,6 +33,8 @@
 <meta name="twitter:image" content="https://sydent.app/favicon.svg">
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260527a01"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -580,6 +582,8 @@ footer{
   .pricing-section{padding:100px 60px;}
 }
 </style>
+<!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
+<link rel="stylesheet" href="theme.css?v=20260527a01">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260527a61"></script>
 </head>
@@ -597,6 +601,7 @@ footer{
     </div>
   </a>
   <div class="nav-actions">
+    <span id="themeToggleMount" class="nav-theme-mount" aria-label="تبديل الوضع"></span>
     <a href="#pricing" class="btn-outline nav-pricing-link">الأسعار</a>
     <a href="auth.html" class="btn-outline">تسجيل الدخول</a>
     <a href="auth.html?tab=register" class="btn-primary">جرّب مجاناً</a>
@@ -978,6 +983,20 @@ footer{
   document.addEventListener('touchstart',function(e){if(window.scrollY>0)return;sy=cy=e.touches[0].clientY;active=true;},{passive:true});
   document.addEventListener('touchmove',function(e){if(!active)return;if(window.scrollY>0){active=false;setState('hide');return;}cy=e.touches[0].clientY;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>4)setState('pull',pull);else setState('hide');},{passive:true});
   document.addEventListener('touchend',function(){if(!active)return;active=false;var pull=Math.min(Math.max(0,cy-sy)*0.55,MAX);if(pull>=THRESHOLD){setState('spin');setTimeout(function(){window.location.reload();},800);}else{setState('hide');}cy=0;});
+})();
+</script>
+
+<script>
+/* Mount theme toggle into navbar. Runs after DOMContentLoaded for safety. */
+(function(){
+  function mount(){
+    if (window.SyDentTheme && typeof window.SyDentTheme.mount === 'function') {
+      window.SyDentTheme.mount('#themeToggleMount');
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount, { once: true });
+  } else { mount(); }
 })();
 </script>
 
