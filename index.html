@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a53"></script>
-<script src="sidebar.js?v=20260526a53"></script>
+<script src="supabase-init.js?v=20260526a54"></script>
+<script src="sidebar.js?v=20260526a54"></script>
 </head>
 <body>
 <script>
@@ -1494,6 +1494,21 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
       var plannedRes = await qPlanned;
       var plannedList = (plannedRes && plannedRes.data) || [];
 
+      // C7-fix: also check for linked lab orders that should auto-deliver. This
+      // appointment might be a lab delivery appointment (created automatically
+      // by patient-profile.html's "تحديد موعد التركيب الآن" flow) with no
+      // planned sessions attached. Without this query the original guard
+      // (plannedList.length > 0) skipped the intercept entirely and the lab
+      // stayed in 'received' forever. Same status filter as autoDeliverLinkedLabs
+      // on appointments.html so the two paths agree.
+      var qLabs = window.sb.from('lab_orders')
+        .select('id, status, work_type, tooth_num')
+        .eq('appointment_id', apptId)
+        .in('status', ['sent', 'received', 'checked']);
+      if (_dashUid) qLabs = qLabs.eq('doctor_id', _dashUid);
+      var labsRes = await qLabs;
+      var labsList = (labsRes && labsRes.data) || [];
+
       if (plannedList.length > 0) {
         // Build the human-readable summary of what's still planned.
         // For 1 session: full detail inline. For 2+: bullet list (RTL).
@@ -1657,6 +1672,63 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
           }
           // Fall through to the normal stamp flow below (no completion).
         }
+      } else if (labsList.length > 0) {
+        // C7-fix: lab-only dismissal. No planned sessions, but linked labs need
+        // to advance to 'delivered'. Single confirm() with the lab list, then
+        // inline UPDATE of each lab, then fall through to the regular stamp.
+        // No "redirect to appointments.html" path because there are no sessions
+        // to pick from — nothing to show in the Phase 8C modal.
+        var labSummary;
+        if (labsList.length === 1) {
+          var lo = labsList[0];
+          var labArea = lo.tooth_num ? ' — السن ' + lo.tooth_num : '';
+          labSummary = '«' + (lo.work_type || 'طلب مخبر') + labArea + '»';
+        } else {
+          var labLines = labsList.slice(0, 5).map(function(lo){
+            var labAr = lo.tooth_num ? ' (السن ' + lo.tooth_num + ')' : '';
+            return '• ' + (lo.work_type || 'طلب مخبر') + labAr;
+          });
+          if (labsList.length > 5) labLines.push('• ... و' + (labsList.length - 5) + ' طلب آخر');
+          labSummary = labLines.join('\n');
+        }
+        var qLab = '🔬 تسجيل طلب المخبر كـ "تم التركيب"؟\n\n'
+                 + labSummary + '\n\n'
+                 + 'موافق → نعم، تم التركيب\n'
+                 + 'إلغاء → فقط تسجيل خروج المريض (الطلب يبقى كما هو)';
+        if (confirm(qLab)) {
+          // Advance each linked lab to 'delivered'. Doctor-scoped UPDATE; same
+          // status guard as autoDeliverLinkedLabs (appointments.html) so the
+          // two paths agree on which states are valid sources.
+          var labUpdated = 0;
+          var labFailed = 0;
+          for (var li = 0; li < labsList.length; li++) {
+            var lab = labsList[li];
+            try {
+              var lq = window.sb.from('lab_orders')
+                .update({ status: 'delivered', date_delivered: new Date().toISOString() })
+                .eq('id', lab.id);
+              if (_dashUid) lq = lq.eq('doctor_id', _dashUid);
+              var lr = await lq;
+              if (lr.error) { labFailed++; console.warn('dashboard lab deliver err:', lr.error); }
+              else labUpdated++;
+            } catch (le) {
+              labFailed++;
+              console.warn('dashboard lab deliver exception:', le);
+            }
+          }
+          // Brief alert so the user knows what happened — toast helper isn't
+          // imported on the dashboard so we use alert() for parity with the
+          // existing confirm() flow above. Skipped when nothing changed.
+          if (labUpdated > 0 || labFailed > 0) {
+            var labMsg = (labUpdated > 0 ? '✅ تم تسليم ' + labUpdated + ' طلب مخبر' : '')
+                       + (labFailed > 0 ? (labUpdated > 0 ? '\n' : '') + '⚠️ تعذّر تحديث ' + labFailed + ' طلب' : '');
+            // Use setTimeout so the alert doesn't block the stamp UPDATE that
+            // happens immediately after we fall through below.
+            setTimeout(function(){ alert(labMsg); }, 50);
+          }
+        }
+        // Fall through to the normal stamp flow below (lab delivered OR user
+        // declined; either way the patient is leaving the chair).
       }
     } catch (e) {
       console.warn('recordDashApptTime: Phase 8C planned-sessions check failed (proceeding with stamp):', e);
