@@ -779,7 +779,13 @@
       '.sd-lock-modal{background:#0f2038;border:1.5px solid rgba(46,232,158,0.25);border-radius:14px;padding:24px;max-width:440px;width:100%;color:#e1f4ee;max-height:90vh;overflow-y:auto;}' +
       '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:#2ee89e;}' +
       '.sd-lock-modal .sd-cur{font-size:13px;color:#8a9ab5;margin-bottom:16px;padding:10px 12px;background:rgba(46,232,158,0.06);border-radius:8px;}' +
-      '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:#132840;border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;}' +
+      '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:#132840;border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;' +
+        // Defense vs global label rules (patients.html: label{font-size:13px;
+        // font-weight:600;color:var(--text2)}, appointments.html: label{
+        // font-size:12px;font-weight:700;color:var(--text2)}). Since .sd-opt
+        // IS a <label>, those global rules apply and dim the text + shrink it.
+        // Force the modal's own typography explicitly.
+        'color:#e1f4ee;font-size:14px;font-weight:600;line-height:1.5;}' +
       '.sd-lock-modal .sd-opt:hover{border-color:rgba(46,232,158,0.30);background:rgba(46,232,158,0.05);}' +
       '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:#2ee89e;' +
         // Defense vs global input resets (patients.html / appointments.html
