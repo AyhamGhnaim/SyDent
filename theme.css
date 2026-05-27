@@ -346,3 +346,37 @@
   border-top-color: var(--green) !important;
 }
 
+/* ========================================================================== */
+/*  Tier B — Tenant primary pages (Stage 2B)                                  */
+/*  Applies to: patients.html, appointments.html, patient-profile.html        */
+/* ========================================================================== */
+
+/* Generic hover backgrounds — many tenant pages use rgba(255,255,255,0.04-0.06)
+   which is invisible on white. Replace with a subtle dark tint. */
+:root[data-theme="light"] tr:hover,
+:root[data-theme="light"] .row:hover,
+:root[data-theme="light"] .item:hover,
+:root[data-theme="light"] .list-item:hover,
+:root[data-theme="light"] .patient-row:hover,
+:root[data-theme="light"] .appt-row:hover {
+  background: rgba(28,25,23,0.04);
+}
+
+/* Empty-state / muted text — hard-coded #8da0bd renders poorly on light bg */
+:root[data-theme="light"] .empty,
+:root[data-theme="light"] .empty-state,
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .muted-text,
+:root[data-theme="light"] .placeholder-text {
+  color: var(--text2);
+}
+
+/* Search inputs + filter chips — common Tier B pattern (was bg3 on dark) */
+:root[data-theme="light"] .search-input,
+:root[data-theme="light"] .filter-chip,
+:root[data-theme="light"] input[type="search"] {
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
