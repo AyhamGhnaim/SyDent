@@ -291,12 +291,20 @@
   // We also strip an optional trailing slash to handle "/auth.html/"
   // (rare but seen on some CDN edges) and use an explicit leading slash
   // boundary so partial matches like "myauth" don't false-positive.
+  // Phase F4 — index.html is the post-auth dashboard, NOT a public page.
+  // The pre-auth guard at the top of index.html redirects unauth users to
+  // landing.html, so by the time any SyDentLock code runs on / or /index.html,
+  // the user is guaranteed authenticated. Listing 'index' here caused the
+  // header switch-employee button to disappear from the dashboard (the very
+  // place users need it most). The public set is: apex `/` is intentionally
+  // excluded too — apex resolves to index.html which is post-auth.
+  // Truly public pages: auth, landing, pending, admin (platform), reset-password.
   function isPublicPage() {
     var path = (window.location.pathname || '').toLowerCase();
     if (path.length > 1 && path.charAt(path.length - 1) === '/') {
       path = path.slice(0, -1);
     }
-    return /^\/$|^\/(index|auth|landing|pending|admin|reset-password)(\.html)?$/.test(path);
+    return /^\/(auth|landing|pending|admin|reset-password)(\.html)?$/.test(path);
   }
 
 
@@ -773,14 +781,23 @@
       '.sd-lock-modal .sd-cur{font-size:13px;color:#8a9ab5;margin-bottom:16px;padding:10px 12px;background:rgba(46,232,158,0.06);border-radius:8px;}' +
       '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:#132840;border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;}' +
       '.sd-lock-modal .sd-opt:hover{border-color:rgba(46,232,158,0.30);background:rgba(46,232,158,0.05);}' +
-      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:#2ee89e;}' +
+      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:#2ee89e;' +
+        // Defense vs global input resets (patients.html / appointments.html
+        // define `input, select, textarea { width:100%; appearance:none }`
+        // which would otherwise hide the radio circle AND stretch it to
+        // 100% width, breaking the layout). Force native radio rendering.
+        'width:auto !important;-webkit-appearance:radio !important;' +
+        '-moz-appearance:radio !important;appearance:radio !important;' +
+        'background:transparent !important;border:none !important;' +
+        'padding:0 !important;height:auto !important;vertical-align:middle;' +
+        'flex-shrink:0;}' +
       '.sd-lock-modal .sd-opt.sd-active{border-color:rgba(46,232,158,0.55);background:rgba(46,232,158,0.08);}' +
       '.sd-lock-modal .sd-sub{padding:8px 12px 8px 28px;margin-top:6px;display:none;}' +
       '.sd-lock-modal .sd-opt.sd-active .sd-sub{display:block;}' +
       '.sd-lock-modal select{width:100%;padding:9px 10px;background:#0a1628;border:1px solid rgba(46,232,158,0.20);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:13px;}' +
       '.sd-lock-modal .sd-pin-row{margin-top:14px;padding:12px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;}' +
       '.sd-lock-modal .sd-pin-row label{display:block;font-size:12px;color:#8a9ab5;margin-bottom:6px;font-weight:700;}' +
-      '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:#0a1628;border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;}' +
+      '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:#0a1628;border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;-webkit-appearance:none;appearance:none;}' +
       '.sd-lock-modal .sd-msg{font-size:12px;color:#ef5350;margin-top:8px;min-height:18px;font-weight:700;}' +
       '.sd-lock-modal .sd-msg.sd-ok{color:#2ee89e;}' +
       '.sd-lock-modal .sd-actions{display:flex;gap:10px;margin-top:18px;}' +
