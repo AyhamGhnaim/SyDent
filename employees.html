@@ -17,8 +17,8 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a57"></script>
-<script src="sidebar.js?v=20260526a57"></script>
+<script src="supabase-init.js?v=20260527a58"></script>
+<script src="sidebar.js?v=20260527a58"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1904,8 +1904,22 @@ async function deleteEmployee(id) {
     .delete().eq('id', id).eq('owner_id', currentUser.id);
 
   if (res.error) {
-    showToast('فشل الحذف', true);
     console.error(res.error);
+    // PostgreSQL FK violation = 23503. السكرتيرة عندها سجلات في provider_payouts،
+    // و FK constraint بيحمي السجلات المالية التاريخية من الحذف.
+    // الحل الصحيح (نمط OpenDental): تعطيل الحساب بدل الحذف.
+    var errMsg = (res.error.message || '') + ' ' + (res.error.code || '');
+    var isFkViolation = /23503|foreign key|violates.*constraint/i.test(errMsg);
+    if (isFkViolation) {
+      alert(
+        '⚠️ لا يمكن حذف الموظف "' + emp.name + '" لأنه مرتبط بسجلات مالية ' +
+        '(رواتب أو حصص) في النظام.\n\n' +
+        'لحماية السجلات التاريخية، استخدم زر "تعطيل الحساب" بدلاً من الحذف.\n\n' +
+        'الموظف المعطّل لن يقدر يدخل البرنامج، لكن سجلاته المالية ستبقى محفوظة.'
+      );
+    } else {
+      showToast('فشل الحذف', true);
+    }
     return;
   }
 
