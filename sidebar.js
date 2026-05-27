@@ -222,7 +222,6 @@ function buildHTML(activeId) {
         </div>
       </a>
       <nav class="sb-nav">${navHTML}</nav>
-      <div id="sbThemeMount" class="sb-theme-mount"></div>
       <div class="sb-footer" id="sbDoctorFooter">جارٍ التحميل…</div>
     </aside>`;
 }
@@ -320,14 +319,6 @@ function initSidebar(activeId) {
   const wrapper = document.createElement('div');
   wrapper.innerHTML = buildHTML(activeId);
   document.body.insertBefore(wrapper, document.body.firstChild);
-
-  // 2.5. Mount theme toggle (skips silently if SyDentTheme missing)
-  try {
-    var mount = document.getElementById('sbThemeMount');
-    if (mount && window.SyDentTheme && typeof window.SyDentTheme.buildSidebarRow === 'function') {
-      mount.appendChild(window.SyDentTheme.buildSidebarRow());
-    }
-  } catch (e) { /* non-fatal */ }
 
   // 3. Wrap main content
   const mainEl = document.getElementById('sbMainContent') ||
