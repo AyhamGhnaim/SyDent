@@ -620,7 +620,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260527a09">
+<link rel="stylesheet" href="theme.css?v=20260527a10">
 </head>
 <body>
 <script>
@@ -2212,17 +2212,21 @@ function buildTimelineEvents() {
   };
   (allAppointmentsForTl || []).forEach(function(a) {
     var prov = (CLINIC_DOCTORS || []).find(function(d){ return d.id === a.provider_id; });
-    // Composite timestamp: date+time if both present, else date, else created_at.
-    var ts;
-    if (a.date && a.time) {
-      // Some DBs return time as 'HH:MM:SS', others 'HH:MM' — normalize to 5 chars.
-      var t = String(a.time).slice(0, 5);
-      ts = tlTs(a.date + 'T' + t + ':00');
-      if (!ts) ts = tlBestTs(a.date, a.created_at);
-    } else if (a.date) {
-      ts = tlBestTs(a.date, a.created_at);
-    } else {
-      ts = tlTs(a.created_at);
+    // Use created_at (when the event was logged in the system) so the timeline
+    // shows when the appointment was *recorded* in the system — not its
+    // scheduled date/time. The scheduled date/time still appear inside the row
+    // title via dateLabel. Fallback to the legacy date+time logic only if
+    // created_at is missing (defensive — Postgres NOT NULL should prevent this).
+    var ts = tlTs(a.created_at);
+    if (!ts) {
+      if (a.date && a.time) {
+        // Some DBs return time as 'HH:MM:SS', others 'HH:MM' — normalize to 5 chars.
+        var t = String(a.time).slice(0, 5);
+        ts = tlTs(a.date + 'T' + t + ':00');
+        if (!ts) ts = tlBestTs(a.date, a.created_at);
+      } else if (a.date) {
+        ts = tlBestTs(a.date, a.created_at);
+      }
     }
     var statusLabel = APPT_STATUS_AR[a.status] || a.status || '—';
     events.push({
@@ -2407,16 +2411,14 @@ function renderTimelineRow(e) {
   }
   else if (e.type === 'appointment') {
     var a = e.data;
-    // The date/time already render in <span class="tl-row-time"> (top-right of
-    // the row, formatted as "27 مايو 2026 — 18:25"). Including the same info
-    // in the title creates a visible duplicate (reported May 28 2026).
-    // For appointments WITH a date: title = type only. For planned-without-date
-    // appointments: tl-row-time falls back to created_at which is misleading,
-    // so we keep an explicit "(بلا تاريخ)" hint in the title.
-    title = escapeHtml(a.type || 'موعد');
-    if (!a.date) {
-      title += ' — 📋 مخطّط (بلا تاريخ)';
-    }
+    // Scheduled date/time go in the TITLE (this is the planned moment of the
+    // appointment). The system-recorded timestamp (when the user added the
+    // event in the DB) appears separately on the right via tl-row-time, sourced
+    // from a.created_at — see buildTimelineEvents() above.
+    var dateLabel = a.date
+      ? ('📅 ' + escapeHtml(String(a.date)) + (a.time ? ' الساعة ' + escapeHtml(String(a.time).slice(0,5)) : ''))
+      : '📋 موعد مخطّط (بلا تاريخ)';
+    title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
     var stColor = '#63b3ed';
     if (e.statusKey === 'completed') stColor = '#2ee89e';
     else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show' || e.statusKey === 'broken') stColor = '#a3a3a3';
