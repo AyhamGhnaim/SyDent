@@ -18,10 +18,10 @@
 :root,
 :root[data-theme="light"] {
   /* Standard naming (landing/admin/most pages) */
-  --bg:        #f1f1ec;       /* page bg — warm light gray (was #fafaf7; darkened for card contrast — Notion/Stripe pattern) */
-  --bg2:       #ffffff;       /* card bg — pure white (unchanged) */
-  --bg3:       #e9e9e3;       /* hover / subtle bg (darkened to remain visible against new --bg) */
-  --bg4:       #ebebe5;       /* nested bg (darkened to match) */
+  --bg:        #ffffff;       /* page bg — pure white (Apple-style: page is clean, cards stand off slightly) */
+  --bg2:       #f8f7f2;       /* card bg — subtle off-white (~2% darker than --bg for soft contrast) */
+  --bg3:       #efeee9;       /* hover / subtle bg (darker than --bg2 to show hover state) */
+  --bg4:       #f3f2ed;       /* nested bg (between bg2 and bg3) */
 
   --text:      #1c1917;       /* primary text — warm near-black */
   --text2:     #57534e;       /* secondary text — warm gray */
@@ -289,7 +289,7 @@
   border-color: rgba(28,25,23,0.15);
 }
 :root[data-theme="light"] .sb-theme-row {
-  background: #f1f1ec;
+  background: #f8f7f2;
 }
 
 /* ========================================================================== */
@@ -299,7 +299,7 @@
 
 /* Hard-coded body gradient (#0a1628 → #0f2038) in all three Tier A pages */
 :root[data-theme="light"] body {
-  background: linear-gradient(135deg, #f1f1ec 0%, #ffffff 50%, #f1f1ec 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f8f7f2 50%, #ffffff 100%);
 }
 
 /* Card containers — dark navy box-shadow looks like a halo on white bg */
@@ -492,4 +492,19 @@
 :root[data-theme="light"] .treat-card:hover,
 :root[data-theme="light"] .doc-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* ========================================================================== */
+/*  Modals — keep pure white in Light Mode                                    */
+/*  ----------------------------------------------------------------------    */
+/*  When --bg2 became off-white (#f8f7f2) for card surfaces, modals that      */
+/*  share var(--bg2) inherited that tint. On top of a dark backdrop overlay  */
+/*  (rgba(0,0,0,0.5)), off-white reads as "dimmed" — modals should feel       */
+/*  bright/focused. Force them back to pure white in light mode.              */
+/* ========================================================================== */
+:root[data-theme="light"] .modal-box,
+:root[data-theme="light"] .modal-card,
+:root[data-theme="light"] .auth-card,
+:root[data-theme="light"] .pending-card {
+  background: #ffffff;
 }
