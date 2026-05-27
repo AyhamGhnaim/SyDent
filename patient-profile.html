@@ -620,7 +620,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260527a08">
+<link rel="stylesheet" href="theme.css?v=20260527a09">
 </head>
 <body>
 <script>
@@ -2407,10 +2407,16 @@ function renderTimelineRow(e) {
   }
   else if (e.type === 'appointment') {
     var a = e.data;
-    var dateLabel = a.date
-      ? ('📅 ' + escapeHtml(String(a.date)) + (a.time ? ' الساعة ' + escapeHtml(String(a.time).slice(0,5)) : ''))
-      : '📋 موعد مخطّط (بلا تاريخ)';
-    title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
+    // The date/time already render in <span class="tl-row-time"> (top-right of
+    // the row, formatted as "27 مايو 2026 — 18:25"). Including the same info
+    // in the title creates a visible duplicate (reported May 28 2026).
+    // For appointments WITH a date: title = type only. For planned-without-date
+    // appointments: tl-row-time falls back to created_at which is misleading,
+    // so we keep an explicit "(بلا تاريخ)" hint in the title.
+    title = escapeHtml(a.type || 'موعد');
+    if (!a.date) {
+      title += ' — 📋 مخطّط (بلا تاريخ)';
+    }
     var stColor = '#63b3ed';
     if (e.statusKey === 'completed') stColor = '#2ee89e';
     else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show' || e.statusKey === 'broken') stColor = '#a3a3a3';

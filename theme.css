@@ -508,3 +508,51 @@
 :root[data-theme="light"] .pending-card {
   background: #ffffff;
 }
+
+/* ========================================================================== */
+/*  patient-profile.html — Timeline (السجل الكامل) Light Mode fixes           */
+/*  ----------------------------------------------------------------------    */
+/*  The timeline uses heavy rgba(0,0,0,0.15-0.25) backgrounds that read       */
+/*  fine on dark navy but render as gray blocks on white. Same with the      */
+/*  rgba(255,255,255,...) hover/icon fills that vanish on white.              */
+/*  All overrides scoped to data-theme="light" — dark mode untouched.        */
+/* ========================================================================== */
+
+/* Timeline event rows (the main cards in the screenshot) */
+:root[data-theme="light"] .tl-row {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-row:hover {
+  background: var(--bg3);
+}
+:root[data-theme="light"] .tl-row-icon {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+:root[data-theme="light"] .tl-row-notes {
+  background: var(--bg4);
+  border-right-color: var(--border);
+}
+
+/* Timeline filters container + chips */
+:root[data-theme="light"] .tl-filters {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-chip {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-chip:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+
+/* Timeline search input + date select — were rgba(0,0,0,0.25) = too dark */
+:root[data-theme="light"] .tl-search-input,
+:root[data-theme="light"] .tl-date-select {
+  background: #ffffff;
+}
+
+/* Data table headers (used elsewhere on patient-profile) */
+:root[data-theme="light"] .data-table th {
+  background: var(--bg2);
+}
