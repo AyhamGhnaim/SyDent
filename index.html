@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a56"></script>
-<script src="sidebar.js?v=20260526a56"></script>
+<script src="supabase-init.js?v=20260526a57"></script>
+<script src="sidebar.js?v=20260526a57"></script>
 </head>
 <body>
 <script>
@@ -1460,25 +1460,20 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
 
   // ── Phase 8C intercept (dashboard variant) ─────────────────────────────
   // When the user clicks 'خرج' on a dashboard appointment with planned
-  // attached sessions, we ask the right clinical question and act on the
-  // answer in-place when possible. The doctor's expectation is direct:
-  // 'I just clicked YES → finish this for me, don't navigate me away'.
+  // attached sessions or linked labs, we ask the right clinical question
+  // and route to the canonical completion flow.
   //
-  // Routing by complexity:
-  //   • Single planned session + YES  → inline complete (UPDATE
-  //     ledger_sessions + teeth_status + audit + auto-complete the
-  //     appointment row + stamp dismissed_at) — all in one click.
-  //     We skip the FIFO reallocation here (it requires the patient-
-  //     profile-scoped reallocatePatientFunds helper which isn't loaded
-  //     on the dashboard); it self-heals next time the user opens the
-  //     patient profile.
-  //   • Single planned session + NO   → Q2 safety-net + plain stamp.
-  //   • Multi-session + YES           → redirect to appointments.html
-  //     (the user MUST pick which procedures were actually done with
-  //     checkboxes — that workflow only exists there). The full Phase 8C
-  //     modal lives in appointments.html and handles provider mismatch,
-  //     lab order auto-delivery, FIFO reallocation, and audit logging.
-  //   • Multi-session + NO            → Q2 safety-net + plain stamp.
+  // C6-fix unified routing — single AND multi session now both redirect:
+  //   • Planned sessions exist + YES → redirect to appointments.html
+  //     ?dismiss=<apptId>. The Phase 8C modal opens there with checkboxes
+  //     for partial completion. completeApptWithProcedures handles:
+  //     provider mismatch prompt, lab auto-delivery, audit logging, FIFO
+  //     reallocation (via patient-profile reload). Single source of truth.
+  //   • Planned sessions exist + NO → Q2 safety-net + plain stamp.
+  //   • No planned but lab orders exist → inline confirm + UPDATE labs to
+  //     'delivered' + plain stamp (C7-fix). No appointments.html redirect
+  //     because there are no sessions to pick from.
+  //   • Neither → fall through to plain stamp.
   //
   // Fetch payload includes patient_id (needed for teeth_status scoping)
   // alongside the display columns. Scoped by doctor_id for defense-in-
