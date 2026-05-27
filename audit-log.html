@@ -12,6 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <title>سجل النشاطات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260527a05"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260527a61"></script>
 <script src="sidebar.js?v=20260527a63"></script>
@@ -251,6 +253,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   .log-actions{justify-content:flex-start;}
 }
 </style>
+<!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
+<link rel="stylesheet" href="theme.css?v=20260527a05">
 </head>
 <body>
 <div class="main" id="sbMainContent">
