@@ -531,8 +531,8 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a55"></script>
-<script src="sidebar.js?v=20260526a55"></script>
+<script src="supabase-init.js?v=20260526a56"></script>
+<script src="sidebar.js?v=20260526a56"></script>
 </head>
 <body>
 <script>
@@ -1533,132 +1533,39 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
         }
 
         // Question 1 — the real chair-side question, asked plainly.
-        // Different action label depending on count so the user knows what
-        // OK will actually do (inline complete vs. open the picker page).
-        var q1ActionLabel = (plannedList.length === 1)
-          ? 'موافق → نعم، تم الإنجاز (إكمال العلاج + تسجيل الخروج)'
-          : 'موافق → نعم، تم الإنجاز (انتقال لصفحة المواعيد لاختيار العلاجات)';
+        // C6-fix: action label is now identical for single and multi-session
+        // because BOTH redirect to appointments.html for the unified Phase 8C
+        // modal (which provides the provider mismatch check + lab auto-deliver
+        // + audit log + FIFO reallocation in one place).
         var q1 = '🦷 هل تم إنجاز العلاج المخطّط؟\n\n'
                + summary + '\n\n'
-               + q1ActionLabel + '\n'
+               + 'موافق → نعم، تم الإنجاز (انتقال لصفحة المواعيد للإكمال)\n'
                + 'إلغاء → لا، لم يُنجَز';
 
         if (confirm(q1)) {
-          // YES path
-          if (plannedList.length > 1) {
-            // Multi-session: redirect to appointments.html where the full
-            // Phase 8C modal (with checkboxes for partial completion) lives.
-            // Pass apptId via QUERY PARAM (not hash) so Cloudflare Pages'
-            // .html → clean-URL redirect chain doesn't corrupt or duplicate
-            // the fragment (known CF Pages issue: hash fragments interact
-            // badly with the 301 .html-stripping rewrite, resulting in HTTP
-            // 500 on the receiving page). Query params survive the rewrite
-            // cleanly — same pattern as ?wa= and ?editAppt= already proven
-            // to work elsewhere on this page.
-            window.location.href = 'appointments.html?dismiss=' + encodeURIComponent(apptId);
-            return;
-          }
-
-          // Single-session inline complete. Run the writes in the same
-          // order completeSessionFromProfile uses (patient-profile.html)
-          // and let any failure surface clearly via console + alert so the
-          // secretary knows the stamp ALSO didn't happen.
-          if (btnEl) btnEl.disabled = true;
-          var single = plannedList[0];
-
-          try {
-            // 1) Flip the session status. This is the keystone — if it
-            //    fails, abort the whole flow (don't stamp dismissed_at on
-            //    a state that doesn't reflect what was actually done).
-            var sessUpd = await window.sb.from('ledger_sessions')
-              .update({ status: 'completed' })
-              .eq('id', single.id);
-            if (sessUpd.error) {
-              console.error('Phase 8C inline complete: session update failed:', sessUpd.error);
-              alert('⚠️ فشل تحديث حالة الجلسة — لم يُسجَّل أي شيء.');
-              if (btnEl) btnEl.disabled = false;
-              return;
-            }
-
-            // 2) Mirror in teeth_status if the session has a tooth.
-            //    Matches the same filter pattern completeSessionFromProfile
-            //    uses: tooth_num + planned status, surface only if present.
-            //    Non-fatal — the session flip is what matters for billing.
-            if (single.tooth_num && single.patient_id) {
-              try {
-                var tq = window.sb.from('teeth_status').update({ status: 'completed' })
-                  .eq('patient_id', single.patient_id)
-                  .eq('tooth_num', String(single.tooth_num))
-                  .eq('status', 'planned');
-                if (single.surface) tq = tq.eq('surface', single.surface);
-                if (_dashUid) tq = tq.eq('doctor_id', _dashUid);
-                var tRes = await tq;
-                if (tRes.error) console.warn('Phase 8C inline: teeth_status update warn:', tRes.error);
-              } catch (te) { console.warn('Phase 8C inline: teeth_status throw:', te); }
-            }
-
-            // 3) Auto-flip the appointment status. Since we know there's
-            //    only ONE planned session and we just flipped it, all
-            //    sessions are now complete. Fall back to 'confirmed' on
-            //    check-constraint rejection (pre-Phase 2 servers).
-            try {
-              var apptUpd = await window.sb.from('appointments')
-                .update({ status: 'completed' })
-                .eq('id', apptId);
-              if (apptUpd.error) {
-                var errStr = (apptUpd.error.message || '') + ' ' + (apptUpd.error.code || '');
-                if (/check constraint|23514|appointments_status_check/i.test(errStr)) {
-                  await window.sb.from('appointments')
-                    .update({ status: 'confirmed' })
-                    .eq('id', apptId);
-                } else {
-                  console.warn('Phase 8C inline: appt status update warn:', apptUpd.error);
-                }
-              }
-            } catch (ae) { console.warn('Phase 8C inline: appt status throw:', ae); }
-
-            // 4) Phase 5 audit trail. Same action_type as
-            //    completeSessionFromProfile uses (session.complete) so
-            //    audit-log.html renders it the same way.
-            try {
-              if (window.logAudit) {
-                window.logAudit('session.complete', {
-                  entityId: single.id,
-                  patientId: single.patient_id || null,
-                  description: 'إكمال علاج مفرد من لوحة التحكم: ' + (single.type || '')
-                             + ((typeof single.cost === 'number' || typeof single.cost === 'string')
-                                 ? ' — ' + (parseFloat(single.cost) || 0).toLocaleString('en-US') + ' ل.س'
-                                 : ''),
-                  oldValue: { status: 'planned' },
-                  newValue: {
-                    status: 'completed',
-                    tooth_num: single.tooth_num || null,
-                    surface: single.surface || null,
-                    source: 'dashboard_dismissed_trigger'
-                  }
-                });
-              }
-            } catch (le) { console.warn('Phase 8C inline: audit log throw:', le); }
-
-            // 5) Note: FIFO payment reallocation is deferred. It depends
-            //    on reallocatePatientFunds() which only loads inside
-            //    patient-profile.html. Allocations self-heal next time the
-            //    user opens the patient profile (loadPayments runs FIFO).
-            //    This is acceptable degradation for the dashboard quick-
-            //    action — the ledger/financial truth is preserved (session
-            //    is completed; what shifts is just which payment row each
-            //    paysplit points to).
-          } catch (workflowErr) {
-            console.error('Phase 8C inline workflow error:', workflowErr);
-            alert('⚠️ حدث خطأ أثناء إكمال العلاج. حالة الجلسة قد لا تكون متطابقة — راجع صفحة المواعيد.');
-            if (btnEl) btnEl.disabled = false;
-            return;
-          }
-
-          // Fall through to the normal stamp flow (dismissed_at) below.
-          // The button is already disabled from step 1; the original code
-          // would have done that too. Mutating _dashApptsToday + re-render
-          // + waiting-room refresh all happen in the unmodified tail.
+          // YES path — unified for ALL session counts (single OR multi).
+          // C6-fix: previously single-session ran inline writes here and
+          // bypassed completeApptWithProcedures, which meant the provider
+          // mismatch safety prompt never fired when the session's provider
+          // differed from the appointment's provider. This violates the
+          // OpenDental / Dentrix / Dentrix Ascend industry pattern where
+          // "Set Complete" always prompts before applying a different
+          // provider's work to the appointment's billing.
+          //
+          // Fix: route through appointments.html?dismiss=<id> in every case.
+          // The Phase 8C dismissed-completion modal opens, the user confirms,
+          // and completeApptWithProcedures runs the provider mismatch check
+          // (and lab auto-delivery + audit logging + FIFO reallocation) as a
+          // single canonical path. Single-session UX is one extra modal click,
+          // matching how Dentrix Set Appointment Complete dialog works even
+          // for one procedure.
+          //
+          // Pass apptId via QUERY PARAM (not hash) — Cloudflare Pages'
+          // .html → clean-URL 301 rewrite mangles hash fragments and yields
+          // HTTP 500 on the receiving page. Query params survive cleanly,
+          // same pattern as ?wa= and ?editAppt=.
+          window.location.href = 'appointments.html?dismiss=' + encodeURIComponent(apptId);
+          return;
         } else {
           // NO path → safety-net confirm before stamping dismissed without
           // completing anything. Misclicks on the dashboard widget are
