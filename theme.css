@@ -18,10 +18,10 @@
 :root,
 :root[data-theme="light"] {
   /* Standard naming (landing/admin/most pages) */
-  --bg:        #fafaf7;       /* page bg — warm off-white */
-  --bg2:       #ffffff;       /* card bg — pure white */
-  --bg3:       #f4f4ef;       /* hover / subtle bg */
-  --bg4:       #f8f8f3;       /* nested bg */
+  --bg:        #f1f1ec;       /* page bg — warm light gray (was #fafaf7; darkened for card contrast — Notion/Stripe pattern) */
+  --bg2:       #ffffff;       /* card bg — pure white (unchanged) */
+  --bg3:       #e9e9e3;       /* hover / subtle bg (darkened to remain visible against new --bg) */
+  --bg4:       #ebebe5;       /* nested bg (darkened to match) */
 
   --text:      #1c1917;       /* primary text — warm near-black */
   --text2:     #57534e;       /* secondary text — warm gray */
@@ -56,8 +56,8 @@
   --text-secondary:var(--text2);
   --text-muted:    var(--text3);
 
-  /* Surface shadow — softer in light mode */
-  --shadow-card:   0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  /* Surface shadow — softer in light mode (slightly stronger to lift cards off the darker bg) */
+  --shadow-card:   0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-modal:  0 20px 50px rgba(0,0,0,0.15);
 }
 
@@ -289,7 +289,7 @@
   border-color: rgba(28,25,23,0.15);
 }
 :root[data-theme="light"] .sb-theme-row {
-  background: #fafaf7;
+  background: #f1f1ec;
 }
 
 /* ========================================================================== */
@@ -299,7 +299,7 @@
 
 /* Hard-coded body gradient (#0a1628 → #0f2038) in all three Tier A pages */
 :root[data-theme="light"] body {
-  background: linear-gradient(135deg, #fafaf7 0%, #ffffff 50%, #fafaf7 100%);
+  background: linear-gradient(135deg, #f1f1ec 0%, #ffffff 50%, #f1f1ec 100%);
 }
 
 /* Card containers — dark navy box-shadow looks like a halo on white bg */
@@ -457,3 +457,39 @@
 
 /* ---- finance-row label tone (var(--text-muted) is fine, no change) ----- */
 /* (nothing extra needed — the alias points at --text3 in light mode)       */
+
+/* ========================================================================== */
+/*  Card elevation — Light Mode global polish                                 */
+/*  ----------------------------------------------------------------------    */
+/*  After darkening --bg to #f1f1ec, white cards already stand out by tone.   */
+/*  Adding a subtle shadow gives them the "lifted surface" feel users        */
+/*  expect from light-mode dashboards (Stripe/Notion/Linear pattern).        */
+/*                                                                            */
+/*  Targets the canonical card classes used across all 19 pages.             */
+/*  Dark mode untouched (rule is scoped to data-theme="light").              */
+/* ========================================================================== */
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .emp-card,
+:root[data-theme="light"] .treat-card,
+:root[data-theme="light"] .doc-card,
+:root[data-theme="light"] .prov-card,
+:root[data-theme="light"] .rpt-card,
+:root[data-theme="light"] .chart-card,
+:root[data-theme="light"] .health-card,
+:root[data-theme="light"] .maint-card,
+:root[data-theme="light"] .hcard,
+:root[data-theme="light"] .feature-card,
+:root[data-theme="light"] .modal-box,
+:root[data-theme="light"] .modal-card {
+  box-shadow: var(--shadow-card);
+}
+
+/* Hover lift — only for cards that already have a hover transform.           */
+/* These selectors slightly deepen the shadow on hover (no transform added).  */
+:root[data-theme="light"] .stat-card:hover,
+:root[data-theme="light"] .emp-card:hover,
+:root[data-theme="light"] .treat-card:hover,
+:root[data-theme="light"] .doc-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
+}
