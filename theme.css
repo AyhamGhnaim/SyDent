@@ -200,3 +200,95 @@
 :root[data-theme-ready] body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* ============================================================================
+   Page-specific LIGHT MODE overrides
+   ----------------------------------------------------------------------------
+   These rules patch elements that hard-code colors via rgba(10,22,40,...) or
+   similar dark literals that don't pick up CSS variables. Scoped to
+   [data-theme="light"] so dark mode stays untouched.
+   ============================================================================ */
+
+/* ---- landing.html navbar (rgba(10,22,40,0.85) hard-coded) ---------------- */
+:root[data-theme="light"] nav {
+  background: rgba(255,255,255,0.92);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+:root[data-theme="light"] .nav-logo-text .name { color: var(--green); }
+:root[data-theme="light"] .nav-logo-text .sub  { color: var(--text2); }
+:root[data-theme="light"] .nav-logo-icon svg   { stroke: var(--green); }
+:root[data-theme="light"] .btn-outline {
+  background: #ffffff;
+  border-color: rgba(28,25,23,0.18);
+  color: var(--text);
+}
+:root[data-theme="light"] .btn-outline:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+:root[data-theme="light"] .btn-primary {
+  background: var(--green);
+  color: #ffffff;
+}
+:root[data-theme="light"] .btn-primary:hover {
+  background: var(--green2);
+}
+
+/* ---- landing.html hero badges + headings -------------------------------- */
+:root[data-theme="light"] .hero-badge {
+  background: rgba(22,160,133,0.08);
+  border: 1px solid rgba(22,160,133,0.25);
+  color: var(--green2);
+}
+:root[data-theme="light"] .hero-bg,
+:root[data-theme="light"] .hero-grid {
+  /* dim the green ambient glow on white bg */
+  opacity: 0.5;
+}
+
+/* ---- admin.html header (rgba(10,22,40,0.9) hard-coded) ------------------ */
+:root[data-theme="light"] header {
+  background: rgba(255,255,255,0.95);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+:root[data-theme="light"] .header-logo .name { color: var(--green); }
+:root[data-theme="light"] .header-logo .badge {
+  background: var(--green-dim);
+  border: 1px solid rgba(22,160,133,0.25);
+  color: var(--green2);
+}
+:root[data-theme="light"] .btn-logout {
+  background: #ffffff;
+  border: 1px solid rgba(28,25,23,0.15);
+  color: var(--text2);
+}
+:root[data-theme="light"] .btn-logout:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ---- admin.html login screen radial glow (rgba(46,232,158,0.06)) ------- */
+:root[data-theme="light"] #loginScreen {
+  background: radial-gradient(ellipse 600px 400px at 50% 40%, rgba(22,160,133,0.05) 0%, transparent 70%);
+}
+:root[data-theme="light"] .login-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal);
+}
+
+/* ---- sb-badge text on green (must stay readable in both modes) --------- */
+:root[data-theme="light"] .sb-badge { color: #ffffff; }
+:root[data-theme="dark"]  .sb-badge { color: #0a1628; }
+
+/* ---- Toggle switch: light-mode track tint ------------------------------- */
+:root[data-theme="light"] .sydent-theme-toggle {
+  background: rgba(28,25,23,0.08);
+  border-color: rgba(28,25,23,0.15);
+}
+:root[data-theme="light"] .sb-theme-row {
+  background: #fafaf7;
+}
+
