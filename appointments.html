@@ -918,8 +918,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a54"></script>
-<script src="sidebar.js?v=20260526a54"></script>
+<script src="supabase-init.js?v=20260526a55"></script>
+<script src="sidebar.js?v=20260526a55"></script>
 </head>
 <body>
 <script>
@@ -1227,7 +1227,7 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
 
       <div id="dcmLabsSection" style="display:none;">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">🔬 طلبات مخبر مرتبطة (ستُسجَّل كـ "تم التركيب"):</div>
+        <div id="dcmLabsHeader" style="font-size:13px;color:var(--text2);margin-bottom:8px;">🔬 طلبات مخبر مرتبطة:</div>
         <div id="dcmLabsList" style="border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;margin-bottom:14px;font-size:12px;color:var(--text2);"></div>
       </div>
 
@@ -3092,6 +3092,11 @@ function openDismissedCompleteModal(apptId, btnEl) {
   } catch (e) {}
   document.getElementById('dcmPatient').textContent = pname;
 
+  // Phase 8C C8-fix: set initial labs-header text based on the default state
+  // (all planned rows are pre-checked when the modal first opens, so the
+  // header reads "ستُسجَّل" until the user unchecks something).
+  dcmUpdateLabsHeader();
+
   document.getElementById('dismissedCompleteModal').classList.add('open');
 }
 
@@ -3125,6 +3130,37 @@ function dcmToggleRow(rowEl, ev) {
   if (chk) {
     if (next === '1') chk.classList.add('dcm-chk-checked');
     else chk.classList.remove('dcm-chk-checked');
+  }
+  // Phase 8C C8-fix: header text for the labs section depends on whether ALL
+  // planned sessions are checked (lab auto-delivers) or only some (lab stays
+  // as-is). Recompute on every toggle so the user sees the consequence of
+  // their choice in real time before pressing OK.
+  dcmUpdateLabsHeader();
+}
+
+// Phase 8C C8-fix: keep the labs-section header in sync with checkbox state.
+// Three states:
+//   • All planned checked (or zero planned) → green "ستُسجَّل كـ تم التركيب ✓"
+//   • Some unchecked (subset)              → yellow warning that labs WON'T deliver
+//   • No labs section visible              → nothing to do (defensive guard)
+// Called from: openDismissedCompleteModal (initial render) and dcmToggleRow.
+function dcmUpdateLabsHeader() {
+  var headerEl = document.getElementById('dcmLabsHeader');
+  var labsSection = document.getElementById('dcmLabsSection');
+  if (!headerEl || !labsSection || labsSection.style.display === 'none') return;
+  var rows = document.querySelectorAll('#dcmPlannedList .dcm-row');
+  var totalPlanned = rows.length;
+  var checkedCount = 0;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].getAttribute('data-checked') === '1') checkedCount++;
+  }
+  // Full-set OR no planned sessions at all (lab-only dismissal) → lab WILL deliver.
+  // Subset (some unchecked) → lab stays.
+  var willDeliver = (totalPlanned === 0) || (checkedCount === totalPlanned);
+  if (willDeliver) {
+    headerEl.innerHTML = '🔬 طلبات مخبر مرتبطة (<span style="color:#2ee89e;">ستُسجَّل كـ "تم التركيب" ✓</span>):';
+  } else {
+    headerEl.innerHTML = '🔬 طلبات مخبر مرتبطة (<span style="color:#f5c842;">⚠️ لن تُسجَّل — يلزم تحديد جميع الجلسات أولاً</span>):';
   }
 }
 
