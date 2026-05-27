@@ -1923,6 +1923,39 @@
       var apptsRes    = results[2];
       var sessRes2    = results[3];
 
+      // 28-May-2026 fix: if the tenant has no clinic_settings row yet, the
+      // welcome prompt ("هل اسم عيادتك … صحيح؟") can't display because
+      // st.clinic_name is null. Pre-Phase 7.6G the row was created lazily on
+      // first visit to settings.html, but a freshly approved tenant typically
+      // lands on index.html first → prompt was silently skipped.
+      // Auto-create the row here with the same defaults settings.html uses on
+      // first visit (clinic_name seeded from auth.users.user_metadata.full_name).
+      // We deliberately do NOT set clinic_name_confirmed_at — the whole point
+      // is for the user to confirm or edit the seeded name. The WhatsApp
+      // template column has a Postgres DEFAULT so we omit it here.
+      // Best-effort: on any failure (race, RLS, missing column) we fall
+      // through with the original empty state. Idempotent via the existing
+      // owner_id unique constraint on clinic_settings (PK).
+      if (settingsRes && !settingsRes.error && !settingsRes.data) {
+        try {
+          var meta = u.user_metadata || {};
+          var seedName = (meta.full_name || meta.name)
+            ? ('عيادة ' + (meta.full_name || meta.name))
+            : null;
+          var seedRes = await window.sb.from('clinic_settings').insert({
+            owner_id: ownerId,
+            clinic_name: seedName,
+            whatsapp_reminders_enabled: true,
+            whatsapp_reminder_hours_before: 24
+          }).select('clinic_name, onboarding_dismissed_at, clinic_name_confirmed_at').single();
+          if (!seedRes.error && seedRes.data) {
+            settingsRes = { data: seedRes.data };  // feed the rest of the function
+          }
+        } catch (seedErr) {
+          console.warn('[onboarding] clinic_settings auto-create failed:', seedErr && seedErr.message);
+        }
+      }
+
       var st = (settingsRes && settingsRes.data) || {};
       var dismissed           = !!st.onboarding_dismissed_at;
       var clinicNameConfirmed = !!st.clinic_name_confirmed_at;
