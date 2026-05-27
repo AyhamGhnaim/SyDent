@@ -918,8 +918,8 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260526a52"></script>
-<script src="sidebar.js?v=20260526a52"></script>
+<script src="supabase-init.js?v=20260526a53"></script>
+<script src="sidebar.js?v=20260526a53"></script>
 </head>
 <body>
 <script>
@@ -2954,6 +2954,42 @@ async function recordApptTime(apptId, fieldKey, btnEl) {
 var _phase8cState = null;     // { apptId, btnEl }
 var _phase8cInFlight = false; // double-click guard across the whole flow
 
+// Phase 8C C7-fix: auto-deliver any lab orders linked to the appointment.
+// Extracted from completeApptWithProcedures (line 5213 region) so the same
+// behavior fires from the three dismissal entry points:
+//   1) completeApptWithProcedures (full-set path) — original caller
+//   2) dismissedConfirmComplete (subset/zero with linkedLabs)
+//   3) dismissedSkipComplete (no completion at all but linkedLabs exist)
+// Returns { updated, failed } so callers can include the count in their toast.
+// Silent — caller decides whether to surface the count to the user.
+// Only advances 'sent' | 'received' | 'checked' → 'delivered'. Anything else
+// (already delivered, rejected, etc.) is left untouched. Doctor-scoped UPDATE.
+async function autoDeliverLinkedLabs(apptId) {
+  var result = { updated: 0, failed: 0 };
+  if (!apptId) return result;
+  var linkedLabs = labOrdersByAppt[apptId] || [];
+  for (var k = 0; k < linkedLabs.length; k++) {
+    var lo = linkedLabs[k];
+    if (lo.status === 'sent' || lo.status === 'received' || lo.status === 'checked') {
+      try {
+        var labRes = await window.sb.from('lab_orders')
+          .update({ status: 'delivered', date_delivered: new Date().toISOString() })
+          .eq('id', lo.id).eq('doctor_id', currentUser.id);
+        if (labRes.error) {
+          result.failed++;
+          console.warn('autoDeliverLinkedLabs err:', labRes.error);
+        } else {
+          result.updated++;
+        }
+      } catch (e) {
+        result.failed++;
+        console.warn('autoDeliverLinkedLabs exception:', e);
+      }
+    }
+  }
+  return result;
+}
+
 function openDismissedCompleteModal(apptId, btnEl) {
   if (_phase8cInFlight) return;  // already running — ignore extra clicks
   // Phase 8C audit R21: defense-in-depth — block if locked doctor is inactive.
@@ -3123,8 +3159,19 @@ async function dismissedSkipComplete() {
         }
       }
     } catch (de) { console.warn('Phase 8C skip-detach exception:', de); }
+    // C7-fix: auto-deliver linked labs even on skip flow. The patient is leaving
+    // the chair — if labs were "received" they should advance to "delivered" as
+    // OpenDental does. Skip flow means "no planned procedures done", but a lab
+    // delivery appointment legitimately has zero planned procedures and still
+    // needs the lab marked delivered.
+    var labAutoResult = await autoDeliverLinkedLabs(apptId);
     // Use the sentinel so recordApptTime skips the interception logic and just stamps.
     await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
+    if (labAutoResult.updated > 0) {
+      showToast('✅ تم تسليم ' + labAutoResult.updated + ' طلب مخبر');
+    } else if (labAutoResult.failed > 0) {
+      showToast('⚠️ تعذّر تحديث ' + labAutoResult.failed + ' طلب مخبر');
+    }
   } catch (e) { console.error('dismissedSkipComplete error:', e); }
   _phase8cInFlight = false;
   _phase8cState = null;
@@ -3160,6 +3207,7 @@ async function dismissedConfirmComplete() {
   document.getElementById('dismissedCompleteModal').classList.remove('open');
   try {
     var completionSucceeded = true;
+    var labAutoResult = null;  // { updated, failed } — set when we deliver labs without going through completeApptWithProcedures
     if (selectedIds.length > 0) {
       // Reuse the unified completion flow. Provider-mismatch and lab-sync prompts
       // inside completeApptWithProcedures will fire as usual.
@@ -3168,6 +3216,13 @@ async function dismissedConfirmComplete() {
       // dismissed_at — leave the appointment exactly where it was.
       var ret = await completeApptWithProcedures(apptId, selectedIds);
       completionSucceeded = (ret !== false);
+    } else {
+      // C7-fix: zero sessions selected, but the modal still opened — meaning there
+      // were either planned sessions (user unchecked all) OR linked labs (or both).
+      // completeApptWithProcedures auto-delivers labs only in the full-set path; we
+      // never reach it here. Deliver labs directly so a lab-only dismissal still
+      // moves the work to 'delivered' as OpenDental does.
+      labAutoResult = await autoDeliverLinkedLabs(apptId);
     }
     // Only stamp dismissed_at when the completion attempt wasn't cancelled.
     // Note: completeApptWithProcedures may have already set appointment.status='completed'
@@ -3192,6 +3247,14 @@ async function dismissedConfirmComplete() {
         } catch (de) { console.warn('Phase 8C detach exception:', de); }
       }
       await recordApptTime(apptId, 'dismissed_at', '__fromDismissedModal');
+      // Surface lab auto-delivery count to the user when it was the only DB write
+      // (completeApptWithProcedures shows its own toast when it runs, so we skip
+      // adding a second toast in that path).
+      if (labAutoResult && labAutoResult.updated > 0) {
+        showToast('✅ تم تسليم ' + labAutoResult.updated + ' طلب مخبر');
+      } else if (labAutoResult && labAutoResult.failed > 0) {
+        showToast('⚠️ تعذّر تحديث ' + labAutoResult.failed + ' طلب مخبر');
+      }
     }
   } catch (e) {
     console.error('dismissedConfirmComplete error:', e);
@@ -5203,27 +5266,17 @@ async function completeApptWithProcedures(apptIdParam, sessionIdsFilter) {
   }
 
   // 4) OpenDental-style: when an appointment is set complete, the lab cases attached
-  //    to it are also marked complete (delivered). If any of them are still in
-  //    'sent' or 'received' or 'checked' status, advance them to 'delivered' since
-  //    the patient is leaving the chair with the work done.
-  //    We use the same column names labs.html already writes (date_delivered) and
-  //    guard against missing column / missing migration silently.
-  // Phase 8C: skip lab auto-completion when only a subset of planned sessions was
-  // selected — the lab work hasn't been seated if half the procedures are deferred.
-  var linkedLabs = _isFullSet ? (labOrdersByAppt[apptId] || []) : [];
+  //    to it are also marked complete (delivered). Phase 8C: skip lab auto-completion
+  //    when only a subset of planned sessions was selected — the lab work hasn't been
+  //    seated if half the procedures are deferred.
+  //    C7-fix: extracted to autoDeliverLinkedLabs() helper so dismissedConfirmComplete
+  //    (zero-selection with labs) and dismissedSkipComplete can reuse the same logic.
   var labFailed = 0;
   var labUpdated = 0;
-  for (var k=0; k<linkedLabs.length; k++) {
-    var lo = linkedLabs[k];
-    if (lo.status === 'sent' || lo.status === 'received' || lo.status === 'checked') {
-      try {
-        var labRes = await window.sb.from('lab_orders')
-          .update({ status: 'delivered', date_delivered: new Date().toISOString() })
-          .eq('id', lo.id).eq('doctor_id', currentUser.id);
-        if (labRes.error) { labFailed++; console.warn('auto-complete lab order err:', labRes.error); }
-        else labUpdated++;
-      } catch(e) { labFailed++; console.warn('auto-complete linked lab order:', e); }
-    }
+  if (_isFullSet) {
+    var labResult = await autoDeliverLinkedLabs(apptId);
+    labFailed = labResult.failed;
+    labUpdated = labResult.updated;
   }
 
   // Build a complete summary that covers both sessions and labs, success and failure.
