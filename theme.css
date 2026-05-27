@@ -380,3 +380,80 @@
   color: var(--text);
 }
 
+/* ========================================================================== */
+/*  Dashboard cards (index.html) — Light Mode polish                          */
+/*  ----------------------------------------------------------------------    */
+/*  index.html uses `border-bottom: rgba(255,255,255,0.05)` for row           */
+/*  separators across "آخر المرضى" (patient-item), "مواعيد اليوم"             */
+/*  (appt-item), "ملخص مالي" (finance-row), and "طلبات المخابر" (lab-item).   */
+/*  On the dark background these read as subtle hairlines. On the light       */
+/*  background they're white-on-white = invisible → rows look stacked         */
+/*  and unstructured. Same story for the small inline `dash-time-stamp`       */
+/*  chips and the `progress-bar` track.                                       */
+/*                                                                            */
+/*  Fix: replace the white-tinted dividers/backgrounds with warm-tinted       */
+/*  equivalents (var(--border), var(--bg3)) scoped to data-theme="light".     */
+/*  Dark mode is untouched. Inspired by Stripe/Linear list density.           */
+/* ========================================================================== */
+
+/* ---- Row separators (invisible on white → warm hairline) ----------------- */
+:root[data-theme="light"] .patient-item,
+:root[data-theme="light"] .appt-item,
+:root[data-theme="light"] .finance-row,
+:root[data-theme="light"] .lab-item {
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="light"] .patient-item:last-child,
+:root[data-theme="light"] .appt-item:last-child,
+:root[data-theme="light"] .finance-row:last-child,
+:root[data-theme="light"] .lab-item:last-child {
+  border-bottom: none;
+}
+
+/* ---- Patient row spacing + hover (cards in "آخر المرضى") ----------------- */
+/* In dark, hover nudges the row right by 8px. On white that loses the row.  */
+/* Switch to a subtle background tint with rounded corners — cleaner read.   */
+:root[data-theme="light"] .patient-item {
+  padding: 12px 8px;
+  border-radius: 8px;
+  margin: 0 -8px;
+  transition: background 0.15s ease;
+}
+:root[data-theme="light"] .patient-item:hover {
+  padding: 12px 8px;          /* override the dark-mode padding-right shift */
+  background: var(--bg3);
+}
+
+/* ---- Appointment row spacing (cards in "مواعيد اليوم") ------------------- */
+:root[data-theme="light"] .appt-item {
+  padding: 12px 8px;
+  border-radius: 8px;
+  margin: 0 -8px;
+}
+
+/* ---- Inline timestamps chips (e.g. "19:33 ✓ 19:33 R 19:33 D") ----------- */
+/* Hard-coded background: rgba(255,255,255,0.04) → invisible on white.       */
+:root[data-theme="light"] .dash-time-stamp {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+
+/* ---- Progress bar track (rgba(255,255,255,0.08) → invisible on white) --- */
+:root[data-theme="light"] .progress-bar {
+  background: rgba(28,25,23,0.08);
+}
+
+/* ---- Patient status pills — re-tone for light mode readability ---------- */
+/* Dark uses rgba(46,232,158,0.15) on dark green text → fine.                */
+/* Light needs slightly stronger fill on white to keep the pill recognizable.*/
+:root[data-theme="light"] .status-paid {
+  background: rgba(22,160,133,0.12);
+  color: var(--green2);
+}
+:root[data-theme="light"] .status-due {
+  background: rgba(220,38,38,0.10);
+  color: var(--red);
+}
+
+/* ---- finance-row label tone (var(--text-muted) is fine, no change) ----- */
+/* (nothing extra needed — the alias points at --text3 in light mode)       */
