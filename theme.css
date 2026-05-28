@@ -484,10 +484,18 @@
 :root[data-theme="light"] .maint-card,
 :root[data-theme="light"] .hcard,
 :root[data-theme="light"] .feature-card,
-:root[data-theme="light"] .req-card,
 :root[data-theme="light"] .modal-box,
 :root[data-theme="light"] .modal-card {
   box-shadow: var(--shadow-card);
+}
+
+/* Admin customer cards (.req-card) get a STRONGER elevation than the generic
+   --shadow-card so they clearly pop off the white page: a slightly darker
+   surface + firmer border + a deeper, wider shadow. Light mode only. */
+:root[data-theme="light"] .req-card {
+  background: #f2f1ea;
+  border-color: rgba(28,25,23,0.13);
+  box-shadow: 0 2px 4px rgba(28,25,23,0.05), 0 8px 22px rgba(28,25,23,0.09);
 }
 
 /* Hover lift — only for cards that already have a hover transform.           */

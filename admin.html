@@ -76,7 +76,8 @@ header{
   padding:0 20px;height:60px;
   display:flex;align-items:center;justify-content:space-between;
 }
-.header-logo{display:flex;align-items:center;gap:8px;}
+.header-logo{display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer;transition:opacity .15s;}
+.header-logo:hover{opacity:.8;}
 .header-logo svg{width:28px;height:28px;}
 .header-logo .name{font-size:16px;font-weight:800;color:var(--green);}
 .header-logo .badge{
@@ -2082,7 +2083,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a14">
+<link rel="stylesheet" href="theme.css?v=20260528a15">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -2093,7 +2094,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <!-- ADMIN -->
 <div id="adminScreen">
   <header>
-    <div class="header-logo">
+    <a class="header-logo" href="landing.html" title="الصفحة الرئيسية">
       <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/>
       </svg>
@@ -2102,7 +2103,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
         <span style="font-size:9px;color:var(--text2);font-weight:600;letter-spacing:0.3px;">لوحة إدارة المنصّة</span>
       </div>
       <span class="badge">Admin</span>
-    </div>
+    </a>
     <div style="display:flex;gap:8px;align-items:center;">
       <span id="themeToggleMount" style="display:inline-flex;align-items:center;margin-left:4px"></span>
       <button type="button" class="btn-logout" onclick="toggleEventsSection()" title="سجلّ أحداث الاشتراكات">📋 السجلّ</button>
