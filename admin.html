@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a83"></script>
+<script src="theme.js?v=20260528a84"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2103,11 +2103,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a83">
+<link rel="stylesheet" href="theme.css?v=20260528a84">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260528a83"></script>
+<script src="supabase-init.js?v=20260528a84"></script>
 </head>
 <body>
 
@@ -2835,6 +2835,13 @@ var allRequests = [];
 // (the editable business name) above the signup/contact name. Empty when the
 // admin RLS read policy is absent or no clinic_name set → falls back to r.name.
 var clinicNameByUid = {};
+
+// owner_id → live owner personal name (clinic_employees.name of the owner row,
+// which is kept synced to auth user_metadata.full_name). Lets the admin show
+// the owner's CURRENT name as the account contact instead of the frozen
+// trial_requests.name signup snapshot. Empty when the row is missing → the
+// contact falls back to trial_requests.name (no regression).
+var ownerNameByUid = {};
 
 // ===== Phase 7.6A: Search + Edit state =====
 var searchTerm = '';
@@ -3610,6 +3617,33 @@ async function loadAndRender() {
       });
     }
   } catch (e) { clinicNameByUid = {}; }
+
+  // Resolve each owner's live personal name (clinic_employees.name of the
+  // role='owner' row, kept synced to auth full_name). Single batched query via
+  // SERVICE_KEY — clinic_employees is RLS-protected per tenant and the admin is
+  // not the owner, so window.sb (anon key) would be filtered out; the same
+  // service-key REST pattern is used by safeCount/safeActiveEmployees below.
+  // On any error/empty we keep the map empty and the contact falls back to the
+  // signup name (trial_requests.name) — no regression.
+  ownerNameByUid = {};
+  try {
+    if (_uids.length && SERVICE_KEY) {
+      var _inList = _uids.map(function(u){ return encodeURIComponent(u); }).join(',');
+      var _onResp = await fetch(
+        SUPABASE_URL + '/rest/v1/clinic_employees' +
+        '?select=owner_id,name&role=eq.owner&owner_id=in.(' + _inList + ')',
+        { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
+      );
+      if (_onResp.ok) {
+        var _onData = await _onResp.json();
+        (Array.isArray(_onData) ? _onData : []).forEach(function(row){
+          if (row && row.owner_id && row.name && String(row.name).trim()) {
+            ownerNameByUid[row.owner_id] = String(row.name).trim();
+          }
+        });
+      }
+    }
+  } catch (e) { ownerNameByUid = {}; }
   // Phase X1: refresh admin Set so renderList can show 👑 badges and
   // promote/demote buttons that reflect ground truth at this moment.
   // Errors are swallowed inside fetchAdminUserIds (defensive — if the
@@ -7016,9 +7050,10 @@ async function exportCSV() {
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       var _clinic = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
+      var _contact = (r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : r.name;
       var line = [
         _clinic,
-        r.name,
+        _contact,
         r.phone,
         r.email,
         r.city,
@@ -7180,7 +7215,7 @@ function evfRebuildTenantMap() {
     // signup/contact name so the event feed can lead with the clinic identity
     // (matching the customer card, 360° drawer, and CSV export).
     map[r.id] = {
-      name: r.name || '',
+      name: (r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : (r.name || ''),
       clinicName: (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '',
       email: r.email || '',
       phone: r.phone || ''
@@ -8177,9 +8212,10 @@ function renderList() {
                        'aria-label="تحديد للإجراء الجماعي">';
 
     var _clinicName = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
-    var _primaryName = _clinicName || r.name || '—';
-    var _subNameHtml = (_clinicName && r.name)
-      ? '<div class="req-name-sub">👤 ' + escapeHtml(r.name) + '</div>'
+    var _contactName = (r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : (r.name || '');
+    var _primaryName = _clinicName || _contactName || '—';
+    var _subNameHtml = (_clinicName && _contactName)
+      ? '<div class="req-name-sub">👤 ' + escapeHtml(_contactName) + '</div>'
       : '';
 
     return '<div class="req-card ' + cardStatusClass + bulkClass + '">' +
@@ -8270,15 +8306,16 @@ function openCustomer360(reqId) {
   // prominent identity, mirroring the customer card; the signup/contact name is
   // surfaced in the Identity section below.
   var _c360Clinic = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
+  var _c360Contact = (r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : (r.name || '');
   var nameEl    = document.getElementById('c360Name');
   var emailEl   = document.getElementById('c360Email');
   var avatarEl  = document.getElementById('c360Avatar');
   var badgesEl  = document.getElementById('c360Badges');
   var createdEl = document.getElementById('c360Created');
   var userIdEl  = document.getElementById('c360UserId');
-  if (nameEl)   nameEl.textContent = _c360Clinic || r.name || '—';
+  if (nameEl)   nameEl.textContent = _c360Clinic || _c360Contact || '—';
   if (emailEl)  emailEl.textContent = r.email || (r.phone ? ('📞 ' + r.phone) : '—');
-  if (avatarEl) avatarEl.textContent = c360AvatarInitial(_c360Clinic || r.name || r.email || '?');
+  if (avatarEl) avatarEl.textContent = c360AvatarInitial(_c360Clinic || _c360Contact || r.email || '?');
   if (createdEl) createdEl.textContent = r.created_at ? ('انضم: ' + evfFormatTimestamp(r.created_at)) : '';
   if (userIdEl)  userIdEl.textContent = r.user_id ? ('uid: ' + String(r.user_id).slice(0, 8) + '…') : '';
 
@@ -8486,7 +8523,8 @@ function c360BuildOverview(r) {
     +   '<div class="c360-card-title">📞 الهوية والاتصال</div>'
     +   (((r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '')
           ? c360Row('اسم العيادة', c360EscapeHtml(clinicNameByUid[r.user_id])) : '')
-    +   c360Row(((r.user_id && clinicNameByUid[r.user_id]) ? 'جهة الاتصال' : 'الاسم'), c360EscapeHtml(r.name || '—'))
+    +   c360Row(((r.user_id && clinicNameByUid[r.user_id]) ? 'جهة الاتصال' : 'الاسم'),
+                 c360EscapeHtml(((r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : (r.name || '—'))))
     +   c360Row('البريد', c360EscapeHtml(r.email || '—'))
     +   c360Row('الهاتف', c360EscapeHtml(r.phone || '—'))
     +   c360Row('المدينة', c360EscapeHtml(r.city || '—'))
