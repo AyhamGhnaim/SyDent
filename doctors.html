@@ -20,10 +20,10 @@
 <title>أطباء العيادة — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a79"></script>
+<script src="theme.js?v=20260528a82"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a79"></script>
-<script src="sidebar.js?v=20260528a79"></script>
+<script src="supabase-init.js?v=20260528a82"></script>
+<script src="sidebar.js?v=20260528a82"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -190,7 +190,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a79">
+<link rel="stylesheet" href="theme.css?v=20260528a82">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -441,7 +441,13 @@ async function loadDoctors() {
   // After Phase 7.2 filter, doctors may be empty even when allRows has secretary
   // rows. We only auto-create if the clinic genuinely has no clinic_doctors at all.
   if (allRows.length === 0) {
-    var ownerName = (doctorOwner && doctorOwner.name) || (currentUser.email ? currentUser.email.split('@')[0] : 'الطبيب الرئيسي');
+    // Name unification: prefer the auth full_name (single source of truth for
+    // the owner's personal/provider name) over the legacy employee name so a
+    // brand-new owner-doctor row is created correct from the first visit.
+    var ownerName = ((currentUser.user_metadata || {}).full_name
+                  || (currentUser.user_metadata || {}).name
+                  || (doctorOwner && doctorOwner.name)
+                  || (currentUser.email ? currentUser.email.split('@')[0] : 'الطبيب الرئيسي'));
     var ownerRole = (doctorOwner && doctorOwner.specialty) || 'طبيب أسنان';
     var ownerPhone = (doctorOwner && doctorOwner.phone) || null;
     var insertOwner = await window.sb.from('clinic_doctors').insert({
@@ -483,6 +489,28 @@ async function loadDoctors() {
       }
     }
   }
+
+  // ── Name unification — read-time self-heal (owner-doctor row) ──
+  // user_metadata.full_name is the single source of truth for the owner's
+  // personal/provider name. Reconcile the owner-doctor row if it drifted
+  // (legacy name, or pre-sync edit). One cheap UPDATE, only when it differs;
+  // non-owner doctor rows are never touched. Fire-and-forget — renderList runs
+  // immediately with the corrected in-memory value.
+  try {
+    var _ownerFull = ((currentUser.user_metadata || {}).full_name
+                   || (currentUser.user_metadata || {}).name || '').trim();
+    if (_ownerFull) {
+      var _od = doctors.find(function(d){ return d.is_owner === true; });
+      if (_od && String(_od.name || '').trim() !== _ownerFull) {
+        _od.name = _ownerFull;  // reflect immediately in renderList
+        window.sb.from('clinic_doctors')
+          .update({ name: _ownerFull, updated_at: new Date().toISOString() })
+          .eq('owner_id', currentUser.id)
+          .eq('is_owner', true)
+          .then(function(){}, function(){});
+      }
+    }
+  } catch (e) { /* non-fatal */ }
 
   renderList();
 }

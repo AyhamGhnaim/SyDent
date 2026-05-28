@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a79"></script>
+<script src="theme.js?v=20260528a82"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a79"></script>
-<script src="sidebar.js?v=20260528a79"></script>
+<script src="supabase-init.js?v=20260528a82"></script>
+<script src="sidebar.js?v=20260528a82"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -254,7 +254,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a79">
+<link rel="stylesheet" href="theme.css?v=20260528a82">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -727,6 +727,29 @@ async function loadData() {
     return;
   }
   employees = empRes.data || [];
+
+  // ── Name unification — read-time self-heal (owner row) ──
+  // user_metadata.full_name is the single source of truth for the owner's
+  // personal/provider name. If this owner's staff row drifted from it (legacy
+  // signup name, or an edit made before write-time sync existed), reconcile
+  // here: one cheap UPDATE, only when the value actually differs. Non-owner
+  // rows are never touched. Fire-and-forget — render proceeds immediately with
+  // the corrected in-memory value; a failed write just retries on next load.
+  try {
+    var _ownerFull = ((currentUser.user_metadata || {}).full_name
+                   || (currentUser.user_metadata || {}).name || '').trim();
+    if (_ownerFull) {
+      var _ownerEmp = employees.find(function(e){ return e.role === 'owner'; });
+      if (_ownerEmp && String(_ownerEmp.name || '').trim() !== _ownerFull) {
+        _ownerEmp.name = _ownerFull;  // reflect immediately in the upcoming render
+        window.sb.from('clinic_employees')
+          .update({ name: _ownerFull })
+          .eq('owner_id', currentUser.id)
+          .or('is_owner.eq.true,role.eq.owner')
+          .then(function(){}, function(){});
+      }
+    }
+  } catch (e) { /* non-fatal */ }
 
   // Load active doctors. Phase 6 Q: expanded SELECT to fetch the full
   // clinical field set, because openEditModal() now pre-fills these into

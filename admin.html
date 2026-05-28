@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a81"></script>
+<script src="theme.js?v=20260528a82"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1182,6 +1182,7 @@ header{
 .evf-card-meta{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;font-size:13px;}
 .evf-time{color:var(--text2);font-size:11px;font-weight:600;}
 .evf-tenant{color:var(--text);font-weight:700;}
+.evf-tenant-sub{color:var(--text2);font-size:11px;font-weight:600;}
 .evf-tenant-email{color:rgba(74,96,128,0.85);font-size:11px;}
 .evf-by{color:var(--text3);font-size:11px;font-style:italic;margin-top:4px;}
 .evf-summary{font-size:12px;color:var(--text);line-height:1.6;margin-top:6px;}
@@ -2102,11 +2103,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a81">
+<link rel="stylesheet" href="theme.css?v=20260528a82">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260528a81"></script>
+<script src="supabase-init.js?v=20260528a82"></script>
 </head>
 <body>
 
@@ -6995,8 +6996,12 @@ async function exportCSV() {
 
   try {
     // Header row in Arabic — order MUST match the row builder below.
+    // Name unification: the live clinic/business name (clinic_settings.clinic_name)
+    // leads as the account identity; the signup/contact name follows as the
+    // account contact — mirroring the customer card and 360° drawer.
     var headers = [
-      'الاسم',
+      'اسم العيادة',
+      'جهة الاتصال',
       'الهاتف',
       'الإيميل',
       'المدينة',
@@ -7010,7 +7015,9 @@ async function exportCSV() {
     lines.push(headers.map(tsvCell).join('\t'));
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
+      var _clinic = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
       var line = [
+        _clinic,
         r.name,
         r.phone,
         r.email,
@@ -7169,7 +7176,15 @@ function toggleEventsSection() {
 function evfRebuildTenantMap() {
   var map = {};
   (allRequests || []).forEach(function(r) {
-    map[r.id] = { name: r.name || '', email: r.email || '', phone: r.phone || '' };
+    // Name unification: carry the live clinic/business name alongside the
+    // signup/contact name so the event feed can lead with the clinic identity
+    // (matching the customer card, 360° drawer, and CSV export).
+    map[r.id] = {
+      name: r.name || '',
+      clinicName: (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '',
+      email: r.email || '',
+      phone: r.phone || ''
+    };
   });
   evfTenantMap = map;
 }
@@ -7376,7 +7391,8 @@ function evfRenderCard(ev) {
     'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();evfOpenModal(\'' + idAttr + '\');}">' +
       '<div class="evf-card-meta">' +
         '<span class="evf-badge ' + meta.category + '">' + meta.emoji + ' ' + evfEscape(meta.label_ar) + '</span>' +
-        '<span class="evf-tenant">' + evfEscape(t.name || '—') + '</span>' +
+        '<span class="evf-tenant">' + evfEscape(t.clinicName || t.name || '—') + '</span>' +
+        ((t.clinicName && t.name) ? '<span class="evf-tenant-sub">👤 ' + evfEscape(t.name) + '</span>' : '') +
         (t.email ? '<span class="evf-tenant-email">' + evfEscape(t.email) + '</span>' : '') +
         '<span class="evf-time">' + evfEscape(when) + '</span>' +
       '</div>' +
@@ -7444,7 +7460,10 @@ function evfOpenModal(eventId) {
   rows += evfDetailRow('🏷 نوع الحدث',
     '<span class="evf-badge ' + meta.category + '">' + meta.emoji + ' ' + evfEscape(meta.label_ar) +
     '</span> <code style="color:var(--text3);font-size:11px;">(' + evfEscape(ev.event_type) + ')</code>');
-  rows += evfDetailRow('👤 العميل', evfEscape(t.name || '—') +
+  if (t.clinicName) {
+    rows += evfDetailRow('🏥 العيادة', evfEscape(t.clinicName));
+  }
+  rows += evfDetailRow((t.clinicName ? '👤 جهة الاتصال' : '👤 العميل'), evfEscape(t.name || '—') +
     (t.email ? '<br><span style="color:var(--text3);font-size:11px;">' + evfEscape(t.email) + '</span>' : '') +
     (t.phone ? '<br><span style="color:var(--text3);font-size:11px;">' + evfEscape(t.phone) + '</span>' : ''));
   if (ev.from_plan || ev.to_plan) {
