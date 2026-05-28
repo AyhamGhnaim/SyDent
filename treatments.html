@@ -13,10 +13,10 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a74"></script>
+<script src="theme.js?v=20260528a75"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a74"></script>
-<script src="sidebar.js?v=20260528a74"></script>
+<script src="supabase-init.js?v=20260528a75"></script>
+<script src="sidebar.js?v=20260528a75"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -69,12 +69,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   margin-bottom:20px;
 }
 .treat-card{
-  background:var(--bg2);border:1px solid var(--border);
+  background:linear-gradient(180deg, rgba(255,255,255,0.025) 0%, rgba(0,0,0,0.20) 100%), var(--bg2);
+  border:1px solid rgba(46,232,158,0.22);
   border-radius:var(--radius);overflow:hidden;
-  transition:all .2s;
+  transition:transform .2s, box-shadow .2s, border-color .2s;
   position:relative;
+  box-shadow:0 10px 26px -8px rgba(0,0,0,.55), 0 2px 6px rgba(0,0,0,.30);
 }
-.treat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.3);border-color:var(--green);}
+.treat-card:hover{transform:translateY(-3px);box-shadow:0 18px 38px -10px rgba(0,0,0,.62), 0 0 0 1px var(--green);border-color:var(--green);}
 .treat-color-bar{height:5px;width:100%;}
 .treat-body{padding:16px 18px;}
 .treat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
@@ -97,7 +99,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   flex-wrap:wrap;
 }
 .treat-actions button{min-width:calc(50% - 3px);}
-.treat-actions button{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.treat-actions button{flex:1;padding:8px 7px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid rgba(255,255,255,0.10);background:rgba(255,255,255,0.05);color:var(--text);transition:all .15s;}
 .treat-toolbar{display:flex;flex-direction:column;gap:10px;margin-bottom:18px;}
 .search-wrap{position:relative;width:100%;}
 .search-icon{position:absolute;top:50%;right:14px;transform:translateY(-50%);font-size:15px;opacity:.6;pointer-events:none;}
@@ -119,12 +121,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .drag-handle:active{cursor:grabbing;}
 .treat-card.dragging{opacity:.4;}
 .treat-card.drag-over{border-color:var(--green) !important;border-width:2px;}
-.treat-actions .ed-btn:hover{border-color:var(--blue);color:var(--blue);}
-.treat-actions .price-btn:hover{border-color:var(--yellow);color:var(--yellow);}
-.treat-actions .hist-btn:hover{border-color:var(--purple);color:var(--purple);}
-.treat-actions .bundle-btn:hover{border-color:var(--blue);color:var(--blue);}
-.treat-actions .dup-btn:hover{border-color:var(--green);color:var(--green);}
-.treat-actions .del-btn:hover{border-color:var(--red);color:var(--red);}
+.treat-actions button:hover{transform:translateY(-1px);}
+.treat-actions .ed-btn{background:rgba(46,232,158,0.12);border-color:rgba(46,232,158,0.38);color:var(--green);}
+.treat-actions .ed-btn:hover{background:rgba(46,232,158,0.2);border-color:var(--green);color:var(--green);}
+.treat-actions .dup-btn:hover{background:rgba(99,179,237,.14);border-color:var(--blue);color:var(--blue);}
+.treat-actions .inact-btn:hover{background:rgba(245,158,11,.14);border-color:#f59e0b;color:#f59e0b;}
+.treat-actions .act-btn:hover{background:rgba(46,232,158,.14);border-color:var(--green);color:var(--green);}
+.treat-actions .del-btn:hover{background:rgba(239,83,80,.14);border-color:var(--red);color:var(--red);}
 .treat-builtin-tag{
   position:absolute;top:8px;left:8px;
   background:rgba(99,179,237,0.15);color:var(--blue);
@@ -219,7 +222,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a74">
+<link rel="stylesheet" href="theme.css?v=20260528a75">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -230,7 +233,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="tb-sub">إدارة الأنواع والأسعار والألوان</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-outline" onclick="openBulkPriceModal()" title="تعديل أسعار مجموعة علاجات دفعة واحدة">💰 أسعار جماعية</button>
     <button class="btn btn-outline" onclick="printLegend()" title="طباعة دليل العلاجات والألوان">🖨️ طباعة الدليل</button>
     <button class="btn btn-outline" onclick="resetToDefaults()">↺ استعادة الافتراضي</button>
     <button class="btn btn-primary" onclick="openAddModal()">＋ علاج جديد</button>
@@ -286,57 +288,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 
 </div>
-</div>
-
-<!-- Modal: Bulk Price Update -->
-<div class="modal-overlay" id="bulkPriceModal">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>💰 تعديل أسعار جماعي</h3>
-      <button class="modal-close" onclick="closeBulkPriceModal()">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label>النطاق</label>
-          <select id="bulkScope" onchange="updateBulkPreview()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
-            <option value="all">كل العلاجات</option>
-            <option value="crown">علاجات سطح التاج</option>
-            <option value="crown_full">علاجات التاج الكامل</option>
-            <option value="root">علاجات الجذر</option>
-            <option value="whole">علاجات السن كامل</option>
-            <option value="extraction">القلع</option>
-            <option value="implant">الزراعات</option>
-            <option value="bridge">الجسور</option>
-            <option value="lab">العلاجات التي تحتاج مخبر</option>
-            <option value="custom">العلاجات المخصصة فقط</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>نوع التعديل</label>
-          <select id="bulkOp" onchange="updateBulkPreview()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
-            <option value="percent_inc">زيادة بنسبة (%)</option>
-            <option value="percent_dec">خصم بنسبة (%)</option>
-            <option value="fixed_inc">زيادة مبلغ ثابت (ل.س)</option>
-            <option value="fixed_dec">خصم مبلغ ثابت (ل.س)</option>
-            <option value="set">تعيين سعر موحّد (ل.س)</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>القيمة</label>
-        <input type="number" id="bulkAmount" placeholder="مثلاً 10 (للنسبة) أو 50000 (للمبلغ)" oninput="updateBulkPreview()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
-      </div>
-      <div class="form-group">
-        <label>معاينة التعديل</label>
-        <div id="bulkPreview" style="min-height:40px;"></div>
-      </div>
-      <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end;padding-top:12px;">
-        <button class="btn btn-outline" onclick="closeBulkPriceModal()">إلغاء</button>
-        <button class="btn btn-primary" id="bulkApplyBtn" onclick="applyBulkPrice()">✓ تطبيق</button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- Modal: Add/Edit Treatment -->
@@ -545,81 +496,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<!-- Doctor Prices Modal -->
-<div class="modal-overlay" id="doctorPricesModal">
-  <div class="modal-box" style="max-width:600px;">
-    <div class="modal-head">
-      <h3 id="dpModalTitle">💰 أسعار حسب الطبيب</h3>
-      <button class="modal-close" onclick="closeModalById('doctorPricesModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.3);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--text2);">
-        💡 ضع سعراً مخصصاً لكل طبيب. إذا تركت الحقل فارغاً، سيُستخدم السعر العام.
-      </div>
-      <div id="doctorPricesList"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-outline" onclick="closeModalById('doctorPricesModal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveDoctorPrices()">💾 حفظ</button>
-    </div>
-  </div>
-</div>
-
-<!-- Price History Modal -->
-<div class="modal-overlay" id="historyModal">
-  <div class="modal-box" style="max-width:600px;">
-    <div class="modal-head">
-      <h3 id="hsModalTitle">📜 سجل تغييرات السعر</h3>
-      <button class="modal-close" onclick="closeModalById('historyModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div id="historyList"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-primary" onclick="closeModalById('historyModal')">إغلاق</button>
-    </div>
-  </div>
-</div>
-
-<!-- Bundle Modal -->
-<div class="modal-overlay" id="bundleModal">
-  <div class="modal-box" style="max-width:640px;">
-    <div class="modal-head">
-      <h3 id="bdModalTitle">📦 ربط كحزمة</h3>
-      <button class="modal-close" onclick="closeModalById('bundleModal')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:rgba(99,179,237,.08);border:1px solid rgba(99,179,237,.3);border-radius:8px;padding:12px;margin-bottom:14px;font-size:12px;color:var(--text2);">
-        💡 الحزمة هي علاج رئيسي يتضمن عدة علاجات فرعية. مثلاً: "فحص دوري" = تنظيف + أشعة + استشارة.
-        <br>عند اختيار الحزمة لمريض، ستُسجّل تلقائياً كل العلاجات الفرعية كجلسات منفصلة.
-      </div>
-      <div class="form-group">
-        <label>اختر العلاجات الفرعية:</label>
-        <div id="bundleItemsList" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;"></div>
-      </div>
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:10px;font-size:13px;color:var(--text);">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span>مجموع أسعار الحزمة (للمعلومات):</span>
-          <span id="bundleTotalPreview" style="font-weight:800;color:var(--green);">0 ل.س</span>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-outline" onclick="closeModalById('bundleModal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveBundle()">💾 حفظ الحزمة</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
 // ── Supabase-backed treatments ──
 var treatments = []; // populated from Supabase
 var currentDoctor = null;
-var clinicDoctors = [];  // list of clinic doctors (for per-doctor pricing)
-var bundleItems = [];    // list of {parent_id, child_id, quantity, sort_order}
-var hasDoctorsTable = true;  // gracefully degrade if migration not run yet
 
 async function loadTreatments() {
   const user = await sbRequireAuth();
@@ -657,45 +539,9 @@ async function loadTreatments() {
       is_active: t.is_active !== false,  // default true if column doesn't exist
       category: t.category || 'other',
       default_note: t.default_note || '',
-      layman_name: t.layman_name || '',
-      price_overrides: t.price_overrides || {},  // {doctor_id: price}
-      is_bundle: !!t.is_bundle
+      layman_name: t.layman_name || ''
     };
   });
-
-  // Load clinic doctors (for per-doctor pricing UI)
-  try {
-    var dRes = await window.sb.from('clinic_doctors')
-      .select('id, name, color, is_owner, is_active')
-      .eq('owner_id', currentDoctor.id)
-      .order('is_owner', { ascending: false })
-      .order('created_at', { ascending: true });
-    if (dRes.error) {
-      // Migration not run yet — disable doctor-specific features
-      hasDoctorsTable = false;
-      clinicDoctors = [];
-    } else {
-      clinicDoctors = (dRes.data || []).filter(function(d){ return d.is_active !== false; });
-      hasDoctorsTable = true;
-    }
-  } catch(e) {
-    hasDoctorsTable = false;
-    clinicDoctors = [];
-  }
-
-  // Load bundle items (parent → child relationships)
-  try {
-    var bRes = await window.sb.from('treatment_bundles')
-      .select('*')
-      .eq('owner_id', currentDoctor.id);
-    if (bRes.error) {
-      bundleItems = [];
-    } else {
-      bundleItems = bRes.data || [];
-    }
-  } catch(e) {
-    bundleItems = [];
-  }
 
   render();
 }
@@ -801,16 +647,6 @@ function render() {
     var tp = targetMap[t.target_part] || targetMap.crown;
     var targetTag = '<span class="treat-target-tag cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;--bc:' + tp.color + ';margin-right:4px;">🦷 ' + tp.text + '</span>';
     var catTag = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(156,163,175,.15);color:var(--text2);border:1px solid rgba(156,163,175,.4);margin-right:4px;">' + (catMap[t.category] || catMap.other) + '</span>';
-    // Bundle badge: shown if this treatment has child items
-    var childItems = bundleItems.filter(function(bi){ return bi.parent_id === t.id; });
-    var bundleTag = childItems.length > 0
-      ? '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.4);margin-right:4px;" title="يشمل ' + childItems.length + ' علاج فرعي">📦 حزمة (' + childItems.length + ')</span>'
-      : '';
-    // Custom prices badge: shown if has price_overrides
-    var overrideCount = Object.keys(t.price_overrides || {}).length;
-    var customPricesTag = overrideCount > 0
-      ? '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(245,200,66,.15);color:var(--yellow);border:1px solid rgba(245,200,66,.4);margin-right:4px;" title="' + overrideCount + ' سعر مخصص للأطباء">💰 أسعار خاصة (' + overrideCount + ')</span>'
-      : '';
     var isInactive = (t.is_active === false);
     var inactiveStyle = isInactive ? 'opacity:.55;' : '';
     var inactiveBadge = isInactive ? '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(160,160,160,.2);color:#9ca3af;border:1px solid #6b7280;margin-right:4px;">⏸️ معطّل</span>' : '';
@@ -826,7 +662,7 @@ function render() {
       + '<div class="treat-body">'
         + '<div class="treat-head">'
           + '<div>'
-            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + bundleTag + ' ' + customPricesTag + ' ' + inactiveBadge + '</div>'
+            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + inactiveBadge + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
             + laymanRow
           + '</div>'
@@ -836,11 +672,6 @@ function render() {
         + '<div class="treat-actions">'
           + '<button class="ed-btn" onclick="editTreatment(\'' + t.id + '\')">✏️ تعديل</button>'
           + '<button class="dup-btn" onclick="duplicateTreatment(\'' + t.id + '\')" title="إنشاء نسخة جديدة من هذا العلاج">📋 نسخ</button>'
-          + (hasDoctorsTable && clinicDoctors.length > 1
-              ? '<button class="price-btn" onclick="openDoctorPricesModal(\'' + t.id + '\')" title="تحديد سعر مختلف لكل طبيب">💰 أسعار الأطباء</button>'
-              : '')
-          + '<button class="hist-btn" onclick="openHistoryModal(\'' + t.id + '\')" title="عرض سجل تغييرات السعر">📜 السجل</button>'
-          + '<button class="bundle-btn" onclick="openBundleModal(\'' + t.id + '\')" title="ربط هذا العلاج بعلاجات فرعية (حزمة)">📦 حزمة</button>'
           + '<button class="' + toggleBtnClass + '" onclick="toggleActive(\'' + t.id + '\')" title="' + (isInactive ? 'تفعيل العلاج' : 'تعطيل العلاج (يخفيه من قائمة العلاجات في مخطط الأسنان)') + '">' + toggleBtnText + '</button>'
           + (t.builtin
               ? ''
@@ -1126,112 +957,6 @@ async function reorderTreatments(draggedId, targetId) {
   showToast('✅ تم تحديث الترتيب');
 }
 
-// ============================================================
-// Bulk price update
-// ============================================================
-function openBulkPriceModal() {
-  if (!treatments.length) {
-    showToast('⚠️ لا توجد علاجات لتعديل أسعارها');
-    return;
-  }
-  document.getElementById('bulkPriceModal').classList.add('active');
-  // Reset form
-  document.getElementById('bulkScope').value = 'all';
-  document.getElementById('bulkOp').value = 'percent_inc';
-  document.getElementById('bulkAmount').value = '';
-  updateBulkPreview();
-}
-
-function closeBulkPriceModal() {
-  document.getElementById('bulkPriceModal').classList.remove('active');
-}
-
-function getBulkAffectedTreatments() {
-  var scope = document.getElementById('bulkScope').value;
-  return treatments.filter(function(t){
-    if (t.is_active === false) return false;  // never touch inactive
-    if (scope === 'all') return true;
-    if (scope === 'custom') return !t.builtin;
-    if (scope === 'lab')    return !!t.needs_lab;
-    return (t.target_part || 'crown') === scope;
-  });
-}
-
-function computeBulkNewPrice(oldPrice, op, amount) {
-  var amt = parseFloat(amount);
-  if (isNaN(amt)) return oldPrice;
-  var p = oldPrice;
-  if (op === 'percent_inc') p = oldPrice * (1 + amt / 100);
-  else if (op === 'percent_dec') p = oldPrice * (1 - amt / 100);
-  else if (op === 'fixed_inc') p = oldPrice + amt;
-  else if (op === 'fixed_dec') p = oldPrice - amt;
-  else if (op === 'set') p = amt;
-  p = Math.max(0, Math.round(p));
-  return p;
-}
-
-function updateBulkPreview() {
-  var affected = getBulkAffectedTreatments();
-  var op = document.getElementById('bulkOp').value;
-  var amount = document.getElementById('bulkAmount').value;
-  var previewEl = document.getElementById('bulkPreview');
-  if (!affected.length) {
-    previewEl.innerHTML = '<div style="color:var(--text2);font-size:13px;padding:8px;">لا توجد علاجات في هذا النطاق</div>';
-    return;
-  }
-  var html = '<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">سيتم تحديث ' + affected.length + ' علاج:</div>';
-  html += '<div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">';
-  for (var i=0; i<affected.length; i++) {
-    var t = affected[i];
-    var newP = computeBulkNewPrice(t.price, op, amount);
-    var diff = newP - t.price;
-    var diffColor = diff > 0 ? 'var(--green)' : (diff < 0 ? '#ef5350' : 'var(--text2)');
-    var diffSign = diff > 0 ? '+' : '';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;">'
-      + '<span style="font-weight:600;color:var(--text);">' + escapeHtml(t.name) + '</span>'
-      + '<span style="color:var(--text2);">' + fmt(t.price) + ' ← <b style="color:var(--text);">' + fmt(newP) + '</b> <span style="color:' + diffColor + ';">(' + diffSign + fmt(diff) + ')</span></span>'
-      + '</div>';
-  }
-  html += '</div>';
-  previewEl.innerHTML = html;
-}
-
-async function applyBulkPrice() {
-  var op = document.getElementById('bulkOp').value;
-  var amount = document.getElementById('bulkAmount').value;
-  if (!amount || isNaN(parseFloat(amount))) {
-    showToast('⚠️ أدخل قيمة صحيحة');
-    return;
-  }
-  var affected = getBulkAffectedTreatments();
-  if (!affected.length) {
-    showToast('⚠️ لا توجد علاجات للتحديث');
-    return;
-  }
-  if (!confirm('سيتم تحديث أسعار ' + affected.length + ' علاج. متابعة؟')) return;
-  var btn = document.getElementById('bulkApplyBtn');
-  var origText = btn.textContent;
-  btn.textContent = '⏳ جاري التحديث...';
-  btn.disabled = true;
-  var failed = 0;
-  for (var i=0; i<affected.length; i++) {
-    var t = affected[i];
-    var newPrice = computeBulkNewPrice(t.price, op, amount);
-    var { error } = await window.sb
-      .from('treatments')
-      .update({ price: newPrice, updated_at: new Date().toISOString() })
-      .eq('id', t.id);
-    if (error) { console.error('bulk update error:', error); failed++; }
-    else { t.price = newPrice; }
-  }
-  btn.textContent = origText;
-  btn.disabled = false;
-  closeBulkPriceModal();
-  render();
-  if (failed) showToast('⚠️ تم تحديث ' + (affected.length - failed) + ' علاج، فشل ' + failed);
-  else showToast('✅ تم تحديث أسعار ' + affected.length + ' علاج');
-}
-
 async function deleteTreatment(id) {
   if (!confirm('حذف هذا العلاج؟ الجلسات السابقة لن تتأثر.')) return;
   const { error } = await window.sb.from('treatments').delete().eq('id', id);
@@ -1498,260 +1223,6 @@ function showToast(msg) {
 }
 
 // ============================================================
-// === Doctor Prices Modal ===
-// ============================================================
-var dpCurrentTreatment = null;
-
-function openDoctorPricesModal(treatmentId) {
-  var t = treatments.find(function(x){ return x.id === treatmentId; });
-  if (!t) return;
-  if (!hasDoctorsTable) {
-    showToast('⚠️ يحتاج تحديث قاعدة البيانات أولاً');
-    return;
-  }
-  if (clinicDoctors.length === 0) {
-    showToast('ℹ️ أضف أطباء العيادة أولاً من صفحة الأطباء');
-    return;
-  }
-  dpCurrentTreatment = t;
-  document.getElementById('dpModalTitle').textContent = '💰 أسعار "' + t.name + '" حسب الطبيب';
-  var overrides = t.price_overrides || {};
-  var listEl = document.getElementById('doctorPricesList');
-  var html = '<div style="display:flex;flex-direction:column;gap:10px;">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;">'
-       + '<div><div style="font-weight:700;color:var(--text);">السعر العام (الافتراضي)</div>'
-       + '<div style="font-size:11px;color:var(--text2);margin-top:2px;">يُستخدم للأطباء غير المدرجين أدناه</div></div>'
-       + '<div style="font-weight:800;color:var(--green);font-size:16px;">' + fmt(t.price) + ' ل.س</div></div>';
-  clinicDoctors.forEach(function(d){
-    var dotHtml = '<div style="width:14px;height:14px;border-radius:50%;background:' + (d.color || '#2ee89e') + ';flex-shrink:0;"></div>';
-    var ownerBadge = d.is_owner ? '<span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;background:rgba(46,232,158,.15);color:var(--green);margin-right:4px;">⭐ مالك</span>' : '';
-    var currentVal = (overrides[d.id] !== undefined && overrides[d.id] !== null) ? overrides[d.id] : '';
-    html += '<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;">'
-         + dotHtml
-         + '<div style="flex:1;">' + escapeHtml(d.name) + ' ' + ownerBadge + '</div>'
-         + '<input type="number" min="0" inputmode="numeric" data-doctor-id="' + d.id + '" value="' + currentVal + '" placeholder="عام" style="width:130px;padding:6px 10px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;text-align:left;">'
-         + '<span style="color:var(--text2);font-size:12px;">ل.س</span></div>';
-  });
-  html += '</div>';
-  listEl.innerHTML = html;
-  document.getElementById('doctorPricesModal').classList.add('show');
-}
-
-async function saveDoctorPrices() {
-  if (!dpCurrentTreatment) return;
-  var inputs = document.querySelectorAll('#doctorPricesList input[data-doctor-id]');
-  var overrides = {};
-  inputs.forEach(function(inp){
-    var did = inp.getAttribute('data-doctor-id');
-    var v = inp.value.trim();
-    if (v !== '' && !isNaN(parseFloat(v))) {
-      overrides[did] = parseFloat(v);
-    }
-  });
-  // Log per-doctor price changes
-  var oldOverrides = dpCurrentTreatment.price_overrides || {};
-  var allDoctorIds = {};
-  Object.keys(oldOverrides).forEach(function(k){ allDoctorIds[k] = true; });
-  Object.keys(overrides).forEach(function(k){ allDoctorIds[k] = true; });
-  for (var did in allDoctorIds) {
-    var oldV = oldOverrides[did];
-    var newV = overrides[did];
-    if (oldV !== newV) {
-      try {
-        await window.sb.from('treatment_price_history').insert({
-          owner_id: currentDoctor.id,
-          treatment_id: dpCurrentTreatment.id,
-          old_price: (oldV !== undefined && oldV !== null) ? oldV : dpCurrentTreatment.price,
-          new_price: (newV !== undefined && newV !== null) ? newV : dpCurrentTreatment.price,
-          doctor_id_override: did,
-          changed_by: currentDoctor.id,
-          changed_at: new Date().toISOString()
-        });
-      } catch(e) { /* ignore if table missing */ }
-    }
-  }
-  var { error } = await window.sb.from('treatments')
-    .update({ price_overrides: overrides, updated_at: new Date().toISOString() })
-    .eq('id', dpCurrentTreatment.id);
-  if (error) { showToast('⚠️ فشل الحفظ: ' + error.message); return; }
-  showToast('✅ تم حفظ الأسعار المخصصة');
-  closeModalById('doctorPricesModal');
-  await loadTreatments();
-}
-
-// ============================================================
-// === Price History Modal ===
-// ============================================================
-async function openHistoryModal(treatmentId) {
-  var t = treatments.find(function(x){ return x.id === treatmentId; });
-  if (!t) return;
-  document.getElementById('hsModalTitle').textContent = '📜 سجل أسعار "' + t.name + '"';
-  var listEl = document.getElementById('historyList');
-  listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">جارٍ التحميل...</div>';
-  document.getElementById('historyModal').classList.add('show');
-
-  try {
-    var { data, error } = await window.sb.from('treatment_price_history')
-      .select('*')
-      .eq('treatment_id', treatmentId)
-      .order('changed_at', { ascending: false });
-    if (error && error.code === 'PGRST204') {
-      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">يحتاج تحديث قاعدة البيانات لتفعيل السجل</div>';
-      return;
-    }
-    if (error) {
-      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);">فشل التحميل: ' + error.message + '</div>';
-      return;
-    }
-    var rows = data || [];
-    if (rows.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);">لا توجد تغييرات سعر مسجلة بعد.<br>عند تعديل سعر هذا العلاج، سيُسجّل التغيير هنا تلقائياً.</div>';
-      return;
-    }
-    var html = '<div style="display:flex;flex-direction:column;gap:8px;">';
-    rows.forEach(function(r){
-      var dt = r.changed_at ? new Date(r.changed_at).toLocaleString('ar-SY', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
-      var doctorLabel = '';
-      if (r.doctor_id_override) {
-        var dr = clinicDoctors.find(function(x){ return x.id === r.doctor_id_override; });
-        doctorLabel = dr ? ' — لطبيب: ' + escapeHtml(dr.name) : ' — سعر مخصص لطبيب';
-      } else {
-        doctorLabel = ' — السعر العام';
-      }
-      var diff = (r.new_price || 0) - (r.old_price || 0);
-      var diffStr = diff > 0 ? '+' + fmt(diff) : fmt(diff);
-      var diffColor = diff > 0 ? 'var(--green)' : 'var(--red)';
-      html += '<div style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:13px;">'
-           + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-           + '<div><span style="color:var(--text2);">من</span> <b style="color:var(--text);">' + fmt(r.old_price) + '</b> '
-           + '<span style="color:var(--text2);">إلى</span> <b style="color:var(--green);">' + fmt(r.new_price) + '</b> '
-           + '<span style="color:var(--text2);">ل.س</span></div>'
-           + '<div style="color:' + diffColor + ';font-weight:700;font-size:12px;">' + diffStr + '</div></div>'
-           + '<div style="margin-top:4px;font-size:11px;color:var(--text2);">' + dt + doctorLabel + '</div>'
-           + '</div>';
-    });
-    html += '</div>';
-    listEl.innerHTML = html;
-  } catch(e) {
-    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">السجل غير متاح</div>';
-  }
-}
-
-// ============================================================
-// === Bundle Modal ===
-// ============================================================
-var bdCurrentTreatment = null;
-
-function openBundleModal(treatmentId) {
-  var t = treatments.find(function(x){ return x.id === treatmentId; });
-  if (!t) return;
-  bdCurrentTreatment = t;
-  document.getElementById('bdModalTitle').textContent = '📦 ربط "' + t.name + '" كحزمة';
-  var existing = bundleItems.filter(function(bi){ return bi.parent_id === t.id; });
-  var existingMap = {};
-  existing.forEach(function(e){ existingMap[e.child_id] = e.quantity || 1; });
-
-  var listEl = document.getElementById('bundleItemsList');
-  // Prevent cycles: exclude treatments where this one already appears as their child
-  // (i.e. if B is a child of A's bundle, A cannot become a child of B's bundle)
-  var parentsOfMe = bundleItems.filter(function(bi){ return bi.child_id === t.id; }).map(function(bi){ return bi.parent_id; });
-  var others = treatments.filter(function(x){
-    if (x.id === t.id) return false;          // not self
-    if (x.is_active === false) return false;  // active only
-    if (parentsOfMe.indexOf(x.id) >= 0) return false;  // prevents A↔B cycle
-    return true;
-  });
-  if (others.length === 0) {
-    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text2);">لا توجد علاجات أخرى متاحة</div>';
-    return;
-  }
-  var html = '<div style="display:flex;flex-direction:column;gap:6px;">';
-  others.forEach(function(o){
-    var qty = existingMap[o.id] || 0;
-    var checked = qty > 0;
-    html += '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:' + (checked ? 'rgba(46,232,158,.08)' : 'var(--bg)') + ';border:1px solid ' + (checked ? 'var(--green)' : 'var(--border)') + ';border-radius:7px;cursor:pointer;" data-bundle-row="' + o.id + '">'
-         + '<input type="checkbox" data-child-id="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="updateBundlePreview()" style="cursor:pointer;">'
-         + '<div style="width:12px;height:12px;border-radius:3px;background:' + o.fill + ';"></div>'
-         + '<div style="flex:1;font-size:13px;">' + escapeHtml(o.name) + '</div>'
-         + '<input type="number" min="1" value="' + Math.max(1, qty) + '" data-child-qty="' + o.id + '" onchange="updateBundlePreview()" oninput="updateBundlePreview()" style="width:54px;padding:4px 8px;background:var(--bg2);color:var(--text);border:1px solid var(--border);border-radius:5px;font-size:12px;text-align:center;font-family:Cairo,sans-serif;" title="الكمية">'
-         + '<span style="color:var(--text2);font-size:11px;width:80px;text-align:left;">' + fmt(o.price) + ' ل.س</span>'
-         + '</label>';
-  });
-  html += '</div>';
-  listEl.innerHTML = html;
-  updateBundlePreview();
-  document.getElementById('bundleModal').classList.add('show');
-}
-
-function updateBundlePreview() {
-  var checkboxes = document.querySelectorAll('#bundleItemsList input[type="checkbox"]:checked');
-  var total = 0;
-  checkboxes.forEach(function(cb){
-    var cid = cb.getAttribute('data-child-id');
-    var qtyInput = document.querySelector('#bundleItemsList input[data-child-qty="' + cid + '"]');
-    var qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
-    var child = treatments.find(function(x){ return x.id === cid; });
-    if (child) total += (child.price || 0) * qty;
-    // Update row highlight
-    var row = document.querySelector('#bundleItemsList [data-bundle-row="' + cid + '"]');
-    if (row) {
-      row.style.background = 'rgba(46,232,158,.08)';
-      row.style.borderColor = 'var(--green)';
-    }
-  });
-  // Unhighlight unchecked rows
-  document.querySelectorAll('#bundleItemsList input[type="checkbox"]:not(:checked)').forEach(function(cb){
-    var cid = cb.getAttribute('data-child-id');
-    var row = document.querySelector('#bundleItemsList [data-bundle-row="' + cid + '"]');
-    if (row) {
-      row.style.background = 'var(--bg)';
-      row.style.borderColor = 'var(--border)';
-    }
-  });
-  document.getElementById('bundleTotalPreview').textContent = fmt(total) + ' ل.س';
-}
-
-async function saveBundle() {
-  if (!bdCurrentTreatment) return;
-  var checkboxes = document.querySelectorAll('#bundleItemsList input[type="checkbox"]:checked');
-  var newItems = [];
-  var idx = 0;
-  checkboxes.forEach(function(cb){
-    var cid = cb.getAttribute('data-child-id');
-    var qtyInput = document.querySelector('#bundleItemsList input[data-child-qty="' + cid + '"]');
-    var qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
-    newItems.push({
-      owner_id: currentDoctor.id,
-      parent_id: bdCurrentTreatment.id,
-      child_id: cid,
-      quantity: qty,
-      sort_order: idx++
-    });
-  });
-
-  // Strategy: delete all existing bundle items for this parent, then insert new ones
-  var delRes = await window.sb.from('treatment_bundles')
-    .delete()
-    .eq('parent_id', bdCurrentTreatment.id);
-  if (delRes.error) { showToast('⚠️ فشل: ' + delRes.error.message); return; }
-
-  if (newItems.length > 0) {
-    var insRes = await window.sb.from('treatment_bundles').insert(newItems);
-    if (insRes.error) { showToast('⚠️ فشل: ' + insRes.error.message); return; }
-  }
-
-  // Mark this treatment as a bundle (or not)
-  var { error: upErr } = await window.sb.from('treatments')
-    .update({ is_bundle: newItems.length > 0, updated_at: new Date().toISOString() })
-    .eq('id', bdCurrentTreatment.id);
-  if (upErr) { console.warn('mark bundle error:', upErr); }
-
-  showToast(newItems.length > 0 ? '✅ تم حفظ الحزمة (' + newItems.length + ' عنصر)' : '✅ تم إزالة الحزمة');
-  closeModalById('bundleModal');
-  await loadTreatments();
-}
-
-// ============================================================
 // === Print Legend ===
 // ============================================================
 function printLegend() {
@@ -1836,17 +1307,6 @@ function printLegend() {
 // ============================================================
 // === Helper to close any modal by id ===
 // ============================================================
-function closeModalById(id) {
-  var el = document.getElementById(id);
-  if (el) el.classList.remove('show');
-}
-
-// Close modals on overlay click
-document.addEventListener('click', function(e){
-  if (e.target.id === 'doctorPricesModal') closeModalById('doctorPricesModal');
-  if (e.target.id === 'historyModal') closeModalById('historyModal');
-  if (e.target.id === 'bundleModal') closeModalById('bundleModal');
-});
 
 </script>
 
