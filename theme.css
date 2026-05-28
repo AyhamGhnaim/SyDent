@@ -45,6 +45,8 @@
   --orange:    #ea580c;
   --purple:    #7c3aed;
   --amber:     #d97706;
+  --cyan:      #0e7490;       /* renew action — readable teal on white */
+  --wa:        #128c3e;       /* WhatsApp actions — darkened brand green for contrast */
 
   /* index.html alias naming */
   --bg-primary:    var(--bg);
@@ -90,6 +92,8 @@
   --orange:    #ffa726;
   --purple:    #a78bfa;
   --amber:     #ffc107;
+  --cyan:      #4dd0e1;
+  --wa:        #25d366;
 
   /* index.html alias naming */
   --bg-primary:    var(--bg);
