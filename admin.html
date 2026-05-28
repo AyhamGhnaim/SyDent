@@ -175,7 +175,11 @@ header{
 .req-card.new{border-color:rgba(46,232,158,0.25);}
 .req-card.accepted{border-color:rgba(46,232,158,0.15);opacity:.7;}
 .req-card.rejected{border-color:rgba(239,83,80,0.15);opacity:.6;}
-.req-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+/* padding-right reserves the top-right corner for the absolutely-positioned
+   .bk-card-check (22px @ right:12px). In RTL the name starts on the right —
+   same side as the checkbox — so without this clearance the checkbox sits on
+   top of the first letters of the customer name. */
+.req-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-right:28px;}
 .req-name{font-size:15px;font-weight:700;color:var(--text);}
 .req-status{
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;
