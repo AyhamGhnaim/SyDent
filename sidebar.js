@@ -303,12 +303,29 @@ async function refreshSidebarDynamic() {
     .maybeSingle();
 
   if (trialData && trialData.status === 'rejected') {
+    // Phase X11 — read vendor support_phone from platform_settings (Migration 33
+    // table + Migration 34 public-read policy). Falls back to the legacy
+    // hardcoded value on RLS/network failure so the suspension screen always
+    // shows a working WhatsApp link. Single query per suspension render.
+    var SB_SUPPORT_PHONE_FALLBACK = '963934012433';
+    var sbSupportPhone = SB_SUPPORT_PHONE_FALLBACK;
+    try {
+      const psRes = await window.sb.from('platform_settings')
+        .select('value')
+        .eq('key', 'support_phone')
+        .maybeSingle();
+      if (psRes && psRes.data && psRes.data.value) {
+        const v = String(psRes.data.value).trim();
+        if (/^\d{8,15}$/.test(v)) sbSupportPhone = v;
+      }
+    } catch (e) { /* keep fallback */ }
+
     document.body.innerHTML = `
       <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
         <div style="font-size:60px;margin-bottom:16px;">🚫</div>
         <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">تم إيقاف حسابك</div>
         <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">للاستفسار أو تجديد الاشتراك، تواصل معنا عبر واتساب.</div>
-        <a href="https://wa.me/963934012433?text=${encodeURIComponent('مرحباً، حسابي في SyDent موقوف وأريد الاستفسار')}" target="_blank"
+        <a href="https://wa.me/${sbSupportPhone}?text=${encodeURIComponent('مرحباً، حسابي في SyDent موقوف وأريد الاستفسار')}" target="_blank"
           style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
           💬 تواصل معنا عبر واتساب
         </a>

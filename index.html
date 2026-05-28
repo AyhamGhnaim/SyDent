@@ -536,7 +536,7 @@
 <link rel="stylesheet" href="theme.css?v=20260527a11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260527a62"></script>
-<script src="sidebar.js?v=20260527a63"></script>
+<script src="sidebar.js?v=20260527a64"></script>
 </head>
 <body>
 <script>
@@ -589,6 +589,26 @@
     const isTrial = (plan === 'trial');
     const isPaid = (plan === 'monthly' || plan === 'yearly');
 
+    // Phase X11 — read vendor support_phone from platform_settings (Migration 33
+    // table + Migration 34 public-read policy for the support_phone row only).
+    // Falls back to the legacy hardcoded value if the query fails or the row
+    // is missing, so banners NEVER break even on RLS/network failure.
+    // Single query per page load — value is local to this IIFE.
+    var SUPPORT_PHONE_FALLBACK = '963934012433';
+    var supportPhone = SUPPORT_PHONE_FALLBACK;
+    try {
+      const psRes = await window.sb.from('platform_settings')
+        .select('value')
+        .eq('key', 'support_phone')
+        .maybeSingle();
+      if (psRes && psRes.data && psRes.data.value) {
+        const v = String(psRes.data.value).trim();
+        if (/^\d{8,15}$/.test(v)) supportPhone = v;
+      }
+    } catch (e) {
+      // Defensive — keep fallback. Don't log on every page load (noisy).
+    }
+
     if (daysLeft <= 0) {
       // انتهت الفترة — احجب الداشبورد (العنوان فقط يتغيّر حسب الحالة؛
       // النص الوصفي والـ WhatsApp message متطابقان لأن الـ CTA واحدة:
@@ -599,7 +619,7 @@
           <div style="font-size:60px;margin-bottom:16px;">⏰</div>
           <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">${expiredTitle}</div>
           <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، تواصل معنا عبر واتساب.</div>
-          <a href="https://wa.me/963934012433?text=${encodeURIComponent('مرحباً، أريد تجديد اشتراكي في SyDent')}" target="_blank"
+          <a href="https://wa.me/${supportPhone}?text=${encodeURIComponent('مرحباً، أريد تجديد اشتراكي في SyDent')}" target="_blank"
             style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
             💬 تواصل معنا عبر واتساب
           </a>
@@ -620,28 +640,28 @@
       // تجربة: banner دائم بألوان تدريجية (السلوك القديم)
       showBanner = true;
       bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
-      bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
+      bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
     } else if (plan === 'yearly') {
       // سنوي: banner فقط ≤30 يوم (Notion/Stripe pattern)
       if (daysLeft <= 7) {
         showBanner = true;
         bannerColor = '#ef5350';
-        bannerText = '🚨 اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+        bannerText = '🚨 اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
       } else if (daysLeft <= 30) {
         showBanner = true;
         bannerColor = '#ffa726';
-        bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+        bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
     } else if (plan === 'monthly') {
       // شهري: banner فقط ≤14 يوم (دورة قصيرة، تحذير أبكر نسبياً)
       if (daysLeft <= 3) {
         showBanner = true;
         bannerColor = '#ef5350';
-        bannerText = '🚨 اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+        bannerText = '🚨 اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
       } else if (daysLeft <= 14) {
         showBanner = true;
         bannerColor = '#ffa726';
-        bannerText = '⏰ اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/963934012433" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+        bannerText = '⏰ اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
     }
     // else: plan غير معروف → لا banner (fail-safe)

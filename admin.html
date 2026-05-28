@@ -1316,6 +1316,79 @@ header{
   .stats-row{grid-template-columns:repeat(3,1fr);}
   .health-row{grid-template-columns:repeat(4, 1fr);}
 }
+/* ===== Phase X11: Platform Settings (ps-* namespace) ===== */
+/* Reuses rpt-section wrapper for header/body chrome; ps-* covers only */
+/* the inner card grid + form fields. Disjoint from tpl-, plan-, c360-. */
+.ps-card{
+  background:var(--bg); border:1px solid var(--border); border-radius:12px;
+  padding:18px 18px 14px; margin-bottom:14px;
+}
+.ps-card:last-child{margin-bottom:0;}
+.ps-card-head{margin-bottom:14px;}
+.ps-card-title{
+  font-size:15px; font-weight:700; color:var(--text); margin:0 0 4px;
+  display:flex; align-items:center; gap:8px;
+}
+.ps-card-desc{font-size:12.5px; color:var(--text2); line-height:1.6;}
+.ps-subcard{
+  background:var(--card); border:1px solid var(--border); border-radius:10px;
+  padding:14px 14px 10px; margin-top:12px;
+}
+.ps-subcard-title{
+  font-size:13px; font-weight:700; color:var(--text); margin-bottom:10px;
+}
+.ps-current{
+  font-size:12.5px; color:var(--text2); margin-bottom:10px;
+  padding:8px 10px; background:var(--bg); border-radius:6px;
+  border:1px dashed var(--border);
+}
+.ps-current strong{color:var(--text); font-weight:700;}
+.ps-field{margin-bottom:12px;}
+.ps-field label{
+  display:block; font-size:12.5px; font-weight:600; color:var(--text2);
+  margin-bottom:5px;
+}
+.ps-field-note{font-weight:400; color:var(--text3); font-size:11px;}
+.ps-field input{
+  width:100%; box-sizing:border-box;
+  padding:9px 12px; font-size:13px; font-family:'Cairo',sans-serif;
+  background:var(--card); color:var(--text);
+  border:1px solid var(--border); border-radius:8px;
+  transition:border-color 0.15s ease, background 0.15s ease;
+}
+.ps-field input:focus{
+  outline:none; border-color:rgba(56,189,248,0.55);
+  background:var(--bg);
+}
+.ps-field input[type="tel"]{direction:ltr; text-align:left;}
+.ps-field input[type="email"]{direction:ltr; text-align:left;}
+.ps-field input[type="password"]{direction:ltr; text-align:left;}
+.ps-field-hint{
+  font-size:11.5px; color:var(--text3); margin-top:5px; line-height:1.5;
+}
+.ps-field-hint code{
+  background:var(--card); padding:1px 5px; border-radius:4px;
+  font-size:11px; color:var(--text2); direction:ltr; display:inline-block;
+}
+.ps-actions{margin-top:10px;}
+.ps-btn-save{
+  padding:8px 16px; font-size:13px; font-weight:700; font-family:inherit;
+  background:rgba(46,232,158,0.15); color:var(--green);
+  border:1px solid rgba(46,232,158,0.4); border-radius:8px;
+  cursor:pointer; transition:all 0.15s ease;
+}
+.ps-btn-save:hover:not(:disabled){
+  background:rgba(46,232,158,0.25); border-color:rgba(46,232,158,0.6);
+}
+.ps-btn-save:disabled{
+  opacity:0.45; cursor:not-allowed;
+  background:var(--bg); color:var(--text3); border-color:var(--border);
+}
+@media(max-width:480px){
+  .ps-card{padding:14px 12px 10px;}
+  .ps-subcard{padding:12px 10px 8px;}
+}
+
 /* ===== Phase X6: Customer 360° Drawer ===== */
 /* All class names prefixed with c360- to avoid collision with evf-*, tpl-*, plan-*. */
 .c360-overlay{
@@ -2347,6 +2420,103 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
         <!-- Empty state (shown only if no data at all) -->
         <div class="rpt-empty" id="rptEmpty" style="display:none;">
           لا توجد بيانات كافية لعرض التقارير في الفترة المحدّدة.
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Phase X11: Platform Settings (Section H) — admin-only config panel -->
+    <!-- Reuses rpt-section visual pattern for consistency; ps-* namespace -->
+    <!-- isolated from rpt-/tpl-/plan-/flt-/c360-. Three cards: support info -->
+    <!-- (phone + email), admin profile (email + password via Supabase Auth), -->
+    <!-- and platform branding (name + renewal message). -->
+    <div class="rpt-section ps-section" id="psSection">
+      <div class="rpt-section-header" onclick="psToggle()" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();psToggle();}">
+        <span class="rpt-section-title">⚙️ إعدادات المنصة</span>
+        <span class="rpt-section-toggle">▶</span>
+      </div>
+      <div class="rpt-section-body">
+
+        <!-- Card 1: Support info (phone + email) -->
+        <div class="ps-card">
+          <div class="ps-card-head">
+            <h3 class="ps-card-title">📞 معلومات الدعم</h3>
+            <div class="ps-card-desc">رقم WhatsApp يظهر للمستأجرين في بانرات تنبيه التجديد ورسائل الدعم. الإيميل للعرض الإداري فقط.</div>
+          </div>
+          <div class="ps-field">
+            <label for="psSupportPhone">رقم WhatsApp للدعم</label>
+            <input type="tel" id="psSupportPhone" placeholder="مثلاً 963934012433" autocomplete="off" oninput="onPsFieldInput('support_phone')">
+            <div class="ps-field-hint">صيغة دولية بدون <code>+</code> أو <code>00</code> (مثل <code>963934012433</code>). 8 إلى 15 رقمًا.</div>
+          </div>
+          <div class="ps-field">
+            <label for="psSupportEmail">إيميل الدعم (للعرض)</label>
+            <input type="email" id="psSupportEmail" placeholder="support@example.com" autocomplete="off" oninput="onPsFieldInput('support_email')">
+            <div class="ps-field-hint">للعرض في الواجهة الإدارية. لا يُستخدم لإرسال إيميلات (الإيميلات الفعلية تأتي من Supabase Auth).</div>
+          </div>
+          <div class="ps-actions">
+            <button type="button" class="ps-btn-save" id="btnPsSaveSupport" onclick="savePsSupportInfo()" disabled>💾 حفظ معلومات الدعم</button>
+          </div>
+        </div>
+
+        <!-- Card 2: Admin profile (email + password change via Supabase Auth) -->
+        <div class="ps-card">
+          <div class="ps-card-head">
+            <h3 class="ps-card-title">🔐 حساب الـ Admin</h3>
+            <div class="ps-card-desc">تعديل إيميل أو كلمة سرّ حسابك الإداري. التغييرات تمرّ عبر Supabase Auth، لا تُخزَّن في DB.</div>
+          </div>
+
+          <!-- Email change subcard -->
+          <div class="ps-subcard">
+            <div class="ps-subcard-title">تغيير إيميل تسجيل الدخول</div>
+            <div class="ps-current">الإيميل الحالي: <strong id="psCurrentEmail">—</strong></div>
+            <div class="ps-field">
+              <label for="psNewEmail">الإيميل الجديد</label>
+              <input type="email" id="psNewEmail" autocomplete="off" placeholder="new@example.com" oninput="onPsEmailInput()">
+              <div class="ps-field-hint">⚠️ بعد الحفظ سيُرسَل إيميل تأكيد للعنوان الجديد. لن يفعَّل التغيير قبل الضغط على الرابط في الإيميل.</div>
+            </div>
+            <div class="ps-actions">
+              <button type="button" class="ps-btn-save" id="btnPsSaveEmail" onclick="savePsAdminEmail()" disabled>📧 تحديث الإيميل</button>
+            </div>
+          </div>
+
+          <!-- Password change subcard -->
+          <div class="ps-subcard">
+            <div class="ps-subcard-title">تغيير كلمة السرّ</div>
+            <div class="ps-field">
+              <label for="psNewPassword">كلمة السرّ الجديدة <span class="ps-field-note">(6 حروف على الأقل)</span></label>
+              <input type="password" id="psNewPassword" autocomplete="new-password" oninput="onPsPasswordInput()">
+            </div>
+            <div class="ps-field">
+              <label for="psConfirmPassword">تأكيد كلمة السرّ</label>
+              <input type="password" id="psConfirmPassword" autocomplete="new-password" oninput="onPsPasswordInput()">
+            </div>
+            <div class="ps-field-hint">⚠️ بعد التحديث سيُسجَّل خروجك من جميع الجلسات وستحتاج تسجيل الدخول مجدداً بكلمة السرّ الجديدة.</div>
+            <div class="ps-actions">
+              <button type="button" class="ps-btn-save" id="btnPsSavePassword" onclick="savePsAdminPassword()" disabled>🔑 تحديث كلمة السرّ</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Platform info (name + renewal message) -->
+        <div class="ps-card">
+          <div class="ps-card-head">
+            <h3 class="ps-card-title">🏷️ معلومات المنصة</h3>
+            <div class="ps-card-desc">إعدادات عرض داخلية. لا تظهر للمستأجرين حاليًا (تبقى admin-only في DB).</div>
+          </div>
+          <div class="ps-field">
+            <label for="psPlatformName">اسم المنصة</label>
+            <input type="text" id="psPlatformName" autocomplete="off" oninput="onPsFieldInput('platform_name')">
+            <div class="ps-field-hint">للعرض في الواجهة الإدارية. لا يؤثّر على branding صفحات المستأجرين.</div>
+          </div>
+          <div class="ps-field">
+            <label for="psRenewalMessage">رسالة WhatsApp الافتراضية للتجديد</label>
+            <input type="text" id="psRenewalMessage" autocomplete="off" oninput="onPsFieldInput('renewal_message')">
+            <div class="ps-field-hint">ℹ️ تُخزَّن للاستخدام المستقبلي. حالياً، البانرات في صفحات المستأجرين تستخدم نصاً ثابتاً في الكود.</div>
+          </div>
+          <div class="ps-actions">
+            <button type="button" class="ps-btn-save" id="btnPsSavePlatform" onclick="savePsPlatformInfo()" disabled>💾 حفظ معلومات المنصة</button>
+          </div>
         </div>
 
       </div>
@@ -5557,6 +5727,9 @@ async function loadPlatformSettings() {
       var btn = document.getElementById('btnSaveSupport');
       if (btn) btn.disabled = true;
     }
+    // Phase X11: rehydrate the new Section H inputs from the same cache.
+    // Defined later in the file — call defensively in case ordering shifts.
+    if (typeof hydratePsUI === 'function') hydratePsUI();
   } catch(e) { console.warn('loadPlatformSettings error:', e); }
 }
 
@@ -5623,6 +5796,418 @@ async function saveSupportPhone() {
 function supportPhoneVars() {
   var v = (PLATFORM_SETTINGS_CACHE.support_phone || '').trim();
   return v ? { support_phone: v } : {};
+}
+
+// ============================================================================
+// === Phase X11 — Platform Settings UI (Section H) ===========================
+// ============================================================================
+//
+// Extends Phase X3 محادثة 3 (support_phone in PLATFORM_SETTINGS_CACHE) with:
+//   - Additional config keys (support_email, platform_name, renewal_message)
+//   - Self-service admin profile editor (email + password via Supabase Auth)
+//   - Dedicated Section H in admin.html (vs. the legacy fSupportPhone input
+//     embedded inside the templates editor — which remains functional)
+//
+// Architecture:
+//   - Reuses loadPlatformSettings() (SELECT * already lands all keys).
+//   - Each card has its own _saveInFlight flag (Golden Rule #66).
+//   - Auth ops use window.sb.auth.updateUser() — NEVER SERVICE_KEY.
+//     The admin updates their OWN credentials (Supabase allows this with
+//     a regular authenticated session — same pattern as Microsoft's
+//     "reset my password" self-service flow).
+//   - Bulk upsert: when both support_phone and support_email are dirty,
+//     a single round-trip writes both rows (atomic at the network layer;
+//     not transactional in DB, but acceptable for non-critical settings).
+//   - Cross-UI sync: when admin saves support_phone here, the legacy
+//     fSupportPhone input in tpl-editor is rehydrated from the cache
+//     (one-way push — no live two-way binding needed).
+//
+// Backward compat: the existing fSupportPhone input + saveSupportPhone()
+// remain functional. Both UIs share PLATFORM_SETTINGS_CACHE as the cache,
+// so saves from one location are observable in the other after a page
+// reload (cross-input live-sync is intentionally NOT implemented to avoid
+// focus-stealing during typing).
+//
+// Audit log NOT extended: would require event_type CHECK constraint
+// expansion (Migration 33's commit explicitly deferred this). Settings
+// changes are still observable via updated_at + updated_by columns.
+
+// Per-field dirty tracking for the new UI section
+var _psFieldDirty = {
+  support_phone:    false,
+  support_email:    false,
+  platform_name:    false,
+  renewal_message:  false
+};
+var _psEmailDirty            = false;
+var _psPasswordDirty         = false;
+var _psSaveSupportInFlight   = false;
+var _psSavePlatformInFlight  = false;
+var _psSaveEmailInFlight     = false;
+var _psSavePasswordInFlight  = false;
+
+function psToggle() {
+  var sec = document.getElementById('psSection');
+  if (sec) sec.classList.toggle('open');
+}
+
+// Hydrate the new Section H UI from PLATFORM_SETTINGS_CACHE.
+// Called from initAdmin AFTER loadPlatformSettings() resolves the cache.
+// Safe to re-call (idempotent — overwrites inputs with cached values,
+// but skips fields the user is currently typing into to avoid focus loss).
+function hydratePsUI() {
+  var c = PLATFORM_SETTINGS_CACHE || {};
+  var set = function(id, val) {
+    var el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = val || '';
+  };
+  set('psSupportPhone',   c.support_phone);
+  set('psSupportEmail',   c.support_email);
+  set('psPlatformName',   c.platform_name);
+  set('psRenewalMessage', c.renewal_message);
+
+  // Sync current admin email display
+  try {
+    if (window.sb) {
+      window.sb.auth.getSession().then(function(s){
+        if (s && s.data && s.data.session && s.data.session.user) {
+          var el = document.getElementById('psCurrentEmail');
+          if (el) el.textContent = s.data.session.user.email || '—';
+        }
+      }).catch(function(){});
+    }
+  } catch(_){}
+
+  // Reset all dirty flags + disable save buttons
+  Object.keys(_psFieldDirty).forEach(function(k){ _psFieldDirty[k] = false; });
+  _updatePsSaveButtons();
+}
+
+function _updatePsSaveButtons() {
+  var supportDirty  = _psFieldDirty.support_phone || _psFieldDirty.support_email;
+  var platformDirty = _psFieldDirty.platform_name || _psFieldDirty.renewal_message;
+  var b1 = document.getElementById('btnPsSaveSupport');
+  var b2 = document.getElementById('btnPsSavePlatform');
+  if (b1) b1.disabled = !supportDirty || _psSaveSupportInFlight;
+  if (b2) b2.disabled = !platformDirty || _psSavePlatformInFlight;
+}
+
+function onPsFieldInput(key) {
+  var idMap = {
+    support_phone:    'psSupportPhone',
+    support_email:    'psSupportEmail',
+    platform_name:    'psPlatformName',
+    renewal_message:  'psRenewalMessage'
+  };
+  var el = document.getElementById(idMap[key]);
+  if (!el) return;
+  var current = String(PLATFORM_SETTINGS_CACHE[key] || '').trim();
+  var typed   = String(el.value || '').trim();
+  _psFieldDirty[key] = (typed !== current);
+  _updatePsSaveButtons();
+}
+
+// Validation helpers — defensive, in addition to server-side (RLS) checks.
+function _psValidPhone(v) {
+  if (!v) return true; // empty allowed (admin can clear)
+  return /^\d{8,15}$/.test(v);
+}
+function _psValidEmail(v) {
+  if (!v) return true; // empty allowed
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+// --- Save support info (bulk: phone + email together) ---
+async function savePsSupportInfo() {
+  if (_psSaveSupportInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح.'); return; }
+
+  var phoneEl = document.getElementById('psSupportPhone');
+  var emailEl = document.getElementById('psSupportEmail');
+  var btn     = document.getElementById('btnPsSaveSupport');
+  if (!phoneEl || !emailEl) return;
+
+  var phone = String(phoneEl.value || '').trim();
+  var email = String(emailEl.value || '').trim();
+
+  if (!_psValidPhone(phone)) {
+    alert('❌ رقم الدعم يجب يكون أرقام فقط (8-15 رقم، صيغة دولية بدون + أو 00).\n\nمثال صحيح: 963934012433');
+    return;
+  }
+  if (!_psValidEmail(email)) {
+    alert('❌ صيغة الإيميل غير صحيحة.');
+    return;
+  }
+
+  _psSaveSupportInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+
+  try {
+    var rows = [];
+    if (_psFieldDirty.support_phone) rows.push({ key:'support_phone', value: phone });
+    if (_psFieldDirty.support_email) rows.push({ key:'support_email', value: email });
+    if (rows.length === 0) { return; } // nothing to save (defensive)
+
+    // Stamp updated_by where possible
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        var by = sess.data.session.user.email || 'admin';
+        rows.forEach(function(r){ r.updated_by = by; });
+      }
+    } catch(_){}
+
+    var res = await window.sb.from('platform_settings')
+      .upsert(rows, { onConflict: 'key' })
+      .select();
+
+    if (res.error) {
+      console.error('savePsSupportInfo error:', res.error);
+      alert('❌ فشل الحفظ: ' + (res.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    if (!res.data || res.data.length === 0) {
+      alert('❌ لم تُحفَظ التغييرات.\n\nقد تكون الصلاحيات مرفوضة (تحقّق من تشغيل Migration 33+34+34.1).');
+      return;
+    }
+
+    // Snapshot which keys actually went to DB, BEFORE we clear the dirty
+    // flags below. Used for cross-UI rehydration of the legacy
+    // fSupportPhone input. (Reading _psFieldDirty.support_phone after the
+    // forEach would always be false — bug caught in R7.)
+    var phoneSaved = rows.some(function(r){ return r.key === 'support_phone'; });
+
+    // Sync cache + clear dirty flags for keys that were saved
+    rows.forEach(function(r){
+      PLATFORM_SETTINGS_CACHE[r.key] = r.value;
+      _psFieldDirty[r.key] = false;
+    });
+
+    // One-way sync: rehydrate the legacy fSupportPhone input in tpl-editor
+    // (if it's mounted and not currently focused — same convention as the
+    // legacy loadPlatformSettings() rehydration).
+    if (phoneSaved) {
+      var legacyInp = document.getElementById('fSupportPhone');
+      if (legacyInp && document.activeElement !== legacyInp) {
+        legacyInp.value = PLATFORM_SETTINGS_CACHE.support_phone || '';
+        var legacyBtn = document.getElementById('btnSaveSupport');
+        if (legacyBtn) legacyBtn.disabled = true;
+      }
+    }
+
+    alert('✅ تم حفظ معلومات الدعم.');
+  } catch(ex) {
+    console.error('savePsSupportInfo exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    _psSaveSupportInFlight = false;
+    if (btn) { btn.textContent = '💾 حفظ معلومات الدعم'; }
+    _updatePsSaveButtons();
+  }
+}
+
+// --- Save platform info (name + renewal_message) ---
+async function savePsPlatformInfo() {
+  if (_psSavePlatformInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح.'); return; }
+
+  var nameEl = document.getElementById('psPlatformName');
+  var msgEl  = document.getElementById('psRenewalMessage');
+  var btn    = document.getElementById('btnPsSavePlatform');
+  if (!nameEl || !msgEl) return;
+
+  var name = String(nameEl.value || '').trim();
+  var msg  = String(msgEl.value || '').trim();
+
+  // Soft validation: length only — these are free-text user-facing strings
+  if (name.length > 100) { alert('❌ اسم المنصة طويل جداً (أقصى 100 حرف).'); return; }
+  if (msg.length > 500)  { alert('❌ رسالة التجديد طويلة جداً (أقصى 500 حرف).'); return; }
+
+  _psSavePlatformInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+
+  try {
+    var rows = [];
+    if (_psFieldDirty.platform_name)   rows.push({ key:'platform_name',   value: name });
+    if (_psFieldDirty.renewal_message) rows.push({ key:'renewal_message', value: msg });
+    if (rows.length === 0) return;
+
+    try {
+      var sess = await window.sb.auth.getSession();
+      if (sess && sess.data && sess.data.session && sess.data.session.user) {
+        var by = sess.data.session.user.email || 'admin';
+        rows.forEach(function(r){ r.updated_by = by; });
+      }
+    } catch(_){}
+
+    var res = await window.sb.from('platform_settings')
+      .upsert(rows, { onConflict: 'key' })
+      .select();
+
+    if (res.error) {
+      alert('❌ فشل الحفظ: ' + (res.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    if (!res.data || res.data.length === 0) {
+      alert('❌ لم تُحفَظ التغييرات.\n\nالصلاحيات قد تكون مرفوضة.');
+      return;
+    }
+
+    rows.forEach(function(r){
+      PLATFORM_SETTINGS_CACHE[r.key] = r.value;
+      _psFieldDirty[r.key] = false;
+    });
+
+    alert('✅ تم حفظ معلومات المنصة.');
+  } catch(ex) {
+    console.error('savePsPlatformInfo exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    _psSavePlatformInFlight = false;
+    if (btn) { btn.textContent = '💾 حفظ معلومات المنصة'; }
+    _updatePsSaveButtons();
+  }
+}
+
+// --- Admin email change (via Supabase Auth) ---
+function onPsEmailInput() {
+  var el  = document.getElementById('psNewEmail');
+  var btn = document.getElementById('btnPsSaveEmail');
+  if (!el || !btn) return;
+  var typed = String(el.value || '').trim();
+  _psEmailDirty = typed.length > 0 && _psValidEmail(typed);
+  btn.disabled = !_psEmailDirty || _psSaveEmailInFlight;
+}
+
+async function savePsAdminEmail() {
+  if (_psSaveEmailInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح.'); return; }
+
+  var el  = document.getElementById('psNewEmail');
+  var btn = document.getElementById('btnPsSaveEmail');
+  if (!el) return;
+  var newEmail = String(el.value || '').trim();
+
+  if (!_psValidEmail(newEmail) || newEmail.length === 0) {
+    alert('❌ صيغة الإيميل غير صحيحة.');
+    return;
+  }
+
+  // Defensive: prevent changing to @sydent.com (Golden Rule #62 — phone-based
+  // auth uses @sydent.com suffix; admins should use real emails).
+  if (newEmail.toLowerCase().endsWith('@sydent.com')) {
+    alert('❌ لا يمكن استخدام إيميل بنطاق @sydent.com (محجوز لحسابات الهاتف).');
+    return;
+  }
+
+  if (!confirm(
+    'سيُرسَل إيميل تأكيد إلى:\n' +
+    newEmail + '\n\n' +
+    'لن يفعَّل التغيير حتى تضغط على رابط التأكيد في الإيميل.\n\n' +
+    'متابعة؟'
+  )) return;
+
+  _psSaveEmailInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الإرسال...'; }
+
+  try {
+    // auth.updateUser() with `email` triggers Supabase to send a
+    // confirmation email to the NEW address. The change is NOT applied
+    // until the user clicks the confirmation link. Supabase also notifies
+    // the OLD address by default (security best practice — Microsoft Entra
+    // pattern, same as Stripe Dashboard email change flow).
+    var res = await window.sb.auth.updateUser({ email: newEmail });
+    if (res.error) {
+      alert('❌ فشل: ' + (res.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    alert(
+      '✅ تم إرسال إيميل التأكيد إلى:\n' + newEmail + '\n\n' +
+      'افتح الإيميل واضغط على الرابط لإكمال تغيير الإيميل.\n' +
+      'ستُسجَّل خروج من الجلسة الحالية تلقائياً بعد التأكيد.'
+    );
+    el.value = '';
+    _psEmailDirty = false;
+  } catch(ex) {
+    console.error('savePsAdminEmail exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    _psSaveEmailInFlight = false;
+    if (btn) {
+      btn.textContent = '📧 تحديث الإيميل';
+      // Re-evaluate disabled state — input may still be dirty if save errored
+      // and user wants to retry. On success path the input was cleared above
+      // (el.value=''), so _psEmailDirty is false and button stays disabled.
+      btn.disabled = !_psEmailDirty;
+    }
+  }
+}
+
+// --- Admin password change (via Supabase Auth) ---
+function onPsPasswordInput() {
+  var p1  = document.getElementById('psNewPassword');
+  var p2  = document.getElementById('psConfirmPassword');
+  var btn = document.getElementById('btnPsSavePassword');
+  if (!p1 || !p2 || !btn) return;
+  var v1 = String(p1.value || '');
+  var v2 = String(p2.value || '');
+  _psPasswordDirty = (v1.length >= 6 && v1 === v2);
+  btn.disabled = !_psPasswordDirty || _psSavePasswordInFlight;
+}
+
+async function savePsAdminPassword() {
+  if (_psSavePasswordInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح.'); return; }
+
+  var p1  = document.getElementById('psNewPassword');
+  var p2  = document.getElementById('psConfirmPassword');
+  var btn = document.getElementById('btnPsSavePassword');
+  if (!p1 || !p2) return;
+  var v1 = String(p1.value || '');
+  var v2 = String(p2.value || '');
+
+  if (v1.length < 6)   { alert('❌ كلمة السرّ يجب 6 حروف على الأقل.'); return; }
+  if (v1 !== v2)       { alert('❌ كلمتا السرّ غير متطابقتين.'); return; }
+
+  if (!confirm(
+    'سيتم تحديث كلمة السرّ وتسجيل خروجك من جميع الجلسات.\n\n' +
+    'ستحتاج تسجيل الدخول مجدداً بكلمة السرّ الجديدة.\n\n' +
+    'متابعة؟'
+  )) return;
+
+  _psSavePasswordInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التحديث...'; }
+
+  try {
+    var res = await window.sb.auth.updateUser({ password: v1 });
+    if (res.error) {
+      alert('❌ فشل: ' + (res.error.message || 'خطأ غير معروف'));
+      // Reset flag + button so user can retry (no finally{} on success path
+      // because we navigate away — so error paths must reset inline).
+      _psSavePasswordInFlight = false;
+      if (btn) { btn.textContent = '🔑 تحديث كلمة السرّ'; btn.disabled = !_psPasswordDirty; }
+      return;
+    }
+
+    // Clear the inputs IMMEDIATELY (defensive — no plaintext lingering in DOM)
+    p1.value = '';
+    p2.value = '';
+    _psPasswordDirty = false;
+
+    alert('✅ تم تحديث كلمة السرّ.\n\nسيتم تسجيل خروجك الآن.');
+
+    // Global sign-out (revokes all refresh tokens; Supabase ALSO auto-revokes
+    // on password change since v2 — this is defense-in-depth).
+    try { await window.sb.auth.signOut({ scope: 'global' }); } catch(_){}
+    window.location.href = 'auth.html?password_changed=1';
+  } catch(ex) {
+    console.error('savePsAdminPassword exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+    _psSavePasswordInFlight = false;
+    if (btn) { btn.textContent = '🔑 تحديث كلمة السرّ'; btn.disabled = true; }
+  }
+  // No finally{} on the success path — we're navigating away. Each error
+  // exit point above resets the in-flight state inline.
 }
 
 // Fallbacks must match Migration 33.1 seed strings exactly so that a
@@ -9201,6 +9786,7 @@ function rptFmtSypShort(n) {
         <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق محرّر الخطط</span>       <span class="kbs-keys"><span class="kbs-key">P</span></span></div>
         <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق محرّر القوالب</span>     <span class="kbs-keys"><span class="kbs-key">T</span></span></div>
         <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق سجلّ الأحداث</span>      <span class="kbs-keys"><span class="kbs-key">E</span></span></div>
+        <div class="kbs-row"><span class="kbs-row-desc">فتح/إغلاق إعدادات المنصة</span>    <span class="kbs-keys"><span class="kbs-key">S</span></span></div>
       </div>
       <div class="kbs-group">
         <div class="kbs-group-title">تنقّل</div>
@@ -9444,6 +10030,11 @@ function rptFmtSypShort(n) {
       case 'e': case 'E':
         e.preventDefault();
         toggleSection('toggleEventsSection');
+        break;
+      case 's': case 'S':
+        // Phase X11: toggle Platform Settings section (Section H)
+        e.preventDefault();
+        toggleSection('psToggle');
         break;
     }
   });
