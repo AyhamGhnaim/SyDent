@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a72"></script>
+<script src="theme.js?v=20260528a73"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a72"></script>
-<script src="sidebar.js?v=20260528a72"></script>
+<script src="supabase-init.js?v=20260528a73"></script>
+<script src="sidebar.js?v=20260528a73"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -627,7 +627,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a72">
+<link rel="stylesheet" href="theme.css?v=20260528a73">
 </head>
 <body>
 <script>
@@ -668,7 +668,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="stat-box"><div class="stat-val green" id="sPaid">0</div><div class="stat-lbl">المدفوع ل.س</div></div>
       <div class="stat-box"><div class="stat-val red" id="sBalance">0</div><div class="stat-lbl">المتبقي ل.س</div></div>
     </div>
-    <div id="plannedEstimate" style="display:none;margin-top:8px;font-size:12.5px;color:var(--text2);background:rgba(148,163,184,0.10);border:1px dashed var(--border);border-radius:8px;padding:6px 12px;"></div>
   </div>
 
   <div class="tabs">
@@ -3164,16 +3163,6 @@ function renderStats() {
   var f = computeFinancials();
   document.getElementById('sTotal').textContent  = fmt(f.completedTotal);
   document.getElementById('sPaid').textContent   = fmt(f.paid);
-  // Planned work is an estimate, not a charge — shown separately, never in balance.
-  var plEl = document.getElementById('plannedEstimate');
-  if (plEl) {
-    if (f.plannedTotal > 0.5) {
-      plEl.style.display = 'block';
-      plEl.innerHTML = '🗓️ علاج مخطّط (تقديري): <b style="color:var(--text)">' + fmt(f.plannedTotal) + ' ل.س</b> — غير محتسب ضمن الرصيد';
-    } else {
-      plEl.style.display = 'none';
-    }
-  }
   var bEl = document.getElementById('sBalance');
   var lblEl = bEl.parentNode.querySelector('.stat-lbl');
   var boxEl = bEl.parentNode;  // .stat-box — for tooltip
@@ -5934,7 +5923,7 @@ function renderPayments() {
   var EPS = 0.5;
 
   var plannedHtml = f.plannedTotal > 0
-    ? '<div class="bs-item" title="مبلغ الجلسات المخططة التي لم تُنجز بعد"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div></div>'
+    ? '<div class="bs-item" title="مبلغ الجلسات المخططة التي لم تُنجز بعد — تقدير لا يدخل ضمن رصيد المريض"><div class="bs-val" style="color:var(--text2)">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div><div style="font-size:10px;color:var(--text2);opacity:.7;margin-top:1px;">غير محتسب ضمن الرصيد</div></div>'
     : '';
   // OpenDental-style "Unearned/Prepayment" card — always shown when > 0,
   // independent of the balance card. Tooltip explains the concept.
