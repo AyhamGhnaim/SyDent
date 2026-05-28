@@ -556,3 +556,20 @@
 :root[data-theme="light"] .data-table th {
   background: var(--bg2);
 }
+
+/* =====================================================================
+ * v60 — iOS Safari input-focus zoom prevention (universal, all pages)
+ * iOS auto-zooms the viewport when a focused field has font-size < 16px,
+ * forcing the user to manually pinch back out — worst on form modals.
+ * Setting form controls to exactly 16px (the iOS threshold) kills the
+ * zoom. Scoped to ≤768px so desktop typography is completely untouched;
+ * only affects font-size, never padding/layout. checkbox/radio/range/file
+ * are excluded (font-size is irrelevant for them).
+ * ===================================================================== */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

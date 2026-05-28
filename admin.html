@@ -1312,7 +1312,10 @@ header{
 
 /* ===== RESPONSIVE ===== */
 @media(min-width:768px){
-  .main{padding:28px;max-width:800px;margin:0 auto;}
+  /* v60: was max-width:800px — far too narrow on desktop/ultrawide (showed
+     as a thin mobile-like column). 1200px centered matches the rest of SyDent
+     (tenant pages cap their content at ~1200px). */
+  .main{padding:28px;max-width:1200px;margin:0 auto;}
   .stats-row{grid-template-columns:repeat(3,1fr);}
   .health-row{grid-template-columns:repeat(4, 1fr);}
 }
@@ -2009,7 +2012,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260527a11">
+<link rel="stylesheet" href="theme.css?v=20260528a12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
