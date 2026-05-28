@@ -34,7 +34,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a68"></script>
+<script src="theme.js?v=20260528a69"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -583,9 +583,9 @@ footer{
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a68">
+<link rel="stylesheet" href="theme.css?v=20260528a69">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a68"></script>
+<script src="supabase-init.js?v=20260528a69"></script>
 </head>
 <body>
 
@@ -803,9 +803,8 @@ footer{
 // can hide a plan from the public site by toggling the switch in
 // admin.html → ⚙️ إعدادات الخطط without touching code.
 //
-// Yearly cards get an auto-computed savings badge ("وفّر ~38%") when both
-// monthly + yearly are active — same logic the admin plan picker uses
-// (admin.html line ~2697). Single source of truth: subscription_plans.
+// Pricing cards render live from subscription_plans (single source of truth);
+// the auto-computed yearly savings badge was removed per owner request.
 //
 // Failure modes:
 //   • Supabase library missing            → fallback hardcoded card set
@@ -872,16 +871,6 @@ footer{
       if (p.code === 'trial')       tagline = 'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.';
       else if (p.code === 'monthly') tagline = 'دفعة شهرية مرنة. أوقف متى شئت.';
       else if (p.code === 'yearly')  tagline = 'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.';
-      // Compute savings badge for yearly when monthly also active.
-      var savingsBadge = '';
-      if (p.code === 'yearly' && byCode.monthly && byCode.monthly.is_active &&
-          Number(byCode.monthly.price) > 0 && Number(p.price) > 0) {
-        var monthlyEq = Number(byCode.monthly.price) * 12;
-        if (Number(p.price) < monthlyEq) {
-          var pct = Math.round((1 - Number(p.price) / monthlyEq) * 100);
-          if (pct > 0) savingsBadge = '<span class="pricing-savings-badge">وفّر ~' + pct + '%</span>';
-        }
-      }
       // Limits chips.
       var limits = '';
       if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
@@ -908,7 +897,7 @@ footer{
       var isFeatured = (p.code === featuredCode);
       html +=
         '<div class="pricing-card' + (isFeatured ? ' featured' : '') + '">' +
-          '<div class="pricing-card-name">' + savingsBadge + name + '</div>' +
+          '<div class="pricing-card-name">' + name + '</div>' +
           '<div class="pricing-card-tagline">' + escHtml(tagline) + '</div>' +
           '<div class="pricing-card-price-row">' +
             '<span class="pricing-card-price">' + price + '</span>' +
