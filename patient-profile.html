@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a71"></script>
+<script src="theme.js?v=20260528a72"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a71"></script>
-<script src="sidebar.js?v=20260528a71"></script>
+<script src="supabase-init.js?v=20260528a72"></script>
+<script src="sidebar.js?v=20260528a72"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -627,7 +627,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a71">
+<link rel="stylesheet" href="theme.css?v=20260528a72">
 </head>
 <body>
 <script>
@@ -664,10 +664,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="h-sub" id="pSub"></div>
     </div>
     <div class="stats-row">
-      <div class="stat-box"><div class="stat-val green" id="sTotal">0</div><div class="stat-lbl">الإجمالي ل.س</div></div>
+      <div class="stat-box"><div class="stat-val green" id="sTotal">0</div><div class="stat-lbl">المُنجَز ل.س</div></div>
       <div class="stat-box"><div class="stat-val green" id="sPaid">0</div><div class="stat-lbl">المدفوع ل.س</div></div>
       <div class="stat-box"><div class="stat-val red" id="sBalance">0</div><div class="stat-lbl">المتبقي ل.س</div></div>
     </div>
+    <div id="plannedEstimate" style="display:none;margin-top:8px;font-size:12.5px;color:var(--text2);background:rgba(148,163,184,0.10);border:1px dashed var(--border);border-radius:8px;padding:6px 12px;"></div>
   </div>
 
   <div class="tabs">
@@ -1478,9 +1479,11 @@ function buildPrintHtml(withPrices){
   var today  = new Date().toLocaleDateString('ar-SY');
   var docMap = {}; (CLINIC_DOCTORS || []).forEach(function(d){ docMap[d.id] = d.name; });
 
-  var billed = (sessions || []).reduce(function(a,s){ return a + Number(s.cost || 0); }, 0);
+  var completedBilled = (sessions || []).reduce(function(a,s){ return a + ((s.status||'completed')==='planned' ? 0 : Number(s.cost || 0)); }, 0);
+  var plannedBilled   = (sessions || []).reduce(function(a,s){ return a + ((s.status||'completed')==='planned' ? Number(s.cost || 0) : 0); }, 0);
+  var billed = completedBilled;   // statement bills completed production only (planned is an estimate)
   var paid   = (payments || []).reduce(function(a,p){ return a + Number(p.amount || 0); }, 0);
-  var balance = billed - paid;
+  var balance = billed - paid;   // > 0 owed, < 0 credit to patient
 
   var th = 'padding:6px 9px;border:1px solid #ccc;background:#eee;text-align:right;font-size:12px;';
   var td = 'padding:6px 9px;border:1px solid #ddd;font-size:12px;';
@@ -1549,9 +1552,10 @@ function buildPrintHtml(withPrices){
       html += '</tbody></table>';
     }
     html += '<table style="width:auto;border-collapse:collapse;margin-bottom:16px;font-size:13px;">' +
-      '<tr><td style="' + td + 'font-weight:700;">إجمالي العلاجات</td><td style="' + td + '">' + fmt(billed) + ' ل.س</td></tr>' +
+      '<tr><td style="' + td + 'font-weight:700;">إجمالي العلاج المنجز</td><td style="' + td + '">' + fmt(billed) + ' ل.س</td></tr>' +
+      (plannedBilled > 0 ? '<tr><td style="' + td + 'color:#666;">علاج مخطّط (تقديري)</td><td style="' + td + 'color:#666;">' + fmt(plannedBilled) + ' ل.س</td></tr>' : '') +
       '<tr><td style="' + td + 'font-weight:700;">إجمالي المدفوع</td><td style="' + td + '">' + fmt(paid) + ' ل.س</td></tr>' +
-      '<tr><td style="' + td + 'font-weight:800;">الرصيد المتبقّي</td><td style="' + td + 'font-weight:800;color:' + (balance>0?'#b00':'#080') + ';">' + fmt(balance) + ' ل.س</td></tr>' +
+      '<tr><td style="' + td + 'font-weight:800;">' + (balance < 0 ? 'رصيد دائن (للمريض)' : 'الرصيد المتبقّي') + '</td><td style="' + td + 'font-weight:800;color:' + (balance>0?'#b00':'#080') + ';">' + fmt(Math.abs(balance)) + ' ل.س</td></tr>' +
       '</table>';
   }
 
@@ -1802,8 +1806,12 @@ function buildFifoSplits(payment, sessionsList, existingSplits) {
   // Sort sessions: completed first (planned shouldn't take payments), then oldest date first.
   // Same-date sessions are tiebroken by created_at (DateTStamp in OpenDental terms),
   // then by id, so the order is fully deterministic and reflects the true creation sequence.
+  // Eligible = COMPLETED sessions with a real cost only. Planned sessions must
+  // NOT receive payments — money toward not-yet-done work stays unearned and is
+  // income-transferred in automatically when the session is set complete
+  // (reallocatePatientFunds re-runs on session edits). Legacy default '' → completed.
   var eligible = (sessionsList || []).slice().filter(function(s){
-    return s && s.id && (parseFloat(s.cost) || 0) > 0;
+    return s && s.id && (s.status || 'completed') === 'completed' && (parseFloat(s.cost) || 0) > 0;
   });
   eligible.sort(function(a, b){
     // Completed before non-completed (OpenDental allocates to actual production first)
@@ -3021,10 +3029,26 @@ async function loadAll() {
   try { await loadAllAppointmentsForTimeline(); }
   catch(e) { console.warn('loadAllAppointmentsForTimeline:', e); allAppointmentsForTl = []; }
 
+  // Self-heal legacy data: if any EARNED split sits on a PLANNED session (created
+  // by the old FIFO behavior before planned sessions were excluded), rebuild this
+  // patient's splits once so the stored rows match the production-only model.
+  // The on-screen balance is already correct via computeFinancials' canonical rule;
+  // this also fixes accounting.html, which sums revenue by is_unearned alone.
+  // After the rebuild those amounts become real unearned credit, so it won't re-run.
+  try {
+    var _plannedIds = {};
+    sessions.forEach(function(s){ if ((s.status||'completed') === 'planned') _plannedIds[s.id] = true; });
+    var _needsHeal = (paymentSplits || []).some(function(sp){
+      return sp && sp.is_unearned === false && sp.session_id && _plannedIds[sp.session_id];
+    });
+    if (_needsHeal) {
+      await reallocatePatientFunds();
+      await syncPaymentStatus();
+    }
+  } catch(e) { console.warn('planned-split self-heal skipped:', e); }
+
   init();
 }
-
-/* ── Sync patient payment status ── */
 async function syncPaymentStatus() {
   // Use the same OpenDental-precise computation as computeFinancials so the
   // status field stays in sync with the displayed balance card.
@@ -3033,7 +3057,7 @@ async function syncPaymentStatus() {
   // Just summing payments.amount would mark a patient with an unallocated
   // prepayment as paid-up even when their actual session is still unpaid.
   var f = computeFinancials();
-  var newStatus = (f.total > 0 && f.trueBalance <= 0.5 && f.unearnedCredit <= 0.5) ? 'مسدّد' : 'متبقي';
+  var newStatus = (f.completedTotal > 0 && f.trueBalance <= 0.5 && f.unearnedCredit <= 0.5) ? 'مسدّد' : 'متبقي';
   if (!patient.payment_manual && patient.payment !== newStatus) {
     await window.sb.from('patients').update({ payment: newStatus })
       .eq('id', patientId).eq('doctor_id', currentUser.id);
@@ -3044,47 +3068,52 @@ async function syncPaymentStatus() {
 /* ── computeFinancials ── */
 function computeFinancials() {
   var total = 0, paid = 0, plannedTotal = 0, completedTotal = 0;
+  var sessStatus = {};
   sessions.forEach(function(s){
     var c = Number(s.cost||0);
     var st = s.status || 'completed';
+    sessStatus[s.id] = st;
     total += c;
     if (st === 'planned') plannedTotal += c;
-    else if (st === 'completed') completedTotal += c;
+    else                  completedTotal += c;   // anything not planned = production (legacy default 'completed')
   });
   payments.forEach(function(p){ paid  += Number(p.amount||0); });
 
-  // OpenDental-style precise balance (Phase 1 splits-aware):
-  //   allocatedToProduction = paid amount actually attached to sessions
-  //   unearnedCredit        = paid amount sitting as prepayment (no session)
-  //   trueBalance           = total production - allocated (NOT minus unearned)
-  // When no splits exist (legacy / pre-Migration-3), allocated = paid,
-  // unearned = 0, and trueBalance == legacy balance. So this is fully
-  // backward compatible.
+  // Canonical rule (OpenDental "Rigorous" parity):
+  //   A split is EARNED (allocatedToProduction) only if is_unearned=false AND it
+  //   sits on a COMPLETED session. A non-unearned split on a PLANNED session is
+  //   money received for work not yet done → treated as mobile credit (unearned),
+  //   exactly like a real unearned split. This keeps the balance correct even on
+  //   legacy data where FIFO had allocated to planned sessions (self-heal rewrites
+  //   those rows on load; buildFifoSplits no longer creates them).
+  // When no splits exist (legacy / pre-Migration-3), allocated = paid.
   var allocatedToProduction = 0;
   var unearnedCredit = 0;
   if (Array.isArray(paymentSplits) && paymentSplits.length) {
     for (var i = 0; i < paymentSplits.length; i++) {
       var sp = paymentSplits[i];
       var a = parseFloat(sp.amount) || 0;
-      if (sp.is_unearned) unearnedCredit += a;
-      else                allocatedToProduction += a;
+      var onCompleted = sp.session_id && sessStatus[sp.session_id] === 'completed';
+      if (sp.is_unearned || !onCompleted) unearnedCredit += a;   // unearned OR on planned → mobile credit
+      else                                allocatedToProduction += a;
     }
   } else {
     // No splits → assume all paid is "allocated" (legacy behavior)
     allocatedToProduction = paid;
   }
-  var trueBalance = total - allocatedToProduction;
+  // Balance is on COMPLETED production only — planned work is an estimate, never owed yet.
+  var trueBalance = completedTotal - allocatedToProduction;
 
   return {
-    total: total,
+    total: total,                       // all sessions (kept for reference)
     paid: paid,
-    balance: total - paid,        // legacy field — kept for backward compat
+    balance: completedTotal - paid,     // legacy field — now production-based
     plannedTotal: plannedTotal,
     completedTotal: completedTotal,
     // New (OpenDental-precise) fields:
     allocatedToProduction: allocatedToProduction,
     unearnedCredit: unearnedCredit,
-    trueBalance: trueBalance      // remaining due on production, ignoring prepayments
+    trueBalance: trueBalance      // remaining due on COMPLETED production, ignoring prepayments
   };
 }
 
@@ -3133,8 +3162,18 @@ function renderInfo() {
 /* ── renderStats ── */
 function renderStats() {
   var f = computeFinancials();
-  document.getElementById('sTotal').textContent  = fmt(f.total);
+  document.getElementById('sTotal').textContent  = fmt(f.completedTotal);
   document.getElementById('sPaid').textContent   = fmt(f.paid);
+  // Planned work is an estimate, not a charge — shown separately, never in balance.
+  var plEl = document.getElementById('plannedEstimate');
+  if (plEl) {
+    if (f.plannedTotal > 0.5) {
+      plEl.style.display = 'block';
+      plEl.innerHTML = '🗓️ علاج مخطّط (تقديري): <b style="color:var(--text)">' + fmt(f.plannedTotal) + ' ل.س</b> — غير محتسب ضمن الرصيد';
+    } else {
+      plEl.style.display = 'none';
+    }
+  }
   var bEl = document.getElementById('sBalance');
   var lblEl = bEl.parentNode.querySelector('.stat-lbl');
   var boxEl = bEl.parentNode;  // .stat-box — for tooltip
@@ -3169,11 +3208,17 @@ function renderStats() {
     bEl.className   = 'stat-val yellow';
     if (lblEl) lblEl.textContent = '💸 يستحقّه المريض ل.س';
     if (boxEl) boxEl.title = 'المريض دفع أكثر من قيمة العلاج — يجب رد المبلغ أو خصمه من علاج قادم';
-  } else {
+  } else if (f.completedTotal > 0.5) {
     bEl.textContent = '✓';
     bEl.className   = 'stat-val green';
     if (lblEl) lblEl.textContent = 'الحساب مكتمل';
-    if (boxEl) boxEl.title = 'كل العلاجات مدفوعة بالكامل';
+    if (boxEl) boxEl.title = 'كل العلاجات المنجزة مدفوعة بالكامل';
+  } else {
+    // No completed production yet (new patient, or only planned work logged).
+    bEl.textContent = '—';
+    bEl.className   = 'stat-val';
+    if (lblEl) lblEl.textContent = 'المتبقي ل.س';
+    if (boxEl) boxEl.title = 'لا يوجد علاج منجز بعد';
   }
 }
 
@@ -5907,13 +5952,13 @@ function renderPayments() {
   } else if (tb < -EPS && unearned <= EPS) {
     // Legacy credit (no splits to attribute the overpayment)
     balanceCard = '<div class="bs-item" title="المريض دفع أكثر من قيمة العلاج — يجب رد المبلغ أو خصمه من علاج قادم"><div class="bs-val" style="color:var(--yellow)">' + fmt(Math.abs(tb)) + ' ل.س</div><div class="bs-lbl">💸 يستحقّه المريض</div></div>';
-  } else if (Math.abs(tb) <= EPS && unearned <= EPS && f.total > 0) {
+  } else if (Math.abs(tb) <= EPS && unearned <= EPS && f.completedTotal > 0) {
     // Settled — only show when there's actual production (otherwise hide for new patients)
     balanceCard = '<div class="bs-item" title="كل العلاجات مدفوعة بالكامل"><div class="bs-val" style="color:var(--green)">✓</div><div class="bs-lbl">الحساب مكتمل</div></div>';
   }
   // When unearned > 0, the unearnedHtml card carries the message; no balance card needed.
   document.getElementById('balanceSummary').innerHTML =
-    '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.total) + ' ل.س</div><div class="bs-lbl">إجمالي العلاج</div></div>'
+    '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.completedTotal) + ' ل.س</div><div class="bs-lbl">العلاج المنجز</div></div>'
   + plannedHtml
   + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)  + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
   + unearnedHtml
