@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a80"></script>
+<script src="theme.js?v=20260528a81"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2102,11 +2102,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a80">
+<link rel="stylesheet" href="theme.css?v=20260528a81">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260528a80"></script>
+<script src="supabase-init.js?v=20260528a81"></script>
 </head>
 <body>
 
@@ -8247,16 +8247,19 @@ function openCustomer360(reqId) {
   c360State.requestId = reqId;
   c360State.activeTab = 'overview';
 
-  // Header
+  // Header. Prefer the live clinic name (clinic_settings.clinic_name) as the
+  // prominent identity, mirroring the customer card; the signup/contact name is
+  // surfaced in the Identity section below.
+  var _c360Clinic = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
   var nameEl    = document.getElementById('c360Name');
   var emailEl   = document.getElementById('c360Email');
   var avatarEl  = document.getElementById('c360Avatar');
   var badgesEl  = document.getElementById('c360Badges');
   var createdEl = document.getElementById('c360Created');
   var userIdEl  = document.getElementById('c360UserId');
-  if (nameEl)   nameEl.textContent = r.name || '—';
+  if (nameEl)   nameEl.textContent = _c360Clinic || r.name || '—';
   if (emailEl)  emailEl.textContent = r.email || (r.phone ? ('📞 ' + r.phone) : '—');
-  if (avatarEl) avatarEl.textContent = c360AvatarInitial(r.name || r.email || '?');
+  if (avatarEl) avatarEl.textContent = c360AvatarInitial(_c360Clinic || r.name || r.email || '?');
   if (createdEl) createdEl.textContent = r.created_at ? ('انضم: ' + evfFormatTimestamp(r.created_at)) : '';
   if (userIdEl)  userIdEl.textContent = r.user_id ? ('uid: ' + String(r.user_id).slice(0, 8) + '…') : '';
 
@@ -8462,7 +8465,9 @@ function c360BuildOverview(r) {
 
     + '<div class="c360-card">'
     +   '<div class="c360-card-title">📞 الهوية والاتصال</div>'
-    +   c360Row('الاسم', c360EscapeHtml(r.name || '—'))
+    +   (((r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '')
+          ? c360Row('اسم العيادة', c360EscapeHtml(clinicNameByUid[r.user_id])) : '')
+    +   c360Row(((r.user_id && clinicNameByUid[r.user_id]) ? 'جهة الاتصال' : 'الاسم'), c360EscapeHtml(r.name || '—'))
     +   c360Row('البريد', c360EscapeHtml(r.email || '—'))
     +   c360Row('الهاتف', c360EscapeHtml(r.phone || '—'))
     +   c360Row('المدينة', c360EscapeHtml(r.city || '—'))
