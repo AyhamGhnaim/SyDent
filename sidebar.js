@@ -281,7 +281,7 @@ function buildHTML(activeId) {
         <div class="sb-logo-icon"><svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg></div>
         <div>
           <div class="sb-logo-name">SyDent</div>
-          <div class="sb-logo-sub">نظام إدارة العيادة</div>
+          <div class="sb-logo-sub" id="sbLogoSub">نظام إدارة العيادة</div>
         </div>
       </a>
       <nav class="sb-nav">${navHTML}</nav>
@@ -364,6 +364,20 @@ async function refreshSidebarDynamic() {
   const role = meta.role || 'طبيب أسنان';
   const nameEl = document.getElementById('sbDoctorName');
   if (nameEl) nameEl.innerHTML = name + '<br>' + role;
+
+  // Clinic name in the brand sub-line. The clinic name lives in
+  // clinic_settings.clinic_name (edited on settings.html) and was previously
+  // only surfaced on the dashboard; loading it here shows it on every tenant
+  // page via the shared sidebar. Falls back to the generic subtitle.
+  try {
+    const subEl = document.getElementById('sbLogoSub');
+    if (subEl && window.sb && u.user && u.user.id) {
+      const csRes = await window.sb.from('clinic_settings')
+        .select('clinic_name').eq('owner_id', u.user.id).maybeSingle();
+      const cn = csRes && csRes.data && csRes.data.clinic_name;
+      if (cn && String(cn).trim()) subEl.textContent = String(cn).trim();
+    }
+  } catch (e) { /* keep default subtitle on any error */ }
 
   // Phase C: hide nav items for modules disabled by the tenant's plan.
   // Composes with the device-role BLOCKED filter in buildHTML: an item shows
