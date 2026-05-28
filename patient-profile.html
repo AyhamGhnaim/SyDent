@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a73"></script>
+<script src="theme.js?v=20260528a74"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a73"></script>
-<script src="sidebar.js?v=20260528a73"></script>
+<script src="supabase-init.js?v=20260528a74"></script>
+<script src="sidebar.js?v=20260528a74"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -627,7 +627,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a73">
+<link rel="stylesheet" href="theme.css?v=20260528a74">
 </head>
 <body>
 <script>
@@ -5923,7 +5923,7 @@ function renderPayments() {
   var EPS = 0.5;
 
   var plannedHtml = f.plannedTotal > 0
-    ? '<div class="bs-item" title="مبلغ الجلسات المخططة التي لم تُنجز بعد — تقدير لا يدخل ضمن رصيد المريض"><div class="bs-val" style="color:var(--text2)">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div><div style="font-size:10px;color:var(--text2);opacity:.7;margin-top:1px;">غير محتسب ضمن الرصيد</div></div>'
+    ? '<div class="bs-item" title="مبلغ الجلسات المخططة التي لم تُنجز بعد — تقدير لا يدخل ضمن رصيد المريض"><div class="bs-val" style="color:#ef4444">' + fmt(f.plannedTotal) + ' ل.س</div><div class="bs-lbl">مخطط (لم يُنجز)</div><div style="font-size:10px;color:var(--text2);opacity:.7;margin-top:1px;">غير محتسب ضمن الرصيد</div></div>'
     : '';
   // OpenDental-style "Unearned/Prepayment" card — always shown when > 0,
   // independent of the balance card. Tooltip explains the concept.
