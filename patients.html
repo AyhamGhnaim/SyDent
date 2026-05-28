@@ -13,7 +13,7 @@
 <title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a70"></script>
+<script src="theme.js?v=20260528a71"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -215,6 +215,7 @@ td {
 .badge.yellow { background: rgba(245,200,66,0.15);  color: #f5c842; }
 .badge.red    { background: rgba(239,83,80,0.15);   color: #ef5350; }
 .badge.blue   { background: rgba(99,179,237,0.15);  color: #63b3ed; }
+.badge.gray   { background: rgba(148,163,184,0.18); color: #94a3b8; }
 .badge::before { content: '●'; font-size: 8px; }
 
 .text-muted { color: var(--text2); font-size: 13px; }
@@ -479,10 +480,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a70">
+<link rel="stylesheet" href="theme.css?v=20260528a71">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a70"></script>
-<script src="sidebar.js?v=20260528a70"></script>
+<script src="supabase-init.js?v=20260528a71"></script>
+<script src="sidebar.js?v=20260528a71"></script>
 </head>
 <body>
 <script>
@@ -638,13 +639,6 @@ textarea { resize: vertical; min-height: 80px; }
           </select>
         </div>
         <div class="form-group">
-          <label>حالة الدفع</label>
-          <select id="fPayment">
-            <option value="مسدّد">مسدّد</option>
-            <option value="متبقي">متبقي</option>
-          </select>
-        </div>
-        <div class="form-group">
           <label>حالة العلاج</label>
           <select id="fStatus">
             <option value="تحت العلاج">تحت العلاج</option>
@@ -681,8 +675,15 @@ let page       = 1;
 const PER_PAGE = 7;
 let editingId  = null;
 let currentUser = null;
+// ledger-derived financials per patient_id (loaded fresh on every loadPatients).
+// We DO NOT trust the stored patients.payment string for display — it is only
+// refreshed when a profile page is opened, so it goes stale. Instead we compute
+// the real status here from ledger_sessions + ledger_payments + payment_splits,
+// using the exact same math as patient-profile.html → computeFinancials().
+let finMap = {};
 
 // ─── Utils ───
+function fmt(n){ return Number(n||0).toLocaleString('ar-SY'); }
 function formatDate(str) {
   if (!str) return '—';
   const d = new Date(str);
@@ -704,14 +705,82 @@ async function loadPatients() {
     .order('created_at', { ascending: true });
   if (error) { showToast('❌ خطأ في تحميل المرضى'); return; }
   patients = data || [];
+  await loadFinancials();
   render();
+}
+
+// ─── Supabase: Load ledger financials (batched) ───
+// 3 queries total regardless of patient count. RLS already scopes rows to the
+// current doctor; the .in() filter limits to the currently-loaded patients.
+async function loadFinancials() {
+  finMap = {};
+  if (!patients.length) return;
+  const ids = patients.map(p => p.id);
+  ids.forEach(id => { finMap[id] = { total:0, paid:0, allocated:0, unearned:0, hasSplits:false }; });
+
+  let sRes, pRes, spRes;
+  try {
+    [sRes, pRes, spRes] = await Promise.all([
+      window.sb.from('ledger_sessions').select('patient_id,cost,status').in('patient_id', ids),
+      window.sb.from('ledger_payments').select('patient_id,amount').in('patient_id', ids),
+      window.sb.from('payment_splits').select('patient_id,amount,is_unearned').in('patient_id', ids)
+    ]);
+  } catch (e) {
+    console.warn('loadFinancials fetch error:', e);
+    return; // finMap stays zeroed → payInfo falls back gracefully to "—"
+  }
+
+  if (!sRes.error) (sRes.data || []).forEach(s => {
+    const b = finMap[s.patient_id]; if (b) b.total += Number(s.cost || 0);
+  });
+  if (!pRes.error) (pRes.data || []).forEach(p => {
+    const b = finMap[p.patient_id]; if (b) b.paid += Number(p.amount || 0);
+  });
+  // payment_splits may be absent on legacy DBs → ignore its error silently.
+  if (spRes && !spRes.error) (spRes.data || []).forEach(sp => {
+    const b = finMap[sp.patient_id]; if (!b) return;
+    b.hasSplits = true;
+    const a = parseFloat(sp.amount) || 0;
+    if (sp.is_unearned) b.unearned += a; else b.allocated += a;
+  });
+
+  // Finalize per-patient (mirror computeFinancials): no splits → allocated = paid.
+  ids.forEach(id => {
+    const b = finMap[id];
+    if (!b.hasSplits) b.allocated = b.paid;
+    b.trueBalance = b.total - b.allocated;   // remaining due on production
+  });
+}
+
+// ─── Derive payment status from ledger (single source of truth) ───
+// Priority (epsilon guards against float drift):
+//   1. trueBalance > 0   → المريض مدين            → متبقي  (أحمر)
+//   2. unearned   > 0    → دفعة مقدّمة غير مخصومة  → دفع مقدم (أزرق)
+//   3. trueBalance < 0   → فائض قديم بلا splits    → دفع مقدم (أزرق)
+//   4. total > 0, رصيد صفر → مسدّد                  → (أخضر)
+//   5. لا جلسات ولا دفعات → بلا حركة                → — (رمادي)
+function payInfo(p) {
+  const b = finMap[p.id];
+  if (!b) return { key:'none', label:'—', cls:'gray', amount:0 };
+  const EPS = 0.5, tb = b.trueBalance || 0, un = b.unearned || 0;
+  if (tb >  EPS) return { key:'due',     label:'متبقي',    cls:'red',  amount: tb };
+  if (un >  EPS) return { key:'advance', label:'دفع مقدم', cls:'blue', amount: un };
+  if (tb < -EPS) return { key:'advance', label:'دفع مقدم', cls:'blue', amount: Math.abs(tb) };
+  if (b.total > EPS) return { key:'paid', label:'مسدّد',   cls:'green', amount: 0 };
+  return { key:'none', label:'—', cls:'gray', amount:0 };
 }
 
 // ─── Stats ───
 function updateStats() {
   document.getElementById('statTotal').textContent   = patients.length;
   document.getElementById('statNew').textContent     = patients.filter(p => isThisMonth(p.created_at)).length;
-  document.getElementById('statPending').textContent = patients.filter(p => p.payment === 'متبقي').length;
+  // "مستحقات متبقية" → real sum of money owed across all patients (ل.س),
+  // computed live from the ledger (not a count of a stale status string).
+  const pendingSum = patients.reduce((a,p) => {
+    const pi = payInfo(p);
+    return a + (pi.key === 'due' ? pi.amount : 0);
+  }, 0);
+  document.getElementById('statPending').textContent = fmt(pendingSum);
   document.getElementById('statActive').textContent  = patients.filter(p => p.status === 'تحت العلاج').length;
 }
 
@@ -736,7 +805,7 @@ function getFiltered() {
     const matchF =
       filter === 'all'     ? true :
       filter === 'active'  ? p.status === 'تحت العلاج' :
-      filter === 'pending' ? p.payment === 'متبقي' :
+      filter === 'pending' ? payInfo(p).key === 'due' :
       filter === 'new'     ? isThisMonth(p.created_at) : true;
     return matchQ && matchF;
   });
@@ -776,6 +845,7 @@ function render() {
       const rowCls = p.status === 'تحت العلاج' ? 'row-active'
                    : p.status === 'مكتمل'      ? 'row-done'
                    : 'row-new';
+      const pi = payInfo(p);
       return `
       <tr class="${rowCls}" onclick="openProfile('${p.id}')" style="cursor:pointer;">
         <td>
@@ -789,7 +859,7 @@ function render() {
         </td>
         <td class="text-muted">${p.phone || '—'}</td>
         <td>
-          <span class="badge ${p.payment === 'مسدّد' ? 'green' : 'yellow'}">${p.payment}</span>
+          <span class="badge ${pi.cls}">${pi.label}${pi.amount > 0 ? ` · ${fmt(pi.amount)} ل.س` : ''}</span>
         </td>
         <td class="text-muted">${formatDate(p.last_visit)}</td>
         <td>
@@ -1013,6 +1083,8 @@ function exportPatientsCsv(){
   var headers = ['رقم المريض','الاسم','الهاتف','العمر','الجنس','آخر زيارة','الرصيد','الحالة','تاريخ التسجيل'];
   var lines = [ headers.map(_csvCell).join(',') ];
   patients.forEach(function(p){
+    var pi = payInfo(p);
+    var balCell = pi.label + (pi.amount > 0 ? ' (' + Math.round(pi.amount) + ')' : '');
     lines.push([
       _csvCell(p.local_id),
       _csvCell(p.name),
@@ -1020,7 +1092,7 @@ function exportPatientsCsv(){
       _csvCell(_csvAge(p.dob)),
       _csvCell(_csvGender(p.gender)),
       _csvCell(p.last_visit),
-      _csvCell(p.payment),
+      _csvCell(balCell),
       _csvCell(p.status),
       _csvCell(p.created_at ? String(p.created_at).slice(0,10) : '')
     ].join(','));
