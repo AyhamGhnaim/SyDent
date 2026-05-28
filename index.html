@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260527a05"></script>
+<script src="theme.js?v=20260527a65"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -533,10 +533,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260527a11">
+<link rel="stylesheet" href="theme.css?v=20260527a65">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a62"></script>
-<script src="sidebar.js?v=20260527a64"></script>
+<script src="supabase-init.js?v=20260527a65"></script>
+<script src="sidebar.js?v=20260527a65"></script>
 </head>
 <body>
 <script>
@@ -1596,6 +1596,28 @@ async function recordDashApptTime(apptId, fieldKey, btnEl) {
           if (!confirm(q2)) {
             return;  // user backed out — leave everything untouched
           }
+          // Phase 8C parity (dashboard): the patient is leaving without the
+          // planned procedures being done. Detach those planned sessions from
+          // this (now-dismissed) appointment so they reappear in "العلاجات
+          // المخطّطة المتاحة للربط" when a follow-up appointment is booked.
+          // appointments.html does this in all its dismiss paths; the dashboard
+          // NO path previously stamped dismissed_at without detaching, leaving
+          // the sessions welded to the old appointment (appointment_id still
+          // set) so the availability query (appointment_id IS NULL) never saw
+          // them. Reuse plannedList (already fetched above) — no extra query.
+          // Silent / fail-open: any error logs but does not block the stamp.
+          try {
+            var _detachIds = plannedList.map(function(ps){ return ps.id; });
+            if (_detachIds.length > 0) {
+              var _dq = window.sb.from('ledger_sessions')
+                .update({ appointment_id: null })
+                .in('id', _detachIds)
+                .eq('status', 'planned');
+              if (_dashUid) _dq = _dq.eq('doctor_id', _dashUid);
+              var _dr = await _dq;
+              if (_dr.error) console.warn('dashboard NO-path detach planned warn:', _dr.error);
+            }
+          } catch (_de) { console.warn('dashboard NO-path detach exception:', _de); }
           // Fall through to the normal stamp flow below (no completion).
         }
       } else if (labsList.length > 0) {
