@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a69"></script>
+<script src="theme.js?v=20260528a70"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,10 +920,10 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a69">
+<link rel="stylesheet" href="theme.css?v=20260528a70">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a69"></script>
-<script src="sidebar.js?v=20260528a69"></script>
+<script src="supabase-init.js?v=20260528a70"></script>
+<script src="sidebar.js?v=20260528a70"></script>
 </head>
 <body>
 <script>
@@ -2057,10 +2057,10 @@ function getApptOperatoryBadge(appt) {
     name  = '[غرفة محذوفة]';
     color = '#8da0bd';
   }
-  // 22 hex = ~13% alpha background, 55 hex = ~33% alpha border. Identical
-  // pattern to lbHtml/psHtml so the visual rhythm of the row stays uniform.
-  return '<span style="display:inline-block;background:' + color + '22;color:'
-       + color + ';border:1px solid ' + color + '55;padding:2px 8px;border-radius:12px;'
+  // Adaptive badge: room colour is passed via --bc; .cbadge derives the
+  // tint/text/border for both themes (legible on the light-mode white bg).
+  return '<span class="cbadge" style="display:inline-block;--bc:' + color
+       + ';padding:2px 8px;border-radius:12px;'
        + 'font-size:11px;font-weight:700;margin-right:6px;" title="' + escapeHtml(name)
        + '">🪑 ' + escapeHtml(name) + '</span>';
 }
@@ -2835,10 +2835,8 @@ function renderTimeStrip(appt) {
 function renderTimeActionBtn(appt) {
   var act = getNextTimeAction(appt);
   if (!act) return '';
-  var bg = act.color + '22';
-  var bd = act.color + '55';
-  return '<button class="time-track-btn" ' +
-         'style="background:' + bg + ';color:' + act.color + ';border:1px solid ' + bd + '" ' +
+  return '<button class="time-track-btn cbadge" ' +
+         'style="--bc:' + act.color + '" ' +
          'onclick="event.stopPropagation();recordApptTime(\'' + appt.id + '\',\'' + act.key + '\',this)">' +
          act.label + '</button>';
 }
@@ -3863,7 +3861,7 @@ function renderDay() {
         : '';
       var ps = getApptProceduresSummary(e.id);
       var psHtml = ps
-        ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
+        ? `<span class="cbadge" style="display:inline-block;--bc:#2ee89e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
       var opHtml = getApptOperatoryBadge(e);
@@ -4345,7 +4343,7 @@ function renderList() {
         : '';
       var ps = getApptProceduresSummary(e.id);
       var psHtml = ps
-        ? `<span style="display:inline-block;background:#2ee89e22;color:#2ee89e;border:1px solid #2ee89e55;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
+        ? `<span class="cbadge" style="display:inline-block;--bc:#2ee89e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
       var opHtml = getApptOperatoryBadge(e);
@@ -4696,8 +4694,8 @@ function renderApptProcedures(appt) {
     var html = '';
     attached.forEach(function(s){
       var statusBadge = '';
-      if (s.status === 'planned') statusBadge = '<span style="background:#ef444422;color:#ef4444;border:1px solid #ef444455;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
-      else if (s.status === 'completed') statusBadge = '<span style="background:#3b82f622;color:#3b82f6;border:1px solid #3b82f655;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
+      if (s.status === 'planned') statusBadge = '<span class="cbadge" style="--bc:#ef4444;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
+      else if (s.status === 'completed') statusBadge = '<span class="cbadge" style="--bc:#3b82f6;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
       else statusBadge = '<span style="background:rgba(255,255,255,0.06);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;">' + (s.status||'—') + '</span>';
       var toothPart = s.tooth_num ? ' • السن ' + s.tooth_num + (s.surface && s.surface !== 'WHOLE' ? '/' + s.surface : '') : '';
       // Phase 3 Feature G: show regional area inline (matches the description field)
@@ -4996,7 +4994,7 @@ function renderPendingPP_A() {
       html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(46,232,158,0.05);border-radius:8px;border:1px solid rgba(46,232,158,0.2);flex-wrap:wrap;">'
         + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
         + '<div style="font-size:12px;color:var(--text2);">' + fmtCost(s.cost) + ' ل.س</div>'
-        + '<span style="background:#fb923c22;color:#fb923c;border:1px solid #fb923c55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
+        + '<span class="cbadge" style="--bc:#fb923c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
         + '<button type="button" onclick="removePendingA(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="إزالة من القائمة">✕</button>'
         + '</div>';
     });

@@ -13,10 +13,10 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a69"></script>
+<script src="theme.js?v=20260528a70"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a69"></script>
-<script src="sidebar.js?v=20260528a69"></script>
+<script src="supabase-init.js?v=20260528a70"></script>
+<script src="sidebar.js?v=20260528a70"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -219,7 +219,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a69">
+<link rel="stylesheet" href="theme.css?v=20260528a70">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -799,7 +799,7 @@ function render() {
       'other':           '📋 أخرى'
     };
     var tp = targetMap[t.target_part] || targetMap.crown;
-    var targetTag = '<span class="treat-target-tag" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:' + tp.color + '22;color:' + tp.color + ';border:1px solid ' + tp.color + '55;margin-right:4px;">🦷 ' + tp.text + '</span>';
+    var targetTag = '<span class="treat-target-tag cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;--bc:' + tp.color + ';margin-right:4px;">🦷 ' + tp.text + '</span>';
     var catTag = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(156,163,175,.15);color:var(--text2);border:1px solid rgba(156,163,175,.4);margin-right:4px;">' + (catMap[t.category] || catMap.other) + '</span>';
     // Bundle badge: shown if this treatment has child items
     var childItems = bundleItems.filter(function(bi){ return bi.parent_id === t.id; });

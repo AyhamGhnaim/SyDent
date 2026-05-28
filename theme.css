@@ -586,3 +586,45 @@
     font-size: 16px;
   }
 }
+
+/* =====================================================================
+ * v61 — LIGHT-MODE BADGE LEGIBILITY (color-mix adaptive badges)
+ * ---------------------------------------------------------------------
+ * The original badge palette is a DARK-mode palette: a vivid neon hue
+ * used as TEXT on a ~13% tint of the same hue. On the dark page bg this
+ * reads great; on the white light-mode bg the vivid text (esp. yellow /
+ * sky / green) collapses to near-zero contrast.
+ *
+ * `.cbadge` is a single adaptive mechanism: the element passes its accent
+ * colour inline via the `--bc` custom property; the colours are then
+ * derived with color-mix(). One rule covers BOTH fixed-semantic badges
+ * (paid/pending/planned/done…) and data-driven ones (treatment / provider
+ * / category colours chosen by the user). It is theme-reactive — toggling
+ * the theme restyles every badge instantly, no re-render needed.
+ *
+ *   Dark  : vivid hue on a faint tint  (matches the original look)
+ *   Light : same hue DARKENED toward ink for legible contrast on white
+ * ===================================================================== */
+.cbadge {
+  background: color-mix(in srgb, var(--bc) 13%, transparent);
+  color: var(--bc);
+  border: 1px solid color-mix(in srgb, var(--bc) 33%, transparent);
+}
+:root[data-theme="light"] .cbadge {
+  background: color-mix(in srgb, var(--bc) 14%, #ffffff);
+  color: color-mix(in srgb, var(--bc) 68%, #1c1917);
+  border: 1px solid color-mix(in srgb, var(--bc) 36%, #ffffff);
+}
+
+/* ---- Static badge classes that hardcode dark-palette text colours ---- *
+ * These live in page-level <style> blocks (loaded before theme.css) with
+ * literal hex, so they can't pick up the adaptive --x vars on their own.
+ * Light mode re-points their TEXT colour to the tuned light palette; the
+ * subtle tint background is fine in both modes. Dark mode is untouched. */
+:root[data-theme="light"] .badge.green  { color: var(--green); }
+:root[data-theme="light"] .badge.yellow { color: var(--yellow); }
+:root[data-theme="light"] .badge.red    { color: var(--red); }
+:root[data-theme="light"] .badge.blue   { color: var(--blue); }
+/* appointments.html appointment-status pills */
+:root[data-theme="light"] .status-scheduled { color: var(--blue); }
+:root[data-theme="light"] .status-broken     { color: color-mix(in srgb, #fb923c 70%, #1c1917); }

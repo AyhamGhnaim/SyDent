@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a69"></script>
+<script src="theme.js?v=20260528a70"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a69"></script>
-<script src="sidebar.js?v=20260528a69"></script>
+<script src="supabase-init.js?v=20260528a70"></script>
+<script src="sidebar.js?v=20260528a70"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -627,7 +627,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a69">
+<link rel="stylesheet" href="theme.css?v=20260528a70">
 </head>
 <body>
 <script>
@@ -1143,7 +1143,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <select id="labOrderLabSelect" style="flex:1;"></select>
           <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(46,232,158,0.12);border:1px solid var(--green);color:var(--green);border-radius:9px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
         </div>
-        <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:#f5c842;padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
+        <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:var(--yellow);padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
           ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
         </div>
       </div>
@@ -2606,7 +2606,7 @@ function renderTimelineRow(e) {
       toothPart = '';  // 'mouth' or legacy session — description carries the scope
     }
     title = escapeHtml(s.type || 'جلسة') + toothPart;
-    var statusBadge = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
+    var statusBadge = '<span class="tl-badge cbadge" style="--bc:' + e.statusColor + ';">' + escapeHtml(e.statusLabel) + '</span>';
     var costPart = (parseFloat(s.cost) || 0) > 0
       ? '<span>التكلفة: <b>' + fmt(s.cost) + ' ل.س</b></span>'
       : '';
@@ -2640,7 +2640,7 @@ function renderTimelineRow(e) {
     var stColor = '#63b3ed';
     if (e.statusKey === 'completed') stColor = '#2ee89e';
     else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show' || e.statusKey === 'broken') stColor = '#a3a3a3';
-    var statBadge2 = '<span class="tl-badge" style="background:' + stColor + '22;color:' + stColor + ';border-color:' + stColor + '55;">' + escapeHtml(e.statusLabel || '—') + '</span>';
+    var statBadge2 = '<span class="tl-badge cbadge" style="--bc:' + stColor + ';">' + escapeHtml(e.statusLabel || '—') + '</span>';
     var plannedBadge = e.isPlanned
       ? '<span class="tl-badge" style="background:rgba(245,200,66,0.15);color:var(--yellow);border-color:rgba(245,200,66,0.4);">مخطّط</span>'
       : '';
@@ -2654,7 +2654,7 @@ function renderTimelineRow(e) {
     var lo = e.data;
     var toothPart2 = lo.tooth_num ? ' — السن ' + escapeHtml(String(lo.tooth_num)) : '';
     title = '🥽 ' + escapeHtml(lo.work_type || 'طلب مخبر') + toothPart2;
-    var statBadge3 = '<span class="tl-badge" style="background:' + e.statusColor + '22;color:' + e.statusColor + ';border-color:' + e.statusColor + '55;">' + escapeHtml(e.statusLabel) + '</span>';
+    var statBadge3 = '<span class="tl-badge cbadge" style="--bc:' + e.statusColor + ';">' + escapeHtml(e.statusLabel) + '</span>';
     var labPart = e.labName
       ? '<span>المخبر: <b>' + escapeHtml(e.labName) + '</b></span>'
       : '';
@@ -2671,7 +2671,7 @@ function renderTimelineRow(e) {
     var origPart = e.payment
       ? '<span>من دفعة بتاريخ <b>' + escapeHtml(String(e.payment.date || '—')) + '</b></span>'
       : '';
-    meta = '<span class="tl-badge" style="background:rgba(125,211,252,0.15);color:#7dd3fc;border-color:rgba(125,211,252,0.4);">غير موزّع</span>' + origPart;
+    meta = '<span class="tl-badge cbadge" style="--bc:#7dd3fc;">غير موزّع</span>' + origPart;
     if (sp.notes) notes = escapeHtml(sp.notes);
   }
   else if (e.type === 'reminder') {
@@ -2684,7 +2684,7 @@ function renderTimelineRow(e) {
     else if (lg.status === 'sent' || lg.status === 'delivered' || lg.status === 'read') {
       stColor2 = '#2ee89e'; stLabel = 'تم الإرسال';
     }
-    var stBadge4 = '<span class="tl-badge" style="background:' + stColor2 + '22;color:' + stColor2 + ';border-color:' + stColor2 + '55;">' + escapeHtml(stLabel) + '</span>';
+    var stBadge4 = '<span class="tl-badge cbadge" style="--bc:' + stColor2 + ';">' + escapeHtml(stLabel) + '</span>';
     var phonePart = lg.recipient_phone
       ? '<span>الهاتف: <b>' + escapeHtml(String(lg.recipient_phone)) + '</b></span>'
       : '';
@@ -5809,7 +5809,7 @@ function renderSessions() {
       .find(function(t){ return t.name === s.type; });
     var typeFill   = typeMatch ? typeMatch.fill   : '#63b3ed';   // var(--blue) fallback
     var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
-    var typeBadge = '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
+    var typeBadge = '<span class="cbadge" style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;--bc:' + typeFill + ';">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;">سن ' + s.tooth_num + '</span>' : '';
     // Phase 3 Feature G: regional badges (quadrant/arch/mouth)
     // Display priority: tooth_num wins (specific). If tooth_num is null and quadrant/arch is set, show the region.
@@ -5817,25 +5817,25 @@ function renderSessions() {
     var regionalBadge = '';
     if (!s.tooth_num) {
       if (s.quadrant && QUADRANT_LABELS[s.quadrant]) {
-        regionalBadge = ' <span style="background:rgba(132,204,22,0.18);color:#84cc16;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + QUADRANT_LABELS[s.quadrant] + '">🔲 ' + QUADRANT_LABELS[s.quadrant] + '</span>';
+        regionalBadge = ' <span class="cbadge" style="--bc:#84cc16;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + QUADRANT_LABELS[s.quadrant] + '">🔲 ' + QUADRANT_LABELS[s.quadrant] + '</span>';
       } else if (s.arch && ARCH_LABELS[s.arch]) {
-        regionalBadge = ' <span style="background:rgba(16,185,129,0.18);color:#10b981;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + ARCH_LABELS[s.arch] + '">🦷 ' + ARCH_LABELS[s.arch] + '</span>';
+        regionalBadge = ' <span class="cbadge" style="--bc:#10b981;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;margin-right:4px;" title="' + ARCH_LABELS[s.arch] + '">🦷 ' + ARCH_LABELS[s.arch] + '</span>';
       }
       // For 'mouth' the description already says "الفم كامل" — no extra badge needed.
     }
     var st = s.status || 'completed';
     var stLbl = STATUS_LABELS[st] || st;
     var stColor = STATUS_COLORS[st] || '#3b82f6';
-    var stBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + stColor + '22;color:' + stColor + ';border:1px solid ' + stColor + '55;margin-right:4px;">' + stLbl + '</span>';
+    var stBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + stColor + ';margin-right:4px;">' + stLbl + '</span>';
     var apptBadge = '';
     if (s.appointment_id) {
-      apptBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:rgba(46,232,158,0.15);color:#2ee89e;border:1px solid rgba(46,232,158,0.35);margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
+      apptBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:#2ee89e;margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
     }
     var provBadge = '';
     if (showProviderCol && s.provider_id) {
       var prov = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
       if (prov) {
-        provBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + (prov.color || '#2ee89e') + '22;color:' + (prov.color || '#2ee89e') + ';border:1px solid ' + (prov.color || '#2ee89e') + '55;margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
+        provBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + (prov.color || '#2ee89e') + ';margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
       }
     }
     // OpenDental-style: show per-session paid amount when payment_splits exist.
@@ -5849,7 +5849,7 @@ function renderSessions() {
       partiallyPaid = !fullyPaid;
       var badgeColor = fullyPaid ? '#2ee89e' : '#f5c842';
       var badgeText = fullyPaid ? '💰 مدفوع' : '💰 ' + fmt(sessPaid) + '/' + fmt(sessCost);
-      paidBadge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;background:' + badgeColor + '22;color:' + badgeColor + ';border:1px solid ' + badgeColor + '55;margin-right:4px;" title="مدفوع من هذه الجلسة">' + badgeText + '</span>';
+      paidBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + badgeColor + ';margin-right:4px;" title="مدفوع من هذه الجلسة">' + badgeText + '</span>';
     }
     // Color the cost amount to reflect payment status visually:
     //   fully paid  → green (matches the badge)
@@ -5958,7 +5958,7 @@ function renderRecentSessions() {
       .find(function(t){ return t.name === s.type; });
     var typeFill   = typeMatch ? typeMatch.fill   : '#63b3ed';
     var typeStroke = typeMatch ? typeMatch.stroke : '#63b3ed';
-    var typeBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:' + typeFill + '22;color:' + typeFill + ';border:1px solid ' + typeStroke + '55;">' + escapeHtml(s.type || '—') + '</span>';
+    var typeBadge = '<span class="cbadge" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;--bc:' + typeFill + ';">' + escapeHtml(s.type || '—') + '</span>';
     var toothBadge = s.tooth_num ? ' <span style="background:rgba(99,179,237,0.15);color:var(--blue);padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700;">سن ' + s.tooth_num + '</span>' : '';
     // Phase 3 Feature G: regional badge for recent sessions list
     var regionalBadge = '';
@@ -7217,7 +7217,7 @@ function renderApptProcedureListPP() {
         html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(46,232,158,0.05);border-radius:8px;border:1px solid rgba(46,232,158,0.2);flex-wrap:wrap;">'
           + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
           + '<div style="font-size:12px;color:var(--text2);">' + costStr + ' ل.س</div>'
-          + '<span style="background:#fb923c22;color:#fb923c;border:1px solid #fb923c55;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
+          + '<span class="cbadge" style="--bc:#fb923c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
           + '<button type="button" onclick="removePendingPP(\'' + s.id + '\')" style="background:transparent;border:1px solid rgba(239,83,80,0.4);color:#ef5350;padding:3px 8px;border-radius:6px;cursor:pointer;font-size:11px;" title="إزالة من القائمة">✕</button>'
           + '</div>';
       });
@@ -7243,9 +7243,9 @@ function renderApptProcedureListPP() {
     attached.forEach(function(s){
       var statusBadge;
       if (s.status === 'planned') {
-        statusBadge = '<span style="background:#ef444422;color:#ef4444;border:1px solid #ef444455;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
+        statusBadge = '<span class="cbadge" style="--bc:#ef4444;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">مخطّط</span>';
       } else if (s.status === 'completed') {
-        statusBadge = '<span style="background:#3b82f622;color:#3b82f6;border:1px solid #3b82f655;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
+        statusBadge = '<span class="cbadge" style="--bc:#3b82f6;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">منجز</span>';
       } else {
         statusBadge = '<span style="background:rgba(255,255,255,0.06);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;">' + escapeHtml(s.status || '—') + '</span>';
       }

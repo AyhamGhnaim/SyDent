@@ -18,7 +18,7 @@
 <title>SyDent — المصاريف</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a69"></script>
+<script src="theme.js?v=20260528a70"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -557,10 +557,10 @@ tbody td {
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a69">
+<link rel="stylesheet" href="theme.css?v=20260528a70">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a69"></script>
-<script src="sidebar.js?v=20260528a69"></script>
+<script src="supabase-init.js?v=20260528a70"></script>
+<script src="sidebar.js?v=20260528a70"></script>
 </head>
 <body>
 
@@ -1098,8 +1098,8 @@ function renderExpenses() {
   filtered.forEach(function(e) {
     var cat = e.category_id ? categories.find(function(c){ return c.id === e.category_id; }) : null;
     var catHtml = cat
-      ? '<span class="cat-chip" style="background:' + escapeHtml(cat.color || '#a3a3a3') + '22;color:' + escapeHtml(cat.color || '#a3a3a3') + ';border:1px solid ' + escapeHtml(cat.color || '#a3a3a3') + '44;">' + escapeHtml(cat.icon || '📋') + ' ' + escapeHtml(cat.name) + '</span>'
-      : '<span class="cat-chip" style="background:#a3a3a322;color:#a3a3a3;border:1px solid #a3a3a344;">— غير مصنّف</span>';
+      ? '<span class="cat-chip cbadge" style="--bc:' + escapeHtml(cat.color || '#a3a3a3') + ';">' + escapeHtml(cat.icon || '📋') + ' ' + escapeHtml(cat.name) + '</span>'
+      : '<span class="cat-chip cbadge" style="--bc:#a3a3a3;">— غير مصنّف</span>';
     var pm = paymentMethodLabel(e.payment_method);
     html +=
       '<tr>' +

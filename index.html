@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a69"></script>
+<script src="theme.js?v=20260528a70"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -533,10 +533,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a69">
+<link rel="stylesheet" href="theme.css?v=20260528a70">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a69"></script>
-<script src="sidebar.js?v=20260528a69"></script>
+<script src="supabase-init.js?v=20260528a70"></script>
+<script src="sidebar.js?v=20260528a70"></script>
 </head>
 <body>
 <script>
@@ -1159,8 +1159,8 @@ function _dashOperatoryChipHtml(operatoryId) {
     name  = '[غرفة محذوفة]';
     color = '#8da0bd';
   }
-  return '<span style="display:inline-block;background:' + color + '22;color:'
-       + color + ';border:1px solid ' + color + '55;padding:2px 8px;border-radius:12px;'
+  return '<span class="cbadge" style="display:inline-block;--bc:' + color
+       + ';padding:2px 8px;border-radius:12px;'
        + 'font-size:11px;font-weight:700;margin-right:6px;vertical-align:middle;" title="'
        + _dashEscapeHtml(name) + '">🪑 ' + _dashEscapeHtml(name) + '</span>';
 }
@@ -1299,9 +1299,8 @@ function getDashNextAction(appt) {
 function renderDashActionBtn(appt) {
   var act = getDashNextAction(appt);
   if (!act) return '';
-  return '<button class="dash-time-btn" '
-       + 'style="background:' + act.color + '22;color:' + act.color
-       + ';border:1px solid ' + act.color + '55" '
+  return '<button class="dash-time-btn cbadge" '
+       + 'style="--bc:' + act.color + '" '
        + 'onclick="recordDashApptTime(\'' + appt.id + '\',\'' + act.key + '\',this)">'
        + act.label + '</button>';
 }
