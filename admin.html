@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a79"></script>
+<script src="theme.js?v=20260528a80"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -182,6 +182,7 @@ header{
    top of the first letters of the customer name. */
 .req-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-right:28px;}
 .req-name{font-size:15px;font-weight:700;color:var(--text);}
+.req-name-sub{font-size:12px;font-weight:600;color:var(--text2);margin-top:2px;}
 .req-status{
   font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;
 }
@@ -2101,11 +2102,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a79">
+<link rel="stylesheet" href="theme.css?v=20260528a80">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260528a79"></script>
+<script src="supabase-init.js?v=20260528a80"></script>
 </head>
 <body>
 
@@ -2828,6 +2829,11 @@ var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
 var currentFilter = 'all';
 var allRequests = [];
+// owner_id (= trial_requests.user_id) → live clinic_settings.clinic_name.
+// Populated per load; lets the customer card show the clinic's current name
+// (the editable business name) above the signup/contact name. Empty when the
+// admin RLS read policy is absent or no clinic_name set → falls back to r.name.
+var clinicNameByUid = {};
 
 // ===== Phase 7.6A: Search + Edit state =====
 var searchTerm = '';
@@ -3400,6 +3406,7 @@ function clearSearch() {
 function matchesSearch(r) {
   if (!searchTerm) return true;
   var hay = (
+    (clinicNameByUid[r.user_id] || '') + ' ' +
     (r.name  || '') + ' ' +
     (r.phone || '') + ' ' +
     (r.email || '') + ' ' +
@@ -3581,6 +3588,27 @@ async function loadAndRender() {
     return;
   }
   allRequests = data || [];
+  // Resolve each customer's live clinic name (clinic_settings.clinic_name) in a
+  // single batched query keyed by user_id (= owner_id). Requires the admin RLS
+  // read policy (Migration 31); on any error/empty we keep the map empty and
+  // the card falls back to the signup name — no regression.
+  try {
+    var _uids = [];
+    var _seen = {};
+    allRequests.forEach(function(r){
+      if (r.user_id && !_seen[r.user_id]) { _seen[r.user_id] = 1; _uids.push(r.user_id); }
+    });
+    clinicNameByUid = {};
+    if (_uids.length) {
+      var csRes = await window.sb.from('clinic_settings')
+        .select('owner_id, clinic_name').in('owner_id', _uids);
+      (csRes && csRes.data ? csRes.data : []).forEach(function(row){
+        if (row.clinic_name && String(row.clinic_name).trim()) {
+          clinicNameByUid[row.owner_id] = String(row.clinic_name).trim();
+        }
+      });
+    }
+  } catch (e) { clinicNameByUid = {}; }
   // Phase X1: refresh admin Set so renderList can show 👑 badges and
   // promote/demote buttons that reflect ground truth at this moment.
   // Errors are swallowed inside fetchAdminUserIds (defensive — if the
@@ -8129,10 +8157,16 @@ function renderList() {
                        ' onclick="bkToggleSelect(\'' + id + '\', event)" ' +
                        'aria-label="تحديد للإجراء الجماعي">';
 
+    var _clinicName = (r.user_id && clinicNameByUid[r.user_id]) ? clinicNameByUid[r.user_id] : '';
+    var _primaryName = _clinicName || r.name || '—';
+    var _subNameHtml = (_clinicName && r.name)
+      ? '<div class="req-name-sub">👤 ' + escapeHtml(r.name) + '</div>'
+      : '';
+
     return '<div class="req-card ' + cardStatusClass + bulkClass + '">' +
       bulkCheckHtml +
       '<div class="req-top">' +
-        '<div class="req-name">' + (escapeHtml(r.name) || '—') + '</div>' +
+        '<div><div class="req-name">' + escapeHtml(_primaryName) + '</div>' + _subNameHtml + '</div>' +
         stateBadge +
       '</div>' +
       '<div class="req-info">' +
