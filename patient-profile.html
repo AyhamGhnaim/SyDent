@@ -15,7 +15,7 @@
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
 <script src="theme.js?v=20260527a05"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a66"></script>
+<script src="supabase-init.js?v=20260527a67"></script>
 <script src="sidebar.js?v=20260527a64"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -618,6 +618,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   font-size:11px; color:var(--text2);
   padding:6px;
 }
+/* ── Print (Phase 9.1) ── */
+#printRoot { display: none; }
+@media print {
+  body.printing > *:not(#printRoot) { display: none !important; }
+  #printRoot { display: block !important; }
+  @page { margin: 14mm; }
+}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
 <link rel="stylesheet" href="theme.css?v=20260527a11">
@@ -643,6 +650,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="btn btn-outline" onclick="openApptModal()" data-doctor-inactive-block>📅 موعد جديد</button>
     <button class="btn btn-outline" onclick="openSessionModal()" data-doctor-inactive-block>🦷 جلسة جديدة</button>
     <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaReminderFromProfile()" style="display:none;">📱 تذكير WhatsApp</button>
+    <button class="btn btn-outline" onclick="openPrintChoice()" data-doctor-inactive-block>🖨️ طباعة / PDF</button>
     <button class="btn btn-primary" onclick="openPayModal()" data-doctor-inactive-block>💰 تسجيل دفعة</button>
   </div>
 </div>
@@ -1278,6 +1286,28 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- Print choice modal (Phase 9.1) -->
+<div class="modal-overlay" id="printChoiceModal" onclick="if(event.target===this) closeModal('printChoiceModal')">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-head">
+      <h3>🖨️ طباعة سجل المريض</h3>
+      <button class="modal-close" onclick="closeModal('printChoiceModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">اختر نوع النسخة. بعد فتح حوار الطباعة يمكنك اختيار «حفظ كـ PDF».</div>
+      <button class="btn btn-outline" style="width:100%;justify-content:center;margin-bottom:10px;padding:13px;" onclick="doPrintRecord(false)">
+        🧑‍⚕️ نسخة للمريض <span style="color:var(--text2);font-weight:400;font-size:12px;">(بدون أسعار)</span>
+      </button>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;" onclick="doPrintRecord(true)">
+        🗄️ أرشيف داخلي <span style="opacity:.8;font-weight:400;font-size:12px;">(مع الأسعار والمدفوعات)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Print render target (hidden on screen; shown only in @media print) -->
+<div id="printRoot"></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1416,6 +1446,152 @@ async function ppLoadClinicSettings() {
     }
     if (res.data) CLINIC_SETTINGS_WA = res.data;
   } catch(e) { console.warn('clinic_settings:', e); }
+}
+
+/* ============================================================
+   Phase 9.1 — Patient Record Printout / Save as PDF
+   Pure client-side: builds a print-optimized RTL document from
+   in-memory data and uses the browser print dialog (→ Save as PDF).
+   No library → flawless Arabic rendering. Fee-toggle: patient copy
+   (no money) vs internal archive (with costs + payments).
+   ============================================================ */
+async function openPrintChoice(){
+  if (!patient) { showToast('لم يكتمل تحميل بيانات المريض بعد'); return; }
+  if (!CLINIC_SETTINGS_WA) { try { await ppLoadClinicSettings(); } catch(e){} }
+  openModal('printChoiceModal');
+}
+
+function _ppSessionStatusAr(s){
+  return ({ planned:'مخطّط', completed:'مكتمل', existing:'موجود', referred:'محوّل' })[s] || (s || '—');
+}
+function _ppGenderAr(g){
+  return ({ male:'ذكر', female:'أنثى' })[g] || (g || '—');
+}
+function _ppRow(label, value){
+  if (value === null || value === undefined || value === '') return '';
+  return '<tr><td style="padding:5px 10px;color:#555;width:140px;border:1px solid #ddd;background:#f7f7f7;">' +
+         escapeHtml(label) + '</td><td style="padding:5px 10px;border:1px solid #ddd;">' + escapeHtml(String(value)) + '</td></tr>';
+}
+
+function buildPrintHtml(withPrices){
+  var clinic = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_name) || 'عيادتنا';
+  var today  = new Date().toLocaleDateString('ar-SY');
+  var docMap = {}; (CLINIC_DOCTORS || []).forEach(function(d){ docMap[d.id] = d.name; });
+
+  var billed = (sessions || []).reduce(function(a,s){ return a + Number(s.cost || 0); }, 0);
+  var paid   = (payments || []).reduce(function(a,p){ return a + Number(p.amount || 0); }, 0);
+  var balance = billed - paid;
+
+  var th = 'padding:6px 9px;border:1px solid #ccc;background:#eee;text-align:right;font-size:12px;';
+  var td = 'padding:6px 9px;border:1px solid #ddd;font-size:12px;';
+
+  // ── Header ──
+  var html = '<div style="font-family:Cairo,Tahoma,sans-serif;direction:rtl;color:#111;background:#fff;padding:4px;">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:14px;">' +
+            '<div><div style="font-size:20px;font-weight:800;">' + escapeHtml(clinic) + '</div>' +
+            '<div style="font-size:13px;color:#444;">ملف المريض</div></div>' +
+            '<div style="font-size:12px;color:#444;">تاريخ الطباعة: ' + escapeHtml(today) + '</div></div>';
+
+  // ── Patient info ──
+  html += '<h3 style="font-size:14px;margin:0 0 6px;">معلومات المريض</h3><table style="width:100%;border-collapse:collapse;margin-bottom:16px;">';
+  html += _ppRow('الاسم', patient.name);
+  html += _ppRow('رقم المريض', patient.local_id);
+  html += _ppRow('الهاتف', patient.phone);
+  if (patient.dob) html += _ppRow('العمر', calcAge(patient.dob) + ' سنة');
+  html += _ppRow('الجنس', _ppGenderAr(patient.gender));
+  html += _ppRow('آخر زيارة', patient.last_visit);
+  html += '</table>';
+
+  // ── Medical ──
+  if (patient.allergies || patient.notes) {
+    html += '<h3 style="font-size:14px;margin:0 0 6px;">معلومات طبية</h3><table style="width:100%;border-collapse:collapse;margin-bottom:16px;">';
+    html += _ppRow('الحساسيات', patient.allergies);
+    html += _ppRow('ملاحظات', patient.notes);
+    html += '</table>';
+  }
+
+  // ── Treatments / sessions ──
+  html += '<h3 style="font-size:14px;margin:0 0 6px;">العلاجات والجلسات</h3>';
+  if ((sessions || []).length) {
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr>' +
+            '<th style="' + th + '">التاريخ</th><th style="' + th + '">السن</th><th style="' + th + '">العلاج</th>' +
+            '<th style="' + th + '">الحالة</th><th style="' + th + '">الطبيب</th>' +
+            (withPrices ? '<th style="' + th + '">التكلفة</th>' : '') + '</tr></thead><tbody>';
+    (sessions || []).slice().sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); }).forEach(function(s){
+      html += '<tr>' +
+        '<td style="' + td + '">' + escapeHtml(s.date || '') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(s.tooth_num != null ? String(s.tooth_num) : '—') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(s.type || s.description || '—') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(_ppSessionStatusAr(s.status)) + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(docMap[s.provider_id] || '—') + '</td>' +
+        (withPrices ? '<td style="' + td + '">' + fmt(s.cost) + ' ل.س</td>' : '') +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div style="font-size:12px;color:#777;margin-bottom:16px;">لا توجد جلسات مسجّلة.</div>';
+  }
+
+  // ── Money (internal archive only) ──
+  if (withPrices) {
+    if ((payments || []).length) {
+      html += '<h3 style="font-size:14px;margin:0 0 6px;">المدفوعات</h3>';
+      html += '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;"><thead><tr>' +
+              '<th style="' + th + '">التاريخ</th><th style="' + th + '">المبلغ</th><th style="' + th + '">الطريقة</th><th style="' + th + '">ملاحظات</th></tr></thead><tbody>';
+      (payments || []).slice().sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); }).forEach(function(p){
+        html += '<tr>' +
+          '<td style="' + td + '">' + escapeHtml(p.date || '') + '</td>' +
+          '<td style="' + td + '">' + fmt(p.amount) + ' ل.س</td>' +
+          '<td style="' + td + '">' + escapeHtml(p.method || '—') + '</td>' +
+          '<td style="' + td + '">' + escapeHtml(p.notes || '') + '</td>' +
+        '</tr>';
+      });
+      html += '</tbody></table>';
+    }
+    html += '<table style="width:auto;border-collapse:collapse;margin-bottom:16px;font-size:13px;">' +
+      '<tr><td style="' + td + 'font-weight:700;">إجمالي العلاجات</td><td style="' + td + '">' + fmt(billed) + ' ل.س</td></tr>' +
+      '<tr><td style="' + td + 'font-weight:700;">إجمالي المدفوع</td><td style="' + td + '">' + fmt(paid) + ' ل.س</td></tr>' +
+      '<tr><td style="' + td + 'font-weight:800;">الرصيد المتبقّي</td><td style="' + td + 'font-weight:800;color:' + (balance>0?'#b00':'#080') + ';">' + fmt(balance) + ' ل.س</td></tr>' +
+      '</table>';
+  }
+
+  // ── Lab orders ──
+  if ((labOrders || []).length) {
+    html += '<h3 style="font-size:14px;margin:0 0 6px;">طلبات المخابر</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr>' +
+            '<th style="' + th + '">السن</th><th style="' + th + '">نوع العمل</th><th style="' + th + '">المخبر</th><th style="' + th + '">الحالة</th></tr></thead><tbody>';
+    (labOrders || []).forEach(function(lo){
+      html += '<tr>' +
+        '<td style="' + td + '">' + escapeHtml(lo.tooth_num != null ? String(lo.tooth_num) : '—') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(lo.work_type || '—') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(lo.lab_name || '—') + '</td>' +
+        '<td style="' + td + '">' + escapeHtml(lo.status || '—') + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // ── Footer ──
+  html += '<div style="margin-top:30px;display:flex;justify-content:space-between;font-size:12px;color:#444;">' +
+          '<div>التوقيع: ____________________</div><div>' + escapeHtml(clinic) + '</div></div>';
+  html += '</div>';
+  return html;
+}
+
+function doPrintRecord(withPrices){
+  closeModal('printChoiceModal');
+  var root = document.getElementById('printRoot');
+  if (!root) return;
+  root.innerHTML = buildPrintHtml(!!withPrices);
+  document.body.classList.add('printing');
+  var cleanup = function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(function(){ window.print(); }, 80);
+  // Safety net in case afterprint never fires (some mobile browsers)
+  setTimeout(cleanup, 60000);
 }
 
 async function ppLoadReminderLogs() {
