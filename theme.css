@@ -628,3 +628,30 @@
 /* appointments.html appointment-status pills */
 :root[data-theme="light"] .status-scheduled { color: var(--blue); }
 :root[data-theme="light"] .status-broken     { color: color-mix(in srgb, #fb923c 70%, #1c1917); }
+
+/* ========================================================================== */
+/*  Badge / pill legibility — Light Mode                                       */
+/*  ----------------------------------------------------------------------     */
+/*  Role/status pills tint their background with rgba() of the DARK-mode       */
+/*  (bright) accent channels at low alpha. On white those tints nearly vanish, */
+/*  so the pill reads as floating text with no container. In light mode we     */
+/*  re-tint with the tuned dark-accent channels at a firmer alpha + a defined  */
+/*  hairline border, so each pill reads as a real labelled chip. Text colour   */
+/*  already adapts via var(--accent). Scoped to data-theme="light" only —      */
+/*  dark mode untouched. (Targets the people/treatment pages.)                 */
+/* ========================================================================== */
+/* employees.html — role badges */
+:root[data-theme="light"] .role-owner     { background:rgba(22,160,133,0.14); border:1px solid rgba(22,160,133,0.32); }
+:root[data-theme="light"] .role-doctor    { background:rgba(37,99,235,0.12);  border:1px solid rgba(37,99,235,0.30); }
+:root[data-theme="light"] .role-secretary { background:rgba(234,88,12,0.12);   border:1px solid rgba(234,88,12,0.30); }
+/* employees.html — PIN status pills */
+:root[data-theme="light"] .pin-set           { background:rgba(22,160,133,0.12); border:1px solid rgba(22,160,133,0.26); }
+:root[data-theme="light"] .pin-unset         { background:rgba(202,138,4,0.14);  border:1px solid rgba(202,138,4,0.30); }
+:root[data-theme="light"] .pin-none-required { background:rgba(37,99,235,0.10);  border:1px solid rgba(37,99,235,0.24); }
+/* doctors.html — role / status badges */
+:root[data-theme="light"] .role-badge   { background:rgba(124,58,237,0.12); border-color:rgba(124,58,237,0.30); }
+:root[data-theme="light"] .you-badge    { background:rgba(22,160,133,0.14); border-color:rgba(22,160,133,0.32); }
+:root[data-theme="light"] .linked-badge { background:rgba(37,99,235,0.12);  border-color:rgba(37,99,235,0.30); }
+/* treatments.html — lab / builtin tags */
+:root[data-theme="light"] .treat-lab-tag     { background:rgba(37,99,235,0.12); }
+:root[data-theme="light"] .treat-builtin-tag { background:rgba(37,99,235,0.12); border-color:rgba(37,99,235,0.30); }

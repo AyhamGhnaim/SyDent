@@ -13,10 +13,10 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a76"></script>
+<script src="theme.js?v=20260528a77"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a76"></script>
-<script src="sidebar.js?v=20260528a76"></script>
+<script src="supabase-init.js?v=20260528a77"></script>
+<script src="sidebar.js?v=20260528a77"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -210,7 +210,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .lab-toggle-switch input:checked + .lab-toggle-slider:before{transform:translateX(-22px);background:var(--green);}
 
 /* Lab tag on treatment card */
-.treat-lab-tag{display:inline-flex;align-items:center;gap:3px;background:rgba(99,179,237,.15);color:#63b3ed;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-right:5px;vertical-align:middle;}
+.treat-lab-tag{display:inline-flex;align-items:center;gap:3px;background:rgba(99,179,237,.15);color:var(--blue);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;margin-right:5px;vertical-align:middle;}
 
 @media(max-width:900px){
   .page{padding:16px;}
@@ -222,7 +222,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a76">
+<link rel="stylesheet" href="theme.css?v=20260528a77">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -1285,7 +1285,7 @@ function printLegend() {
         : '';
       html += '<tr>';
       html += '<td><span class="color-dot" style="background:' + t.fill + ';"></span></td>';
-      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#a78bfa;font-size:11px;">🥽 مخبر</span>' : '') + laymanSub + '</td>';
+      html += '<td><b>' + escapeHtml(t.name) + '</b>' + (t.needs_lab ? ' <span style="color:#7c3aed;font-size:11px;">🥽 مخبر</span>' : '') + laymanSub + '</td>';
       html += '<td>' + escapeHtml(t.label) + '</td>';
       html += '<td class="price-col">' + fmt(t.price) + ' ل.س</td>';
       html += '</tr>';

@@ -20,10 +20,10 @@
 <title>أطباء العيادة — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260528a76"></script>
+<script src="theme.js?v=20260528a77"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260528a76"></script>
-<script src="sidebar.js?v=20260528a76"></script>
+<script src="supabase-init.js?v=20260528a77"></script>
+<script src="sidebar.js?v=20260528a77"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -190,7 +190,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a76">
+<link rel="stylesheet" href="theme.css?v=20260528a77">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -511,13 +511,13 @@ function renderList() {
     // throughout the app for consistency.
     var typeBadge = '';
     if (d.provider_type === 'hygienist') {
-      typeBadge = '<span class="role-badge" style="background:rgba(99,179,237,0.18);color:#63b3ed;border-color:rgba(99,179,237,0.35);" title="متدرب/مساعد (Hygienist)">🩺 متدرب/مساعد</span>';
+      typeBadge = '<span class="role-badge" style="background:rgba(99,179,237,0.18);color:var(--blue);border-color:rgba(99,179,237,0.35);" title="متدرب/مساعد (Hygienist)">🩺 متدرب/مساعد</span>';
     } else if (d.provider_type === 'assistant') {
-      typeBadge = '<span class="role-badge" style="background:rgba(255,167,38,0.18);color:#ffa726;border-color:rgba(255,167,38,0.35);" title="مساعدة كرسي">🤝 مساعدة كرسي</span>';
+      typeBadge = '<span class="role-badge" style="background:rgba(255,167,38,0.18);color:var(--orange);border-color:rgba(255,167,38,0.35);" title="مساعدة كرسي">🤝 مساعدة كرسي</span>';
     } else if (d.provider_type === 'secretary') {
-      typeBadge = '<span class="role-badge" style="background:rgba(245,200,66,0.18);color:#f5c842;border-color:rgba(245,200,66,0.35);" title="سكرتيرة">👩‍💼 سكرتيرة</span>';
+      typeBadge = '<span class="role-badge" style="background:rgba(245,200,66,0.18);color:var(--yellow);border-color:rgba(245,200,66,0.35);" title="سكرتيرة">👩‍💼 سكرتيرة</span>';
     } else if (d.provider_type === 'other') {
-      typeBadge = '<span class="role-badge" style="background:rgba(141,160,189,0.18);color:#8da0bd;border-color:rgba(141,160,189,0.35);" title="موظف آخر (محاسب/عامل/إلخ)">👥 موظف آخر</span>';
+      typeBadge = '<span class="role-badge" style="background:rgba(141,160,189,0.18);color:var(--text2);border-color:rgba(141,160,189,0.35);" title="موظف آخر (محاسب/عامل/إلخ)">👥 موظف آخر</span>';
     }
 
     var sharePart = (d.share_percent !== null && d.share_percent !== undefined) ? ('<b>النسبة:</b> ' + d.share_percent + '%') : '';
