@@ -1564,6 +1564,10 @@ header{
 }
 .c360-actions-row{display:flex; flex-wrap:wrap; gap:6px;}
 .c360-actions-row > *{min-width:0;}
+/* The relocated trial-duration adjuster (.extension-widget) carries a
+   margin-top:12px from its old card context — neutralize it here since the
+   group title already provides the spacing. */
+.c360-action-group .extension-widget{margin-top:0;}
 
 /* Communications placeholder */
 .c360-comm-placeholder{
@@ -2016,7 +2020,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a12">
+<link rel="stylesheet" href="theme.css?v=20260528a13">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -3041,7 +3045,13 @@ function setExtendMode(reqId, mode) {
     if (!isNaN(raw)) extendDaysByReq[reqId] = raw;
   }
   extendModeByReq[reqId] = mode;
-  renderList();
+  // The widget now lives in the 360° drawer's "actions" tab (not the card
+  // list), so re-render THAT to reflect the new mode (presets/labels/colors).
+  // Falls back to a no-op if the drawer isn't showing this customer's actions.
+  if (typeof c360State !== 'undefined' && c360State.requestId === reqId
+      && c360State.activeTab === 'actions') {
+    c360RenderTab('actions');
+  }
 }
 
 function getExtendDays(reqId) {
@@ -3246,7 +3256,13 @@ async function applyAdjust(reqId) {
   // common operation is extension.)
   delete extendDaysByReq[reqId];
   delete extendModeByReq[reqId];
-  loadAndRender();
+  await loadAndRender();
+  // If the 360° drawer is open for this same customer, refresh its active tab
+  // so the (relocated) widget resets to defaults and the new trial_end shows
+  // up in overview/actions. c360RenderTab re-reads the fresh allRequests row.
+  if (typeof c360State !== 'undefined' && c360State.requestId === reqId) {
+    c360RenderTab(c360State.activeTab);
+  }
 }
 
 // XSS-safe HTML escaping for user-controlled fields rendered into innerHTML.
@@ -7892,7 +7908,9 @@ function renderList() {
     // trial, paid (non-permanent), grace, and expired states — operators
     // sometimes need to adjust an already-expired trial_end before
     // making other decisions.
-    var showExtensionWidget = !!r.trial_end && s.state !== 'new' && s.state !== 'suspended';
+    // NOTE: the trial-duration adjuster widget was RELOCATED out of the card
+    // into the 360° drawer's "actions" tab — see c360BuildActions(). The card
+    // no longer renders it (kept the cards compact / less noisy).
 
     // Activity panel: show for any accepted (active or expired) state.
     // Suspended rows have no meaningful "last active" data exposed.
@@ -7924,7 +7942,6 @@ function renderList() {
         trialBadgeHtml +
       '</div>' +
       '<div class="req-actions">' + actions + '</div>' +
-      (showExtensionWidget ? renderExtensionWidget(id) : '') +
       (showActivityPanel ? renderActivityPanel(id) : '') +
     '</div>';
   }).join('');
@@ -8315,6 +8332,14 @@ function c360BuildActions(r) {
   }
   if (lifecycle.length) groups.push({ title: '⚙️ دورة حياة الاشتراك', buttons: lifecycle });
 
+  // Trial-duration adjuster — RELOCATED here from the card list. Same widget,
+  // same per-reqId state functions (setExtendMode/setExtendDays/applyAdjust).
+  // Rendered as customHtml (it's a mini-form, not a button row). Shown only
+  // when there's an adjustable trial/paid window — mirrors the old card
+  // condition exactly (trial_end present + not new/suspended).
+  var showExt = !!r.trial_end && s.state !== 'new' && s.state !== 'suspended';
+  if (showExt) groups.push({ title: '⏰ تعديل مدة التجربة', customHtml: renderExtensionWidget(id) });
+
   // Admin role group (Phase X1)
   var adminBtns = [];
   if (canPromote) adminBtns.push('<button class="btn-promote" onclick="promoteToAdmin(\'' + id + '\'); closeCustomer360();">👑 ترقية إلى Admin</button>');
@@ -8361,9 +8386,14 @@ function c360BuildActions(r) {
   var html = '<div class="c360-actions">';
   for (var g = 0; g < groups.length; g++) {
     var grp = groups[g];
+    // A group is either a button row (grp.buttons) or a custom mini-form
+    // (grp.customHtml, e.g. the trial-duration adjuster widget).
+    var inner = grp.customHtml
+      ? grp.customHtml
+      : '<div class="c360-actions-row">' + grp.buttons.join('') + '</div>';
     html += '<div class="c360-action-group">'
          +    '<div class="c360-action-group-title">' + c360EscapeHtml(grp.title) + '</div>'
-         +    '<div class="c360-actions-row">' + grp.buttons.join('') + '</div>'
+         +    inner
          + '</div>';
   }
   html += '</div>';

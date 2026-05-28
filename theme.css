@@ -480,6 +480,7 @@
 :root[data-theme="light"] .maint-card,
 :root[data-theme="light"] .hcard,
 :root[data-theme="light"] .feature-card,
+:root[data-theme="light"] .req-card,
 :root[data-theme="light"] .modal-box,
 :root[data-theme="light"] .modal-card {
   box-shadow: var(--shadow-card);
