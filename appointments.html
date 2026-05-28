@@ -922,7 +922,7 @@ textarea { resize: vertical; min-height: 72px; }
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
 <link rel="stylesheet" href="theme.css?v=20260527a11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a62"></script>
+<script src="supabase-init.js?v=20260527a66"></script>
 <script src="sidebar.js?v=20260527a64"></script>
 </head>
 <body>
@@ -1161,6 +1161,31 @@ textarea { resize: vertical; min-height: 72px; }
           <a href="labs.html" style="font-size:12px;color:#63b3ed;text-decoration:none;">إدارة المخابر ←</a>
         </div>
         <div id="apptLabList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+
+      <!-- 📎 Files section (Phase 9) — visible only when editing a real appointment.
+           Files uploaded here are linked to both patient_id and appointment_id
+           (CareStack-style: grouped by visit). They also appear in the patient
+           profile's الملفات tab. -->
+      <div id="apptFilesSection" style="display:none;margin-top:12px;padding:14px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.20);border-radius:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-weight:700;color:var(--text);">📎 ملفات هذا الموعد</div>
+          <select id="apptFileCategory" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);padding:6px 9px;font-family:Cairo,sans-serif;font-size:12px;cursor:pointer;">
+            <option value="xray">🦷 أشعة</option>
+            <option value="clinical_photo">📷 صورة سريرية</option>
+            <option value="document" selected>📄 مستند</option>
+            <option value="receipt">🧾 إيصال</option>
+            <option value="other">📎 أخرى</option>
+          </select>
+        </div>
+        <div id="apptFileDrop" onclick="document.getElementById('apptFileInput').click()"
+             style="border:2px dashed rgba(167,139,250,0.4);border-radius:9px;padding:14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;margin-bottom:10px;">
+          📎 انقر أو اسحب لرفع صورة أشعة / مستند لهذا الموعد
+        </div>
+        <input type="file" id="apptFileInput" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+               style="display:none;" onchange="apptOnFilesPicked(this.files); this.value='';">
+        <div id="apptFileStatus" style="display:none;font-size:12px;color:#a78bfa;text-align:center;margin-bottom:8px;"></div>
+        <div id="apptFileList" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
 
       <!-- 💸 No-show fee button (visible only when editing + status='no_show' + fee enabled + not yet applied) -->
@@ -4371,6 +4396,8 @@ async function openModal(prefillDate) {
   if (typeof setApptProcSectionModeA === 'function') setApptProcSectionModeA('create');
   // إخفاء قسم المخبر (يظهر فقط في التعديل ولو فيه طلبات مرتبطة)
   document.getElementById('apptLabSection').style.display = 'none';
+  var _afs = document.getElementById('apptFilesSection');
+  if (_afs) _afs.style.display = 'none';
   // إخفاء زر "تطبيق رسم عدم الحضور" (يظهر فقط في التعديل عند الحاجة)
   var noShowBtn = document.getElementById('noShowFeeBtn');
   if (noShowBtn) noShowBtn.style.display = 'none';
@@ -4490,6 +4517,17 @@ async function editAppt(id) {
     if (labSec) labSec.style.display = 'none';
   } else {
     renderApptLabOrders(a);
+  }
+
+  // 📎 Files section (Phase 9) — only for real (scheduled) appointments.
+  var filesSec = document.getElementById('apptFilesSection');
+  if (filesSec) {
+    if (isPlanned || !a.patient_id || !window.SyDentFiles) {
+      filesSec.style.display = 'none';
+    } else {
+      filesSec.style.display = 'block';
+      renderApptFiles(a);
+    }
   }
 
   // Show/hide the no-show fee button based on current state (Gap 5).
@@ -6139,6 +6177,115 @@ function showToast(msg) {
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2800);
 }
+
+/* ============================================================
+   Phase 9 — Patient Documents & Imaging  (appointment modal)
+   Files uploaded here link to patient_id + appointment_id and
+   also surface in the patient profile الملفات tab. Shared helper:
+   window.SyDentFiles (supabase-init.js).
+   ============================================================ */
+var _apptFilesCtx = { apptId:null, patientId:null };
+var _apptFiles    = [];
+var _apptFileUrls = {};
+
+async function renderApptFiles(appt){
+  if (!window.SyDentFiles || !appt || !appt.patient_id) return;
+  _apptFilesCtx = { apptId: appt.id, patientId: appt.patient_id };
+  var listEl = document.getElementById('apptFileList');
+  if (listEl) listEl.innerHTML = '<div style="color:var(--text2);font-size:12px;text-align:center;padding:6px;">جارٍ التحميل…</div>';
+  _apptFiles = await window.SyDentFiles.list(appt.patient_id, { appointmentId: appt.id });
+  var imgPaths = _apptFiles.filter(function(f){ return window.SyDentFiles.isImage(f.mime_type); })
+                           .map(function(f){ return f.storage_path; });
+  _apptFileUrls = imgPaths.length ? await window.SyDentFiles.signedUrls(imgPaths, 3600) : {};
+  paintApptFiles();
+}
+
+function paintApptFiles(){
+  var listEl = document.getElementById('apptFileList');
+  if (!listEl) return;
+  if (!_apptFiles.length){
+    listEl.innerHTML = '<div style="color:var(--text2);font-size:12px;text-align:center;padding:6px;">لا توجد ملفات مرتبطة بهذا الموعد بعد.</div>';
+    return;
+  }
+  listEl.innerHTML = _apptFiles.map(function(f){
+    var isImg = window.SyDentFiles.isImage(f.mime_type);
+    var url   = _apptFileUrls[f.storage_path] || '';
+    var cat   = window.SyDentFiles.CAT_LABELS[f.category] || window.SyDentFiles.CAT_LABELS.other;
+    var thumb = (isImg && url)
+      ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;flex-shrink:0;">'
+      : '<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,0.05);border-radius:7px;flex-shrink:0;">📄</div>';
+    return '<div style="display:flex;align-items:center;gap:9px;padding:7px 9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;">' +
+      thumb +
+      '<div style="flex:1;min-width:0;cursor:pointer;" onclick="apptOpenFile(\'' + f.id + '\')">' +
+        '<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(f.file_name) + '</div>' +
+        '<div style="font-size:10px;color:var(--text2);">' + cat + ' · ' + escapeHtml(window.SyDentFiles.humanSize(f.size_bytes)) + '</div>' +
+      '</div>' +
+      '<button type="button" onclick="apptDeleteFile(\'' + f.id + '\')" title="حذف" style="background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:#ef5350;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:12px;flex-shrink:0;">🗑️</button>' +
+    '</div>';
+  }).join('');
+}
+
+async function apptOpenFile(id){
+  var f = _apptFiles.find(function(x){ return x.id === id; });
+  if (!f) return;
+  var url = window.SyDentFiles.isImage(f.mime_type) ? _apptFileUrls[f.storage_path] : null;
+  if (!url) url = await window.SyDentFiles.signedUrl(f.storage_path, 3600);
+  if (!url){ showToast('تعذّر فتح الملف'); return; }
+  window.open(url, '_blank', 'noopener');
+}
+
+async function apptOnFilesPicked(fileList){
+  if (!fileList || !fileList.length || !window.SyDentFiles) return;
+  if (!_apptFilesCtx.patientId){ showToast('احفظ الموعد أولاً'); return; }
+  var cat = (document.getElementById('apptFileCategory') || {}).value || 'other';
+  var status = document.getElementById('apptFileStatus');
+  var files = Array.prototype.slice.call(fileList);
+  var done = 0, failed = 0;
+  if (status) status.style.display = 'block';
+  for (var i = 0; i < files.length; i++){
+    if (status) status.textContent = 'جارٍ الرفع… (' + (i+1) + '/' + files.length + ')';
+    var r = await window.SyDentFiles.upload(_apptFilesCtx.patientId, files[i], {
+      category: cat, appointmentId: _apptFilesCtx.apptId
+    });
+    if (r.ok){
+      done++;
+      if (window.logAudit){ try { window.logAudit('patient.file_upload', { patientId:_apptFilesCtx.patientId, entityId:_apptFilesCtx.apptId, description:'رفع ملف للموعد: ' + (files[i].name || '') + ' (' + cat + ')' }); } catch(e){} }
+    } else { failed++; console.error('appt upload failed', r); }
+  }
+  if (status){
+    status.textContent = failed ? ('تم رفع ' + done + ' — فشل ' + failed) : ('تم رفع ' + done + ' ملف ✓');
+    setTimeout(function(){ status.style.display = 'none'; }, 2600);
+  }
+  _apptFiles = await window.SyDentFiles.list(_apptFilesCtx.patientId, { appointmentId:_apptFilesCtx.apptId });
+  var imgPaths = _apptFiles.filter(function(f){ return window.SyDentFiles.isImage(f.mime_type); }).map(function(f){ return f.storage_path; });
+  _apptFileUrls = imgPaths.length ? await window.SyDentFiles.signedUrls(imgPaths, 3600) : {};
+  paintApptFiles();
+}
+
+async function apptDeleteFile(id){
+  var f = _apptFiles.find(function(x){ return x.id === id; });
+  if (!f) return;
+  if (!confirm('حذف هذا الملف نهائياً؟\n' + (f.file_name || ''))) return;
+  var r = await window.SyDentFiles.remove(f);
+  if (r.ok){
+    if (window.logAudit){ try { window.logAudit('patient.file_delete', { patientId:_apptFilesCtx.patientId, entityId:_apptFilesCtx.apptId, description:'حذف ملف من الموعد: ' + (f.file_name || '') }); } catch(e){} }
+    _apptFiles = _apptFiles.filter(function(x){ return x.id !== id; });
+    paintApptFiles();
+    showToast('تم الحذف');
+  } else { showToast('تعذّر الحذف'); console.error('appt delete failed', r); }
+}
+
+(function(){
+  function wire(){
+    var dz = document.getElementById('apptFileDrop');
+    if (!dz) return;
+    ['dragenter','dragover'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='#a78bfa'; }); });
+    ['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='rgba(167,139,250,0.4)'; }); });
+    dz.addEventListener('drop', function(e){ if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) apptOnFilesPicked(e.dataTransfer.files); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+})();
 
 // ─── Init ────────────────────────────────────────────
 (async function init() {

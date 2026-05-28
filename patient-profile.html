@@ -15,7 +15,7 @@
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
 <script src="theme.js?v=20260527a05"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a62"></script>
+<script src="supabase-init.js?v=20260527a66"></script>
 <script src="sidebar.js?v=20260527a64"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -668,6 +668,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
     <button class="tab" onclick="switchTab('labs',this)">🥽 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('files',this); loadPatientFiles();">📎 الملفات <span id="filesBadge" class="lab-badge" style="display:none">0</span></button>
     <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">📋 سجل النشاطات</button>
   </div>
 
@@ -795,6 +796,32 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ طلب جديد</button>
       </div>
       <div id="labOrdersContent"></div>
+    </div>
+  </div>
+
+  <!-- Tab: الملفات (Phase 9 — Patient Documents & Imaging) -->
+  <div class="panel" id="tab-files">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📎 ملفات المريض</span>
+        <select id="pfUploadCategory" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+          <option value="xray">🦷 أشعة</option>
+          <option value="clinical_photo">📷 صورة سريرية</option>
+          <option value="document" selected>📄 مستند</option>
+          <option value="receipt">🧾 إيصال</option>
+          <option value="other">📎 أخرى</option>
+        </select>
+      </div>
+      <div id="pfDropZone" onclick="document.getElementById('pfFileInput').click()"
+           style="border:2px dashed var(--border);border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;color:var(--text2);transition:all .2s;margin-bottom:16px;">
+        <div style="font-size:34px;line-height:1;">📎</div>
+        <div style="font-weight:700;color:var(--text);margin-top:8px;">اسحب الملفات هنا أو انقر للاختيار</div>
+        <div style="font-size:12px;margin-top:4px;">صور (JPG / PNG / WebP) أو PDF — حتى 10 ميغابايت للملف</div>
+      </div>
+      <input type="file" id="pfFileInput" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+             style="display:none;" onchange="pfOnFilesPicked(this.files); this.value='';">
+      <div id="pfUploadStatus" style="display:none;font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;"></div>
+      <div id="pfFilesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
     </div>
   </div>
 
@@ -1232,6 +1259,21 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button type="button" class="wa-send-btn" id="ppWaSendBtn" onclick="ppSendWaReminder()">
         <span>📱</span> <span>فتح WhatsApp وإرسال</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- File preview lightbox (Phase 9) -->
+<div class="modal-overlay" id="pfLightbox" onclick="if(event.target===this) closeModal('pfLightbox')">
+  <div class="modal-box" style="max-width:760px;width:92%;">
+    <div class="modal-head">
+      <h3 id="pfLightboxName" style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">معاينة</h3>
+      <button class="modal-close" onclick="closeModal('pfLightbox')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <img id="pfLightboxImg" alt="" style="max-width:100%;max-height:70vh;border-radius:10px;display:none;">
+      <a id="pfLightboxDownload" href="#" target="_blank" rel="noopener" download
+         style="display:inline-block;margin-top:14px;background:var(--green);color:var(--bg);text-decoration:none;border-radius:9px;padding:9px 18px;font-weight:700;font-size:13px;">⬇️ تنزيل</a>
     </div>
   </div>
 </div>
@@ -8284,6 +8326,154 @@ function showToast(msg) {
   clearTimeout(toastT);
   toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
 }
+
+/* ============================================================
+   Phase 9 — Patient Documents & Imaging  (files tab)
+   Uses the shared window.SyDentFiles helper (supabase-init.js).
+   ============================================================ */
+var _pfFiles = [];          // current patient's document rows
+var _pfUrls  = {};          // storage_path -> short-lived signed URL
+var _pfLoadInFlight = false;
+
+async function loadPatientFiles(){
+  if (!window.SyDentFiles || !patientId) return;
+  var grid = document.getElementById('pfFilesGrid');
+  if (grid && !_pfFiles.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:24px;">جارٍ التحميل…</div>';
+  }
+  if (_pfLoadInFlight) return;
+  _pfLoadInFlight = true;
+  try {
+    _pfFiles = await window.SyDentFiles.list(patientId);
+    var imgPaths = _pfFiles.filter(function(f){ return window.SyDentFiles.isImage(f.mime_type); })
+                           .map(function(f){ return f.storage_path; });
+    _pfUrls = imgPaths.length ? await window.SyDentFiles.signedUrls(imgPaths, 3600) : {};
+    renderPatientFiles();
+  } catch(e){
+    console.error('loadPatientFiles', e);
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--red);padding:24px;">تعذّر تحميل الملفات</div>';
+  } finally {
+    _pfLoadInFlight = false;
+  }
+}
+
+function pfUpdateBadge(){
+  var b = document.getElementById('filesBadge');
+  if (!b) return;
+  if (_pfFiles.length > 0) { b.textContent = _pfFiles.length; b.style.display = 'inline-block'; }
+  else b.style.display = 'none';
+}
+
+function renderPatientFiles(){
+  var grid = document.getElementById('pfFilesGrid');
+  if (!grid) return;
+  pfUpdateBadge();
+  if (!_pfFiles.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:24px;">لا توجد ملفات بعد — ارفع أول صورة أشعة أو مستند.</div>';
+    return;
+  }
+  grid.innerHTML = _pfFiles.map(function(f){
+    var isImg = window.SyDentFiles.isImage(f.mime_type);
+    var url   = _pfUrls[f.storage_path] || '';
+    var cat   = window.SyDentFiles.CAT_LABELS[f.category] || window.SyDentFiles.CAT_LABELS.other;
+    var thumb = (isImg && url)
+      ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" style="width:100%;height:110px;object-fit:cover;display:block;">'
+      : '<div style="width:100%;height:110px;display:flex;align-items:center;justify-content:center;font-size:40px;background:var(--bg3);">📄</div>';
+    var d = f.created_at ? new Date(f.created_at).toLocaleDateString('ar-SY') : '';
+    return '<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--bg2);display:flex;flex-direction:column;">' +
+      '<div style="cursor:pointer;" onclick="pfOpenFile(\'' + f.id + '\')">' + thumb + '</div>' +
+      '<div style="padding:8px 9px;flex:1;display:flex;flex-direction:column;gap:4px;">' +
+        '<div style="font-size:11px;color:var(--text2);">' + cat + '</div>' +
+        '<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(f.file_name) + '">' + escapeHtml(f.file_name) + '</div>' +
+        '<div style="font-size:10px;color:var(--text2);">' + escapeHtml(d) + ' · ' + escapeHtml(window.SyDentFiles.humanSize(f.size_bytes)) + '</div>' +
+        '<div style="display:flex;gap:6px;margin-top:4px;">' +
+          '<button onclick="pfOpenFile(\'' + f.id + '\')" title="عرض / تنزيل" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px;cursor:pointer;font-size:13px;">👁️</button>' +
+          '<button onclick="pfDeleteFile(\'' + f.id + '\')" title="حذف" style="flex:1;background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:var(--red);border-radius:7px;padding:5px;cursor:pointer;font-size:13px;">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function pfOpenFile(id){
+  var f = _pfFiles.find(function(x){ return x.id === id; });
+  if (!f) return;
+  var url = window.SyDentFiles.isImage(f.mime_type) ? _pfUrls[f.storage_path] : null;
+  if (!url) url = await window.SyDentFiles.signedUrl(f.storage_path, 3600);
+  if (!url) { showToast('تعذّر فتح الملف'); return; }
+  if (window.SyDentFiles.isImage(f.mime_type)) {
+    document.getElementById('pfLightboxName').textContent = f.file_name || 'معاينة';
+    var img = document.getElementById('pfLightboxImg');
+    img.src = url; img.style.display = 'block';
+    var dl = document.getElementById('pfLightboxDownload');
+    dl.href = url; dl.setAttribute('download', f.file_name || 'file');
+    openModal('pfLightbox');
+  } else {
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
+async function pfOnFilesPicked(fileList){
+  if (!fileList || !fileList.length) return;
+  if (!window.SyDentFiles) { showToast('الميزة غير متاحة'); return; }
+  var cat = (document.getElementById('pfUploadCategory') || {}).value || 'other';
+  var status = document.getElementById('pfUploadStatus');
+  var files = Array.prototype.slice.call(fileList);
+  var done = 0, failed = 0;
+  if (status){ status.style.display = 'block'; }
+  for (var i = 0; i < files.length; i++) {
+    if (status) status.textContent = 'جارٍ الرفع… (' + (i+1) + '/' + files.length + ')';
+    var r = await window.SyDentFiles.upload(patientId, files[i], { category: cat });
+    if (r.ok) {
+      done++;
+      if (window.logAudit) {
+        try { window.logAudit('patient.file_upload', { patientId: patientId, patientName: (patient && patient.name) || null, description: 'رفع ملف: ' + (files[i].name || '') + ' (' + cat + ')' }); } catch(e){}
+      }
+    } else {
+      failed++;
+      console.error('upload failed', r);
+    }
+  }
+  if (status) {
+    status.textContent = (failed ? ('تم رفع ' + done + ' — فشل ' + failed) : ('تم رفع ' + done + ' ملف ✓'));
+    setTimeout(function(){ status.style.display = 'none'; }, 2600);
+  }
+  await loadPatientFiles();
+}
+
+async function pfDeleteFile(id){
+  var f = _pfFiles.find(function(x){ return x.id === id; });
+  if (!f) return;
+  if (!confirm('حذف هذا الملف نهائياً؟\n' + (f.file_name || ''))) return;
+  var r = await window.SyDentFiles.remove(f);
+  if (r.ok) {
+    if (window.logAudit) { try { window.logAudit('patient.file_delete', { patientId: patientId, patientName: (patient && patient.name) || null, description: 'حذف ملف: ' + (f.file_name || '') }); } catch(e){} }
+    showToast('تم الحذف');
+    await loadPatientFiles();
+  } else {
+    showToast('تعذّر الحذف');
+    console.error('delete failed', r);
+  }
+}
+
+/* Drag-and-drop wiring for the files drop zone. */
+(function(){
+  function wire(){
+    var dz = document.getElementById('pfDropZone');
+    if (!dz) return;
+    ['dragenter','dragover'].forEach(function(ev){
+      dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--green)'; dz.style.color = 'var(--text)'; });
+    });
+    ['dragleave','drop'].forEach(function(ev){
+      dz.addEventListener(ev, function(e){ e.preventDefault(); e.stopPropagation(); dz.style.borderColor = 'var(--border)'; dz.style.color = 'var(--text2)'; });
+    });
+    dz.addEventListener('drop', function(e){
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) pfOnFilesPicked(e.dataTransfer.files);
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+})();
 
 /* ── Init ── */
 async function init() {

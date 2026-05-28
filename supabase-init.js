@@ -2755,3 +2755,165 @@
     sanitizeHex: sanitizeHex
   };
 })();
+
+/* ============================================================
+   Phase 9 — Patient Documents & Imaging  (shared helper)
+   Single source of truth for Supabase Storage I/O used by
+   patient-profile.html (files tab) + appointments.html (modal).
+   Bucket: patient-files (private). Path: {owner_id}/{patient_id}/{uuid}-{name}
+   so storage RLS (foldername[1] = auth.uid()) isolates each tenant.
+   Rule #68: consolidate repeated query patterns into window.SyDent* namespace.
+   ============================================================ */
+(function(){
+  'use strict';
+  var BUCKET = 'patient-files';
+  var CAT_LABELS = {
+    xray:           '🦷 أشعة',
+    clinical_photo: '📷 صورة سريرية',
+    document:       '📄 مستند',
+    receipt:        '🧾 إيصال',
+    other:          '📎 أخرى'
+  };
+
+  function uuid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+      var r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8); return v.toString(16);
+    });
+  }
+
+  // Keep a human-readable but filesystem-safe object name (Arabic letters allowed).
+  function sanitizeName(name){
+    name = String(name || 'file');
+    var dot  = name.lastIndexOf('.');
+    var base = dot > 0 ? name.slice(0, dot) : name;
+    var ext  = dot > 0 ? name.slice(dot)    : '';
+    base = base.replace(/[^\w\-\u0600-\u06FF]+/g, '_').slice(0, 60) || 'file';
+    ext  = ext.replace(/[^.\w]+/g, '').slice(0, 8);
+    return base + ext;
+  }
+
+  function isImage(m){ return /^image\//.test(m || ''); }
+
+  // Client-side compression. Returns a Blob for large raster images, else the
+  // original File untouched (PDFs always pass through). Never enlarges a file.
+  async function compressImage(file){
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+    if (file.size < 400 * 1024) return file;
+    try {
+      var bmp   = await createImageBitmap(file);
+      var maxD  = 1800;
+      var scale = Math.min(1, maxD / Math.max(bmp.width, bmp.height));
+      var w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+      if (bmp.close) bmp.close();
+      var blob = await new Promise(function(res){ canvas.toBlob(res, 'image/jpeg', 0.85); });
+      return (blob && blob.size < file.size) ? blob : file;
+    } catch (e){ console.warn('[SyDentFiles] compress failed, using original', e); return file; }
+  }
+
+  async function ownerId(){
+    try { var u = (await window.sb.auth.getUser()).data.user; return u ? u.id : null; }
+    catch(e){ return null; }
+  }
+
+  // opts: { appointmentId, category, note }
+  async function upload(patientId, file, opts){
+    opts = opts || {};
+    if (!window.sb)   return { ok:false, reason:'no-sb' };
+    if (!patientId)   return { ok:false, reason:'no-patient' };
+    var oid = await ownerId();
+    if (!oid)         return { ok:false, reason:'no-owner' };
+
+    var body = await compressImage(file);
+    var mime = (body && body.type) || file.type || 'application/octet-stream';
+    var displayName = file.name || ('ملف-' + Date.now());
+    var storeName   = sanitizeName(displayName);
+    // If compression transcoded to JPEG, keep the stored extension honest.
+    if (body !== file && /image\/jpeg/.test(mime) && !/\.jpe?g$/i.test(storeName)) {
+      storeName = storeName.replace(/\.[^.]+$/, '') + '.jpg';
+    }
+    var path = oid + '/' + patientId + '/' + uuid() + '-' + storeName;
+
+    var up = await window.sb.storage.from(BUCKET).upload(path, body, { contentType: mime, upsert:false });
+    if (up.error) return { ok:false, reason:'storage', error:up.error };
+
+    var ins = await window.sb.from('patient_documents').insert({
+      owner_id:       oid,
+      patient_id:     patientId,
+      appointment_id: opts.appointmentId || null,
+      storage_path:   path,
+      file_name:      displayName,
+      mime_type:      mime,
+      size_bytes:     (body && body.size) || file.size || null,
+      category:       opts.category || 'other',
+      note:           opts.note || null,
+      uploaded_by:    oid
+    }).select().single();
+
+    if (ins.error) {
+      // Roll back the orphaned object so storage never drifts from the table.
+      try { await window.sb.storage.from(BUCKET).remove([path]); } catch(e){}
+      return { ok:false, reason:'db', error:ins.error };
+    }
+    return { ok:true, row: ins.data };
+  }
+
+  // opts: { appointmentId }  → scope to one appointment's files
+  async function list(patientId, opts){
+    opts = opts || {};
+    if (!window.sb || !patientId) return [];
+    var q = window.sb.from('patient_documents').select('*')
+              .eq('patient_id', patientId).order('created_at', { ascending:false });
+    if (opts.appointmentId) q = q.eq('appointment_id', opts.appointmentId);
+    var res = await q;
+    return res.error ? [] : (res.data || []);
+  }
+
+  async function countFor(patientId){
+    if (!window.sb || !patientId) return 0;
+    var res = await window.sb.from('patient_documents')
+                .select('id', { count:'exact', head:true }).eq('patient_id', patientId);
+    return res.error ? 0 : (res.count || 0);
+  }
+
+  async function signedUrls(paths, expiry){
+    if (!window.sb || !paths || !paths.length) return {};
+    var res = await window.sb.storage.from(BUCKET).createSignedUrls(paths, expiry || 3600);
+    var map = {};
+    if (!res.error && res.data) res.data.forEach(function(d){ if (d.signedUrl) map[d.path] = d.signedUrl; });
+    return map;
+  }
+
+  async function signedUrl(path, expiry){
+    if (!window.sb || !path) return null;
+    var res = await window.sb.storage.from(BUCKET).createSignedUrl(path, expiry || 3600);
+    return res.error ? null : ((res.data && res.data.signedUrl) || null);
+  }
+
+  // Storage object removed first, then the row — a row never silently points
+  // at a missing file. Non-fatal storage error still proceeds to row delete.
+  async function remove(row){
+    if (!window.sb || !row) return { ok:false, reason:'no-row' };
+    try { await window.sb.storage.from(BUCKET).remove([row.storage_path]); } catch(e){}
+    var del = await window.sb.from('patient_documents').delete().eq('id', row.id);
+    return { ok: !del.error, error: del.error };
+  }
+
+  function humanSize(bytes){
+    bytes = Number(bytes || 0);
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
+    return (bytes/1024/1024).toFixed(1) + ' MB';
+  }
+
+  window.SyDentFiles = {
+    BUCKET: BUCKET, CAT_LABELS: CAT_LABELS,
+    upload: upload, list: list, countFor: countFor,
+    signedUrl: signedUrl, signedUrls: signedUrls,
+    remove: remove, compressImage: compressImage,
+    isImage: isImage, humanSize: humanSize
+  };
+})();
