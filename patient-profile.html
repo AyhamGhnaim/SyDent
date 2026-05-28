@@ -5067,7 +5067,15 @@ function isLightColor(hex) {
 }
 
 // OpenDental-style default provider resolver.
-// Priority order (matches OpenDental's documented logic):
+// Priority order (matches OpenDental's documented logic — the treating
+// provider defaults to whoever is *actually operating the device*):
+//   0. The ACTIVE OPERATOR (Phase-5 Device-Lock employee). In SyDent an
+//      employee doctor has no separate auth account — they use the owner's
+//      shared login via Device Lock, so currentUser.id always points at the
+//      OWNER. We must therefore resolve the operator from the locked employee
+//      identity, not the auth user, so an employee doctor logging a treatment
+//      is auto-set as the treating provider regardless of the owner-defined
+//      default. Skipped in owner mode (owner falls through to tier 2).
 //   1. The provider linked to the currently logged-in user (user_id === currentUser.id)
 //   2. The clinic owner (is_owner === true)
 //   3. First active doctor in the list
@@ -5078,6 +5086,17 @@ function getDefaultProviderId(pool) {
   // Prefer active doctors at each tier
   var active = pool.filter(function(d){ return d.is_active !== false; });
   var searchPool = active.length > 0 ? active : pool;
+  // 0) Active operator (Device-Lock employee → linked clinic_doctors row).
+  //    Defensive: only when SyDentLock is loaded AND we're not in owner mode.
+  var _lock = window.SyDentLock;
+  if (_lock && typeof _lock.getEffectiveDoctorId === 'function' &&
+      !(typeof _lock.isOwner === 'function' && _lock.isOwner())) {
+    var operatorDid = _lock.getEffectiveDoctorId();
+    if (operatorDid) {
+      var operator = searchPool.find(function(d){ return d.id === operatorDid; });
+      if (operator) return operator.id;
+    }
+  }
   // 1) User-linked provider
   if (currentUser && currentUser.id) {
     var linked = searchPool.find(function(d){ return d.user_id === currentUser.id; });
@@ -5114,7 +5133,7 @@ function populateProviderPicker() {
     html += '<option value="' + d.id + '">' + escapeHtml(d.name) + ownerStr + inactiveStr + '</option>';
   });
   select.innerHTML = html;
-  // Default via OpenDental-style resolver (user-link → owner → first active).
+  // Default via OpenDental-style resolver (active-operator → user-link → owner → first active).
   // Keep existing pendingProviderId if it's still valid in the list (user pre-selected).
   if (!pendingProviderId || !listToShow.find(function(d){ return d.id === pendingProviderId; })) {
     pendingProviderId = getDefaultProviderId(listToShow);
@@ -8422,7 +8441,7 @@ function openPayModal()     {
 function openSessionModal() {
   populateSessionTypes();
   document.getElementById('sDate').value = toDay();
-  // Populate provider picker (OpenDental-style default: user-link → owner → first active)
+  // Populate provider picker (OpenDental-style default: active-operator → user-link → owner → first active)
   var group = document.getElementById('sessionProviderGroup');
   var select = document.getElementById('sProvider');
   if (group && select) {
@@ -8480,7 +8499,7 @@ function openApptModal() {
   var chk = document.getElementById('aIsPlanned');
   if (chk) chk.checked = false;
   onApptPlannedToggle();   // make sure date/time row is visible, reason hidden
-  // Provider picker (OpenDental-style default: user-link → owner → first active)
+  // Provider picker (OpenDental-style default: active-operator → user-link → owner → first active)
   setupApptProviderPicker(null);
   // Workflow B: clear pending buffer + switch section to create mode. The
   // user can pick planned procedures NOW; they'll be linked atomically
