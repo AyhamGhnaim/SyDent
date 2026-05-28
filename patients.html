@@ -13,7 +13,7 @@
 <title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260527a05"></script>
+<script src="theme.js?v=20260528a68"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -479,10 +479,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a15">
+<link rel="stylesheet" href="theme.css?v=20260528a68">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a67"></script>
-<script src="sidebar.js?v=20260528a66"></script>
+<script src="supabase-init.js?v=20260528a68"></script>
+<script src="sidebar.js?v=20260528a68"></script>
 </head>
 <body>
 <script>
@@ -882,6 +882,27 @@ async function submitPatient(e) {
       showToast('✅ تم تعديل بيانات المريض'); closeModal(); await loadPatients();
     }
   } else {
+    // Phase D: enforce plan patient quota. Client-side check is for a friendly
+    // message + instant feedback; the DB trigger (Migration 36) is the hard,
+    // un-bypassable gate. Fail-open on any error (don't block on a glitch).
+    try {
+      if (window.SyDentPlan) {
+        await window.SyDentPlan.load();
+        var patLimit = window.SyDentPlan.limit('patients');
+        if (patLimit != null) {
+          var pc = await window.sb.from('patients')
+            .select('id', { count:'exact', head:true })
+            .eq('doctor_id', currentUser.id);
+          var pUsed = (pc && typeof pc.count === 'number') ? pc.count : 0;
+          if (pUsed >= patLimit) {
+            showToast('🔒 بلغت حد خطتك (' + patLimit + ' مريض). للمزيد رقِّ خطتك.');
+            btn.disabled = false; btn.textContent = 'حفظ المريض';
+            return;
+          }
+        }
+      }
+    } catch(limErr) { console.warn('[patients] limit check skipped:', limErr); }
+
     const maxSeq = patients.reduce((mx, p) => {
       const n = parseInt((p.local_id || 'P000').slice(1));
       return isNaN(n) ? mx : Math.max(mx, n);

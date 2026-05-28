@@ -365,6 +365,33 @@ async function refreshSidebarDynamic() {
   const nameEl = document.getElementById('sbDoctorName');
   if (nameEl) nameEl.innerHTML = name + '<br>' + role;
 
+  // Phase C: hide nav items for modules disabled by the tenant's plan.
+  // Composes with the device-role BLOCKED filter in buildHTML: an item shows
+  // only if (role allows) AND (plan allows). Fail-open via SyDentPlan.can.
+  try {
+    if (window.SyDentPlan) {
+      await window.SyDentPlan.load();
+      const nav = document.querySelector('.sb-nav');
+      if (nav) {
+        const GATEABLE = ['treatments','doctors','employees','payouts','expenses','labs','accounting','provider-reports','audit-log'];
+        GATEABLE.forEach(function(id){
+          if (window.SyDentPlan.can(id)) return;
+          let href = null;
+          for (let ni = 0; ni < navItems.length; ni++) { if (navItems[ni].id === id) { href = navItems[ni].href; break; } }
+          if (!href) return;
+          const a = nav.querySelector('.sb-item[href="' + href + '"]');
+          if (a) a.remove();
+        });
+        // Prune section headers left with no items (followed by another section or the end).
+        const secs = nav.querySelectorAll('.sb-section');
+        secs.forEach(function(sec){
+          const nx = sec.nextElementSibling;
+          if (!nx || (nx.classList && nx.classList.contains('sb-section'))) sec.remove();
+        });
+      }
+    }
+  } catch (entErr) { console.warn('[sidebar] entitlement filter skipped:', entErr); }
+
   // badge المواعيد = عدد مواعيد اليوم
   const today = new Date();
   const todayStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');

@@ -160,6 +160,86 @@
   };
 
   // ─────────────────────────────────────────────────────────
+  // Entitlements — per-plan feature gating + quota limits
+  // ─────────────────────────────────────────────────────────
+  // Single source of truth: subscription_plans.entitlements (JSONB boolean
+  // map, keyed by the same module ids as sidebar.js nav) + max_employees /
+  // max_patients numeric quotas. The tenant's tier comes from
+  // trial_requests.plan. Pattern: Stripe Entitlements + the pricing_plans
+  // model — the catalog DEFINES, the runtime ENFORCES.
+  //
+  // Fail-open by design (mirrors ensureAccountAccessible): a missing key, a
+  // missing column (pre-migration), or any error → feature ALLOWED / limit
+  // UNLIMITED. We never lock a paying tenant out of their own data over a
+  // config glitch. Under-enforcement is the safe failure direction here; the
+  // hard quota enforcement lives in the DB triggers (Migration 36).
+  (function(){
+    var _plan = null;     // cached resolved plan object
+    var _loading = null;  // in-flight promise (dedupe concurrent callers)
+
+    async function _resolve() {
+      try {
+        var user = await window.sbGetUser();
+        if (!user) return null;
+        var tr = await window.sb.from('trial_requests')
+          .select('plan').eq('user_id', user.id).maybeSingle();
+        var code = (tr && tr.data && tr.data.plan) ? tr.data.plan : null;
+        if (!code) return { code:null, entitlements:{}, max_patients:null, max_employees:null };
+        var pl = await window.sb.from('subscription_plans')
+          .select('code, display_name, entitlements, max_patients, max_employees')
+          .eq('code', code).maybeSingle();
+        var row = (pl && pl.data) ? pl.data : {};
+        return {
+          code: code,
+          display_name: row.display_name || code,
+          entitlements: (row.entitlements && typeof row.entitlements === 'object') ? row.entitlements : {},
+          max_patients:  (row.max_patients  == null ? null : Number(row.max_patients)),
+          max_employees: (row.max_employees == null ? null : Number(row.max_employees))
+        };
+      } catch(e) {
+        console.warn('[SyDentPlan] resolve failed (fail-open):', e);
+        return { code:null, entitlements:{}, max_patients:null, max_employees:null };
+      }
+    }
+
+    window.SyDentPlan = {
+      load: function() {
+        if (_plan) return Promise.resolve(_plan);
+        if (_loading) return _loading;
+        _loading = _resolve().then(function(p){ _plan = p; _loading = null; return p; });
+        return _loading;
+      },
+      getPlan: function() { return _plan; },
+      // boolean feature — default ALLOW when key/plan unknown (grandfather)
+      can: function(key) {
+        if (!_plan || !_plan.entitlements) return true;
+        return (_plan.entitlements[key] === false) ? false : true;
+      },
+      // numeric quota — null = unlimited
+      limit: function(kind) {
+        if (!_plan) return null;
+        if (kind === 'patients')  return _plan.max_patients;
+        if (kind === 'employees') return _plan.max_employees;
+        return null;
+      }
+    };
+  })();
+
+  // Phase C: full-screen "this module is not in your plan" gate. Mirrors the
+  // suspension/pending screens in sidebar.js for visual consistency.
+  window.__sydentRenderPlanBlock = function() {
+    var planName = (window.SyDentPlan && window.SyDentPlan.getPlan() && window.SyDentPlan.getPlan().display_name) || '';
+    var nameLine = planName ? ('خطتك الحالية: ' + planName) : 'هذه الميزة غير متاحة في خطتك الحالية.';
+    document.body.innerHTML =
+      '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;">' +
+        '<div style="font-size:60px;margin-bottom:16px;">🔒</div>' +
+        '<div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">هذه الميزة غير متاحة في خطتك</div>' +
+        '<div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:340px;line-height:1.7;">' + nameLine + '<br>للترقية والوصول لكل الميزات، تواصل معنا.</div>' +
+        '<a href="index.html" style="padding:14px 28px;background:#2ee89e;border-radius:12px;color:#062a1c;font-size:15px;font-weight:800;text-decoration:none;">← العودة للوحة التحكم</a>' +
+      '</div>';
+  };
+
+  // ─────────────────────────────────────────────────────────
   // Phase 7.6F — Auto-gate on page load
   // ─────────────────────────────────────────────────────────
   // Runs ensureAccountAccessible automatically on tenant pages, so we don't
@@ -187,6 +267,21 @@
       var skip = { 'auth.html':1, 'landing.html':1, 'pending.html':1, 'admin.html':1, 'reset-password.html':1 };
       if (skip[page]) return;
 
+      // Phase C: map gateable pages → entitlement module id (same ids as the
+      // sidebar nav). Core pages (dashboard/patients/appointments/settings)
+      // are intentionally absent — they are never plan-gated.
+      var PAGE_MODULE = {
+        'treatments.html':'treatments',
+        'doctors.html':'doctors',
+        'employees.html':'employees',
+        'payouts.html':'payouts',
+        'expenses.html':'expenses',
+        'labs.html':'labs',
+        'accounting.html':'accounting',
+        'provider-reports.html':'provider-reports',
+        'audit-log.html':'audit-log'
+      };
+
       var gateRan = false;
       var runGate = async function(reason) {
         if (gateRan) return;
@@ -194,7 +289,21 @@
         try {
           var user = await window.sbGetUser();
           if (!user) return; // tenant page's own auth check will redirect — let it
-          await window.ensureAccountAccessible(user);
+          var accessible = await window.ensureAccountAccessible(user);
+          if (accessible === false) return; // a redirect was already issued
+
+          // Phase C: per-plan module gate. If this page maps to a module that
+          // the tenant's plan disables, block it. Fail-open: any error here
+          // leaves the page accessible (SyDentPlan.can defaults to allow).
+          var moduleId = PAGE_MODULE[page];
+          if (moduleId && window.SyDentPlan) {
+            try {
+              await window.SyDentPlan.load();
+              if (!window.SyDentPlan.can(moduleId)) {
+                window.__sydentRenderPlanBlock();
+              }
+            } catch(mErr) { console.warn('[autoGate] module gate skipped:', mErr); }
+          }
         } catch(e) {
           console.warn('[autoGate] failed (' + reason + '):', e);
         }

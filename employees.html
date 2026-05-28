@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260527a05"></script>
+<script src="theme.js?v=20260528a68"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260527a67"></script>
-<script src="sidebar.js?v=20260528a66"></script>
+<script src="supabase-init.js?v=20260528a68"></script>
+<script src="sidebar.js?v=20260528a68"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -248,7 +248,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a15">
+<link rel="stylesheet" href="theme.css?v=20260528a68">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -1509,6 +1509,26 @@ async function saveEmployee() {
         });
       }
     } else {
+      // Phase D: enforce plan employee quota. Client-side message + instant
+      // feedback; the DB trigger (Migration 36) is the hard gate. The finally
+      // block re-enables the save button on this early return.
+      try {
+        if (window.SyDentPlan) {
+          await window.SyDentPlan.load();
+          var empLimit = window.SyDentPlan.limit('employees');
+          if (empLimit != null) {
+            var ec = await window.sb.from('clinic_employees')
+              .select('id', { count:'exact', head:true })
+              .eq('owner_id', currentUser.id);
+            var eUsed = (ec && typeof ec.count === 'number') ? ec.count : 0;
+            if (eUsed >= empLimit) {
+              showMsg('modalMsg', '🔒 بلغت حد خطتك (' + empLimit + ' موظف). للمزيد رقِّ خطتك.', true);
+              return;
+            }
+          }
+        }
+      } catch(limErr) { console.warn('[employees] limit check skipped:', limErr); }
+
       res = await window.sb.from('clinic_employees').insert(row).select().single();
       // Pre-Migration-20 fallback: retry without HR fields if they're missing
       if (res.error && _isHRColumnMissing(res.error)) {

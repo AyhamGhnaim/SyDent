@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260527a05"></script>
+<script src="theme.js?v=20260528a68"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -740,6 +740,24 @@ header{
   background:var(--text);border-radius:50%;transition:all .2s;
 }
 .plan-switch.on .plan-switch-knob{right:21px;background:#2ee89e;}
+
+/* Phase B: per-plan entitlement (module) toggles */
+.plan-entitlements-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;
+}
+@media(max-width:680px){.plan-entitlements-grid{grid-template-columns:1fr;}}
+.plan-ent-row{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:7px 10px;background:var(--bg2);border-radius:7px;border:1px solid var(--border);
+}
+.plan-ent-label{font-size:12px;font-weight:600;color:var(--text);}
+.plan-ent-switch{width:38px;height:20px;flex:0 0 auto;}
+.plan-ent-switch .plan-switch-knob{width:16px;height:16px;}
+.plan-ent-switch.on .plan-switch-knob{right:19px;}
+.preview-card-disabled{
+  font-size:11px;color:#ef9a9a;margin-top:8px;line-height:1.5;
+  border-top:1px dashed var(--border);padding-top:8px;
+}
 
 .plan-preview-pane{
   background:linear-gradient(135deg,var(--bg3) 0%,var(--bg4) 100%);
@@ -2083,11 +2101,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260528a15">
+<link rel="stylesheet" href="theme.css?v=20260528a68">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260527a67"></script>
+<script src="supabase-init.js?v=20260528a68"></script>
 </head>
 <body>
 
@@ -2218,9 +2236,9 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
       </div>
       <div class="plan-editor-body">
         <div class="plan-tabs-wrap" id="planTabsWrap">
-          <button type="button" class="plan-tab active" data-plan-code="trial"   onclick="selectPlanTab('trial',this)">🆓 تجربة</button>
-          <button type="button" class="plan-tab"        data-plan-code="monthly" onclick="selectPlanTab('monthly',this)">💵 شهري</button>
-          <button type="button" class="plan-tab"        data-plan-code="yearly"  onclick="selectPlanTab('yearly',this)">💎 سنوي</button>
+          <button type="button" class="plan-tab active" data-plan-code="trial"   onclick="selectPlanTab('trial',this)"><span class="plan-tab-icon">🆓</span> <span class="plan-tab-label">تجربة</span></button>
+          <button type="button" class="plan-tab"        data-plan-code="monthly" onclick="selectPlanTab('monthly',this)"><span class="plan-tab-icon">💵</span> <span class="plan-tab-label">شهري</span></button>
+          <button type="button" class="plan-tab"        data-plan-code="yearly"  onclick="selectPlanTab('yearly',this)"><span class="plan-tab-icon">💎</span> <span class="plan-tab-label">سنوي</span></button>
         </div>
         <div class="plan-edit-grid">
           <div class="plan-edit-pane">
@@ -2256,6 +2274,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
               <label for="planFldFeatures">الميزات (سطر لكل ميزة)</label>
               <textarea id="planFldFeatures" oninput="onPlanFieldChange()" placeholder="كل الميزات&#10;حتى 5 موظفين&#10;حتى 50 مريض&#10;بدون التزام"></textarea>
               <div class="plan-field-hint">كل سطر يصبح بنداً منفصلاً في بطاقة العرض. السطور الفارغة تُحذف تلقائياً. <strong style="color:#ffc107;">ملاحظة:</strong> رقم الخصم في الميزات (مثل "خصم ~16%") لا يُحسب تلقائياً — حدّثه يدوياً لو غيّرت السعر.</div>
+            </div>
+            <div class="plan-field">
+              <label>الموديولات المُفعّلة <span style="color:var(--text3);font-weight:400;">(أطفئ ميزة لإخفائها وحجبها عن هذه الخطة)</span></label>
+              <div class="plan-entitlements-grid" id="planEntitlementsGrid"></div>
+              <div class="plan-field-hint">إيقاف موديول يخفيه من القائمة الجانبية ويمنع الوصول لصفحته للمشتركين على هذه الخطة. الصفحات الأساسية (المرضى/المواعيد/الإعدادات) لا تُحجب.</div>
             </div>
             <div class="plan-toggle-row">
               <div>
@@ -3656,11 +3679,13 @@ async function loadPlanConfig() {
                    max_employees:null, max_patients:null, is_active:true, sort_order:3 }
       };
       planConfigLoaded = true;
+      refreshPlanTabLabels(); // Phase A
       return false;
     }
     planConfigCache = {};
     (res.data || []).forEach(function(p){ planConfigCache[p.code] = p; });
     planConfigLoaded = true;
+    refreshPlanTabLabels(); // Phase A: tab labels follow display_name
     return true;
   } catch(e) {
     console.warn('loadPlanConfig error:', e);
@@ -3710,6 +3735,62 @@ var planEditorState = {
   isDirty:  false
 };
 
+// Phase B: gateable modules (ids match sidebar.js nav + the autoGate
+// PAGE_MODULE map + Migration 35 seed). Each toggle, when OFF, hides the
+// module from the sidebar AND blocks its page for tenants on this plan.
+var PLAN_ENTITLEMENT_DEFS = [
+  { key:'treatments',       label:'قائمة العلاجات' },
+  { key:'doctors',          label:'أطباء العيادة' },
+  { key:'employees',        label:'الموظفون' },
+  { key:'payouts',          label:'المدفوعات' },
+  { key:'expenses',         label:'المصاريف' },
+  { key:'labs',             label:'المخابر' },
+  { key:'accounting',       label:'المحاسبة' },
+  { key:'provider-reports', label:'تقارير الأطباء' },
+  { key:'audit-log',        label:'سجل النشاطات' }
+];
+
+function renderPlanEntitlements(p) {
+  var grid = document.getElementById('planEntitlementsGrid');
+  if (!grid) return;
+  var ent = (p && p.entitlements && typeof p.entitlements === 'object') ? p.entitlements : {};
+  var html = '';
+  for (var i = 0; i < PLAN_ENTITLEMENT_DEFS.length; i++) {
+    var d = PLAN_ENTITLEMENT_DEFS[i];
+    var on = (ent[d.key] === false) ? false : true; // default ON (grandfather)
+    html +=
+      '<div class="plan-ent-row">' +
+        '<span class="plan-ent-label">' + escapeHtml(d.label) + '</span>' +
+        '<div class="plan-switch plan-ent-switch' + (on ? ' on' : '') + '" role="switch" ' +
+             'aria-checked="' + (on ? 'true' : 'false') + '" tabindex="0" ' +
+             'data-ent-key="' + escapeHtml(d.key) + '" ' +
+             'onclick="onPlanEntitlementToggle(\'' + d.key + '\')" ' +
+             'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();onPlanEntitlementToggle(\'' + d.key + '\');}">' +
+          '<span class="plan-switch-knob"></span>' +
+        '</div>' +
+      '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+function onPlanEntitlementToggle(key) {
+  if (!planEditorState.edited) return;
+  if (!planEditorState.edited.entitlements || typeof planEditorState.edited.entitlements !== 'object') {
+    planEditorState.edited.entitlements = {};
+  }
+  var cur = (planEditorState.edited.entitlements[key] === false) ? false : true;
+  planEditorState.edited.entitlements[key] = !cur; // flip (true → false → true)
+  var sw = document.querySelector('#planEntitlementsGrid .plan-ent-switch[data-ent-key="' + key + '"]');
+  if (sw) {
+    var nowOn = planEditorState.edited.entitlements[key] !== false;
+    sw.classList.toggle('on', nowOn);
+    sw.setAttribute('aria-checked', nowOn ? 'true' : 'false');
+  }
+  computePlanDirty();
+  renderPlanPreview(planEditorState.edited);
+  updatePlanDirtyUI();
+}
+
 function togglePlanEditor() {
   var sec = document.getElementById('planEditorSection');
   if (!sec) return;
@@ -3725,6 +3806,21 @@ function togglePlanEditor() {
     // Re-load fresh from cache every time the section opens so the editor
     // reflects any external changes (e.g. another admin tab made an edit).
     selectPlanTab(planEditorState.selectedCode, null);
+  }
+}
+
+// Phase A: tab labels mirror display_name (not the fixed plan code) so that
+// renaming a plan to e.g. "Mini" is reflected in the tab strip at the top of
+// the editor — not just the preview card. The leading icon span is preserved.
+function refreshPlanTabLabels() {
+  var wrap = document.getElementById('planTabsWrap');
+  if (!wrap) return;
+  var tabs = wrap.querySelectorAll('.plan-tab');
+  for (var i = 0; i < tabs.length; i++) {
+    var code = tabs[i].getAttribute('data-plan-code');
+    var cfg = getPlanConfig(code);
+    var lblEl = tabs[i].querySelector('.plan-tab-label');
+    if (lblEl) lblEl.textContent = (cfg && cfg.display_name) ? cfg.display_name : code;
   }
 }
 
@@ -3756,6 +3852,7 @@ function selectPlanTab(code, btnEl) {
   renderPlanEditorFields(planEditorState.edited);
   renderPlanPreview(planEditorState.edited);
   updatePlanDirtyUI();
+  refreshPlanTabLabels(); // Phase A: keep all tab labels in sync on switch
 }
 
 function renderPlanEditorFields(p) {
@@ -3766,6 +3863,7 @@ function renderPlanEditorFields(p) {
   document.getElementById('planFldMaxEmp').value      = (p.max_employees == null ? '' : String(p.max_employees));
   document.getElementById('planFldMaxPat').value      = (p.max_patients == null ? '' : String(p.max_patients));
   document.getElementById('planFldFeatures').value    = stringifyFeatures(p.features);
+  renderPlanEntitlements(p); // Phase B
   var sw = document.getElementById('planSwitchActive');
   if (sw) {
     sw.classList.toggle('on', !!p.is_active);
@@ -3815,6 +3913,11 @@ function onPlanFieldChange() {
   computePlanDirty();
   renderPlanPreview(planEditorState.edited);
   updatePlanDirtyUI();
+  // Phase A: live-reflect the typed name in the active tab label.
+  var activeLbl = document.querySelector('#planTabsWrap .plan-tab.active .plan-tab-label');
+  if (activeLbl && planEditorState.edited) {
+    activeLbl.textContent = planEditorState.edited.display_name || planEditorState.selectedCode;
+  }
 }
 
 function onPlanToggleActive() {
@@ -3844,6 +3947,9 @@ function computePlanDirty() {
     if (a !== b) { planEditorState.isDirty = true; return; }
   }
   if (JSON.stringify(o.features || []) !== JSON.stringify(e.features || [])) {
+    planEditorState.isDirty = true; return;
+  }
+  if (JSON.stringify(o.entitlements || {}) !== JSON.stringify(e.entitlements || {})) {
     planEditorState.isDirty = true; return;
   }
   planEditorState.isDirty = false;
@@ -3889,13 +3995,23 @@ function renderPlanPreview(p) {
       featsHtml += '<li class="preview-feature">' + escapeHtml(String(featsArr[i])) + '</li>';
     }
   }
+  // Phase B: summarize modules switched OFF on this plan.
+  var entP = (p.entitlements && typeof p.entitlements === 'object') ? p.entitlements : {};
+  var disabledNames = [];
+  for (var dj = 0; dj < PLAN_ENTITLEMENT_DEFS.length; dj++) {
+    if (entP[PLAN_ENTITLEMENT_DEFS[dj].key] === false) disabledNames.push(PLAN_ENTITLEMENT_DEFS[dj].label);
+  }
+  var disabledHtml = disabledNames.length
+    ? '<div class="preview-card-disabled">🔒 محجوب على هذه الخطة: ' + disabledNames.map(escapeHtml).join('، ') + '</div>'
+    : '';
   box.innerHTML =
     inactive +
     '<div class="preview-card-name">' + name + '</div>' +
     '<div class="preview-card-price">' + priceStr + ' <span class="preview-card-currency">' + curr + '</span></div>' +
     '<div class="preview-card-duration">لمدة ' + dur + ' يوم</div>' +
     '<div class="preview-card-limits">' + limits + '</div>' +
-    '<ul class="preview-features">' + featsHtml + '</ul>';
+    '<ul class="preview-features">' + featsHtml + '</ul>' +
+    disabledHtml;
 }
 
 function validatePlanEdits(p) {
@@ -3957,6 +4073,20 @@ function buildPlanDiff(orig, edited) {
   if (JSON.stringify(oFeat) !== JSON.stringify(eFeat)) {
     diff.features = { from_count:oFeat.length, to_count:eFeat.length, changed:true };
   }
+  var oEnt = (orig.entitlements && typeof orig.entitlements === 'object') ? orig.entitlements : {};
+  var eEnt = (edited.entitlements && typeof edited.entitlements === 'object') ? edited.entitlements : {};
+  if (JSON.stringify(oEnt) !== JSON.stringify(eEnt)) {
+    // Record which modules were turned on/off (clean change log, Stripe events style).
+    var turnedOff = [], turnedOn = [];
+    for (var ek = 0; ek < PLAN_ENTITLEMENT_DEFS.length; ek++) {
+      var k = PLAN_ENTITLEMENT_DEFS[ek].key;
+      var was = (oEnt[k] === false) ? false : true;
+      var now = (eEnt[k] === false) ? false : true;
+      if (was && !now) turnedOff.push(k);
+      else if (!was && now) turnedOn.push(k);
+    }
+    diff.entitlements = { enabled:turnedOn, disabled:turnedOff };
+  }
   return diff;
 }
 
@@ -3971,6 +4101,7 @@ function revertPlanEdits(silent) {
   renderPlanEditorFields(planEditorState.edited);
   renderPlanPreview(planEditorState.edited);
   updatePlanDirtyUI();
+  refreshPlanTabLabels(); // Phase A: restore label after revert
 }
 
 async function savePlanEdits() {
@@ -4014,7 +4145,8 @@ async function savePlanEdits() {
     max_employees:'حد الموظفين',
     max_patients:'حد المرضى',
     is_active:'حالة التفعيل',
-    features:'الميزات'
+    features:'الميزات',
+    entitlements:'الموديولات'
   };
   var changedKeys = Object.keys(diff);
   var changedArabic = changedKeys.map(function(k){ return labelMap[k] || k; });
@@ -4039,6 +4171,12 @@ async function savePlanEdits() {
       features:      p.features,
       is_active:     !!p.is_active
     };
+    // Resilience: only send entitlements if the loaded row actually had the
+    // column (i.e. Migration 35 ran). Pre-migration, o.entitlements is
+    // undefined → we omit it so name/price/etc. edits still save cleanly.
+    if (o.entitlements !== undefined) {
+      updatePayload.entitlements = (p.entitlements && typeof p.entitlements === 'object') ? p.entitlements : {};
+    }
     // updated_by — write the admin's email if available, falling back to a
     // generic marker. Matches the performed_by convention in subscription_events.
     try {
@@ -4128,6 +4266,7 @@ async function savePlanEdits() {
     renderPlanEditorFields(planEditorState.edited);
     renderPlanPreview(planEditorState.edited);
     updatePlanDirtyUI();
+    refreshPlanTabLabels(); // Phase A: tab strip reflects the saved name
 
     alert('✅ تم حفظ تعديلات خطة "' + p.display_name + '".');
   } catch(e) {
