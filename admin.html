@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a89"></script>
+<script src="theme.js?v=20260529a90"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2143,11 +2143,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a89">
+<link rel="stylesheet" href="theme.css?v=20260529a90">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a89"></script>
+<script src="supabase-init.js?v=20260529a90"></script>
 </head>
 <body>
 
@@ -4005,6 +4005,7 @@ async function addPlanTab() {
   try {
     var ins = await window.sb.from('subscription_plans').insert(newRow).select().maybeSingle();
     if (ins.error) { alert('❌ فشل إنشاء الخطة: ' + (ins.error.message || 'خطأ غير معروف')); return; }
+    if (!ins.data) { alert('❌ لم تُنشأ الخطة (0 صفوف). غالباً صلاحيات المسؤول — سجّل خروج/دخول وأعد المحاولة.'); return; }
     await logSubscriptionEvent({
       trial_request_id: null, user_id: null, event_type: 'plan_created',
       from_plan: code, to_plan: code, from_status: null, to_status: null,
@@ -4023,6 +4024,7 @@ async function archivePlan(code, name) {
   try {
     var upd = await window.sb.from('subscription_plans').update({ is_active: false }).eq('code', code).select().maybeSingle();
     if (upd.error) { alert('❌ فشل الأرشفة: ' + (upd.error.message || 'خطأ غير معروف')); return; }
+    if (!upd.data) { alert('❌ لم تتم الأرشفة (0 صفوف). غالباً صلاحيات المسؤول — سجّل خروج/دخول وأعد المحاولة.'); return; }
     await logSubscriptionEvent({
       trial_request_id: null, user_id: null, event_type: 'plan_updated',
       from_plan: code, to_plan: code, from_status: null, to_status: null,
@@ -4627,6 +4629,15 @@ async function savePlanEdits() {
     if (upd.error) {
       console.error('savePlanEdits: update error', upd.error);
       alert('❌ فشل الحفظ: ' + (upd.error.message || 'خطأ غير معروف'));
+      return;
+    }
+    // Silent-failure guard (Rule from Phase X3): update().maybeSingle() returns
+    // data:null with NO error when the UPDATE matched 0 rows — almost always an
+    // RLS write denial (the session isn't recognized as a platform admin).
+    // Without this check the code would falsely report "✅ تم الحفظ".
+    if (!upd.data) {
+      console.warn('savePlanEdits: update affected 0 rows (RLS write denial?)', { code:o.code, upd:upd });
+      alert('❌ لم يُحفظ أي تعديل (0 صفوف تأثّرت).\n\nالسبب الأرجح: صلاحيات الكتابة (RLS) — جلستك غير معترَف بها كمسؤول منصّة للكتابة.\n\nجرّب: تسجيل خروج ثم دخول من جديد. إذا استمرّت المشكلة أبلغني لأتحقق من جدول platform_admins.');
       return;
     }
 
