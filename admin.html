@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a88"></script>
+<script src="theme.js?v=20260529a89"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2143,11 +2143,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a88">
+<link rel="stylesheet" href="theme.css?v=20260529a89">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a88"></script>
+<script src="supabase-init.js?v=20260529a89"></script>
 </head>
 <body>
 
@@ -2337,17 +2337,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
                 <input type="text" id="planFldFeaturedLabel" oninput="onPlanFieldChange()" autocomplete="off" placeholder="الأكثر شعبية">
               </div>
             </div>
-            <div class="plan-field-row">
-              <div class="plan-field">
-                <label for="planFldEmployeesDisp">عرض حد الموظفين <span style="color:var(--text3);font-weight:400;">(نص حر — فارغ = تلقائي)</span></label>
-                <input type="text" id="planFldEmployeesDisp" oninput="onPlanFieldChange()" autocomplete="off" placeholder="مثال: حتى 3 موظفين">
-              </div>
-              <div class="plan-field">
-                <label for="planFldPatientsDisp">عرض حد المرضى <span style="color:var(--text3);font-weight:400;">(نص حر — فارغ = تلقائي)</span></label>
-                <input type="text" id="planFldPatientsDisp" oninput="onPlanFieldChange()" autocomplete="off" placeholder="مثال: حتى 500 مريض">
-              </div>
-            </div>
-            <div class="plan-field-hint" style="margin-bottom:14px;">🎨 حقول العرض أعلاه تظهر في صفحة الأسعار فقط — <strong>لا تؤثّر</strong> على المدة الفعلية أو حدود المرضى/الموظفين المُطبّقة على الحساب (تلك تُضبط من «المدة» و«حد الموظفين» و«حد المرضى»).</div>
+            <div class="plan-field-hint" style="margin-bottom:14px;">🎨 العبارة التعريفية وتسمية الفترة وشارة الإبراز أعلاه للعرض فقط في صفحة الأسعار — <strong>لا تؤثّر</strong> على المدة الفعلية أو حدود المرضى/الموظفين (تلك تُضبط من «المدة» و«حد الموظفين» و«حد المرضى»، وتظهر في البطاقة تلقائياً).</div>
             <div class="plan-toggle-row">
               <div>
                 <div class="plan-toggle-label">⭐ الأكثر شعبية</div>
@@ -3816,17 +3806,17 @@ async function loadPlanConfig() {
                    features:['كل الميزات','حتى 5 موظفين','حتى 50 مريض','بدون التزام'],
                    max_employees:5, max_patients:50, is_active:true, sort_order:1,
                    icon:'🆓', subtitle:'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.', price_period_label:'لمدة 30 يوم',
-                   patients_display:null, employees_display:null, is_featured:false, featured_label:'الأكثر شعبية' },
+                   is_featured:false, featured_label:'الأكثر شعبية' },
         monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP',
                    features:['كل الميزات','موظفين بلا حدود','مرضى بلا حدود','دعم فني','نسخ احتياطي يومي'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:2,
                    icon:'💵', subtitle:'دفعة شهرية مرنة. أوقف متى شئت.', price_period_label:'شهرياً',
-                   patients_display:null, employees_display:null, is_featured:false, featured_label:'الأكثر شعبية' },
+                   is_featured:false, featured_label:'الأكثر شعبية' },
         yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP',
                    features:['كل ميزات الشهري','خصم ~16%','أولوية الدعم','ميزات حصرية قادمة'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:3,
                    icon:'💎', subtitle:'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.', price_period_label:'سنوياً',
-                   patients_display:null, employees_display:null, is_featured:true, featured_label:'الأكثر شعبية' }
+                   is_featured:true, featured_label:'الأكثر شعبية' }
       };
       planConfigLoaded = true;
       refreshPlanTabLabels(); // Phase A
@@ -4136,8 +4126,6 @@ function renderPlanEditorFields(p) {
   document.getElementById('planFldSubtitle').value      = p.subtitle || '';
   document.getElementById('planFldPeriodLabel').value   = p.price_period_label || '';
   document.getElementById('planFldFeaturedLabel').value = p.featured_label || '';
-  document.getElementById('planFldEmployeesDisp').value = p.employees_display || '';
-  document.getElementById('planFldPatientsDisp').value  = p.patients_display || '';
   renderPlanEntitlements(p); // Phase B
   var sw = document.getElementById('planSwitchActive');
   if (sw) {
@@ -4247,8 +4235,6 @@ function readEditorIntoState() {
   ed.subtitle           = (document.getElementById('planFldSubtitle').value || '').trim() || null;
   ed.price_period_label = (document.getElementById('planFldPeriodLabel').value || '').trim() || null;
   ed.featured_label     = (document.getElementById('planFldFeaturedLabel').value || '').trim() || null;
-  ed.employees_display  = (document.getElementById('planFldEmployeesDisp').value || '').trim() || null;
-  ed.patients_display   = (document.getElementById('planFldPatientsDisp').value || '').trim() || null;
   // is_active is mutated separately via onPlanToggleActive() — no read needed.
   // is_featured is mutated separately via onPlanToggleFeatured() — no read needed.
 }
@@ -4302,7 +4288,7 @@ function computePlanDirty() {
   if (!o || !e) { planEditorState.isDirty = false; return; }
   // Compare each editable field. JSON.stringify on features handles arrays.
   var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
-              'icon','subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
+              'icon','subtitle','price_period_label','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var a = o[keys[i]]; var b = e[keys[i]];
     // Normalize null/undefined to null for comparison.
@@ -4348,16 +4334,12 @@ function renderPlanPreview(p) {
   var featuredHtml = p.is_featured
     ? '<div class="preview-card-featured">⭐ ' + escapeHtml(p.featured_label || 'الأكثر شعبية') + '</div>' : '';
   var limits = '';
-  if (p.employees_display && String(p.employees_display).trim()) {
-    limits += '<span class="preview-card-limit">👥 ' + escapeHtml(p.employees_display) + '</span>';
-  } else if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
+  if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
     limits += '<span class="preview-card-limit">👥 حتى ' + Number(p.max_employees) + ' موظف</span>';
   } else {
     limits += '<span class="preview-card-limit">👥 بلا حد</span>';
   }
-  if (p.patients_display && String(p.patients_display).trim()) {
-    limits += '<span class="preview-card-limit">🦷 ' + escapeHtml(p.patients_display) + '</span>';
-  } else if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
+  if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
     limits += '<span class="preview-card-limit">🦷 حتى ' + Number(p.max_patients) + ' مريض</span>';
   } else {
     limits += '<span class="preview-card-limit">🦷 بلا حد</span>';
@@ -4441,12 +4423,6 @@ function validatePlanEdits(p) {
   if (p.featured_label != null && String(p.featured_label).length > 40) {
     return { ok:false, error:'تسمية شارة الإبراز طويلة جداً (الحد الأقصى 40 حرف).' };
   }
-  if (p.employees_display != null && String(p.employees_display).length > 60) {
-    return { ok:false, error:'نص عرض حد الموظفين طويل جداً (الحد الأقصى 60 حرف).' };
-  }
-  if (p.patients_display != null && String(p.patients_display).length > 60) {
-    return { ok:false, error:'نص عرض حد المرضى طويل جداً (الحد الأقصى 60 حرف).' };
-  }
   return { ok:true, error:null };
 }
 
@@ -4457,7 +4433,7 @@ function buildPlanDiff(orig, edited) {
   if (!orig || !edited) return {};
   var diff = {};
   var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
-              'icon','subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
+              'icon','subtitle','price_period_label','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
     var a = orig[k]; var b = edited[k];
@@ -4552,8 +4528,6 @@ async function savePlanEdits() {
     icon:'الأيقونة',
     subtitle:'العبارة التعريفية',
     price_period_label:'تسمية الفترة',
-    patients_display:'عرض حد المرضى',
-    employees_display:'عرض حد الموظفين',
     is_featured:'الأكثر شعبية',
     featured_label:'تسمية الإبراز'
   };
@@ -4593,8 +4567,6 @@ async function savePlanEdits() {
     if (o.is_featured !== undefined) {
       updatePayload.subtitle           = (p.subtitle == null || p.subtitle === '') ? null : String(p.subtitle);
       updatePayload.price_period_label = (p.price_period_label == null || p.price_period_label === '') ? null : String(p.price_period_label);
-      updatePayload.patients_display   = (p.patients_display == null || p.patients_display === '') ? null : String(p.patients_display);
-      updatePayload.employees_display  = (p.employees_display == null || p.employees_display === '') ? null : String(p.employees_display);
       updatePayload.is_featured        = !!p.is_featured;
       updatePayload.featured_label     = (p.featured_label == null || p.featured_label === '') ? null : String(p.featured_label);
     }

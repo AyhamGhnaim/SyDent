@@ -34,7 +34,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a88"></script>
+<script src="theme.js?v=20260529a89"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -582,9 +582,9 @@ footer{
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a88">
+<link rel="stylesheet" href="theme.css?v=20260529a89">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a88"></script>
+<script src="supabase-init.js?v=20260529a89"></script>
 </head>
 <body>
 
@@ -864,19 +864,14 @@ footer{
       var subtitle = (p.subtitle && String(p.subtitle).trim()) ? escHtml(p.subtitle) : '';
       var period = (p.price_period_label && String(p.price_period_label).trim())
         ? escHtml(p.price_period_label) : ('لمدة ' + dur + ' يوم');
-      // Limits chips — admin can override the displayed text without touching
-      // the enforced max_employees / max_patients.
+      // Limits chips — from the enforced max_employees / max_patients.
       var limits = '';
-      if (p.employees_display && String(p.employees_display).trim()) {
-        limits += '<span class="pricing-card-limit">👥 ' + escHtml(p.employees_display) + '</span>';
-      } else if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
+      if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
         limits += '<span class="pricing-card-limit">👥 حتى ' + Number(p.max_employees) + ' موظف</span>';
       } else {
         limits += '<span class="pricing-card-limit">👥 بلا حد</span>';
       }
-      if (p.patients_display && String(p.patients_display).trim()) {
-        limits += '<span class="pricing-card-limit">🦷 ' + escHtml(p.patients_display) + '</span>';
-      } else if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
+      if (p.max_patients != null && !isNaN(Number(p.max_patients))) {
         limits += '<span class="pricing-card-limit">🦷 حتى ' + Number(p.max_patients) + ' مريض</span>';
       } else {
         limits += '<span class="pricing-card-limit">🦷 بلا حد</span>';
