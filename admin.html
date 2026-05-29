@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a90"></script>
+<script src="theme.js?v=20260529a91"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2143,11 +2143,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a90">
+<link rel="stylesheet" href="theme.css?v=20260529a91">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a90"></script>
+<script src="supabase-init.js?v=20260529a91"></script>
 </head>
 <body>
 
@@ -4571,6 +4571,11 @@ async function savePlanEdits() {
       updatePayload.price_period_label = (p.price_period_label == null || p.price_period_label === '') ? null : String(p.price_period_label);
       updatePayload.is_featured        = !!p.is_featured;
       updatePayload.featured_label     = (p.featured_label == null || p.featured_label === '') ? null : String(p.featured_label);
+    } else if (diff.subtitle || diff.price_period_label || diff.is_featured || diff.featured_label) {
+      // Migration 37 not applied yet → those columns don't exist, so the block
+      // above is skipped. Surface this instead of silently dropping the edit
+      // (the owner hit exactly this: "saved" but the subtitle reverts).
+      alert('⚠️ حقول العرض (العبارة التعريفية / تسمية الفترة / الأكثر شعبية / تسمية الإبراز) لن تُحفظ — أعمدتها غير موجودة بعد في قاعدة البيانات.\n\nشغّل Migration 37 في Supabase ثم أعد المحاولة.\n\n(الحقول الأساسية كالاسم والسعر ستُحفظ الآن عادةً.)');
     }
     // icon ships from Migration 38 (separate from the 37 batch) — guard with
     // its own sentinel so name/price edits still save if 38 hasn't run yet.
