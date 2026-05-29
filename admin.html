@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a85"></script>
+<script src="theme.js?v=20260529a86"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2109,11 +2109,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a85">
+<link rel="stylesheet" href="theme.css?v=20260529a86">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a85"></script>
+<script src="supabase-init.js?v=20260529a86"></script>
 </head>
 <body>
 
@@ -2284,6 +2284,10 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
               <div class="plan-field-hint">كل سطر يصبح بنداً منفصلاً في بطاقة العرض. السطور الفارغة تُحذف تلقائياً. <strong style="color:#ffc107;">ملاحظة:</strong> رقم الخصم في الميزات (مثل "خصم ~16%") لا يُحسب تلقائياً — حدّثه يدوياً لو غيّرت السعر.</div>
             </div>
             <!-- Phase X11: Display layer (decoupled from enforcement) -->
+            <div class="plan-field">
+              <label for="planFldIcon">أيقونة الخطة <span style="color:var(--text3);font-weight:400;">(إيموجي بجانب الاسم — فارغة = بدون أيقونة)</span></label>
+              <input type="text" id="planFldIcon" oninput="onPlanFieldChange()" autocomplete="off" maxlength="8" placeholder="مثال: 💎" style="max-width:120px;">
+            </div>
             <div class="plan-field">
               <label for="planFldSubtitle">العبارة التعريفية <span style="color:var(--text3);font-weight:400;">(تحت اسم الخطة — فارغة = تُخفى)</span></label>
               <input type="text" id="planFldSubtitle" oninput="onPlanFieldChange()" autocomplete="off" placeholder="مثال: دفعة شهرية مرنة. أوقف متى شئت.">
@@ -3775,17 +3779,17 @@ async function loadPlanConfig() {
         trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       currency:'SYP',
                    features:['كل الميزات','حتى 5 موظفين','حتى 50 مريض','بدون التزام'],
                    max_employees:5, max_patients:50, is_active:true, sort_order:1,
-                   subtitle:'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.', price_period_label:'لمدة 30 يوم',
+                   icon:'🆓', subtitle:'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.', price_period_label:'لمدة 30 يوم',
                    patients_display:null, employees_display:null, is_featured:false, featured_label:'الأكثر شعبية' },
         monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP',
                    features:['كل الميزات','موظفين بلا حدود','مرضى بلا حدود','دعم فني','نسخ احتياطي يومي'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:2,
-                   subtitle:'دفعة شهرية مرنة. أوقف متى شئت.', price_period_label:'شهرياً',
+                   icon:'💵', subtitle:'دفعة شهرية مرنة. أوقف متى شئت.', price_period_label:'شهرياً',
                    patients_display:null, employees_display:null, is_featured:false, featured_label:'الأكثر شعبية' },
         yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP',
                    features:['كل ميزات الشهري','خصم ~16%','أولوية الدعم','ميزات حصرية قادمة'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:3,
-                   subtitle:'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.', price_period_label:'سنوياً',
+                   icon:'💎', subtitle:'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.', price_period_label:'سنوياً',
                    patients_display:null, employees_display:null, is_featured:true, featured_label:'الأكثر شعبية' }
       };
       planConfigLoaded = true;
@@ -3931,6 +3935,11 @@ function refreshPlanTabLabels() {
     var cfg = getPlanConfig(code);
     var lblEl = tabs[i].querySelector('.plan-tab-label');
     if (lblEl) lblEl.textContent = (cfg && cfg.display_name) ? cfg.display_name : code;
+    // Phase X11: icon follows the plan's icon column. Only touch it if the
+    // column exists (cfg.icon !== undefined) so the hard-coded fallback icon
+    // stays put on a pre-Migration-38 DB.
+    var icoEl = tabs[i].querySelector('.plan-tab-icon');
+    if (icoEl && cfg && cfg.icon !== undefined) icoEl.textContent = cfg.icon || '';
   }
 }
 
@@ -3974,6 +3983,7 @@ function renderPlanEditorFields(p) {
   document.getElementById('planFldMaxPat').value      = (p.max_patients == null ? '' : String(p.max_patients));
   document.getElementById('planFldFeatures').value    = stringifyFeatures(p.features);
   // Phase X11: display-layer fields
+  document.getElementById('planFldIcon').value          = p.icon || '';
   document.getElementById('planFldSubtitle').value      = p.subtitle || '';
   document.getElementById('planFldPeriodLabel').value   = p.price_period_label || '';
   document.getElementById('planFldFeaturedLabel').value = p.featured_label || '';
@@ -4027,6 +4037,7 @@ function readEditorIntoState() {
   ed.max_patients = mp === '' ? null : Number(mp);
   ed.features = parseFeatures(document.getElementById('planFldFeatures').value);
   // Phase X11: display-layer fields (blank → null so the column stores NULL).
+  ed.icon               = (document.getElementById('planFldIcon').value || '').trim() || null;
   ed.subtitle           = (document.getElementById('planFldSubtitle').value || '').trim() || null;
   ed.price_period_label = (document.getElementById('planFldPeriodLabel').value || '').trim() || null;
   ed.featured_label     = (document.getElementById('planFldFeaturedLabel').value || '').trim() || null;
@@ -4045,6 +4056,11 @@ function onPlanFieldChange() {
   var activeLbl = document.querySelector('#planTabsWrap .plan-tab.active .plan-tab-label');
   if (activeLbl && planEditorState.edited) {
     activeLbl.textContent = planEditorState.edited.display_name || planEditorState.selectedCode;
+  }
+  // Phase X11: live-reflect the typed icon in the active tab.
+  var activeIco = document.querySelector('#planTabsWrap .plan-tab.active .plan-tab-icon');
+  if (activeIco && planEditorState.edited && planEditorState.edited.icon !== undefined) {
+    activeIco.textContent = planEditorState.edited.icon || '';
   }
 }
 
@@ -4080,7 +4096,7 @@ function computePlanDirty() {
   if (!o || !e) { planEditorState.isDirty = false; return; }
   // Compare each editable field. JSON.stringify on features handles arrays.
   var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
-              'subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
+              'icon','subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var a = o[keys[i]]; var b = e[keys[i]];
     // Normalize null/undefined to null for comparison.
@@ -4113,6 +4129,7 @@ function renderPlanPreview(p) {
     ? '<div class="preview-inactive-badge">⏸️ موقوفة</div>'
     : '';
   var name = escapeHtml(p.display_name || '—');
+  var iconStr = (p.icon && String(p.icon).trim()) ? (escapeHtml(p.icon) + ' ') : '';
   var priceNum = (p.price == null || isNaN(Number(p.price))) ? 0 : Number(p.price);
   var priceStr = priceNum.toLocaleString('en-US');
   var dur = (p.duration_days == null || isNaN(Number(p.duration_days))) ? '—' : String(p.duration_days);
@@ -4159,7 +4176,7 @@ function renderPlanPreview(p) {
     : '';
   box.innerHTML =
     inactive + featuredHtml +
-    '<div class="preview-card-name">' + name + '</div>' +
+    '<div class="preview-card-name">' + iconStr + name + '</div>' +
     subtitleHtml +
     '<div class="preview-card-price">' + priceStr + ' <span class="preview-card-currency">' + curr + '</span></div>' +
     '<div class="preview-card-duration">' + periodLbl + '</div>' +
@@ -4206,6 +4223,9 @@ function validatePlanEdits(p) {
     }
   }
   // Phase X11: display-layer fields (all optional; only cap length).
+  if (p.icon != null && String(p.icon).length > 8) {
+    return { ok:false, error:'الأيقونة طويلة جداً (إيموجي واحد يكفي — الحد الأقصى 8 محارف).' };
+  }
   if (p.subtitle != null && String(p.subtitle).length > 200) {
     return { ok:false, error:'العبارة التعريفية طويلة جداً (الحد الأقصى 200 حرف).' };
   }
@@ -4231,7 +4251,7 @@ function buildPlanDiff(orig, edited) {
   if (!orig || !edited) return {};
   var diff = {};
   var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
-              'subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
+              'icon','subtitle','price_period_label','patients_display','employees_display','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
     var a = orig[k]; var b = edited[k];
@@ -4318,6 +4338,7 @@ async function savePlanEdits() {
     is_active:'حالة التفعيل',
     features:'الميزات',
     entitlements:'الموديولات',
+    icon:'الأيقونة',
     subtitle:'العبارة التعريفية',
     price_period_label:'تسمية الفترة',
     patients_display:'عرض حد المرضى',
@@ -4365,6 +4386,11 @@ async function savePlanEdits() {
       updatePayload.employees_display  = (p.employees_display == null || p.employees_display === '') ? null : String(p.employees_display);
       updatePayload.is_featured        = !!p.is_featured;
       updatePayload.featured_label     = (p.featured_label == null || p.featured_label === '') ? null : String(p.featured_label);
+    }
+    // icon ships from Migration 38 (separate from the 37 batch) — guard with
+    // its own sentinel so name/price edits still save if 38 hasn't run yet.
+    if (o.icon !== undefined) {
+      updatePayload.icon = (p.icon == null || p.icon === '') ? null : String(p.icon);
     }
     // updated_by — write the admin's email if available, falling back to a
     // generic marker. Matches the performed_by convention in subscription_events.

@@ -34,7 +34,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a85"></script>
+<script src="theme.js?v=20260529a86"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -582,9 +582,9 @@ footer{
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a85">
+<link rel="stylesheet" href="theme.css?v=20260529a86">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a85"></script>
+<script src="supabase-init.js?v=20260529a86"></script>
 </head>
 <body>
 
@@ -856,6 +856,7 @@ footer{
     plans.forEach(function(p){
       if (p.is_active === false) return; // skip inactive — admin hid it
       var name = escHtml(p.display_name || p.code || '—');
+      var iconStr = (p.icon && String(p.icon).trim()) ? (escHtml(p.icon) + ' ') : '';
       var price = fmtPrice(p.price);
       var dur = (p.duration_days == null ? '—' : Number(p.duration_days));
       var curr = escHtml(p.currency || 'SYP');
@@ -898,7 +899,7 @@ footer{
       html +=
         '<div class="pricing-card' + (isFeatured ? ' featured' : '') + '">' +
           featuredBadge +
-          '<div class="pricing-card-name">' + name + '</div>' +
+          '<div class="pricing-card-name">' + iconStr + name + '</div>' +
           (subtitle ? '<div class="pricing-card-tagline">' + subtitle + '</div>' : '') +
           '<div class="pricing-card-price-row">' +
             '<span class="pricing-card-price">' + price + '</span>' +
