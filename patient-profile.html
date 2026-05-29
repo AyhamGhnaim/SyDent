@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a91"></script>
+<script src="theme.js?v=20260529a92"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a91"></script>
-<script src="sidebar.js?v=20260529a91"></script>
+<script src="supabase-init.js?v=20260529a92"></script>
+<script src="sidebar.js?v=20260529a92"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -271,6 +271,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .lab-action-btn.next{border-color:rgba(46,232,158,.4);color:var(--green);}
 .lab-action-btn.reject{border-color:rgba(239,83,80,.3);color:var(--red);}
 .lab-action-btn.reject:hover{background:rgba(239,83,80,.1);}
+.lab-action-btn.redo{border-color:rgba(245,158,11,.4);color:#f59e0b;}
+.lab-action-btn.redo:hover{background:rgba(245,158,11,.1);}
 .btn-lab{padding:9px 18px;background:transparent;border:1px solid #63b3ed;color:#63b3ed;border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
 .btn-lab:hover{background:rgba(99,179,237,.12);}
 
@@ -627,7 +629,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a91">
+<link rel="stylesheet" href="theme.css?v=20260529a92">
 </head>
 <body>
 <script>
@@ -2164,13 +2166,15 @@ var LAB_STATUSES = {
   'received':  { ar: 'تم الاستلام من المخبر', color: '#f5c842', bg: 'rgba(245,200,66,0.15)' },
   'checked':   { ar: 'تم الفحص',              color: '#2ee89e', bg: 'rgba(46,232,158,0.15)' },
   'delivered': { ar: 'تم التركيب',            color: '#a3a3a3', bg: 'rgba(163,163,163,0.15)' },
+  'redo':      { ar: 'إعادة',                  color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   'rejected':  { ar: 'مرفوض',                  color: '#ef5350', bg: 'rgba(239,83,80,0.15)' }
 };
 
 var LAB_NEXT_STATUS = {
   'sent':     { next: 'received',  label: '📦 تم الاستلام من المخبر' },
   'received': { next: 'checked',   label: '✓ تم الفحص' },
-  'checked':  { next: 'delivered', label: '🤝 تم التركيب' }
+  'checked':  { next: 'delivered', label: '🤝 تم التركيب' },
+  'redo':     { next: 'sent',      label: '📤 تم التسليم للمخبر' }
 };
 
 /* ── Utils ── */
@@ -7768,8 +7772,8 @@ function renderLabOrders() {
     if (nx) {
       actions += '<button class="lab-action-btn next" onclick="advanceLabOrder(\'' + lo.id + '\')">' + nx.label + '</button>';
     }
-    if (lo.status !== 'rejected' && lo.status !== 'delivered') {
-      actions += '<button class="lab-action-btn reject" onclick="rejectLabOrder(\'' + lo.id + '\')">رفض</button>';
+    if (lo.status === 'received' || lo.status === 'checked') {
+      actions += '<button class="lab-action-btn redo" onclick="redoLabOrder(\'' + lo.id + '\')">🔄 إعادة</button>';
     }
     actions += '<button class="lab-action-btn" onclick="editLabOrder(\'' + lo.id + '\')">✏️</button>';
     actions += '<button class="del-btn" onclick="delLabOrder(\'' + lo.id + '\')">🗑</button>';
@@ -8291,6 +8295,7 @@ async function advanceLabOrder(id) {
   if (nx.next === 'received')  update.date_received  = nowIso;
   if (nx.next === 'checked')   update.date_checked   = nowIso;
   if (nx.next === 'delivered') update.date_delivered = nowIso;
+  if (nx.next === 'sent')      update.date_sent      = nowIso;
   const { data, error } = await window.sb.from('lab_orders')
     .update(update).eq('id', id).eq('doctor_id', currentUser.id).select().single();
   if (error) { showToast('⚠️ فشل التحديث'); return; }
@@ -8303,10 +8308,10 @@ async function advanceLabOrder(id) {
   showToast('✅ تم تحديث الحالة إلى: ' + LAB_STATUSES[nx.next].ar);
 }
 
-async function rejectLabOrder(id) {
-  if (!confirm('هل أنت متأكد من رفض هذا الطلب وإعادته للمخبر؟')) return;
+async function redoLabOrder(id) {
+  if (!confirm('هل تريد إعادة هذا العمل إلى المخبر؟')) return;
   const { data, error } = await window.sb.from('lab_orders')
-    .update({ status: 'rejected' }).eq('id', id).eq('doctor_id', currentUser.id).select().single();
+    .update({ status: 'redo' }).eq('id', id).eq('doctor_id', currentUser.id).select().single();
   if (error) { showToast('⚠️ فشل التحديث'); return; }
   if (data) {
     var idx = labOrders.findIndex(function(x){ return x.id === id; });
@@ -8314,7 +8319,7 @@ async function rejectLabOrder(id) {
   }
   renderLabOrders();
   renderTimeline();
-  showToast('🔴 تم رفض الطلب');
+  showToast('🔄 تم وضع العمل في حالة إعادة');
 }
 
 async function delLabOrder(id) {
