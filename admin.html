@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a86"></script>
+<script src="theme.js?v=20260529a87"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -813,6 +813,18 @@ header{
   display:flex;gap:10px;justify-content:flex-end;
   padding-top:10px;border-top:1px solid var(--border);
 }
+.btn-delete-plan{
+  padding:9px 16px;background:rgba(255,87,87,0.10);
+  border:1px solid rgba(255,87,87,0.35);border-radius:8px;
+  color:#ff5757;font-family:'Cairo',sans-serif;
+  font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;
+  margin-inline-end:auto;
+}
+.btn-delete-plan:hover{background:rgba(255,87,87,0.20);}
+.plan-tab-add{border-style:dashed !important;opacity:0.85;}
+.plan-tab-add:hover{opacity:1;}
+.plan-tab-off{opacity:0.55;}
+.plan-tab-off .plan-tab-label::after{content:' ⏸';font-size:10px;}
 .btn-revert-plan{
   padding:9px 16px;background:transparent;
   border:1px solid var(--border);border-radius:8px;
@@ -2109,11 +2121,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a86">
+<link rel="stylesheet" href="theme.css?v=20260529a87">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a86"></script>
+<script src="supabase-init.js?v=20260529a87"></script>
 </head>
 <body>
 
@@ -2343,6 +2355,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
           </div>
         </div>
         <div class="plan-actions-row">
+          <button type="button" class="btn-delete-plan" id="btnDeletePlan" onclick="deleteCurrentPlan()">🗑 حذف الخطة</button>
           <button type="button" class="btn-revert-plan" id="btnRevertPlan" onclick="revertPlanEdits()" disabled>↺ إلغاء التعديلات</button>
           <button type="button" class="btn-save-plan"   id="btnSavePlan"   onclick="savePlanEdits()"   disabled>💾 حفظ التغييرات</button>
         </div>
@@ -3929,17 +3942,130 @@ function togglePlanEditor() {
 function refreshPlanTabLabels() {
   var wrap = document.getElementById('planTabsWrap');
   if (!wrap) return;
-  var tabs = wrap.querySelectorAll('.plan-tab');
-  for (var i = 0; i < tabs.length; i++) {
-    var code = tabs[i].getAttribute('data-plan-code');
-    var cfg = getPlanConfig(code);
-    var lblEl = tabs[i].querySelector('.plan-tab-label');
-    if (lblEl) lblEl.textContent = (cfg && cfg.display_name) ? cfg.display_name : code;
-    // Phase X11: icon follows the plan's icon column. Only touch it if the
-    // column exists (cfg.icon !== undefined) so the hard-coded fallback icon
-    // stays put on a pre-Migration-38 DB.
-    var icoEl = tabs[i].querySelector('.plan-tab-icon');
-    if (icoEl && cfg && cfg.icon !== undefined) icoEl.textContent = cfg.icon || '';
+  // Phase X11 part 2: rebuild the tab strip from the live plan cache so ADDED
+  // plans appear and DELETED plans disappear. If the cache isn't loaded yet,
+  // keep the static placeholder tabs already in the HTML.
+  var codes = Object.keys(planConfigCache);
+  if (!codes.length) return;
+  var plans = codes.map(function(k){ return planConfigCache[k]; })
+    .sort(function(a,b){ return (Number(a.sort_order) || 999) - (Number(b.sort_order) || 999); });
+  var sel = planEditorState.selectedCode;
+  var DEF_ICONS = { trial:'🆓', monthly:'💵', yearly:'💎' };
+  var html = '';
+  plans.forEach(function(p){
+    var active = (p.code === sel) ? ' active' : '';
+    var inactive = (p.is_active === false) ? ' plan-tab-off' : '';
+    var ico = (p.icon !== undefined && p.icon !== null) ? p.icon : (DEF_ICONS[p.code] || '📦');
+    html += '<button type="button" class="plan-tab' + active + inactive + '" data-plan-code="' + escapeHtml(p.code) + '" onclick="selectPlanTab(\'' + jsAttr(p.code) + '\',this)">' +
+              '<span class="plan-tab-icon">' + escapeHtml(ico) + '</span> ' +
+              '<span class="plan-tab-label">' + escapeHtml(p.display_name || p.code) + '</span>' +
+            '</button>';
+  });
+  html += '<button type="button" class="plan-tab plan-tab-add" onclick="addPlanTab()" title="إضافة خطة جديدة"><span class="plan-tab-icon">➕</span> <span class="plan-tab-label">إضافة خطة</span></button>';
+  wrap.innerHTML = html;
+}
+
+async function addPlanTab() {
+  if (planEditorState.isDirty) {
+    if (!confirm('لديك تعديلات غير محفوظة ستُفقد. متابعة لإضافة خطة جديدة؟')) return;
+  }
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+  var code = prompt('كود الخطة الجديدة (إنجليزي صغير/أرقام/شرطة سفلية فقط، مثل: pro):');
+  if (code == null) return;
+  code = String(code).trim().toLowerCase().replace(/\s+/g, '_');
+  if (!/^[a-z0-9_]{2,40}$/.test(code)) { alert('الكود غير صالح. استخدم أحرفاً إنجليزية صغيرة/أرقاماً/شرطة سفلية (2–40 محرفاً).'); return; }
+  if (getPlanConfig(code)) { alert('يوجد خطة بهذا الكود مسبقاً.'); return; }
+  var name = prompt('اسم العرض للخطة الجديدة:', code);
+  if (name == null) return;
+  name = String(name).trim() || code;
+  var maxSort = 0;
+  Object.keys(planConfigCache).forEach(function(k){ var s = Number(planConfigCache[k].sort_order) || 0; if (s > maxSort) maxSort = s; });
+  // Minimal column set guaranteed by Migration 23. New rows start INACTIVE
+  // (draft) so they never hit the public pricing page until the admin reviews
+  // price/features and activates them. Display + entitlement columns take their
+  // DB defaults (entitlements '{}' = all modules allowed = grandfather).
+  var newRow = {
+    code: code, display_name: name, duration_days: 30, price: 0, currency: 'SYP',
+    features: ['كل الميزات'], max_employees: null, max_patients: null,
+    is_active: false, sort_order: maxSort + 1
+  };
+  try {
+    var ins = await window.sb.from('subscription_plans').insert(newRow).select().maybeSingle();
+    if (ins.error) { alert('❌ فشل إنشاء الخطة: ' + (ins.error.message || 'خطأ غير معروف')); return; }
+    await logSubscriptionEvent({
+      trial_request_id: null, user_id: null, event_type: 'plan_created',
+      from_plan: code, to_plan: code, from_status: null, to_status: null,
+      from_trial_end: null, to_trial_end: null, amount: null, currency: 'SYP',
+      notes: JSON.stringify({ plan_code: code, display_name: name })
+    });
+    await loadPlanConfig();
+    selectPlanTab(code, null);
+    alert('✅ تم إنشاء خطة "' + name + '" (غير نشطة). اضبط السعر/المدة/الميزات ثم فعّلها من مفتاح «الخطة نشطة».');
+  } catch(e) {
+    alert('❌ خطأ غير متوقع: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
+async function archivePlan(code, name) {
+  try {
+    var upd = await window.sb.from('subscription_plans').update({ is_active: false }).eq('code', code).select().maybeSingle();
+    if (upd.error) { alert('❌ فشل الأرشفة: ' + (upd.error.message || 'خطأ غير معروف')); return; }
+    await logSubscriptionEvent({
+      trial_request_id: null, user_id: null, event_type: 'plan_updated',
+      from_plan: code, to_plan: code, from_status: null, to_status: null,
+      from_trial_end: null, to_trial_end: null, amount: null, currency: 'SYP',
+      notes: JSON.stringify({ plan_code: code, diff: { is_active: { from: true, to: false } }, archived: true })
+    });
+    await loadPlanConfig();
+    selectPlanTab(code, null);
+    alert('📦 تمت أرشفة خطة "' + name + '". اختفت من صفحة الأسعار، والحسابات الحالية عليها تبقى تعمل. يمكنك إعادة تفعيلها لاحقاً.');
+  } catch(e) {
+    alert('❌ خطأ غير متوقع: ' + (e && e.message ? e.message : String(e)));
+  }
+}
+
+async function deleteCurrentPlan() {
+  var code = planEditorState.selectedCode;
+  if (!code) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+  if (code === 'trial') { alert('لا يمكن حذف خطة التجربة — هي خطة أساسية في النظام (مسار قبول الطلبات يعتمد عليها).'); return; }
+  if (planEditorState.isDirty) { alert('احفظ التعديلات أو ألغِها قبل الحذف.'); return; }
+  var cfg = getPlanConfig(code);
+  var name = (cfg && cfg.display_name) ? cfg.display_name : code;
+  // How many accounts are currently on this plan? Deleting the catalog row for
+  // a plan that tenants reference would break their entitlement/limit lookup,
+  // so in that case we archive instead of delete (Stripe pattern).
+  var refCount = null;
+  try {
+    var rc = await window.sb.from('trial_requests').select('id', { count: 'exact', head: true }).eq('plan', code);
+    refCount = (rc && typeof rc.count === 'number') ? rc.count : null;
+  } catch(e) { refCount = null; }
+  if (refCount === null) {
+    if (!confirm('تعذّر التحقق من وجود حسابات على هذه الخطة. للأمان سيتم أرشفتها بدل الحذف النهائي. متابعة؟')) return;
+    return archivePlan(code, name);
+  }
+  if (refCount > 0) {
+    alert('🔒 يوجد ' + refCount + ' حساب على خطة "' + name + '" — لا يمكن حذفها نهائياً (سيكسر اشتراكاتهم).\n\nسيتم أرشفتها: تختفي من صفحة الأسعار، والحسابات الحالية تبقى كما هي.');
+    return archivePlan(code, name);
+  }
+  if (!confirm('حذف خطة "' + name + '" نهائياً؟\n\nلا يوجد أي حساب عليها. هذا الإجراء لا يمكن التراجع عنه.')) return;
+  try {
+    var del = await window.sb.from('subscription_plans').delete().eq('code', code);
+    if (del.error) { alert('❌ فشل الحذف: ' + (del.error.message || 'خطأ غير معروف')); return; }
+    await logSubscriptionEvent({
+      trial_request_id: null, user_id: null, event_type: 'plan_deleted',
+      from_plan: code, to_plan: code, from_status: null, to_status: null,
+      from_trial_end: null, to_trial_end: null, amount: null, currency: 'SYP',
+      notes: JSON.stringify({ plan_code: code, display_name: name })
+    });
+    await loadPlanConfig();
+    var remaining = Object.keys(planConfigCache).sort(function(a,b){
+      return (Number(planConfigCache[a].sort_order) || 999) - (Number(planConfigCache[b].sort_order) || 999);
+    });
+    if (remaining.length) selectPlanTab(remaining[0], null); else refreshPlanTabLabels();
+    alert('🗑 تم حذف خطة "' + name + '" نهائياً.');
+  } catch(e) {
+    alert('❌ خطأ غير متوقع: ' + (e && e.message ? e.message : String(e)));
   }
 }
 
@@ -5251,6 +5377,32 @@ async function transitionAccount(eventType, r, params) {
       authAction = 'unban';
       break;
     }
+    case 'convert_plan': {
+      // Phase X11 part 2: generic paid conversion for ANY plan code (added
+      // plans included). Same enforcement math as convert_monthly/yearly —
+      // reads the plan's OWN duration_days + price from config — just not
+      // hardcoded to one code. This is what guarantees an added/edited plan
+      // applies correctly on upgrade: trial_end = today + that plan's duration,
+      // price_paid = that plan's price, trial_requests.plan = that plan's code.
+      var planCodeG = params.planCode;
+      var cfgG = planCodeG ? getPlanConfig(planCodeG) : null;
+      if (!cfgG) return { ok:false, error:'unknown_plan' + (planCodeG ? (':' + planCodeG) : ''), newRow:null };
+      var durG = (cfgG.duration_days != null && !isNaN(Number(cfgG.duration_days))) ? Number(cfgG.duration_days) : 30;
+      var priceG = (cfgG.price != null && !isNaN(Number(cfgG.price))) ? Number(cfgG.price) : 0;
+      toPlan = planCodeG;
+      amount = priceG;
+      updatePayload = {
+        status: 'accepted',
+        plan: planCodeG,
+        trial_end: todayPlus(durG),
+        grace_until: null,
+        price_paid: priceG,
+        currency: cfgG.currency || 'SYP',
+        converted_at: nowIso
+      };
+      authAction = 'unban';
+      break;
+    }
     case 'make_permanent': {
       // Phase 7.6E-Part 2.1: admin override for "حساب دائم" — bypasses
       // the subscription billing model intentionally. Use cases:
@@ -5511,48 +5663,49 @@ function openPlanModal(reqId, eventType) {
     hint += 'تجربة';
     if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
   } else if (state.state === 'paid') {
-    hint += (state.plan === 'yearly' ? 'سنوي' : 'شهري');
+    var hintCfg = getPlanConfig(state.plan);
+    hint += (hintCfg && hintCfg.display_name) ? hintCfg.display_name
+          : (state.plan === 'yearly' ? 'سنوي' : state.plan === 'monthly' ? 'شهري' : (state.plan || 'مدفوع'));
     if (state.isPermanent) hint += ' — دائم';
     else if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
   } else {
     hint += state.label;
   }
   document.getElementById('planModalHint').innerHTML = hint;
-  // Render plan options (monthly + yearly only — trial isn't a paid choice)
+  // Render plan options — every ACTIVE plan except trial (trial isn't a paid
+  // choice; it's the accept path). Phase X11 part 2: was hardcoded to
+  // monthly+yearly; now lists all paid plans so ADDED plans are assignable on
+  // upgrade. The actual enforcement (trial_end/price) happens generically in
+  // transitionAccount('convert_plan') which reads each plan's own config.
   var optionsHtml = '';
-  var monthlyP = getPlanConfig('monthly');
-  var yearlyP = getPlanConfig('yearly');
-  if (monthlyP) {
-    optionsHtml +=
-      '<div class="plan-option" data-plan="monthly" onclick="selectPlanOption(\'monthly\')">' +
-        '<div class="plan-radio"></div>' +
-        '<div class="plan-body">' +
-          '<div class="plan-name">' + escapeHtml(monthlyP.display_name || 'شهري') + '</div>' +
-          '<div class="plan-price">' + formatPrice(monthlyP.price, monthlyP.currency) + ' / ' + monthlyP.duration_days + ' يوم</div>' +
-          '<div class="plan-meta">دفعة واحدة شهرية. التجديد يدوي.</div>' +
-        '</div>' +
-      '</div>';
-  }
-  if (yearlyP) {
-    // Compute savings vs 12× monthly if both exist
+  var paidPlans = Object.keys(planConfigCache)
+    .map(function(k){ return planConfigCache[k]; })
+    .filter(function(pp){ return pp && pp.code !== 'trial' && pp.is_active !== false; })
+    .sort(function(a,b){ return (Number(a.sort_order) || 999) - (Number(b.sort_order) || 999); });
+  var mP = getPlanConfig('monthly'), yP = getPlanConfig('yearly');
+  paidPlans.forEach(function(pp){
     var savingsBadge = '';
-    if (monthlyP && yearlyP.price && monthlyP.price) {
-      var monthlyEq = monthlyP.price * 12;
-      if (yearlyP.price < monthlyEq) {
-        var pct = Math.round((1 - yearlyP.price / monthlyEq) * 100);
-        if (pct > 0) savingsBadge = '<span class="plan-savings">وفّر ~' + pct + '%</span>';
+    if (pp.code === 'yearly' && mP && yP && yP.price && mP.price) {
+      var monthlyEq = mP.price * 12;
+      if (yP.price < monthlyEq) {
+        var pct = Math.round((1 - yP.price / monthlyEq) * 100);
+        if (pct > 0) savingsBadge = ' <span class="plan-savings">وفّر ~' + pct + '%</span>';
       }
     }
+    var ico = (pp.icon && String(pp.icon).trim()) ? (escapeHtml(pp.icon) + ' ') : '';
+    var meta = (pp.subtitle && String(pp.subtitle).trim())
+      ? escapeHtml(pp.subtitle) : 'دفعة واحدة. التجديد يدوي.';
+    var durTxt = (pp.duration_days == null || isNaN(Number(pp.duration_days))) ? '—' : Number(pp.duration_days);
     optionsHtml +=
-      '<div class="plan-option" data-plan="yearly" onclick="selectPlanOption(\'yearly\')">' +
+      '<div class="plan-option" data-plan="' + escapeHtml(pp.code) + '" onclick="selectPlanOption(\'' + jsAttr(pp.code) + '\')">' +
         '<div class="plan-radio"></div>' +
         '<div class="plan-body">' +
-          '<div class="plan-name">' + escapeHtml(yearlyP.display_name || 'سنوي') + ' ' + savingsBadge + '</div>' +
-          '<div class="plan-price">' + formatPrice(yearlyP.price, yearlyP.currency) + ' / ' + yearlyP.duration_days + ' يوم</div>' +
-          '<div class="plan-meta">دفعة واحدة سنوية. الأنسب للعيادات المستقرّة.</div>' +
+          '<div class="plan-name">' + ico + escapeHtml(pp.display_name || pp.code) + savingsBadge + '</div>' +
+          '<div class="plan-price">' + formatPrice(pp.price, pp.currency) + ' / ' + durTxt + ' يوم</div>' +
+          '<div class="plan-meta">' + meta + '</div>' +
         '</div>' +
       '</div>';
-  }
+  });
   // Phase 7.6E-Part 2.1: 'permanent' option — admin override outside the
   // subscription billing model. Visually distinguished (yellow accent +
   // warning copy) so it doesn't get picked by accident. Use cases:
@@ -5621,11 +5774,12 @@ async function confirmPlanChoice() {
   //               + notes in transitionAccount before the DB write so the
   //               event_type CHECK constraint is honored)
   var eventType;
-  if (ctx.selectedPlan === 'yearly')         eventType = 'convert_yearly';
+  if (ctx.selectedPlan === 'permanent')      eventType = 'make_permanent';
+  else if (ctx.selectedPlan === 'yearly')    eventType = 'convert_yearly';
   else if (ctx.selectedPlan === 'monthly')   eventType = 'convert_monthly';
-  else if (ctx.selectedPlan === 'permanent') eventType = 'make_permanent';
-  else { closePlanModal(); return; }
-  var result = await transitionAccount(eventType, r, {});
+  else                                       eventType = 'convert_plan'; // any added plan
+  var tParams = (eventType === 'convert_plan') ? { planCode: ctx.selectedPlan } : {};
+  var result = await transitionAccount(eventType, r, tParams);
   closePlanModal();
   if (!result.ok) {
     alert('فشل تغيير الخطة: ' + (result.error || 'خطأ غير معروف'));
@@ -7316,6 +7470,7 @@ var EVF_EVENT_TYPES = {
   'reject':           { label_ar: 'رفض طلب',           category: 'destructive', emoji: '🚫' },
   'convert_monthly':  { label_ar: 'تحويل لشهري',       category: 'lifecycle',   emoji: '💎' },
   'convert_yearly':   { label_ar: 'تحويل لسنوي',       category: 'lifecycle',   emoji: '💎' },
+  'convert_plan':     { label_ar: 'تحويل لخطة',        category: 'lifecycle',   emoji: '💎' },
   'renew':            { label_ar: 'تجديد',             category: 'lifecycle',   emoji: '🔄' },
   'extend':           { label_ar: 'تمديد تجربة',       category: 'lifecycle',   emoji: '➕' },
   'shorten':          { label_ar: 'تقصير تجربة',       category: 'warning',     emoji: '➖' },
@@ -7328,6 +7483,8 @@ var EVF_EVENT_TYPES = {
   'demote_from_admin':{ label_ar: 'تنزيل من مسؤول',    category: 'auth',        emoji: '👤' },
   // Config (Phase X2, X3)
   'plan_updated':     { label_ar: 'تعديل خطة',         category: 'config',      emoji: '⚙️' },
+  'plan_created':     { label_ar: 'إنشاء خطة',         category: 'config',      emoji: '🆕' },
+  'plan_deleted':     { label_ar: 'حذف خطة',           category: 'destructive', emoji: '🗑' },
   'template_updated': { label_ar: 'تعديل قالب رسالة',  category: 'config',      emoji: '💬' }
 };
 
