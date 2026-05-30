@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a93"></script>
+<script src="theme.js?v=20260529a94"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -185,17 +185,28 @@
   }
   .card-action:hover { text-decoration: underline; }
 
+  /* ─── Dashboard list rows (patients + today's appts) — modern hover & entrance ─── */
   .patient-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 11px 10px;
+    margin: 1px -10px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s;
     text-decoration: none;
     color: inherit;
+    transition: background .2s ease, transform .2s ease;
+    animation: dashRowIn .38s cubic-bezier(.22,.61,.36,1) backwards;
   }
-  .patient-item:last-child { border-bottom: none; }
-  .patient-item:hover { padding-right: 8px; }
+  .patient-item:hover {
+    background: rgba(46,232,158,0.07);
+    transform: translateX(-3px);
+  }
+  .patient-item:active { transform: translateX(-1px) scale(0.995); }
+  .patient-item:hover .patient-name { color: var(--accent); }
+  .patient-item:hover .patient-avatar {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 3px rgba(46,232,158,0.18);
+  }
 
   .patient-avatar {
     width: 38px; height: 38px;
@@ -203,9 +214,10 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 14px; font-weight: 700;
     flex-shrink: 0;
+    transition: transform .2s ease, box-shadow .2s ease;
   }
 
-  .patient-name { font-size: 14px; font-weight: 600; }
+  .patient-name { font-size: 14px; font-weight: 600; transition: color .2s ease; }
   .patient-info { font-size: 12px; color: var(--text-muted); }
   .patient-status {
     margin-right: auto;
@@ -219,23 +231,55 @@
 
   .appt-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 9px 10px;
+    margin: 1px -10px;
+    border-radius: 12px;
+    transition: background .2s ease, transform .2s ease;
+    animation: dashRowIn .38s cubic-bezier(.22,.61,.36,1) backwards;
   }
-  .appt-item:last-child { border-bottom: none; }
+  .appt-item:hover {
+    background: rgba(46,232,158,0.07);
+    transform: translateX(-3px);
+  }
+  .appt-item:hover .appt-name { color: var(--accent); }
 
   .appt-time {
-    min-width: 55px;
-    font-size: 13px; font-weight: 700;
+    min-width: 50px;
+    font-size: 13px; font-weight: 800;
     color: var(--accent);
+    background: rgba(46,232,158,0.1);
+    padding: 5px 8px;
+    border-radius: 8px;
+    text-align: center;
+    flex-shrink: 0;
   }
-  .appt-name { font-size: 13px; font-weight: 600; }
+  .appt-name { font-size: 13px; font-weight: 600; transition: color .2s ease; }
   .appt-type { font-size: 11px; color: var(--text-muted); }
   .appt-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
     margin-right: auto;
     flex-shrink: 0;
+  }
+
+  /* Staggered fade/slide-in for the first rows of each dashboard list */
+  @keyframes dashRowIn {
+    from { opacity: 0; transform: translateY(7px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .patient-item:nth-child(1), .appt-item:nth-child(1) { animation-delay: .02s; }
+  .patient-item:nth-child(2), .appt-item:nth-child(2) { animation-delay: .07s; }
+  .patient-item:nth-child(3), .appt-item:nth-child(3) { animation-delay: .12s; }
+  .patient-item:nth-child(4), .appt-item:nth-child(4) { animation-delay: .17s; }
+  .patient-item:nth-child(5), .appt-item:nth-child(5) { animation-delay: .22s; }
+  .patient-item:nth-child(6), .appt-item:nth-child(6) { animation-delay: .27s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .patient-item, .appt-item { animation: none; }
+    .patient-item, .appt-item, .patient-avatar,
+    .patient-name, .appt-name { transition: none; }
+    .patient-item:hover, .appt-item:hover,
+    .patient-item:hover .patient-avatar { transform: none; }
   }
 
   /* ─── Gap 6: Inline next-action button in today's appointments ─── */
@@ -533,10 +577,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a93">
+<link rel="stylesheet" href="theme.css?v=20260529a94">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a93"></script>
-<script src="sidebar.js?v=20260529a93"></script>
+<script src="supabase-init.js?v=20260529a94"></script>
+<script src="sidebar.js?v=20260529a94"></script>
 </head>
 <body>
 <script>
