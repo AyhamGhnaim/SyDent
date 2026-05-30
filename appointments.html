@@ -6301,8 +6301,7 @@ async function apptDeleteFile(id){
       // awaiting, the inner setTimeout fires BEFORE the pickers are populated
       // → t.default_treatment_id finds no match in TREATMENTS (still loading),
       // and t.default_provider_id finds no <option> in fProvider (still
-      // empty). The lab-hint banner renders because it only needs the
-      // template object, but treatment/duration/provider silently no-op.
+      // empty), so treatment/duration/provider silently no-op.
       // The fix is `await openModal()` so the full template-apply pipeline
       // sees a fully populated form.
       setTimeout(async function(){
@@ -6312,7 +6311,7 @@ async function apptDeleteFile(id){
           // safely apply the template. .value = ... does NOT fire onchange
           // (qaeda #22), so we explicitly call onApptTypePicked() to run the
           // full template-apply pipeline (duration, treatment, provider,
-          // operatory, notes, lab hint banner).
+          // operatory, notes).
           if (tplExists) {
             var sel = document.getElementById('fApptTypePicker');
             if (sel) {
