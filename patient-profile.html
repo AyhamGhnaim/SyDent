@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b07"></script>
+<script src="theme.js?v=20260530b08"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b07"></script>
-<script src="sidebar.js?v=20260530b07"></script>
+<script src="supabase-init.js?v=20260530b08"></script>
+<script src="sidebar.js?v=20260530b08"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b07">
+<link rel="stylesheet" href="theme.css?v=20260530b08">
 </head>
 <body>
 <script>
@@ -4688,11 +4688,19 @@ function buildOcclusalTooth(num, sm, isUpper){
   var ant=isAnterior(num);
   var cap=(b.x1-b.x0)*0.20, third=(b.y1-b.y0)/3, midX=b.x0+cap, midW=(b.x1-b.x0)-2*cap;
   var bY=up?b.y0:(b.y1-third), lY=up?(b.y1-third):b.y0, oY=b.y0+third;
-  // Incisal band (anterior only): the 2/3 of the central column nearest the
-  // incisal/buccal edge — i.e. everything EXCEPT the lingual third, so L keeps its
-  // exact original position. iY/iH express that span for upper (top 2/3) and lower
-  // (bottom 2/3) teeth.
-  var iY=up?b.y0:(b.y0+third), iH=2*third;
+  // (Anterior incisal/lingual geometry is defined just below — full-width raised
+  //  incisal edge + lingual fill — see the comment there.)
+  // Anterior surfaces (Dr. request): the Incisal (I) band hugs the incisal EDGE,
+  // RAISED toward it and spanning the FULL mesio-distal width — so an incisal
+  // edge/corner filling reads across the whole edge. The M/D side strips (drawn
+  // last) reclaim the true mesial/distal corners for proximal fillings. The
+  // Lingual (L) then fills the REST toward the cingulum, covering the gap left by
+  // raising I. iEdgeY/iHv = raised incisal band; lFillY/lHv = the remaining cingulum side.
+  var bbH=(b.y1-b.y0);
+  var iHv=bbH*0.45, lHv=bbH-iHv;
+  var iEdgeY=up?b.y0:(b.y1-iHv);
+  var lFillY=up?(b.y0+iHv):b.y0;
+  var antX=b.x0, antW=(b.x1-b.x0);
   var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
   var OS=16; // overshoot (occlusal units) — trimmed back to the crown by the clip-path
   function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
@@ -4712,8 +4720,8 @@ function buildOcclusalTooth(num, sm, isUpper){
       // and spans the 2/3 nearest the incisal edge. There is NO buccal (B) band on
       // the top-down view of an anterior tooth. L keeps its EXACT original third
       // (Dr.: lingual position is excellent, don't change it). M/D drawn last.
-      svg+=reg('I', midX-OS, up?iY-OS:iY,    midW+2*OS, iH+OS);
-      svg+=reg('L', midX-OS, lTop?lY-OS:lY,  midW+2*OS, third+OS);
+      svg+=reg('I', antX-OS, up?iEdgeY-OS:iEdgeY, antW+2*OS, iHv+OS);
+      svg+=reg('L', antX-OS, up?lFillY:lFillY-OS, antW+2*OS, lHv+OS);
     } else {
       // ── POSTERIOR (premolar / molar) ──
       // O (central occlusal surface): BOUNDED to the central column — no lateral
@@ -4748,8 +4756,8 @@ function buildOcclusalTooth(num, sm, isUpper){
            + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"></rect>';
     };
     if(ant){
-      svg+=hit('I', midX, iY, midW, iH);
-      svg+=hit('L', midX, lY, midW, third);
+      svg+=hit('I', antX, iEdgeY, antW, iHv);
+      svg+=hit('L', antX, lFillY, antW, lHv);
     } else {
       svg+=hit('O', midX, oY, midW, third);
       svg+=hit('B', midX, bY, midW, third);
