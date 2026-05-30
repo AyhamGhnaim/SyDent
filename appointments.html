@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a95"></script>
+<script src="theme.js?v=20260529a96"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,10 +920,10 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a95">
+<link rel="stylesheet" href="theme.css?v=20260529a96">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a95"></script>
-<script src="sidebar.js?v=20260529a95"></script>
+<script src="supabase-init.js?v=20260529a96"></script>
+<script src="sidebar.js?v=20260529a96"></script>
 </head>
 <body>
 <script>
@@ -3416,11 +3416,11 @@ async function loadLabsForHint() {
 async function loadAppointmentTypes() {
   if (!currentUser) return;
   try {
-    // Gap 8.2 / Migration 11: select default_provider_id + default_lab_id +
-    // default_notes alongside the original fields. If any of those columns
-    // don't exist yet (42703), retry with the legacy projection so the picker
-    // still works on older installations.
-    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, default_notes, is_active, sort_order';
+    // Gap 8.2 / Migration 11 / Migration 12: select default_provider_id +
+    // default_lab_id + default_notes + default_operatory_id alongside the
+    // original fields. If any of those columns don't exist yet (42703), retry
+    // with the legacy projection so the picker still works on older installs.
+    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, default_notes, default_operatory_id, is_active, sort_order';
     var legacyCols = 'id, name, default_duration_min, default_treatment_id, is_active, sort_order';
     var res = await window.sb.from('appointment_types')
       .select(fullCols)
@@ -3436,7 +3436,7 @@ async function loadAppointmentTypes() {
       }
       // Gap 8.2 / Migration 11 fallback: retry with legacy projection
       var msg = (res.error.message || '') + ' ' + (res.error.code || '');
-      if (/42703|default_provider_id|default_lab_id|default_notes/i.test(msg)) {
+      if (/42703|default_provider_id|default_lab_id|default_notes|default_operatory_id/i.test(msg)) {
         console.warn('Gap 8.2 / Migration 11: optional columns missing on SELECT — falling back to legacy columns.');
         res = await window.sb.from('appointment_types')
           .select(legacyCols)
