@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a94"></script>
+<script src="theme.js?v=20260529a95"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a94"></script>
+<script src="supabase-init.js?v=20260529a95"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a94">
-<script src="sidebar.js?v=20260529a94"></script>
+<link rel="stylesheet" href="theme.css?v=20260529a95">
+<script src="sidebar.js?v=20260529a95"></script>
 </head>
 <body>
 
@@ -624,13 +624,6 @@ textarea::placeholder { color: var(--text2); }
       <label>👨‍⚕️ الطبيب الافتراضي</label>
       <select id="fAtProvider"></select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار القالب</div>
-    </div>
-    <div class="form-group" id="fAtLabWrap">
-      <label>🥽 المخبر الافتراضي</label>
-      <select id="fAtLab">
-        <option value="">— بدون مخبر —</option>
-      </select>
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعلاجات التي تحتاج مخبر (تلبيسة، جسر، إلخ)</div>
     </div>
     <!-- Phase 6 K: optional operatory link. JS hides this wrapper entirely
          when the clinic has no active operatories (Soft mode — قاعدة #15)
@@ -1243,7 +1236,6 @@ async function confirmDelete() {
 var _apptTypes = [];            // cached templates for the list
 var _apptTypesTreatments = [];  // cached treatments for the dropdown
 var _apptTypesProviders = [];   // Gap 8.2: cached active doctors for picker
-var _apptTypesLabs = [];        // Gap 8.2: cached active labs for picker
 var _editingApptTypeId = null;  // id of the template currently being edited
 var _gap8TableMissing = false;  // true once we detect pre-migration state
 var _gap82ColumnsMissing = false; // Gap 8.2: provider/lab columns not yet migrated
@@ -1315,20 +1307,6 @@ async function loadAppointmentTypes() {
   }
   populateApptTypeProviderSelect();
 
-  // 1.6. Gap 8.2: Labs (for the optional lab picker).
-  // Same pattern as labs.html: select active labs, RLS gates by user.
-  try {
-    var labRes = await window.sb.from('labs')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
-    _apptTypesLabs = (labRes && labRes.data) ? labRes.data : [];
-  } catch (e) {
-    console.warn('Gap 8.2: labs load failed (continuing):', e);
-    _apptTypesLabs = [];
-  }
-  populateApptTypeLabSelect();
-
   // 2. Templates
   try {
     var res = await window.sb.from('appointment_types')
@@ -1386,20 +1364,6 @@ function populateApptTypeProviderSelect() {
     var d = _apptTypesProviders[i];
     var safeName = String(d.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     html += '<option value="' + d.id + '">' + safeName + '</option>';
-  }
-  sel.innerHTML = html;
-}
-
-// Gap 8.2: Populate the lab <select>. Same pattern as the provider one —
-// users see this even when no labs exist yet, keeping the layout stable.
-function populateApptTypeLabSelect() {
-  var sel = document.getElementById('fAtLab');
-  if (!sel) return;
-  var html = '<option value="">— بدون مخبر —</option>';
-  for (var i = 0; i < _apptTypesLabs.length; i++) {
-    var lab = _apptTypesLabs[i];
-    var safeName = String(lab.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    html += '<option value="' + lab.id + '">' + safeName + '</option>';
   }
   sel.innerHTML = html;
 }
@@ -1504,10 +1468,6 @@ function renderApptTypesList() {
   for (var di = 0; di < _apptTypesProviders.length; di++) {
     docMap[_apptTypesProviders[di].id] = _apptTypesProviders[di];
   }
-  var labMap = {};
-  for (var li = 0; li < _apptTypesLabs.length; li++) {
-    labMap[_apptTypesLabs[li].id] = _apptTypesLabs[li];
-  }
   // Phase 6 K: build operatory lookup. We use _operatoriesList (the full
   // unfiltered list, including inactive ones) here — same reasoning as the
   // ghost-option logic in editApptType: a template might link to a now-
@@ -1538,12 +1498,6 @@ function renderApptTypesList() {
         ? String(docMap[t.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
         : '[طبيب محذوف]';
       extras.push('👨‍⚕️ ' + docName);
-    }
-    if (t.default_lab_id) {
-      var labName = labMap[t.default_lab_id]
-        ? String(labMap[t.default_lab_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        : '[مخبر محذوف]';
-      extras.push('🥽 ' + labName);
     }
     // Phase 6 K: show operatory badge when set. Uses the same '[<entity>
     // محذوف/غير نشط]' fallback pattern as provider/lab so the doctor can
@@ -1637,7 +1591,6 @@ async function duplicateApptType(id) {
     default_duration_min: src.default_duration_min,
     default_treatment_id: src.default_treatment_id || null,
     default_provider_id: src.default_provider_id || null,
-    default_lab_id: src.default_lab_id || null,
     default_notes: src.default_notes || null,
     default_operatory_id: src.default_operatory_id || null,
     sort_order: maxSort + 1
@@ -1825,11 +1778,9 @@ function openApptTypeModal() {
   document.getElementById('fAtDuration').value = '30';
   populateApptTypeTreatmentSelect();
   document.getElementById('fAtTreatment').value = '';
-  // Gap 8.2: reset optional provider + lab pickers
+  // Gap 8.2: reset optional provider picker
   populateApptTypeProviderSelect();
   document.getElementById('fAtProvider').value = '';
-  populateApptTypeLabSelect();
-  document.getElementById('fAtLab').value = '';
   // Phase 6 K: reset optional operatory picker (and update wrapper visibility)
   populateApptTypeOperatorySelect();
   document.getElementById('fAtOperatory').value = '';
@@ -1889,26 +1840,8 @@ function editApptType(id) {
     fAtProv.value = '';
   }
 
-  populateApptTypeLabSelect();
-  var fAtLb = document.getElementById('fAtLab');
-  if (t.default_lab_id) {
-    var labInActive = false;
-    for (var li2 = 0; li2 < fAtLb.options.length; li2++) {
-      if (fAtLb.options[li2].value === t.default_lab_id) { labInActive = true; break; }
-    }
-    if (!labInActive) {
-      var ghostLab = document.createElement('option');
-      ghostLab.value = t.default_lab_id;
-      ghostLab.textContent = '[مخبر غير نشط — احتفظ بالحالي]';
-      fAtLb.appendChild(ghostLab);
-    }
-    fAtLb.value = t.default_lab_id;
-  } else {
-    fAtLb.value = '';
-  }
-
   // Phase 6 K: pre-fill operatory with the same ghost-option pattern as
-  // provider/lab — if the linked operatory was deactivated AFTER this
+  // provider — if the linked operatory was deactivated AFTER this
   // template was saved, we keep its id in a placeholder option so saving
   // doesn't accidentally null out the FK.
   populateApptTypeOperatorySelect();
@@ -1953,9 +1886,8 @@ async function saveApptType() {
   var durationRaw = document.getElementById('fAtDuration').value;
   var duration = parseInt(durationRaw, 10);
   var treatmentId = document.getElementById('fAtTreatment').value || null;
-  // Gap 8.2: capture optional provider + lab ids (empty string → null)
+  // Gap 8.2: capture optional provider id (empty string → null)
   var providerId = document.getElementById('fAtProvider').value || null;
-  var labId = document.getElementById('fAtLab').value || null;
   // Phase 6 K: capture optional operatory id (empty string → null)
   var operatoryId = document.getElementById('fAtOperatory').value || null;
   // Migration 11: optional default notes (empty string → null, trimmed)
@@ -2002,7 +1934,6 @@ async function saveApptType() {
         default_duration_min: duration,
         default_treatment_id: treatmentId,
         default_provider_id: providerId,
-        default_lab_id: labId,
         default_notes: defaultNotes,
         default_operatory_id: operatoryId
       };
@@ -2032,7 +1963,6 @@ async function saveApptType() {
         default_duration_min: duration,
         default_treatment_id: treatmentId,
         default_provider_id: providerId,
-        default_lab_id: labId,
         default_notes: defaultNotes,
         default_operatory_id: operatoryId,
         sort_order: maxSort + 1
