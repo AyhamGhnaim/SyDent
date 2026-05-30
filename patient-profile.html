@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530a99"></script>
+<script src="theme.js?v=20260530b01"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530a99"></script>
-<script src="sidebar.js?v=20260530a99"></script>
+<script src="supabase-init.js?v=20260530b01"></script>
+<script src="sidebar.js?v=20260530b01"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -636,7 +636,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530a99">
+<link rel="stylesheet" href="theme.css?v=20260530b01">
 </head>
 <body>
 <script>
@@ -4615,7 +4615,12 @@ function occGeom(num){
   return {t:t,upper:upper,outline:outline,anat:anat,bbox:bbox};
 }
 /* Occlusal (top) view — anatomical (cusp eminences + real groove pattern + fossae).
-   ONLY the LINGUAL (L) surface is editable here; O/B/M/D are synced from the facial view. */
+   ALL surfaces are registrable here, exactly like the facial view: hover paints the
+   green per-surface box (CSS .crown-surface:hover) and a click opens the modal for
+   that surface. Posterior = O(center)/B/L/M/D; anterior = I(center)/L/M/D — the
+   incisal (I) takes the buccal position and there is NO buccal (B) band on an
+   anterior tooth. V (cervical/لثوي) is never shown/registrable here — it is not
+   visible from a top-down view. */
 function buildOcclusalTooth(num, sm, isUpper){
   sm=sm||{};
   var G=occGeom(num), t=G.t, up=G.upper, gid='o'+num, outline=G.outline, b=G.bbox;
@@ -4637,22 +4642,39 @@ function buildOcclusalTooth(num, sm, isUpper){
   // (Dr. note: M/D were showing as small rectangles). Draw order: middle bands
   // (O,B,L) first, then the M/D side strips LAST so they cleanly overlay the
   // lateral bleed from the middle bands — same unified logic as the facial view.
+  var ant=isAnterior(num);
   var cap=(b.x1-b.x0)*0.20, third=(b.y1-b.y0)/3, midX=b.x0+cap, midW=(b.x1-b.x0)-2*cap;
   var bY=up?b.y0:(b.y1-third), lY=up?(b.y1-third):b.y0, oY=b.y0+third;
+  // Incisal band (anterior only): the 2/3 of the central column nearest the
+  // incisal/buccal edge — i.e. everything EXCEPT the lingual third, so L keeps its
+  // exact original position. iY/iH express that span for upper (top 2/3) and lower
+  // (bottom 2/3) teeth.
+  var iY=up?b.y0:(b.y0+third), iH=2*third;
   var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
   var OS=16; // overshoot (occlusal units) — trimmed back to the crown by the clip-path
   function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
   if(crownFull){ svg+='<path d="'+outline+'" fill="'+(T_FILL[crownFull]||"#a855f7")+'" fill-opacity="'+SURFACE_FILL_OPACITY+'" pointer-events="none"/>'; }
   else {
     var bTop=(bY<oY), lTop=(lY<oY); // which vertical end each band sits at
-    // O (central occlusal surface): BOUNDED to the central column — no lateral
-    // overshoot. It is hemmed in by M/D (sides) and B/L (top/bottom), so it stays
-    // a central patch and must NOT spread to the crown edges (Dr. red boundary).
-    svg+=reg('O', midX, oY, midW, third);
-    // B / L (buccal / lingual edge bands): lateral overshoot (covered by M/D when
-    // colored) + outward vertical overshoot toward their own crown edge.
-    svg+=reg('B', midX-OS, bTop?bY-OS:bY,     midW+2*OS, third+OS);
-    svg+=reg('L', midX-OS, lTop?lY-OS:lY,     midW+2*OS, third+OS);
+    if(ant){
+      // ── ANTERIOR (incisor / canine) ──
+      // Incisal (I) takes the buccal+central position (Dr.: "القاطع مكان الدهليزي")
+      // and spans the 2/3 nearest the incisal edge. There is NO buccal (B) band on
+      // the top-down view of an anterior tooth. L keeps its EXACT original third
+      // (Dr.: lingual position is excellent, don't change it). M/D drawn last.
+      svg+=reg('I', midX-OS, up?iY-OS:iY,    midW+2*OS, iH+OS);
+      svg+=reg('L', midX-OS, lTop?lY-OS:lY,  midW+2*OS, third+OS);
+    } else {
+      // ── POSTERIOR (premolar / molar) ──
+      // O (central occlusal surface): BOUNDED to the central column — no lateral
+      // overshoot. It is hemmed in by M/D (sides) and B/L (top/bottom), so it stays
+      // a central patch and must NOT spread to the crown edges (Dr. red boundary).
+      svg+=reg('O', midX, oY, midW, third);
+      // B / L (buccal / lingual edge bands): lateral overshoot (covered by M/D when
+      // colored) + outward vertical overshoot toward their own crown edge.
+      svg+=reg('B', midX-OS, bTop?bY-OS:bY,     midW+2*OS, third+OS);
+      svg+=reg('L', midX-OS, lTop?lY-OS:lY,     midW+2*OS, third+OS);
+    }
     // side strips LAST: outward lateral + vertical to hug the rounded M/D lobes
     svg+=reg(leftKey,  b.x0-OS,  b.y0-OS, cap+OS, (b.y1-b.y0)+2*OS);
     svg+=reg(rightKey, b.x1-cap, b.y0-OS, cap+OS, (b.y1-b.y0)+2*OS);
@@ -4660,7 +4682,29 @@ function buildOcclusalTooth(num, sm, isUpper){
   svg+=G.anat;
   svg+='<path d="'+outline+'" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.3" clip-path="url(#cl'+gid+')" pointer-events="none"/>';
   if(isImplant){ svg+='<circle cx="50" cy="50" r="13" fill="#0ea5e9" fill-opacity="0.85" stroke="#0369a1" stroke-width="1" pointer-events="none"/>'; }
-  else { svg+='<path class="crown-surface" data-tooth="'+num+'" data-surface="L" d="'+outline+'" fill="#000" fill-opacity="0"></path>'; }
+  else {
+    // Per-surface transparent hit-zones at LOGICAL geometry (no overshoot) so they
+    // tile the crown without overlap → accurate hit-testing. Each is a .crown-surface
+    // with data-tooth/data-surface, so attachSurfaceClicks() wires it to the modal and
+    // the .crown-surface:hover CSS paints the green box — identical to the facial view.
+    // Drawn LAST (on top) so they receive the click over the fills/anatomy underneath.
+    // V (cervical) is intentionally omitted (not visible from the top-down view).
+    var hit=function(key,rx,ry,rw,rh){
+      return '<rect class="crown-surface" data-tooth="'+num+'" data-surface="'+key+'" '
+           + 'x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" rx="2" ry="2" '
+           + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"></rect>';
+    };
+    if(ant){
+      svg+=hit('I', midX, iY, midW, iH);
+      svg+=hit('L', midX, lY, midW, third);
+    } else {
+      svg+=hit('O', midX, oY, midW, third);
+      svg+=hit('B', midX, bY, midW, third);
+      svg+=hit('L', midX, lY, midW, third);
+    }
+    svg+=hit(leftKey,  b.x0,     b.y0, cap, (b.y1-b.y0));
+    svg+=hit(rightKey, b.x1-cap, b.y0, cap, (b.y1-b.y0));
+  }
   svg+='</svg>';
   return svg;
 }
@@ -4676,7 +4720,7 @@ function renderOcclusal(){
       var op=1, st=getDominantStatus(num);
       if(st==='planned') op=0.55; else if(st==='referred') op=0.5; else if(st==='condition') op=0.45;
       else if(st==='existing_current') op=0.8; else if(st==='existing_other'||st==='existing') op=0.6;
-      html+='<div class="occ-cell" data-occ-cell="'+num+'" title="السن '+num+' — اضغط لتسجيل اللساني (L)" style="opacity:'+op+'">'
+      html+='<div class="occ-cell" data-occ-cell="'+num+'" title="السن '+num+'" style="opacity:'+op+'">'
           + buildOcclusalTooth(num, sm, R[2])
           + '<div class="tooth-num">'+num+'</div></div>';
     }
