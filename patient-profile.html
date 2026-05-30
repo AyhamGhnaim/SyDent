@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b04"></script>
+<script src="theme.js?v=20260530b05"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b04"></script>
-<script src="sidebar.js?v=20260530b04"></script>
+<script src="supabase-init.js?v=20260530b05"></script>
+<script src="sidebar.js?v=20260530b05"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -142,18 +142,24 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tooth-shape .root-part:hover{stroke:var(--green) !important;stroke-width:2 !important;}
 .tooth-shape .tooth-detail{pointer-events:none;}
 .tooth-shape .gum-line{pointer-events:none;}
-.tooth-tip{
-  position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+/* .tooth-tip is now just a hidden CONTENT SOURCE inside each cell. It is rendered
+   on screen via the #chartTip portal (below), appended to <body>, so it is never
+   clipped by the chart's horizontal scroll container (.jaw-wrap overflow-x:auto,
+   which forces overflow-y to auto and clips an absolutely-positioned tooltip). */
+.tooth-tip{ display:none; }
+.chart-tip{
+  position:fixed;z-index:99999;
   background:#0a1628;color:#fff;padding:6px 10px;border-radius:8px;
   font-size:11px;white-space:nowrap;pointer-events:none;
-  border:1px solid var(--green);box-shadow:0 4px 12px rgba(0,0,0,.4);
-  display:none;z-index:9999;
+  border:1px solid var(--green);box-shadow:0 6px 18px rgba(0,0,0,.45);
+  display:none;
 }
-.tooth-tip::after{
-  content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:var(--green);
+.chart-tip::after{
+  content:'';position:absolute;left:var(--tip-arrow,50%);transform:translateX(-50%);
+  border:5px solid transparent;
 }
-.tooth-cell:hover .tooth-tip{display:block;}
+.chart-tip.tip-above::after{top:100%;border-top-color:var(--green);}
+.chart-tip.tip-below::after{bottom:100%;border-bottom-color:var(--green);}
 .extract-slot:hover{background:rgba(239,83,80,0.10)!important;border-color:rgba(239,83,80,0.65)!important;}
 .extract-slot:hover .extract-plus{transform:scale(1.4);color:#ef5350;}
 .bridge-bar{transition:opacity .15s;}
@@ -640,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b04">
+<link rel="stylesheet" href="theme.css?v=20260530b05">
 </head>
 <body>
 <script>
@@ -4770,6 +4776,38 @@ function renderOcclusal(){
     el.innerHTML=html;
   });
 }
+/* Floating tooltip portal (self-contained). The chart lives inside .jaw-wrap
+   which scrolls horizontally (overflow-x:auto → overflow-y computes to auto),
+   so an absolutely-positioned .tooth-tip gets clipped. Instead we render a single
+   #chartTip element on <body> (position:fixed) and position it above the hovered
+   cell — flipping below when there isn't room above. Event-delegated on #jawWrap
+   so it keeps working after every renderTeeth() re-render. */
+(function(){
+  var tip=null;
+  function ensure(){ if(tip) return tip; tip=document.createElement('div'); tip.className='chart-tip'; document.body.appendChild(tip); return tip; }
+  function show(cell){
+    var src=cell.querySelector(':scope > .tooth-tip'); if(!src) return;
+    var t=ensure(); t.innerHTML=src.innerHTML; t.style.display='block';
+    var cr=cell.getBoundingClientRect(), tr=t.getBoundingClientRect();
+    var left=cr.left + cr.width/2 - tr.width/2;
+    left=Math.max(6, Math.min(left, window.innerWidth - tr.width - 6));
+    var below=false, top=cr.top - tr.height - 9;
+    if(top < 6){ top=cr.bottom + 9; below=true; } // flip below if no room above
+    t.style.left=left+'px'; t.style.top=top+'px';
+    t.classList.toggle('tip-above', !below); t.classList.toggle('tip-below', below);
+    t.style.setProperty('--tip-arrow', (cr.left + cr.width/2 - left) + 'px'); // arrow points at cell center
+  }
+  function hide(){ if(tip) tip.style.display='none'; }
+  function wireTip(){
+    var wrap=document.getElementById('jawWrap'); if(!wrap || wrap.__tipWired) return; wrap.__tipWired=true;
+    wrap.addEventListener('mouseover', function(e){ var c=e.target.closest('.tooth-cell'); if(c && wrap.contains(c)) show(c); });
+    wrap.addEventListener('mouseout', function(e){ var c=e.target.closest('.tooth-cell'); if(!c) return; var to=e.relatedTarget; if(!to || !c.contains(to)) hide(); });
+    wrap.addEventListener('scroll', hide, {passive:true});
+    window.addEventListener('scroll', hide, {passive:true});
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wireTip);
+  else wireTip();
+})();
 /* Occlusal view toggle (self-contained; wires once on DOM ready) */
 (function(){
   function wireOccViews(){
