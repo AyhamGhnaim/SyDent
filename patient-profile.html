@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530a98"></script>
+<script src="theme.js?v=20260530a99"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530a98"></script>
-<script src="sidebar.js?v=20260530a98"></script>
+<script src="supabase-init.js?v=20260530a99"></script>
+<script src="sidebar.js?v=20260530a99"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -236,7 +236,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
 .modal-head h3{font-size:16px;font-weight:700;}
 .modal-close{background:transparent;border:none;color:var(--text2);font-size:20px;cursor:pointer;}
-.modal-body{padding:20px;max-height:75vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
+.modal-body{padding:20px;max-height:80vh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
 .modal-body::-webkit-scrollbar{display:none;width:0;height:0;}
 .no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
 .form-group{margin-bottom:15px;}
@@ -264,7 +264,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-existing{background:#9ca3af;opacity:.7;}           /* legacy fallback (pre-migration) */
 .status-referred{background:#f59e0b;}
 .status-condition{background:#6b7280;opacity:.70;}         /* Cn — clinical watch only, no charge */
-.topt{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
+.topt{padding:14px 12px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(46,232,158,.08);}
 
 /* ── Lab Orders ── */
@@ -636,7 +636,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530a98">
+<link rel="stylesheet" href="theme.css?v=20260530a99">
 </head>
 <body>
 <script>
@@ -1042,7 +1042,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <!-- Modal: السن -->
 <div class="modal-overlay" id="toothModal">
-  <div class="modal-box" style="max-width:440px;">
+  <div class="modal-box" style="max-width:560px;">
     <div class="modal-head"><h3 id="toothModalTitle">السن</h3><button class="modal-close" onclick="closeModal('toothModal')">✕</button></div>
     <div class="modal-body">
       <!-- Step 1: choose treatment (populated dynamically) -->
@@ -3268,6 +3268,11 @@ var SURFACE_LABELS = {
   'PONTIC': 'سن وهمي (جسر)'
 };
 
+/* Unified surface-fill opacity ("solidity") for treatment colors across BOTH
+   the facial (buccal) and occlusal views. Higher = more solid / less see-through.
+   Single source of truth so the two views always match. */
+var SURFACE_FILL_OPACITY = 0.85;
+
 /* Get the center surface key for a given tooth (O for posterior, I for anterior) */
 function centerSurface(num){ return isAnterior(num) ? 'I' : 'O'; }
 
@@ -3314,9 +3319,11 @@ function rootsCount(num) {
   return isUpper ? 3 : 2;
 }
 
-/* Cell width in px — uniform 50px for all teeth */
+/* Cell width in px — uniform 60px for all teeth (enlarged +20% for a more
+   comfortable, readable chart; single source of truth for facial + implant +
+   pontic + extracted placeholders). */
 function cellWidth(num) {
-  return 50;
+  return 60;
 }
 
 /* Anatomically realistic tooth drawing.
@@ -4310,35 +4317,38 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // ── Surface overlay rectangles (clickable) ──
-  // Each overlay is filled transparent if no treatment, or with treatment color (60% opacity) if treated.
-  // The overlay is clipped visually by the crown outline because it's drawn within the SVG.
+  // Each overlay is transparent if no treatment, or filled with the treatment
+  // color at SURFACE_FILL_OPACITY (unified "solidity" shared with the occlusal
+  // view) if treated. The overlay is clipped to the crown outline.
   //
   // Crown silhouette fix (Phase 6 N follow-up):
   // For COLORED surfaces (has a treatment), expand the rect outward by OVERSHOOT
   // so the clip-path actually clips against the crown outline — otherwise small
   // inner rects sit entirely inside the silhouette and appear as floating
-  // rectangles with sharp edges (e.g. the green box on tooth 11 in the live test
-  // — that was a B-only fill, where the inner rect is naturally narrower than
-  // the crown at its equator so clip-path had nothing to clip).
-  // The clipPath (cc${gid}) is built from anat.outlineD, so any overshoot is
-  // trimmed away exactly along the natural crown curve.
+  // rectangles with sharp edges. The clipPath (cc${gid}) is built from
+  // anat.outlineD, so any overshoot is trimmed exactly along the crown curve.
   //
   // The expansion is DIRECTIONAL per surface, and draw-order is M/D LAST so
   // that if both B and M (or D) carry colors, the M/D strip cleanly overlays
-  // any lateral bleed-through from B's expansion.
+  // any lateral bleed-through.
+  //
+  // EXCEPTION (Dr. request): the B (facial) surface is NOT expanded to the
+  // edges — it is a CENTERED patch covering the central 70% of the crown width
+  // (inset 15% from both mesial and distal), so a facial filling reads as a
+  // real restoration instead of an edge-to-edge band.
   //
   // Crown grid (recap):
   //   ┌──┬───────┬──┐
   //   │  │   O   │  │  ← top: O/I — overshoots UP toward incisal/occlusal edge
-  //   │M │   B   │D │  ← middle: B — lateral overshoot (covered by M/D if present)
-  //   │  │   L   │  │  ← bottom: L — overshoots DOWN toward cervical
+  //   │M │  [B]  │D │  ← middle: B — CENTERED 70% patch (no lateral overshoot)
+  //   │  │   V   │  │  ← bottom: V — overshoots DOWN toward cervical
   //   └──┴───────┴──┘
   //   ↑              ↑
   //   M/D strips overshoot LATERALLY + slight vertical (drawn last → on top)
   //
   // Click zones (transparent rects) stay at their original geometry so that
   // hit-testing remains accurate and the inter-surface dividers below still
-  // line up with the logical M/D/B/O/L boundaries.
+  // line up with the logical M/D/B/O/V boundaries.
   var OVERSHOOT = 12;
   function overlayRect(rect, isCenter) {
     var fillKey = rect.key;
@@ -4346,7 +4356,7 @@ function buildTooth(num, surfaceMap, isUpper) {
     var fill, opacity, useColor = false;
     if (hasWhole) { fill = wholeColor; opacity = 0; } // whole already painted via outline
     else if (hasCrownFull) { fill = crownFullColor; opacity = 0; } // crown_full painted as overlay below
-    else if (tk) { fill = T_FILL[tk] || crownBase; opacity = 0.75; useColor = true; }
+    else if (tk) { fill = T_FILL[tk] || crownBase; opacity = SURFACE_FILL_OPACITY; useColor = true; }
     else { fill = '#000'; opacity = 0; } // transparent click zone
     // Directional overshoot — only when actually painting a colored surface.
     var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
@@ -4373,11 +4383,14 @@ function buildTooth(num, surfaceMap, isUpper) {
         padB = OVERSHOOT;
         padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'B') {
-        // Buccal/labial: same horizontal logic as L — lateral overshoot
-        // so the colored body reaches the crown silhouette on both sides,
-        // covering the M/D strip area when those surfaces are uncolored.
-        // M/D drawn last will cleanly overlay any bleed when colored.
-        padL = OVERSHOOT; padR = OVERSHOOT;
+        // Buccal/labial restoration: a CENTERED facial patch. Per Dr. request,
+        // inset 15% from BOTH the mesial and distal edges → the color covers
+        // the central 70% of the crown width instead of spanning edge-to-edge.
+        // This reads as a real facial filling rather than a full lateral band,
+        // and leaves the M/D surfaces visually free for their own colors.
+        var crownW = anat.crownR - anat.crownL;
+        rx = anat.crownL + crownW * 0.15;
+        rw = crownW * 0.70;
       }
       rx -= padL; ry -= padT;
       rw += padL + padR; rh += padT + padB;
@@ -4616,21 +4629,33 @@ function buildOcclusalTooth(num, sm, isUpper){
     +'<radialGradient id="cc'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,255,255,0.9)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient>'
     +'<radialGradient id="rs'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="70%" stop-color="rgba(120,85,45,0)"/><stop offset="100%" stop-color="rgba(120,85,45,0.32)"/></radialGradient>'
     +'<clipPath id="cl'+gid+'"><path d="'+outline+'"/></clipPath></defs>';
-  var svg='<svg class="tooth-shape" viewBox="0 0 100 100" width="50" height="50" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
+  var svg='<svg class="tooth-shape" viewBox="16.67 16.67 66.67 66.67" width="60" height="60" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
   if(isExtract){ svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg; }
   svg+='<path d="'+outline+'" fill="url(#en'+gid+')" stroke="#b08d5b" stroke-width="1.4"/>';
-  // surface tints (clipped to the real outline; grooves/cusps render on top so anatomy stays visible)
+  // surface tints — clipped to the real outline, with directional OVERSHOOT so a
+  // colored surface fills its full (curved) area instead of a floating rectangle
+  // (Dr. note: M/D were showing as small rectangles). Draw order: middle bands
+  // (O,B,L) first, then the M/D side strips LAST so they cleanly overlay the
+  // lateral bleed from the middle bands — same unified logic as the facial view.
   var cap=(b.x1-b.x0)*0.20, third=(b.y1-b.y0)/3, midX=b.x0+cap, midW=(b.x1-b.x0)-2*cap;
   var bY=up?b.y0:(b.y1-third), lY=up?(b.y1-third):b.y0, oY=b.y0+third;
   var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
-  function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=0.6;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
-  if(crownFull){ svg+='<path d="'+outline+'" fill="'+(T_FILL[crownFull]||"#a855f7")+'" fill-opacity="0.62" pointer-events="none"/>'; }
+  var OS=16; // overshoot (occlusal units) — trimmed back to the crown by the clip-path
+  function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
+  if(crownFull){ svg+='<path d="'+outline+'" fill="'+(T_FILL[crownFull]||"#a855f7")+'" fill-opacity="'+SURFACE_FILL_OPACITY+'" pointer-events="none"/>'; }
   else {
-    svg+=reg(leftKey,b.x0,b.y0,cap,b.y1-b.y0);
-    svg+=reg(rightKey,b.x1-cap,b.y0,cap,b.y1-b.y0);
-    svg+=reg('B',midX,bY,midW,third);
-    svg+=reg('O',midX,oY,midW,third);
-    svg+=reg('L',midX,lY,midW,third);
+    var bTop=(bY<oY), lTop=(lY<oY); // which vertical end each band sits at
+    // O (central occlusal surface): BOUNDED to the central column — no lateral
+    // overshoot. It is hemmed in by M/D (sides) and B/L (top/bottom), so it stays
+    // a central patch and must NOT spread to the crown edges (Dr. red boundary).
+    svg+=reg('O', midX, oY, midW, third);
+    // B / L (buccal / lingual edge bands): lateral overshoot (covered by M/D when
+    // colored) + outward vertical overshoot toward their own crown edge.
+    svg+=reg('B', midX-OS, bTop?bY-OS:bY,     midW+2*OS, third+OS);
+    svg+=reg('L', midX-OS, lTop?lY-OS:lY,     midW+2*OS, third+OS);
+    // side strips LAST: outward lateral + vertical to hug the rounded M/D lobes
+    svg+=reg(leftKey,  b.x0-OS,  b.y0-OS, cap+OS, (b.y1-b.y0)+2*OS);
+    svg+=reg(rightKey, b.x1-cap, b.y0-OS, cap+OS, (b.y1-b.y0)+2*OS);
   }
   svg+=G.anat;
   svg+='<path d="'+outline+'" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.3" clip-path="url(#cl'+gid+')" pointer-events="none"/>';
@@ -5139,7 +5164,7 @@ async function openToothModal(n, surface) {
       : '';
     html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
          + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
-         + '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:18px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
+         + '<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:20px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
          + '<span>' + escapeHtml(t.name) + '</span>'
          + laymanLine
          + '</button>';
