@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b03"></script>
+<script src="theme.js?v=20260530b04"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b03"></script>
-<script src="sidebar.js?v=20260530b03"></script>
+<script src="supabase-init.js?v=20260530b04"></script>
+<script src="sidebar.js?v=20260530b04"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -640,7 +640,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b03">
+<link rel="stylesheet" href="theme.css?v=20260530b04">
 </head>
 <body>
 <script>
@@ -4239,17 +4239,19 @@ function buildTooth(num, surfaceMap, isUpper) {
     var rTreatKey = sm[r.key];
     var isCanal = isRootCanalTreat(rTreatKey);
     var rFill;
-    if (hasWhole) rFill = wholeColor;
-    else if (rTreatKey && !isCanal && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
+    // whole-tooth is rendered as a colored OUTLINE (not a solid fill) so any
+    // surface/root treatment beneath it stays visible. So the root keeps its
+    // own treatment color (or the natural gradient) regardless of hasWhole.
+    if (rTreatKey && !isCanal && T_FILL[rTreatKey]) rFill = T_FILL[rTreatKey];
     else rFill = 'url(#rg' + gid + ')';
     svg += '<path class="root-part" data-tooth="' + num + '" data-surface="' + r.key + '" '
         +  'd="' + r.d + '" fill="' + rFill + '" stroke="' + rootStroke + '" stroke-width="0.6"></path>';
     // Side shadow overlay on each root (only if no full-fill treatment)
-    if (!hasWhole && !(rTreatKey && !isCanal && T_FILL[rTreatKey])) {
+    if (!(rTreatKey && !isCanal && T_FILL[rTreatKey])) {
       svg += '<path d="' + r.d + '" fill="url(#rs' + gid + ')" pointer-events="none"></path>';
     }
     // Root canal: draw a thin vertical channel INSIDE the root, from CEJ down toward apex
-    if (isCanal && r.canalTopCx !== undefined && !hasWhole) {
+    if (isCanal && r.canalTopCx !== undefined) {
       var canalColor = T_FILL[rTreatKey] || '#a78bfa';
       var canalTopW = (r.canalTopW || 8) * 0.22;  // canal opening ≈ 22% of root cervical width
       var canalApexW = canalTopW * 0.18;          // narrows toward apex
@@ -4279,10 +4281,13 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // ── Crown outline (gradient + perikymata + inner shadow + highlight) ──
-  var crownFillBase = hasWhole ? wholeColor : ('url(#cg' + gid + ')');
+  // Crown always uses the natural enamel gradient. whole-tooth treatments are
+  // drawn as a colored OUTLINE later (after the surface fills) so treatments
+  // beneath them remain visible — same for crown_full (transparent overlay).
+  var crownFillBase = 'url(#cg' + gid + ')';
   svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="' + crownFillBase + '" '
       +  'stroke="' + crownStroke + '" stroke-width="1" stroke-linejoin="round"></path>';
-  if (!hasWhole) {
+  {
     // Perikymata (subtle horizontal growth-line texture)
     svg += '<path class="tooth-detail" d="' + anat.outlineD + '" fill="url(#pk' + gid + ')" pointer-events="none"></path>';
     // Inner shadow at edges for 3D bulge
@@ -4296,15 +4301,9 @@ function buildTooth(num, surfaceMap, isUpper) {
   }
 
   // ── Occlusal/Incisal band (drawn INSIDE the crown — clipped by crown outline) ──
-  // crown_full: semi-transparent color overlay over entire crown (preserves gradient + details)
-  // Bridge abutments use higher opacity so they read as solid crown of bridge color
-  if (hasCrownFull) {
-    var cfOpacity = isBridgeAbutment ? 0.92 : 0.85;
-    svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="' + cfOpacity + '" '
-        +  'stroke="none" pointer-events="none"></path>';
-  }
-
-  if (anat.occlusalBandD && !hasWhole) {
+  // (crown_full + whole-tooth outline are drawn AFTER the surface overlays, below,
+  //  so the treatments beneath them stay visible.)
+  if (anat.occlusalBandD) {
     var clipId = 'cc' + gid;
     // Soft shadow band representing the occlusal table depth
     svg += '<path d="' + anat.occlusalBandD + '" fill="rgba(160,110,55,0.18)" '
@@ -4358,9 +4357,10 @@ function buildTooth(num, surfaceMap, isUpper) {
     var fillKey = rect.key;
     var tk = sm[fillKey];
     var fill, opacity, useColor = false;
-    if (hasWhole) { fill = wholeColor; opacity = 0; } // whole already painted via outline
-    else if (hasCrownFull) { fill = crownFullColor; opacity = 0; } // crown_full painted as overlay below
-    else if (tk) { fill = T_FILL[tk] || crownBase; opacity = SURFACE_FILL_OPACITY; useColor = true; }
+    // Surface treatments always paint at full solidity. whole-tooth (outline)
+    // and crown_full (transparent overlay) are drawn separately AFTER these, so
+    // the surface treatments beneath them remain visible.
+    if (tk) { fill = T_FILL[tk] || crownBase; opacity = SURFACE_FILL_OPACITY; useColor = true; }
     else { fill = '#000'; opacity = 0; } // transparent click zone
     // Directional overshoot — only when actually painting a colored surface.
     var rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
@@ -4441,9 +4441,28 @@ function buildTooth(num, surfaceMap, isUpper) {
       +  ' '  + (anat.crownR + 3) + ' ' + (gumY + 4) + '" '
       +  'fill="none" stroke="rgba(120,180,220,0.4)" stroke-width="2" stroke-linecap="round"></path>';
 
-  svg += '</g></svg>';
+  // ── Full-coverage layers (drawn LAST so surface/root treatments stay visible) ──
+  // crown_full: a SEMI-TRANSPARENT color wash over the whole crown — the
+  // restoration reads as a cap while any treatment beneath shows through.
+  // Bridge abutments stay near-solid (they represent a physical bridge crown).
+  if (hasCrownFull) {
+    var cfOpacity = isBridgeAbutment ? 0.92 : 0.38;
+    svg += '<path d="' + anat.outlineD + '" fill="' + crownFullColor + '" fill-opacity="' + cfOpacity + '" '
+        +  'stroke="none" pointer-events="none"></path>';
+  }
+  // whole-tooth: a colored OUTLINE (ring) around the crown + each root, so the
+  // tooth reads as fully treated while leaving the interior (and its surface
+  // treatments) clearly visible.
+  if (hasWhole) {
+    svg += '<path d="' + anat.outlineD + '" fill="none" stroke="' + wholeColor + '" '
+        +  'stroke-width="3" stroke-linejoin="round" pointer-events="none"></path>';
+    for (var wri = 0; wri < anat.roots.length; wri++) {
+      svg += '<path d="' + anat.roots[wri].d + '" fill="none" stroke="' + wholeColor + '" '
+          +  'stroke-width="2.4" stroke-linejoin="round" pointer-events="none"></path>';
+    }
+  }
 
-  // ── Tooltip rows ──
+  svg += '</g></svg>';
   // Phase 3 Feature F follow-up: surface tooltip now shows the status badge
   // (مراقبة/مخطط/محوّل/...) inline after the treatment name. Previously the
   // tooltip showed "وحشي: حشوة املغم" with no indication that the wحشي surface
@@ -4472,7 +4491,10 @@ function buildTooth(num, surfaceMap, isUpper) {
     var wt = getTreatment(wholeT);
     var wBadge = tipStatusBadge(sm, 'WHOLE');
     tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + wholeColor + '"></span><b>السن كاملاً:</b> ' + (wt ? wt.name : wholeT) + wBadge + '</div>';
-  } else {
+  }
+  // ALWAYS list surface + lingual + root treatments — even under a whole/crown_full —
+  // so the doctor sees every treatment on the tooth, not just the full-coverage one.
+  {
     var crownKeys = surfacesFor(num);
     for (var ki = 0; ki < crownKeys.length; ki++) {
       var sk = crownKeys[ki];
@@ -4631,6 +4653,17 @@ function buildOcclusalTooth(num, sm, isUpper){
   var quad=Math.floor(parseInt(num,10)/10), mesialOnRight=(quad===1||quad===4);
   var whole=sm.WHOLE, crownFull=sm.CROWN_FULL||null;
   var isExtract=isExtractionKey(whole), isImplant=isImplantKey(whole);
+  // Classify the WHOLE entry exactly like the facial view: a legacy WHOLE record
+  // may actually be a crown_full or bridge abutment. crown_full → transparent wash;
+  // genuine whole (e.g. x-ray) → colored outline. Keeps both views consistent.
+  var occWTreat=whole?getTreatment(whole):null;
+  var occWTP=occWTreat?(occWTreat.target_part||'whole'):null;
+  var occIsBridge=isBridgeKey(whole);
+  var occCrownFullKey=crownFull||((occWTP==='crown_full')?whole:null)||(occIsBridge?whole:null);
+  var occHasCrownFull=!!occCrownFullKey;
+  var occCrownFullColor=occHasCrownFull?(T_FILL[occCrownFullKey]||'#fb923c'):null;
+  var occHasWhole=!!whole && !isExtract && !isImplant && !occIsBridge && occWTP!=='crown_full';
+  var occWholeColor=occHasWhole?(T_FILL[whole]||'#f5e6c8'):null;
   var defs='<defs>'
     +'<radialGradient id="en'+gid+'" cx="44%" cy="36%" r="72%"><stop offset="0%" stop-color="#fbf4e3"/><stop offset="60%" stop-color="#f0e4c8"/><stop offset="100%" stop-color="#d6c293"/></radialGradient>'
     +'<radialGradient id="cu'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,253,245,0.95)"/><stop offset="60%" stop-color="rgba(247,238,214,0.5)"/><stop offset="100%" stop-color="rgba(247,238,214,0)"/></radialGradient>'
@@ -4657,8 +4690,10 @@ function buildOcclusalTooth(num, sm, isUpper){
   var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
   var OS=16; // overshoot (occlusal units) — trimmed back to the crown by the clip-path
   function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
-  if(crownFull){ svg+='<path d="'+outline+'" fill="'+(T_FILL[crownFull]||"#a855f7")+'" fill-opacity="'+SURFACE_FILL_OPACITY+'" pointer-events="none"/>'; }
-  else {
+  // Surface tints are ALWAYS drawn; the full-coverage layers (crown_full wash /
+  // whole-tooth outline) are applied AFTER (below), so any treatment beneath a
+  // crown/whole stays visible — matches the facial view.
+  {
     var bTop=(bY<oY), lTop=(lY<oY); // which vertical end each band sits at
     if(ant){
       // ── ANTERIOR (incisor / canine) ──
@@ -4685,6 +4720,10 @@ function buildOcclusalTooth(num, sm, isUpper){
   }
   svg+=G.anat;
   svg+='<path d="'+outline+'" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.3" clip-path="url(#cl'+gid+')" pointer-events="none"/>';
+  // ── Full-coverage layers (drawn last so surface treatments beneath stay visible) ──
+  // crown_full: semi-transparent wash (bridge abutment near-solid); whole: colored ring.
+  if(occHasCrownFull){ var occCfOp=occIsBridge?0.92:0.38; svg+='<path d="'+outline+'" fill="'+occCrownFullColor+'" fill-opacity="'+occCfOp+'" pointer-events="none"/>'; }
+  if(occHasWhole){ svg+='<path d="'+outline+'" fill="none" stroke="'+occWholeColor+'" stroke-width="2.6" stroke-linejoin="round" pointer-events="none"/>'; }
   if(isImplant){ svg+='<circle cx="50" cy="50" r="13" fill="#0ea5e9" fill-opacity="0.85" stroke="#0369a1" stroke-width="1" pointer-events="none"/>'; }
   else {
     // Per-surface transparent hit-zones at LOGICAL geometry (no overshoot) so they
