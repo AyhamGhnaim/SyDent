@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a97"></script>
+<script src="theme.js?v=20260530a98"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a97"></script>
-<script src="sidebar.js?v=20260529a97"></script>
+<script src="supabase-init.js?v=20260530a98"></script>
+<script src="sidebar.js?v=20260530a98"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -162,6 +162,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tip-dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
 .tooth-num{font-size:10px;color:var(--text2);text-align:center;line-height:1.6;min-width:28px;font-weight:600;}
 .jaw-gap{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:3px;margin:2px 0;}
+.occ-cell{display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;transition:transform .15s;}
+.occ-cell:hover{transform:scale(1.12);z-index:5;}
+.occ-cell:hover .tooth-shape{filter:drop-shadow(0 0 4px var(--green));}
+.hide-row{display:none!important;}
+.seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.seg button{background:transparent;color:var(--text2);border:0;padding:6px 13px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;}
+.seg button.active{background:var(--green);color:#04222e;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;justify-content:center;}
 .leg{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2);}
 .leg-dot{width:12px;height:12px;border-radius:3px;}
@@ -629,7 +636,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a97">
+<link rel="stylesheet" href="theme.css?v=20260530a98">
 </head>
 <body>
 <script>
@@ -727,10 +734,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           + علاج جماعي
         </button>
       </div>
+      <div class="seg" id="occViewSeg" style="margin:0 auto 8px;width:max-content;">
+        <button data-view="all" class="active">الكل</button>
+        <button data-view="buc">دهليزي</button>
+        <button data-view="occ">إطباقي</button>
+      </div>
       <div class="jaw-wrap">
-        <div class="jaw-row" id="upperJaw"></div>
+        <div class="jaw-row row-buc" id="upperJaw"></div>
+        <div class="jaw-row row-occ" id="upperOcc"></div>
         <div class="jaw-gap"></div>
-        <div class="jaw-row" id="lowerJaw"></div>
+        <div class="jaw-row row-occ" id="lowerOcc"></div>
+        <div class="jaw-row row-buc" id="lowerJaw"></div>
       </div>
 <div class="chart-legend" id="chartLegend"></div>
     </div>
@@ -3243,8 +3257,8 @@ var SURFACE_LABELS = {
   'M': 'وحشي',
   'D': 'إنسي',
   'B': 'دهليزي',
-  'L': 'لثوي',
-  'V': 'عنقي',
+  'L': 'لساني',
+  'V': 'لثوي',
   'R1': 'جذر 1',
   'R2': 'جذر 2',
   'R3': 'جذر 3',
@@ -3259,7 +3273,7 @@ function centerSurface(num){ return isAnterior(num) ? 'I' : 'O'; }
 
 /* Get all valid surface keys for a tooth */
 function surfacesFor(num){
-  return isAnterior(num) ? ['I','M','D','B','L'] : ['O','M','D','B','L'];
+  return isAnterior(num) ? ['I','M','D','B','V'] : ['O','M','D','B','V'];
 }
 
 /* ── TOOTH ANATOMY SYSTEM ──
@@ -3493,7 +3507,7 @@ function toothAnatomy(num) {
 
   var oRect = { x: midL, y: stripY,            w: midW, h: oH,            key: (t === 'incisor' || t === 'canine') ? 'I' : 'O' };
   var bRect = { x: midL, y: stripY + oH,       w: midW, h: bH,            key: 'B' };
-  var lRect = { x: midL, y: stripY + oH + bH,  w: midW, h: stripH-oH-bH,  key: 'L' };
+  var lRect = { x: midL, y: stripY + oH + bH,  w: midW, h: stripH-oH-bH,  key: 'V' };
   var leftRect  = { x: stripL_x, y: stripY, w: sideStripW, h: stripH, key: leftKey };
   var rightRect = { x: stripR_x, y: stripY, w: sideStripW, h: stripH, key: rightKey };
 
@@ -4349,7 +4363,7 @@ function buildTooth(num, surfaceMap, isUpper) {
         // lateral pad to hug the curving corners
         padT = OVERSHOOT;
         padL = OVERSHOOT; padR = OVERSHOOT;
-      } else if (fillKey === 'L') {
+      } else if (fillKey === 'V') {
         // Lingual: overshoot DOWN toward the cervical line, plus LATERAL
         // overshoot equal to OVERSHOOT so the lingual fill spans from
         // crown-edge to crown-edge — no visible 'gap' where the M/D strips
@@ -4454,6 +4468,14 @@ function buildTooth(num, surfaceMap, isUpper) {
         tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + SURFACE_LABELS[sk] + ':</b> ' + tname + skBadge + '</div>';
       }
     }
+    // Lingual (L) is recorded only from the occlusal view; surfacesFor() (facial) omits it,
+    // so list it explicitly here to keep the facial hover tooltip complete.
+    if (sm['L']) {
+      var ltobj = getTreatment(sm['L']);
+      var ltname = ltobj ? ltobj.name : sm['L'];
+      var ltcolor = T_FILL[sm['L']] || '#888';
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + ltcolor + '"></span><b>' + (SURFACE_LABELS['L'] || 'لساني') + ':</b> ' + ltname + tipStatusBadge(sm, 'L') + '</div>';
+    }
     for (var rj = 0; rj < anat.roots.length; rj++) {
       var rk = anat.roots[rj].key;
       var rtk = sm[rk];
@@ -4498,6 +4520,162 @@ function renderLegend() {
   html += '<div class="leg" title="حالة سريرية للمتابعة فقط — بدون تكلفة"><div class="leg-dot" style="background:#6b7280;border-radius:50%;"></div>مراقبة</div>';
   leg.innerHTML = html;
 }
+
+/* ===== OCCLUSAL (top) VIEW — second perspective of the same odontogram (shares teethMap). Lingual (L) only editable here; O/M/D/B synced. ===== */
+
+/* ── OCCLUSAL (top-down) VIEW — SyDent enamel style, shares teethMap with facial ── */
+function occSpline(pts){var n=pts.length,d='M'+pts[0][0].toFixed(1)+','+pts[0][1].toFixed(1);for(var i=0;i<n;i++){var p0=pts[(i-1+n)%n],p1=pts[i],p2=pts[(i+1)%n],p3=pts[(i+2)%n];d+=' C'+(p1[0]+(p2[0]-p0[0])/6).toFixed(1)+','+(p1[1]+(p2[1]-p0[1])/6).toFixed(1)+' '+(p2[0]-(p3[0]-p1[0])/6).toFixed(1)+','+(p2[1]-(p3[1]-p1[1])/6).toFixed(1)+' '+p2[0].toFixed(1)+','+p2[1].toFixed(1);}return d+' Z';}
+function occMirror(g){g.outline=g.outline.map(function(p){return [p[0],100-p[1]];});g.cusps=g.cusps.map(function(c){return [c[0],100-c[1],c[2]];});g.fossae=g.fossae.map(function(f){return [f[0],100-f[1],f[2]];});g.ridges=g.ridges.map(function(r){return [r[0],100-r[1],r[2],100-r[3]];});g.grooves=g.grooves.replace(/(-?[0-9]+(?:[.][0-9]+)?),(-?[0-9]+(?:[.][0-9]+)?)/g,function(m,a,b){return a+','+(100-parseFloat(b));});return g;}
+function occGeom(num){
+  var t=toothType(num),p=num%10,quad=Math.floor(num/10),upper=(quad===1||quad===2),gid='o'+num,g,bbox;
+  if(t==='incisor'){
+    var mand=(quad>=3), central=(p===1), w=mand?(central?32:33):(central?42:35), hw=w/2;
+    function X(f){return 50+f*hw;}
+    var O=[[X(-0.95),40],[50,33.5],[X(0.95),40],[X(0.86),52],[X(0.34),61.5],[X(-0.34),61.5],[X(-0.86),52]];
+    var crestY=40, crestMidY=35, edgeY=40;
+    var mam=[X(-0.42),X(0),X(0.42)], cing=[50,57], fossa=[50,48,3.6];
+    var mRidge=[X(-0.8),45,X(-0.28),60], dRidge=[X(0.8),45,X(0.28),60];
+    function fy(q){return [q[0],100-q[1]];}
+    if(!upper){O=O.map(fy);cing=fy(cing);fossa=[fossa[0],100-fossa[1],fossa[2]];mRidge=[mRidge[0],100-mRidge[1],mRidge[2],100-mRidge[3]];dRidge=[dRidge[0],100-dRidge[1],dRidge[2],100-dRidge[3]];crestY=100-crestY;crestMidY=100-crestMidY;edgeY=100-edgeY;}
+    var ioutline=occSpline(O), ianat='<g clip-path="url(#cl'+gid+')">';
+    ianat+='<ellipse cx="50" cy="'+(crestMidY+(upper?4:-4))+'" rx="'+(hw*0.92)+'" ry="7.5" fill="url(#cu'+gid+')"/>';
+    ianat+='<ellipse cx="'+cing[0]+'" cy="'+cing[1]+'" rx="'+(hw*0.55)+'" ry="7" fill="url(#cu'+gid+')"/>';
+    ianat+='<circle cx="'+fossa[0]+'" cy="'+fossa[1]+'" r="'+(fossa[2]+4)+'" fill="url(#fo'+gid+')"/>';
+    ianat+='<path d="M'+X(-0.86)+','+crestY+' Q50,'+(crestMidY+(upper?-1:1))+' '+X(0.86)+','+crestY+'" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="2.2" stroke-linecap="round"/>';
+    mam.forEach(function(mx){ianat+='<line x1="'+mx+'" y1="'+edgeY+'" x2="'+mx+'" y2="'+(upper?edgeY+7:edgeY-7)+'" stroke="rgba(120,82,40,0.28)" stroke-width="1.1" stroke-linecap="round"/>';});
+    [mRidge,dRidge].forEach(function(r){ianat+='<line x1="'+r[0]+'" y1="'+r[1]+'" x2="'+r[2]+'" y2="'+r[3]+'" stroke="rgba(255,255,255,0.34)" stroke-width="2.2" stroke-linecap="round"/>';});
+    ianat+='<rect x="0" y="0" width="100" height="100" fill="url(#rs'+gid+')"/></g>';
+    var ixs=O.map(function(q){return q[0];}),iys=O.map(function(q){return q[1];});
+    return {t:t,upper:upper,outline:ioutline,anat:ianat,bbox:{x0:Math.min.apply(null,ixs),x1:Math.max.apply(null,ixs),y0:Math.min.apply(null,iys),y1:Math.max.apply(null,iys)}};
+  }
+  if(t==='canine'){
+    var mesialLeft=!(quad===1||quad===4);
+    var O=[[50,26],[37,31],[30,45],[37,62],[50,71],[63,62],[70,45],[63,31]];
+    var cuspTip=[49,42], cing=[50,64];
+    var ridges=[[cuspTip[0],cuspTip[1],49,30],[cuspTip[0],cuspTip[1],36,47],[cuspTip[0],cuspTip[1],64,49]];
+    var lingR=[cuspTip[0],cuspTip[1],50,61], fossae=[[44,57,2],[56,57,2]];
+    function fy(p){return [p[0],100-p[1]];} function fyl(l){return [l[0],100-l[1],l[2],100-l[3]];}
+    if(!upper){O=O.map(fy);cuspTip=fy(cuspTip);cing=fy(cing);ridges=ridges.map(fyl);lingR=fyl(lingR);fossae=fossae.map(function(f){return[f[0],100-f[1],f[2]];});}
+    if(!mesialLeft){var fx=function(p){return[100-p[0],p[1]];};var fxl=function(l){return[100-l[0],l[1],100-l[2],l[3]];};O=O.map(fx);cuspTip=fx(cuspTip);cing=fx(cing);ridges=ridges.map(fxl);lingR=fxl(lingR);fossae=fossae.map(function(f){return[100-f[0],f[1],f[2]];});}
+    var cxs=O.map(function(p){return p[0];}),cys=O.map(function(p){return p[1];});
+    var cbb={x0:Math.min.apply(null,cxs),x1:Math.max.apply(null,cxs),y0:Math.min.apply(null,cys),y1:Math.max.apply(null,cys)};
+    var coutline=occSpline(O), canat='<g clip-path="url(#cl'+gid+')">';
+    canat+='<ellipse cx="'+cuspTip[0]+'" cy="'+cuspTip[1]+'" rx="18" ry="18" fill="url(#cu'+gid+')"/>';
+    canat+='<ellipse cx="'+cing[0]+'" cy="'+cing[1]+'" rx="12" ry="9" fill="url(#cu'+gid+')"/>';
+    canat+='<ellipse cx="'+cuspTip[0]+'" cy="'+cuspTip[1]+'" rx="5.5" ry="6" fill="url(#cc'+gid+')"/>';
+    ridges.forEach(function(r){canat+='<line x1="'+r[0]+'" y1="'+r[1]+'" x2="'+r[2]+'" y2="'+r[3]+'" stroke="rgba(255,255,255,0.42)" stroke-width="2.8" stroke-linecap="round"/>';});
+    canat+='<line x1="'+lingR[0]+'" y1="'+lingR[1]+'" x2="'+lingR[2]+'" y2="'+lingR[3]+'" stroke="rgba(255,255,255,0.3)" stroke-width="2.2" stroke-linecap="round"/>';
+    fossae.forEach(function(f){canat+='<circle cx="'+f[0]+'" cy="'+f[1]+'" r="'+(f[2]+2.5)+'" fill="url(#fo'+gid+')"/>';});
+    canat+='<rect x="0" y="0" width="100" height="100" fill="url(#rs'+gid+')"/></g>';
+    return {t:t,upper:upper,outline:coutline,anat:canat,bbox:cbb};
+  }
+  if(t==='molar'){
+    if(upper&&p===6) g={outline:[[28,26],[72,22],[78,52],[74,74],[30,70],[22,50]],cusps:[[34,34,'MB'],[68,34,'DB'],[35,64,'ML'],[70,62,'DL']],grooves:'M50,46 L36,30 M50,46 L50,24 M50,46 Q44,58 40,70 M62,60 Q70,66 76,66',ridges:[[35,64,68,34]],fossae:[[50,46,4.2],[64,58,3]]};
+    else if(upper) g={outline:[[28,26],[72,26],[70,64],[30,68]],cusps:[[35,35,'MB'],[66,35,'DB'],[35,60,'ML'],[64,58,'DL']],grooves:'M50,46 L50,26 M50,46 L30,46 M50,46 L66,52 M50,46 L46,66',ridges:[],fossae:[[50,46,4]]};
+    else if(p===6) g={outline:[[22,34],[50,26],[78,34],[74,70],[28,72]],cusps:[[32,40,'MB'],[54,36,'DB'],[72,46,'D'],[64,66,'DL'],[34,66,'ML']],grooves:'M28,50 L72,50 M44,50 L40,32 M58,50 L62,34 M50,50 L50,72',ridges:[],fossae:[[40,50,3.4],[60,50,3.4],[50,50,2.6]]};
+    else g={outline:[[26,32],[74,32],[74,72],[26,72]],cusps:[[37,44,'MB'],[63,44,'DB'],[63,62,'DL'],[37,62,'ML']],grooves:'M30,52 L70,52 M50,34 L50,70',ridges:[],fossae:[[50,52,3.6]]};
+    if(!upper) g=occMirror(g);
+  } else if(t==='premolar'){
+    g={outline:[[50,24],[64.3,37],[66.5,50],[64.3,63],[50,76],[35.7,63],[33.5,50],[35.7,37]],cusps:[[50,37,'B'],[50,64,'L']],grooves:'M35.7,50 Q50,49 64.3,50',ridges:[],fossae:[[40.1,50,2.6],[59.9,50,2.6]]};
+    if(!upper) g=occMirror(g);
+  }
+  var xs=g.outline.map(function(p){return p[0];}), ys=g.outline.map(function(p){return p[1];});
+  bbox={x0:Math.min.apply(null,xs),x1:Math.max.apply(null,xs),y0:Math.min.apply(null,ys),y1:Math.max.apply(null,ys)};
+  var outline=occSpline(g.outline), anat='<g clip-path="url(#cl'+gid+')">';
+  // cusp eminences + bright cores
+  g.cusps.forEach(function(c){var dx=(50-c[0])*0.16,dy=(50-c[1])*0.16,rr=(t==='premolar'&&c[2]==='B')?17:15;anat+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="'+rr+'" ry="'+(rr-1)+'" fill="url(#cu'+gid+')"/>';});
+  g.cusps.forEach(function(c){var dx=(50-c[0])*0.16,dy=(50-c[1])*0.16;anat+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="6" ry="5.5" fill="url(#cc'+gid+')"/>';});
+  // triangular ridges
+  g.cusps.forEach(function(c){anat+='<line x1="'+c[0]+'" y1="'+c[1]+'" x2="'+(c[0]+(50-c[0])*0.46)+'" y2="'+(c[1]+(50-c[1])*0.46)+'" stroke="rgba(255,255,255,0.28)" stroke-width="2.6" stroke-linecap="round"/>';});
+  // marginal ridges (mesial/distal) for posterior teeth
+  if(t==='molar'||t==='premolar'){
+    anat+='<path d="M'+(bbox.x0+5)+','+(bbox.y0+9)+' Q'+(bbox.x0+2)+','+((bbox.y0+bbox.y1)/2)+' '+(bbox.x0+5)+','+(bbox.y1-9)+'" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="2.6" stroke-linecap="round"/>';
+    anat+='<path d="M'+(bbox.x1-5)+','+(bbox.y0+9)+' Q'+(bbox.x1-2)+','+((bbox.y0+bbox.y1)/2)+' '+(bbox.x1-5)+','+(bbox.y1-9)+'" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="2.6" stroke-linecap="round"/>';
+  }
+  g.ridges.forEach(function(r){anat+='<line x1="'+r[0]+'" y1="'+r[1]+'" x2="'+r[2]+'" y2="'+r[3]+'" stroke="rgba(255,255,255,0.42)" stroke-width="3" stroke-linecap="round"/>';});
+  g.fossae.forEach(function(f){anat+='<circle cx="'+f[0]+'" cy="'+f[1]+'" r="'+(f[2]+3.5)+'" fill="url(#fo'+gid+')"/>';});
+  // grooves: soft under-shadow + crisp line
+  anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(92,58,24,0.28)" stroke-width="3.4" stroke-linecap="round"/>';
+  anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(82,50,20,0.78)" stroke-width="1.4" stroke-linecap="round"/>';
+  // inner rim shadow for depth
+  anat+='<rect x="0" y="0" width="100" height="100" fill="url(#rs'+gid+')"/></g>';
+  return {t:t,upper:upper,outline:outline,anat:anat,bbox:bbox};
+}
+/* Occlusal (top) view — anatomical (cusp eminences + real groove pattern + fossae).
+   ONLY the LINGUAL (L) surface is editable here; O/B/M/D are synced from the facial view. */
+function buildOcclusalTooth(num, sm, isUpper){
+  sm=sm||{};
+  var G=occGeom(num), t=G.t, up=G.upper, gid='o'+num, outline=G.outline, b=G.bbox;
+  var quad=Math.floor(parseInt(num,10)/10), mesialOnRight=(quad===1||quad===4);
+  var whole=sm.WHOLE, crownFull=sm.CROWN_FULL||null;
+  var isExtract=isExtractionKey(whole), isImplant=isImplantKey(whole);
+  var defs='<defs>'
+    +'<radialGradient id="en'+gid+'" cx="44%" cy="36%" r="72%"><stop offset="0%" stop-color="#fbf4e3"/><stop offset="60%" stop-color="#f0e4c8"/><stop offset="100%" stop-color="#d6c293"/></radialGradient>'
+    +'<radialGradient id="cu'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,253,245,0.95)"/><stop offset="60%" stop-color="rgba(247,238,214,0.5)"/><stop offset="100%" stop-color="rgba(247,238,214,0)"/></radialGradient>'
+    +'<radialGradient id="fo'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(120,82,40,0.6)"/><stop offset="100%" stop-color="rgba(120,82,40,0)"/></radialGradient>'
+    +'<radialGradient id="cc'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,255,255,0.9)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient>'
+    +'<radialGradient id="rs'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="70%" stop-color="rgba(120,85,45,0)"/><stop offset="100%" stop-color="rgba(120,85,45,0.32)"/></radialGradient>'
+    +'<clipPath id="cl'+gid+'"><path d="'+outline+'"/></clipPath></defs>';
+  var svg='<svg class="tooth-shape" viewBox="0 0 100 100" width="50" height="50" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
+  if(isExtract){ svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg; }
+  svg+='<path d="'+outline+'" fill="url(#en'+gid+')" stroke="#b08d5b" stroke-width="1.4"/>';
+  // surface tints (clipped to the real outline; grooves/cusps render on top so anatomy stays visible)
+  var cap=(b.x1-b.x0)*0.20, third=(b.y1-b.y0)/3, midX=b.x0+cap, midW=(b.x1-b.x0)-2*cap;
+  var bY=up?b.y0:(b.y1-third), lY=up?(b.y1-third):b.y0, oY=b.y0+third;
+  var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
+  function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=0.6;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
+  if(crownFull){ svg+='<path d="'+outline+'" fill="'+(T_FILL[crownFull]||"#a855f7")+'" fill-opacity="0.62" pointer-events="none"/>'; }
+  else {
+    svg+=reg(leftKey,b.x0,b.y0,cap,b.y1-b.y0);
+    svg+=reg(rightKey,b.x1-cap,b.y0,cap,b.y1-b.y0);
+    svg+=reg('B',midX,bY,midW,third);
+    svg+=reg('O',midX,oY,midW,third);
+    svg+=reg('L',midX,lY,midW,third);
+  }
+  svg+=G.anat;
+  svg+='<path d="'+outline+'" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.3" clip-path="url(#cl'+gid+')" pointer-events="none"/>';
+  if(isImplant){ svg+='<circle cx="50" cy="50" r="13" fill="#0ea5e9" fill-opacity="0.85" stroke="#0369a1" stroke-width="1" pointer-events="none"/>'; }
+  else { svg+='<path class="crown-surface" data-tooth="'+num+'" data-surface="L" d="'+outline+'" fill="#000" fill-opacity="0"></path>'; }
+  svg+='</svg>';
+  return svg;
+}
+
+function renderOcclusal(){
+  var rows=[['upperOcc',UPPER_T,true],['lowerOcc',LOWER_T,false]];
+  rows.forEach(function(R){
+    var el=document.getElementById(R[0]); if(!el) return;
+    var html='';
+    for(var i=0;i<R[1].length;i++){
+      if(i===8) html+='<div class="midline"></div>';
+      var num=R[1][i], sm=teethMap[String(num)]||{};
+      var op=1, st=getDominantStatus(num);
+      if(st==='planned') op=0.55; else if(st==='referred') op=0.5; else if(st==='condition') op=0.45;
+      else if(st==='existing_current') op=0.8; else if(st==='existing_other'||st==='existing') op=0.6;
+      html+='<div class="occ-cell" data-occ-cell="'+num+'" title="السن '+num+' — اضغط لتسجيل اللساني (L)" style="opacity:'+op+'">'
+          + buildOcclusalTooth(num, sm, R[2])
+          + '<div class="tooth-num">'+num+'</div></div>';
+    }
+    el.innerHTML=html;
+  });
+}
+/* Occlusal view toggle (self-contained; wires once on DOM ready) */
+(function(){
+  function wireOccViews(){
+    var seg=document.getElementById('occViewSeg'); if(!seg || seg.__wired) return; seg.__wired=true;
+    seg.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      var bs=seg.querySelectorAll('button'); for(var i=0;i<bs.length;i++) bs[i].classList.remove('active');
+      b.classList.add('active');
+      var v=b.getAttribute('data-view');
+      var buc=[document.getElementById('upperJaw'),document.getElementById('lowerJaw')];
+      var occ=[document.getElementById('upperOcc'),document.getElementById('lowerOcc')];
+      buc.forEach(function(el){ if(el) el.classList.toggle('hide-row', v==='occ'); });
+      occ.forEach(function(el){ if(el) el.classList.toggle('hide-row', v==='buc'); });
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wireOccViews);
+  else wireOccViews();
+})();
 
 function renderTeeth() {
   _T = rebuildToothMaps();
@@ -4560,6 +4738,7 @@ function renderTeeth() {
   lowerEl.innerHTML = lHtml;
   // Draw bridge connectors after teeth are in DOM
   setTimeout(renderBridges, 0);
+  renderOcclusal();
   attachSurfaceClicks();
   addStatusBadges();
 }
