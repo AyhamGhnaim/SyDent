@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a96"></script>
+<script src="theme.js?v=20260529a97"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,10 +920,10 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a96">
+<link rel="stylesheet" href="theme.css?v=20260529a97">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a96"></script>
-<script src="sidebar.js?v=20260529a96"></script>
+<script src="supabase-init.js?v=20260529a97"></script>
+<script src="sidebar.js?v=20260529a97"></script>
 </head>
 <body>
 <script>
@@ -1064,9 +1064,6 @@ textarea { resize: vertical; min-height: 72px; }
           <select id="fApptTypePicker" onchange="onApptTypePicked()">
             <option value="">— بدون قالب —</option>
           </select>
-          <!-- Phase 6 L (Obs B): non-intrusive lab hint banner. Shown only when
-               the picked template has a default_lab_id. JS toggles display. -->
-          <div id="apptTypeLabHint" style="display:none;margin-top:8px;"></div>
         </div>
         <div class="form-group full">
           <label>اسم المريض *</label>
@@ -3381,10 +3378,6 @@ async function overrideApptTime(apptId, fieldKey) {
 
 var _appointmentTypes = [];   // cached templates for this session
 var _gap8TableMissing = false;
-// Phase 6 L (Obs B): cached labs for resolving default_lab_id → human name
-// in the lab-hint banner. Fault-tolerant: empty array means we just show a
-// generic "مخبر مرتبط" without the specific name (still informative).
-var _labsCache = [];
 
 function _gap8IsTableMissing(err) {
   if (!err) return false;
@@ -3392,35 +3385,14 @@ function _gap8IsTableMissing(err) {
   return /42P01|PGRST205|relation .* does not exist|appointment_types/i.test(msg);
 }
 
-// Phase 6 L (Obs B): one-shot loader for the labs cache, called alongside
-// loadAppointmentTypes(). Only active labs — matches the picker UX in
-// settings.html. Never throws.
-async function loadLabsForHint() {
-  if (!currentUser) return;
-  try {
-    var res = await window.sb.from('labs')
-      .select('id, name')
-      .eq('is_active', true);
-    if (res.error) {
-      console.warn('Phase 6 L: labs cache load failed (continuing):', res.error);
-      _labsCache = [];
-      return;
-    }
-    _labsCache = res.data || [];
-  } catch (e) {
-    console.warn('Phase 6 L: labs cache load exception:', e);
-    _labsCache = [];
-  }
-}
-
 async function loadAppointmentTypes() {
   if (!currentUser) return;
   try {
     // Gap 8.2 / Migration 11 / Migration 12: select default_provider_id +
-    // default_lab_id + default_notes + default_operatory_id alongside the
-    // original fields. If any of those columns don't exist yet (42703), retry
-    // with the legacy projection so the picker still works on older installs.
-    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_lab_id, default_notes, default_operatory_id, is_active, sort_order';
+    // default_notes + default_operatory_id alongside the original fields. If
+    // any of those columns don't exist yet (42703), retry with the legacy
+    // projection so the picker still works on older installs.
+    var fullCols = 'id, name, default_duration_min, default_treatment_id, default_provider_id, default_notes, default_operatory_id, is_active, sort_order';
     var legacyCols = 'id, name, default_duration_min, default_treatment_id, is_active, sort_order';
     var res = await window.sb.from('appointment_types')
       .select(fullCols)
@@ -3569,11 +3541,9 @@ function onApptTypePicked() {
   if (!sel) return;
   var id = sel.value;
   if (!id) {
-    // Phase 6 L (Obs B): user picked "— بدون قالب —" → clear any visible
-    // lab hint banner from a previous template. We don't touch the form
-    // fields (duration/treatment/notes) — those keep user edits per the
+    // User picked "— بدون قالب —". We don't touch the form fields
+    // (duration/treatment/notes) — those keep user edits per the
     // "don't clobber" philosophy elsewhere in this function.
-    _renderApptTypeLabHint(null);
     return;
   }
   var t = _appointmentTypes.find(function(x){ return x.id === id; });
@@ -3700,13 +3670,6 @@ function onApptTypePicked() {
     }
   }
 
-  // Gap 8.2: default_lab_id is intentionally NOT applied to the appointment
-  // form here — appointments don't directly carry a lab id. Phase 6 L (Obs B)
-  // surfaces it as a non-intrusive banner instead, so the user knows this
-  // template's lab association and can create the matching lab order from
-  // the Labs tab (or the per-appointment lab section) afterwards.
-  _renderApptTypeLabHint(t);
-
   // Migration 11 (Phase 6 L): pre-fill the appointment notes field from the
   // template's default_notes, BUT only if the user hasn't typed anything yet.
   // This honors the user's edits while still providing a smart default — the
@@ -3718,31 +3681,6 @@ function onApptTypePicked() {
       notesEl.value = t.default_notes;
     }
   }
-}
-
-// Phase 6 L (Obs B): Renders/clears the lab hint banner under the template
-// picker. Non-intrusive — just informs the user about the template's lab so
-// they can create the lab order afterwards. No automatic mutation.
-function _renderApptTypeLabHint(t) {
-  var wrap = document.getElementById('apptTypeLabHint');
-  if (!wrap) return;
-  if (!t || !t.default_lab_id) {
-    wrap.style.display = 'none';
-    wrap.innerHTML = '';
-    return;
-  }
-  // Resolve the lab name from the cache. If the lab was deleted/deactivated,
-  // we fall back to a generic notice rather than showing a broken UUID.
-  var labName = null;
-  for (var i = 0; i < _labsCache.length; i++) {
-    if (_labsCache[i].id === t.default_lab_id) { labName = _labsCache[i].name; break; }
-  }
-  var labText = labName ? escapeHtml(labName) : 'مخبر مرتبط بهذا القالب';
-  wrap.innerHTML = '<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:8px;font-size:13px;color:var(--text2);line-height:1.6;">'
-    + '<span style="font-size:16px;line-height:1;">💡</span>'
-    + '<span>هذا القالب مرتبط بـ <strong style="color:var(--text);">' + labText + '</strong> — أنشئ طلب مخبر من تبويب المخابر أو من الموعد بعد الحفظ.</span>'
-    + '</div>';
-  wrap.style.display = '';
 }
 
 // ─── Render ──────────────────────────────────────────
@@ -4420,10 +4358,6 @@ async function openModal(prefillDate) {
       atPickerWrap.style.display = '';
     }
   }
-  // Phase 6 L (Obs B): reset the lab hint banner on every fresh modal open.
-  // The user may have triggered it on a previous draft; without this reset
-  // the stale banner would briefly show until the user picked a new template.
-  _renderApptTypeLabHint(null);
   onPlannedToggle();  // sync visibility of date/time/reason/note
   updateColorPreview();
 
@@ -6295,7 +6229,6 @@ async function apptDeleteFile(id){
   await loadClinicDoctors();
   await loadOperatoriesCache();   // Phase 6 K (Migration 12)
   await loadAppointmentTypes();  // Gap 8: cache templates for the modal picker
-  await loadLabsForHint();       // Phase 6 L: cache labs for the template hint banner
   // Phase 2A — WhatsApp Reminders state
   await loadClinicSettingsWa();
   await loadPatientPhones();
