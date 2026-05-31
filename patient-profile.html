@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b12"></script>
+<script src="theme.js?v=20260530b13"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b12"></script>
-<script src="sidebar.js?v=20260530b12"></script>
+<script src="supabase-init.js?v=20260530b13"></script>
+<script src="sidebar.js?v=20260530b13"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b12">
+<link rel="stylesheet" href="theme.css?v=20260530b13">
 </head>
 <body>
 <script>
@@ -4615,6 +4615,7 @@ function occGeom(num){
     if(upper&&p===6) g={outline:[[28,26],[72,22],[78,52],[74,74],[30,70],[22,50]],cusps:[[34,34,'MB'],[68,34,'DB'],[35,64,'ML'],[70,62,'DL']],grooves:'M50,46 L36,30 M50,46 L50,24 M50,46 Q44,58 40,70 M62,60 Q70,66 76,66',ridges:[[35,64,68,34]],fossae:[[50,46,4.2],[64,58,3]]};
     else if(upper) g={outline:[[28,26],[72,26],[70,64],[30,68]],cusps:[[35,35,'MB'],[66,35,'DB'],[35,60,'ML'],[64,58,'DL']],grooves:'M50,46 L50,26 M50,46 L30,46 M50,46 L66,52 M50,46 L46,66',ridges:[],fossae:[[50,46,4]]};
     else if(p===6) g={outline:[[22,34],[50,26],[78,34],[74,70],[28,72]],cusps:[[32,40,'MB'],[54,36,'DB'],[72,46,'D'],[64,66,'DL'],[34,66,'ML']],grooves:'M28,50 L72,50 M44,50 L40,32 M58,50 L62,34 M50,50 L50,72',ridges:[],fossae:[[40,50,3.4],[60,50,3.4],[50,50,2.6]]};
+    else if(p===7) g={outline:[[26,32],[74,32],[74,72],[26,72]],cusps:[[33,40,'MB'],[67,40,'DB'],[67,64,'DL'],[33,64,'ML']],grooves:'',ridges:[],fossae:[[50,52,3]],cuspRX:12,cuspPull:0,noTriRidges:true}; // lower 2nd molar (37/47) — Dr.: cusps toward the edges, smaller, no visible lines between them
     else g={outline:[[26,32],[74,32],[74,72],[26,72]],cusps:[[37,44,'MB'],[63,44,'DB'],[63,62,'DL'],[37,62,'ML']],grooves:'M30,52 L70,52 M50,34 L50,70',ridges:[],fossae:[[50,52,3.6]]};
     if(!upper) g=occMirror(g);
   } else if(t==='premolar'){
@@ -4628,12 +4629,13 @@ function occGeom(num){
   // surface fills) AND returned separately (G.cusps) so the caller can re-stamp them
   // ON TOP of partial surface fills (Dr.: large central cusps vanish under fills).
   var cuspStamp='';
-  g.cusps.forEach(function(c){var dx=(50-c[0])*0.16,dy=(50-c[1])*0.16,rr=(t==='premolar'&&c[2]==='B')?17:15;cuspStamp+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="'+rr+'" ry="'+(rr-1)+'" fill="url(#cu'+gid+')"/>';});
-  g.cusps.forEach(function(c){var dx=(50-c[0])*0.16,dy=(50-c[1])*0.16;cuspStamp+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="6" ry="5.5" fill="url(#cc'+gid+')"/>';});
+  var cPull=(g.cuspPull!=null?g.cuspPull:0.16); // center-pull (0 = sit at the edge positions, per-tooth override)
+  g.cusps.forEach(function(c){var dx=(50-c[0])*cPull,dy=(50-c[1])*cPull,rr=(g.cuspRX!=null?g.cuspRX:((t==='premolar'&&c[2]==='B')?17:15));cuspStamp+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="'+rr+'" ry="'+(rr-1)+'" fill="url(#cu'+gid+')"/>';});
+  g.cusps.forEach(function(c){var dx=(50-c[0])*cPull,dy=(50-c[1])*cPull,cr=(g.cuspRX!=null?g.cuspRX*0.42:6);cuspStamp+='<ellipse cx="'+(c[0]+dx)+'" cy="'+(c[1]+dy)+'" rx="'+cr+'" ry="'+(cr-0.5)+'" fill="url(#cc'+gid+')"/>';});
   anat+=cuspStamp;
   var cuspsTop='<g clip-path="url(#cl'+gid+')" pointer-events="none">'+cuspStamp+'</g>';
-  // triangular ridges
-  g.cusps.forEach(function(c){anat+='<line x1="'+c[0]+'" y1="'+c[1]+'" x2="'+(c[0]+(50-c[0])*0.46)+'" y2="'+(c[1]+(50-c[1])*0.46)+'" stroke="rgba(255,255,255,0.18)" stroke-width="2.6" stroke-linecap="round"/>';});
+  // triangular ridges (skipped when the geometry asks for no inter-cusp lines)
+  if(!g.noTriRidges) g.cusps.forEach(function(c){anat+='<line x1="'+c[0]+'" y1="'+c[1]+'" x2="'+(c[0]+(50-c[0])*0.46)+'" y2="'+(c[1]+(50-c[1])*0.46)+'" stroke="rgba(255,255,255,0.18)" stroke-width="2.6" stroke-linecap="round"/>';});
   // marginal ridges (mesial/distal) for posterior teeth
   if(t==='molar'||t==='premolar'){
     anat+='<path d="M'+(bbox.x0+5)+','+(bbox.y0+9)+' Q'+(bbox.x0+2)+','+((bbox.y0+bbox.y1)/2)+' '+(bbox.x0+5)+','+(bbox.y1-9)+'" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2.6" stroke-linecap="round"/>';
@@ -4642,8 +4644,10 @@ function occGeom(num){
   g.ridges.forEach(function(r){anat+='<line x1="'+r[0]+'" y1="'+r[1]+'" x2="'+r[2]+'" y2="'+r[3]+'" stroke="rgba(255,255,255,0.2)" stroke-width="3" stroke-linecap="round"/>';});
   g.fossae.forEach(function(f){anat+='<circle cx="'+f[0]+'" cy="'+f[1]+'" r="'+(f[2]+3.5)+'" fill="url(#fo'+gid+')"/>';});
   // grooves: soft under-shadow + crisp line (lightened — were too dark per Dr.)
-  anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(112,78,40,0.16)" stroke-width="3.2" stroke-linecap="round"/>';
-  anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(120,84,44,0.46)" stroke-width="1.3" stroke-linecap="round"/>';
+  if(g.grooves){
+    anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(112,78,40,0.16)" stroke-width="3.2" stroke-linecap="round"/>';
+    anat+='<path d="'+g.grooves+'" fill="none" stroke="rgba(120,84,44,0.46)" stroke-width="1.3" stroke-linecap="round"/>';
+  }
   // inner rim shadow for depth
   anat+='<rect x="0" y="0" width="100" height="100" fill="url(#rs'+gid+')"/></g>';
   return {t:t,upper:upper,outline:outline,anat:anat,cusps:cuspsTop,bbox:bbox};
