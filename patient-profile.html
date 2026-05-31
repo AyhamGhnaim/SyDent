@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b13"></script>
+<script src="theme.js?v=20260530b14"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b13"></script>
-<script src="sidebar.js?v=20260530b13"></script>
+<script src="supabase-init.js?v=20260530b14"></script>
+<script src="sidebar.js?v=20260530b14"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b13">
+<link rel="stylesheet" href="theme.css?v=20260530b14">
 </head>
 <body>
 <script>
@@ -3977,20 +3977,30 @@ function findBridgeAbutments(num) {
   return { mesial: leftAbut, distal: rightAbut, gap: gap };
 }
 
-/* Build an empty placeholder for an extracted tooth.
-   Clickable area exposes a "+ ضع علاج" affordance on hover. */
+/* Build a dashed "ghost" silhouette for an extracted tooth (crown + roots),
+   mirroring the dashed outline used in the occlusal view. The whole shape is
+   clickable and opens the same modal as before (openToothModal(num,'WHOLE')). */
 function buildExtractedPlaceholder(num, isUpper) {
-  var anatRef = toothAnatomy(num);
-  var W = anatRef.cellW;
+  var anat = toothAnatomy(num);
+  var W = anat.cellW;
   var H = Math.round(W * 2.1);
+  var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
+  var DASH = 'fill="none" stroke="#9aa3b0" stroke-width="2.6" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"';
+  var ghost = '<path d="' + anat.outlineD + '" ' + DASH + '/>'; // crown silhouette
+  for (var ri = 0; ri < anat.roots.length; ri++) {                // roots
+    ghost += '<path d="' + anat.roots[ri].d + '" ' + DASH + '/>';
+  }
+  var svg = '<svg class="tooth-shape extract-ghost" data-tooth="' + num + '" '
+    + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
+    + 'xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'
+    + '<g ' + transform + '>' + ghost + '</g></svg>';
   var slot = '<div class="extract-slot" data-tooth="' + num + '" '
     + 'style="display:flex;align-items:center;justify-content:center;'
-    + 'width:' + W + 'px;height:' + H + 'px;cursor:pointer;'
-    + 'border:1.5px dashed rgba(239,83,80,0.35);border-radius:8px;'
-    + 'background:rgba(239,83,80,0.04);position:relative;" '
+    + 'width:' + W + 'px;height:' + H + 'px;cursor:pointer;position:relative;'
+    + 'border:none;background:transparent;" '
     + 'onclick="openToothModal(' + num + ', &quot;WHOLE&quot;)" '
-    + 'title="السن ' + num + ' — مقلوع (اضغط لإضافة جسر/زراعة)">'
-    + '<span class="extract-plus" style="font-size:22px;color:rgba(239,83,80,0.55);font-weight:300;transition:transform .15s,color .15s;">+</span>'
+    + 'title="السن ' + num + ' — مقلوع (اضغط لإضافة علاج/جسر/زراعة)">'
+    + svg
     + '</div>';
   var num_html = '<div class="tooth-num">' + num + '</div>';
   var inner = isUpper ? (slot + num_html) : (num_html + slot);
