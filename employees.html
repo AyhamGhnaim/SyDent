@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a98"></script>
+<script src="theme.js?v=20260531b11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a98"></script>
-<script src="sidebar.js?v=20260529a98"></script>
+<script src="supabase-init.js?v=20260531b11"></script>
+<script src="sidebar.js?v=20260531b11"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -86,11 +86,20 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .emp-color-bar{height:5px;width:100%;}
 .emp-body{padding:16px 18px;}
 .emp-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+/* Color swatch square (no initials) — mirrors treatments' .treat-icon so the
+   employee's accent color reads at a glance without letters. */
 .emp-avatar{
-  width:52px;height:52px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:24px;font-weight:800;color:#fff;flex-shrink:0;
+  width:46px;height:46px;border-radius:12px;
+  flex-shrink:0;border:2px solid rgba(255,255,255,0.22);
+  box-shadow:inset 0 0 0 1px rgba(0,0,0,0.18);
 }
+/* Drag-and-drop reordering (mirrors treatments.html) */
+.drag-handle{position:absolute;top:8px;left:8px;font-size:14px;color:var(--text2);cursor:grab;opacity:.5;font-weight:900;user-select:none;letter-spacing:-2px;line-height:1;padding:4px 6px;border-radius:6px;transition:opacity .15s,background .15s;z-index:2;}
+.emp-card:hover .drag-handle{opacity:1;}
+.drag-handle:hover{background:var(--bg3);}
+.drag-handle:active{cursor:grabbing;}
+.emp-card.dragging{opacity:.4;}
+.emp-card.drag-over{border-color:var(--green) !important;border-width:2px;}
 .emp-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.3;}
 .emp-role-badge{
   display:inline-block;font-size:10px;font-weight:800;
@@ -254,7 +263,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a98">
+<link rel="stylesheet" href="theme.css?v=20260531b11">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -681,13 +690,6 @@ function openEmpDocColorPicker() {
   });
 }
 
-function initials(name) {
-  var parts = String(name || '').trim().split(/\s+/);
-  if (parts.length === 0 || !parts[0]) return '?';
-  if (parts.length === 1) return parts[0].charAt(0);
-  return parts[0].charAt(0) + parts[parts.length - 1].charAt(0);
-}
-
 // SHA-256 hash for PIN (delegates to SyDentLock.hashPin)
 async function hashPin(pin) {
   return await window.SyDentLock.hashPin(pin);
@@ -705,13 +707,13 @@ async function loadData() {
   var empRes = await window.sb.from('clinic_employees')
     .select('id, name, role, doctor_id, pin_hash, is_active, created_at, updated_at, has_system_access, ' +
             'phone, color, notes, weekly_hours, monthly_salary, share_percent, ' +
-            'provider_type, compensation_model')
+            'provider_type, compensation_model, sort_order')
     .eq('owner_id', currentUser.id)
     .order('role', { ascending: true })
     .order('name', { ascending: true });
 
-  // Pre-Migration-20/21 fallback: drop the new columns if any are missing.
-  if (empRes.error && /42703|phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model|has_system_access/i.test(
+  // Pre-Migration-20/21/42 fallback: drop the new columns if any are missing.
+  if (empRes.error && /42703|phone|color|notes|weekly_hours|monthly_salary|share_percent|provider_type|compensation_model|has_system_access|sort_order/i.test(
         (empRes.error.message || '') + ' ' + (empRes.error.code || ''))) {
     console.warn('Phase 7.3/7.4: Migration 20/21 not applied — retrying clinic_employees with legacy columns');
     empRes = await window.sb.from('clinic_employees')
@@ -805,11 +807,16 @@ function renderList() {
     return;
   }
 
-  // Group: owner first, then doctors, then secretaries
+  // Owner is always pinned first (never draggable). Everyone else is ordered
+  // by the custom sort_order (Migration 42) set via drag-and-drop, with name
+  // as a stable tiebreak. Rows that predate the column (sort_order null) sort
+  // last so they don't jump above intentionally-ordered cards.
   var sorted = employees.slice().sort(function(a, b){
-    var rank = { owner: 1, doctor: 2, secretary: 3 };
-    var ra = rank[a.role] || 99, rb = rank[b.role] || 99;
-    if (ra !== rb) return ra - rb;
+    if (a.role === 'owner' && b.role !== 'owner') return -1;
+    if (b.role === 'owner' && a.role !== 'owner') return 1;
+    var sa = (a.sort_order == null) ? Number.MAX_SAFE_INTEGER : a.sort_order;
+    var sb = (b.sort_order == null) ? Number.MAX_SAFE_INTEGER : b.sort_order;
+    if (sa !== sb) return sa - sb;
     return String(a.name).localeCompare(String(b.name), 'ar');
   });
 
@@ -828,10 +835,17 @@ function renderList() {
     // Phase 6 W + X: Resolve provider_type from the linked clinic_doctors row
     // for ALL non-owner employees (secretaries also have linkedDoc since
     // Phase 6 X). Falls back to a sensible default per role if no linkage.
+    // FIX (Migration 42 session): the canonical source is
+    // clinic_employees.provider_type (Phase 7.3). Non-clinical staff
+    // ('secretary:other') have NO doctor_id → linkedDocForBadge is null, so
+    // reading only the mirror made every 'other' employee display as
+    // "سكرتيرة". Prefer e.provider_type first (mirrors the edit modal's
+    // _coalesceHR(emp.provider_type, linkedDoc.provider_type) precedence).
     var linkedDocForBadge = (e.role !== 'owner' && e.doctor_id)
       ? doctors.find(function(d){ return d.id === e.doctor_id; })
       : null;
-    var empProviderType = linkedDocForBadge ? linkedDocForBadge.provider_type : null;
+    var empProviderType = e.provider_type
+      || (linkedDocForBadge ? linkedDocForBadge.provider_type : null);
 
     // Phase 7.4: Three possible badges depending on system access state:
     //   1. Owner          → no badge (has system access by definition)
@@ -864,12 +878,18 @@ function renderList() {
         '<button class="btn btn-sm btn-danger" onclick="deleteEmployee(\'' + e.id + '\')">🗑️ حذف</button>';
     }
 
+    // Owner card is pinned (not draggable). All other employees get the
+    // draggable flag + a grab handle so they can be reordered (Migration 42).
+    var isOwnerCard = (e.role === 'owner');
+    var dragAttrs = isOwnerCard ? '' : (' draggable="true" data-emp-id="' + e.id + '"');
+    var dragHandle = isOwnerCard ? '' : '<div class="drag-handle" title="اسحب لإعادة الترتيب">⋮⋮</div>';
     html +=
-      '<div class="emp-card' + (inactive ? ' inactive' : '') + '">' +
+      '<div class="emp-card' + (inactive ? ' inactive' : '') + '"' + dragAttrs + '>' +
         '<div class="emp-color-bar" style="background:' + color + ';"></div>' +
+        dragHandle +
         '<div class="emp-body">' +
           '<div class="emp-head">' +
-            '<div class="emp-avatar" style="background:' + color + ';">' + escapeHtml(initials(e.name)) + '</div>' +
+            '<div class="emp-avatar" style="background:' + color + ';" title="اللون المميز"></div>' +
             '<div>' +
               '<div class="emp-name">' + escapeHtml(e.name) +
                 (inactive ? ' <span style="color:var(--red);font-size:11px;font-weight:700;">(معطّل)</span>' : '') +
@@ -885,6 +905,97 @@ function renderList() {
   });
   html += '</div>';
   box.innerHTML = html;
+  wireDragAndDrop();
+}
+
+// ============================================================
+// Drag-and-drop reordering (mirrors treatments.html pattern)
+// ============================================================
+// The owner card is never draggable (pinned first), so only non-owner cards
+// carry [data-emp-id]. Reordering persists clinic_employees.sort_order
+// (Migration 42) one row at a time, with an optimistic re-render first.
+var draggedEmpId = null;
+
+function wireDragAndDrop() {
+  var cards = document.querySelectorAll('.emp-card[data-emp-id]');
+  cards.forEach(function(card){
+    card.addEventListener('dragstart', function(e){
+      draggedEmpId = card.getAttribute('data-emp-id');
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', function(){
+      card.classList.remove('dragging');
+      document.querySelectorAll('.emp-card.drag-over').forEach(function(c){ c.classList.remove('drag-over'); });
+    });
+    card.addEventListener('dragover', function(e){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var thisId = card.getAttribute('data-emp-id');
+      if (thisId !== draggedEmpId) card.classList.add('drag-over');
+    });
+    card.addEventListener('dragleave', function(){
+      card.classList.remove('drag-over');
+    });
+    card.addEventListener('drop', async function(e){
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      var targetId = card.getAttribute('data-emp-id');
+      if (!draggedEmpId || draggedEmpId === targetId) return;
+      await reorderEmployees(draggedEmpId, targetId);
+      draggedEmpId = null;
+    });
+  });
+}
+
+async function reorderEmployees(draggedId, targetId) {
+  // Reorder within the non-owner subset only; the owner stays pinned and is
+  // excluded from sort_order churn entirely.
+  var owners  = employees.filter(function(e){ return e.role === 'owner'; });
+  var movable = employees.filter(function(e){ return e.role !== 'owner'; });
+
+  var draggedIdx = movable.findIndex(function(e){ return e.id === draggedId; });
+  var targetIdx  = movable.findIndex(function(e){ return e.id === targetId; });
+  if (draggedIdx < 0 || targetIdx < 0) return;
+
+  // Remove and reinsert at the target position.
+  var dragged = movable.splice(draggedIdx, 1)[0];
+  targetIdx = movable.findIndex(function(e){ return e.id === targetId; });
+  movable.splice(targetIdx, 0, dragged);
+
+  // Reassign sort_order sequentially. Owners keep sort_order 0 so they never
+  // compete with the movable block (which starts at 1).
+  owners.forEach(function(e){ e.sort_order = 0; });
+  var updates = [];
+  for (var j = 0; j < movable.length; j++) {
+    movable[j].sort_order = j + 1;
+    updates.push({ id: movable[j].id, sort_order: j + 1 });
+  }
+  // Rebuild the master array so renderList's sort reflects the new order.
+  employees = owners.concat(movable);
+
+  // Optimistic re-render.
+  renderList();
+
+  // Persist (one update per row — small list, no batching needed).
+  for (var k = 0; k < updates.length; k++) {
+    var res = await window.sb.from('clinic_employees')
+      .update({ sort_order: updates[k].sort_order })
+      .eq('id', updates[k].id)
+      .eq('owner_id', currentUser.id);
+    if (res.error) {
+      console.error('reorder error:', res.error);
+      // Pre-Migration-42 fallback: column missing → tell the user, then reload.
+      if (/42703|sort_order/i.test((res.error.message || '') + ' ' + (res.error.code || ''))) {
+        showToast('⚠️ عمود الترتيب غير مفعّل بعد على قاعدة البيانات', true);
+      } else {
+        showToast('⚠️ فشل حفظ الترتيب: ' + res.error.message, true);
+      }
+      await loadData();  // restore a consistent state from the server
+      return;
+    }
+  }
+  showToast('✅ تم تحديث الترتيب');
 }
 
 // ── Add/Edit Modal ──
@@ -1485,6 +1596,16 @@ async function saveEmployee() {
       // Phase 7.4: system access flag (HR-only vs login user)
       has_system_access: hasSystemAccess
     };
+    // Migration 42: a newly-added employee goes to the END of the movable
+    // (non-owner) list. Edits omit sort_order so the existing position is
+    // preserved. Owner rows keep sort_order 0 and are ignored here.
+    if (!editingId) {
+      var _maxSort = (employees || []).reduce(function(m, e){
+        var s = (e.role === 'owner' || e.sort_order == null) ? 0 : e.sort_order;
+        return s > m ? s : m;
+      }, 0);
+      row.sort_order = _maxSort + 1;
+    }
     // PIN handling: write the new hash if entered, or NULL it out if the
     // employee just lost system access (clearPin), otherwise leave it
     // unchanged (don't include in payload).
@@ -1508,6 +1629,7 @@ async function saveEmployee() {
       delete legacy.provider_type;
       delete legacy.compensation_model;
       delete legacy.has_system_access;  // Phase 7.4 (Migration 21)
+      delete legacy.sort_order;         // Migration 42
       return legacy;
     }
     function _isHRColumnMissing(err) {
