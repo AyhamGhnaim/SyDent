@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b08"></script>
+<script src="theme.js?v=20260530b09"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b08"></script>
-<script src="sidebar.js?v=20260530b08"></script>
+<script src="supabase-init.js?v=20260530b09"></script>
+<script src="sidebar.js?v=20260530b09"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b08">
+<link rel="stylesheet" href="theme.css?v=20260530b09">
 </head>
 <body>
 <script>
@@ -4413,7 +4413,7 @@ function buildTooth(num, surfaceMap, isUpper) {
     return '<rect class="crown-surface" data-tooth="' + num + '" data-surface="' + fillKey + '" '
         + 'x="' + rx + '" y="' + ry + '" width="' + rw + '" height="' + rh + '" rx="2" ry="2" '
         + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
-        + 'clip-path="url(#cc' + gid + ')"></rect>';
+        + 'clip-path="url(#cc' + gid + ')"><title>' + (SURFACE_LABELS[fillKey]||fillKey) + '</title></rect>';
   }
 
   var s = anat.surfaces;
@@ -4753,7 +4753,7 @@ function buildOcclusalTooth(num, sm, isUpper){
     var hit=function(key,rx,ry,rw,rh){
       return '<rect class="crown-surface" data-tooth="'+num+'" data-surface="'+key+'" '
            + 'x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" rx="2" ry="2" '
-           + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"></rect>';
+           + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"><title>'+(SURFACE_LABELS[key]||key)+'</title></rect>';
     };
     if(ant){
       svg+=hit('I', antX, iEdgeY, antW, iHv);
