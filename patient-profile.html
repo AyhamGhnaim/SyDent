@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260530b10"></script>
+<script src="theme.js?v=20260530b11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260530b10"></script>
-<script src="sidebar.js?v=20260530b10"></script>
+<script src="supabase-init.js?v=20260530b11"></script>
+<script src="sidebar.js?v=20260530b11"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260530b10">
+<link rel="stylesheet" href="theme.css?v=20260530b11">
 </head>
 <body>
 <script>
@@ -4384,14 +4384,11 @@ function buildTooth(num, surfaceMap, isUpper) {
         padT = OVERSHOOT;
         padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'V') {
-        // Lingual: overshoot DOWN toward the cervical line, plus LATERAL
-        // overshoot equal to OVERSHOOT so the lingual fill spans from
-        // crown-edge to crown-edge — no visible 'gap' where the M/D strips
-        // sit (those zones are transparent click areas when not colored).
-        // When M/D ARE colored, they are drawn LAST and cleanly overlay
-        // this bleed, restoring the per-surface meaning.
+        // Lingual: overshoot DOWN toward the cervical line ONLY. NO lateral
+        // overshoot — the lingual fill stays confined to the central column
+        // (between the M/D side strips) so it never covers the mesial/distal
+        // zones, which are reserved for proximal treatments (Dr. red boundary).
         padB = OVERSHOOT;
-        padL = OVERSHOOT; padR = OVERSHOOT;
       } else if (fillKey === 'B') {
         // Buccal/labial restoration: a CENTERED facial patch. Per Dr. request,
         // inset 15% from BOTH the mesial and distal edges → the color covers
@@ -4721,7 +4718,10 @@ function buildOcclusalTooth(num, sm, isUpper){
       // the top-down view of an anterior tooth. L keeps its EXACT original third
       // (Dr.: lingual position is excellent, don't change it). M/D drawn last.
       svg+=reg('I', antX-OS, up?iEdgeY-OS:iEdgeY, antW+2*OS, iHv+OS);
-      svg+=reg('L', antX-OS, up?lFillY:lFillY-OS, antW+2*OS, lHv+OS);
+      // Lingual (L): CONFINED to the central column (midX/midW) with vertical
+      // overshoot only — never spreads laterally into the M/D crown edges, which
+      // are reserved for proximal treatments (Dr. red boundary — same rule as O).
+      svg+=reg('L', midX, up?lFillY:lFillY-OS, midW, lHv+OS);
     } else {
       // ── POSTERIOR (premolar / molar) ──
       // O (central occlusal surface): BOUNDED to the central column — no lateral
@@ -4731,7 +4731,9 @@ function buildOcclusalTooth(num, sm, isUpper){
       // B / L (buccal / lingual edge bands): lateral overshoot (covered by M/D when
       // colored) + outward vertical overshoot toward their own crown edge.
       svg+=reg('B', midX-OS, bTop?bY-OS:bY,     midW+2*OS, third+OS);
-      svg+=reg('L', midX-OS, lTop?lY-OS:lY,     midW+2*OS, third+OS);
+      // Lingual (L): no lateral overshoot — confined to the central column so it
+      // never covers the M/D crown edges (reserved for proximal treatments).
+      svg+=reg('L', midX, lTop?lY-OS:lY,     midW, third+OS);
     }
     // side strips LAST: outward lateral + vertical to hug the rounded M/D lobes
     svg+=reg(leftKey,  b.x0-OS,  b.y0-OS, cap+OS, (b.y1-b.y0)+2*OS);
