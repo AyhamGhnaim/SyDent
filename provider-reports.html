@@ -13,10 +13,10 @@
 <title>تقارير الأطباء — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a97"></script>
+<script src="theme.js?v=20260529a98"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a97"></script>
-<script src="sidebar.js?v=20260529a97"></script>
+<script src="supabase-init.js?v=20260529a98"></script>
+<script src="sidebar.js?v=20260529a98"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -273,7 +273,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a97">
+<link rel="stylesheet" href="theme.css?v=20260529a98">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -927,7 +927,20 @@ function render() {
     totalPayouts += computePayout(d, stats);
   });
 
-  document.getElementById('summaryRow').innerHTML =
+  // Doctor mode: show ONLY this doctor's own report (the provider card below).
+  // Hide the clinic-wide aggregate summary (sessions/production/lab/collection/
+  // payouts) — a doctor-employee must never see other providers' or whole-clinic
+  // totals. Data is fetched tenant-wide and scoped client-side, so the summary
+  // row would otherwise leak clinic totals. Matches Dentrix/OpenDental provider
+  // self-service scoping. Provider card below already shows all of this doctor's
+  // own numbers, so no information is lost.
+  var summaryEl = document.getElementById('summaryRow');
+  if (window.SyDentLock && window.SyDentLock.isDoctor()) {
+    summaryEl.innerHTML = '';
+    summaryEl.style.display = 'none';
+  } else {
+    summaryEl.style.display = '';
+    summaryEl.innerHTML =
     '<div class="stat-card blue">'
       + '<div class="lbl">عدد الجلسات</div>'
       + '<div class="val">' + fmt(totalSessions) + '</div>'
@@ -953,6 +966,7 @@ function render() {
       + '<div class="val">' + fmtSY(totalPayouts) + '</div>'
       + '<div class="sub">حسب الأساس المُختار</div>'
     + '</div>';
+  }
 
   // ─── Provider cards ───
   var html = '<div class="providers-grid">';
