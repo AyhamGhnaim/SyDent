@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b04"></script>
+<script src="theme.js?v=20260601b05"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2160,11 +2160,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b04">
+<link rel="stylesheet" href="theme.css?v=20260601b05">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b04"></script>
+<script src="supabase-init.js?v=20260601b05"></script>
 </head>
 <body>
 
@@ -5423,6 +5423,27 @@ function computeAccountState(r) {
 //   • delete             — * → (row deleted, auth user deleted)
 //
 // Returns: { ok: bool, error: string|null, newRow: object|null }
+// Count ACTIVE staff for a tenant, EXCLUDING the owner (role='owner') — the
+// canonical "seat usage" for plan employee limits (owner never counts).
+// Returns a number, or null on failure (callers fail-open). Uses SERVICE_KEY
+// because the admin is not the owner of these rows (RLS would deny window.sb).
+async function countActiveStaff(ownerUserId) {
+  if (!ownerUserId || !SERVICE_KEY) return null;
+  try {
+    var url = SUPABASE_URL + '/rest/v1/clinic_employees?select=id' +
+              '&owner_id=eq.' + encodeURIComponent(ownerUserId) +
+              '&is_active=eq.true&role=neq.owner&limit=0';
+    var resp = await fetch(url, { method:'GET', headers:{
+      'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY, 'Prefer': 'count=exact'
+    }});
+    if (!resp.ok && resp.status !== 206) return null;
+    var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
+    var slash = cr.lastIndexOf('/'); if (slash < 0) return null;
+    var totalStr = cr.slice(slash + 1).trim(); if (totalStr === '*') return null;
+    var n = parseInt(totalStr, 10); return isNaN(n) ? null : n;
+  } catch(e) { console.warn('countActiveStaff:', e && e.message); return null; }
+}
+
 async function transitionAccount(eventType, r, params) {
   params = params || {};
   if (!r || !r.id) return { ok:false, error:'invalid_request', newRow:null };
@@ -5685,6 +5706,26 @@ async function transitionAccount(eventType, r, params) {
       return { ok:false, error:'unknown_event_type', newRow:null };
   }
 
+  // ---- 2b. Downgrade guard (Option A) ----
+  // Never let a plan change push an account over its employee seat limit. If the
+  // target plan allows fewer active staff than the clinic currently has, BLOCK
+  // the change (operator/tenant must deactivate or remove staff first). The owner
+  // is never counted. Only plan-change conversions are guarded (not accept/
+  // reactivate/renew/extend). Fail-open on count error (UX remains a backstop).
+  if (eventType === 'convert_monthly' || eventType === 'convert_yearly' || eventType === 'convert_plan') {
+    var _limCfg = getPlanConfig(toPlan);
+    var _empLimit = (_limCfg && _limCfg.max_employees != null && !isNaN(Number(_limCfg.max_employees))) ? Number(_limCfg.max_employees) : null;
+    if (_empLimit != null && r.user_id) {
+      var _usedStaff = await countActiveStaff(r.user_id);
+      if (_usedStaff != null && _usedStaff > _empLimit) {
+        var _pName = (typeof planDisplayName === 'function') ? planDisplayName(toPlan) : toPlan;
+        return { ok:false, error:'employee_over_limit',
+          userMessage: 'لا يمكن التحويل إلى خطة ' + _pName + ': العيادة لديها ' + _usedStaff + ' موظف نشط، والخطة تسمح بـ ' + _empLimit + ' فقط. يجب تعطيل أو حذف الزائد أولاً (المالك لا يُحتسب).',
+          newRow:null };
+      }
+    }
+  }
+
   // ---- 3. Write to trial_requests (DB is the primary store) ----
   var upd = await window.sb.from('trial_requests')
     .update(updatePayload).eq('id', r.id).select().maybeSingle();
@@ -5912,7 +5953,7 @@ async function confirmPlanChoice() {
   var result = await transitionAccount(eventType, r, tParams);
   closePlanModal();
   if (!result.ok) {
-    alert('فشل تغيير الخطة: ' + (result.error || 'خطأ غير معروف'));
+    alert(result.userMessage ? result.userMessage : ('فشل تغيير الخطة: ' + (result.error || 'خطأ غير معروف')));
   }
   loadAndRender();
 }
@@ -6757,7 +6798,7 @@ async function srqApprove(reqId) {
   }
   var result = await transitionAccount(et, tr, tp);
   if (!result || !result.ok) {
-    alert('فشل التفعيل: ' + ((result && result.error) || 'خطأ غير معروف'));
+    alert((result && result.userMessage) ? result.userMessage : ('فشل التفعيل: ' + ((result && result.error) || 'خطأ غير معروف')));
     _srqInFlight = false;
     return;
   }

@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b04"></script>
+<script src="theme.js?v=20260601b05"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b04"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b04">
+<script src="supabase-init.js?v=20260601b05"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b05">
 <style>
 :root {
   --bg:        #0a1628;
@@ -200,7 +200,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b04"></script>
+<script src="sidebar.js?v=20260601b05"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -569,6 +569,24 @@ body {
       note: note || null,
       status: 'pending'
     };
+
+    // Downgrade guard (Option A): block requesting a plan whose employee limit is
+    // below the clinic's current ACTIVE staff (owner excluded). The clinic must
+    // deactivate/remove the excess first — we never silently enter an over-quota state.
+    var _selLimit = (ST.selPlan.max_employees != null && !isNaN(Number(ST.selPlan.max_employees))) ? Number(ST.selPlan.max_employees) : null;
+    if (_selLimit != null) {
+      try {
+        var _ecq = await window.sb.from('clinic_employees')
+          .select('id', { count:'exact', head:true })
+          .eq('owner_id', ST.user.id).eq('is_active', true).neq('role', 'owner');
+        var _used = (_ecq && typeof _ecq.count === 'number') ? _ecq.count : null;
+        if (_used != null && _used > _selLimit) {
+          toast('خطة ' + (ST.selPlan.display_name || ST.selPlan.code) + ' تسمح بـ ' + _selLimit + ' موظف، ولديك ' + _used + ' موظف نشط. عطّل أو احذف الزائد أولاً (المالك لا يُحتسب).', true);
+          ST.inFlight = false; syncConfirm();
+          return;
+        }
+      } catch(eLim) { console.warn('[subscription] staff limit check skipped:', eLim && eLim.message); }
+    }
 
     try {
       var res = await window.sb.from('subscription_requests').insert(payload).select().maybeSingle();
