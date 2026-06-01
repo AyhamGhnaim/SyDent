@@ -32,12 +32,10 @@
 -- (Migration 34 was applied directly to Supabase and is NOT in the repo, so
 -- we must not assume its exact shape).
 -- ════════════════════════════════════════════════════════════════════════
---   SELECT polname, cmd, roles,
---          pg_get_expr(polqual, polrelid)      AS using_expr,
---          pg_get_expr(polwithcheck, polrelid) AS check_expr
---   FROM pg_policy
---   WHERE polrelid = 'public.platform_settings'::regclass
---   ORDER BY polname;
+--   SELECT policyname, cmd, roles, qual, with_check
+--   FROM pg_policies
+--   WHERE schemaname = 'public' AND tablename = 'platform_settings'
+--   ORDER BY policyname;
 --
 -- Expected to ALREADY include (from Migrations 33 + 34):
 --   p_platform_settings_admin_read   (admin only)
@@ -171,14 +169,14 @@ CREATE POLICY p_platform_settings_tenant_read
 --              idx_sub_requests_user (+ pkey)
 --
 -- 3) RLS policies (expect 5 on subscription_requests):
---    SELECT polname, cmd FROM pg_policy
---    WHERE polrelid = 'public.subscription_requests'::regclass ORDER BY polname;
+--    SELECT policyname, cmd FROM pg_policies
+--    WHERE schemaname='public' AND tablename='subscription_requests' ORDER BY policyname;
 --
 -- 4) platform_settings now has the seed + the tenant-read policy:
 --    SELECT key FROM public.platform_settings WHERE key = 'payment_instructions_ar';
---    SELECT polname FROM pg_policy
---    WHERE polrelid = 'public.platform_settings'::regclass
---      AND polname = 'p_platform_settings_tenant_read';
+--    SELECT policyname FROM pg_policies
+--    WHERE schemaname='public' AND tablename='platform_settings'
+--      AND policyname = 'p_platform_settings_tenant_read';
 --
 -- 5) Smoke test — open a TENANT session and run:
 --    SELECT key, value FROM public.platform_settings;
