@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b02"></script>
+<script src="theme.js?v=20260601b03"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2160,11 +2160,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b02">
+<link rel="stylesheet" href="theme.css?v=20260601b03">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b02"></script>
+<script src="supabase-init.js?v=20260601b03"></script>
 </head>
 <body>
 
@@ -5359,6 +5359,17 @@ async function saveTplEdits() {
 // Note: a row with trial_end=NULL is treated as 'permanent paid' (the
 // historical 'تفعيل دائم' affordance) and goes into the 'paid' state
 // with isPermanent=true so the badge can show ♾️ instead of a counter.
+// Canonical plan display name: the admin-configured display_name (Max/Mini)
+// from subscription_plans, with a safe fallback. Use EVERYWHERE a plan name
+// is shown so the admin matches the tenant-facing naming (no legacy سنوي/شهري).
+function planDisplayName(code) {
+  try { var c = getPlanConfig(code); if (c && c.display_name) return c.display_name; } catch(_) {}
+  if (code === 'trial') return 'تجريبي';
+  if (code === 'monthly') return 'Mini';
+  if (code === 'yearly') return 'Max';
+  return code || '—';
+}
+
 function computeAccountState(r) {
   var st = r.status || 'new';
   var now = new Date();
@@ -5381,7 +5392,7 @@ function computeAccountState(r) {
   if (trialEnd && trialEnd > now) {
     // Active subscription window
     if (plan === 'trial') return { state:'trial', daysLeft:daysLeft, label:'تجربة', isPermanent:false, plan:plan };
-    return { state:'paid', daysLeft:daysLeft, label:(plan==='yearly'?'سنوي':'شهري'), isPermanent:false, plan:plan };
+    return { state:'paid', daysLeft:daysLeft, label:'نشط', isPermanent:false, plan:plan };
   }
   // trialEnd past or invalid → grace or expired
   if (graceUntil && graceUntil > now) {
@@ -5784,8 +5795,7 @@ function openPlanModal(reqId, eventType) {
     if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
   } else if (state.state === 'paid') {
     var hintCfg = getPlanConfig(state.plan);
-    hint += (hintCfg && hintCfg.display_name) ? hintCfg.display_name
-          : (state.plan === 'yearly' ? 'سنوي' : state.plan === 'monthly' ? 'شهري' : (state.plan || 'مدفوع'));
+    hint += planDisplayName(state.plan);
     if (state.isPermanent) hint += ' — دائم';
     else if (state.daysLeft !== null) hint += ' (متبقي ' + state.daysLeft + ' يوم)';
   } else {
@@ -6602,11 +6612,7 @@ function srqEsc(s) {
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function srqPlanLabel(code) {
-  try { var c = getPlanConfig(code); if (c && c.display_name) return c.display_name; } catch(_) {}
-  if (code === 'trial') return 'تجريبي';
-  if (code === 'monthly') return 'Mini';
-  if (code === 'yearly') return 'Max';
-  return code || '—';
+  return planDisplayName(code);
 }
 
 // Derive the real relationship by comparing plan prices (request_kind in the
@@ -6714,17 +6720,41 @@ async function srqApprove(reqId) {
   if (!tr || !tr.id) { alert('لم يُعثر على حساب المستأجر المرتبط بالطلب.'); return; }
 
   var who = tr.name || tr.email || '';
-  if (!confirm('تأكيد تفعيل الطلب؟\n\n' + who + '\n' +
-               srqPlanLabel(req.current_plan) + ' ← ' + srqPlanLabel(req.requested_plan) + '\n' +
+  var relC = srqRelation(req.current_plan || tr.plan || '', req.requested_plan);
+  if (!confirm('تأكيد ' + relC.label + ' الاشتراك؟\n\n' + who + '\n' +
+               'من خطة ' + srqPlanLabel(req.current_plan || tr.plan || '') +
+               ' إلى خطة ' + srqPlanLabel(req.requested_plan) + '\n' +
                'طريقة الدفع: ' + (SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '\n\n' +
                '⚠️ تأكّد من استلام الدفع قبل التفعيل.')) return;
 
   _srqInFlight = true;
-  // Same event-type mapping as the plan-picker modal (event_type CHECK honored).
-  var et = (req.requested_plan === 'yearly') ? 'convert_yearly'
-         : (req.requested_plan === 'monthly') ? 'convert_monthly'
-         : 'convert_plan';
-  var tp = (et === 'convert_plan') ? { planCode: req.requested_plan } : {};
+  // F3: re-confirm the request is still pending (tenant may have cancelled, or
+  // it was resolved in another admin tab) — never change a plan for a request
+  // that is no longer pending.
+  try {
+    var fresh = await window.sb.from('subscription_requests').select('status').eq('id', reqId).maybeSingle();
+    if (!fresh || !fresh.data || fresh.data.status !== 'pending') {
+      alert('هذا الطلب لم يعد قيد المراجعة (رُبما أُلغي أو عولج). يتم تحديث القائمة.');
+      _srqInFlight = false;
+      await loadSubRequests();
+      return;
+    }
+  } catch (e) { /* network hiccup — proceed */ }
+
+  // Event mapping. F1: a RENEW (same plan) uses the 'renew' event, which extends
+  // trial_end from the CURRENT end (preserves remaining days, Stripe-style). A
+  // plan CHANGE (upgrade/downgrade) uses convert_*, starting a fresh period.
+  var curCode = req.current_plan || tr.plan || '';
+  var et, tp;
+  if (req.requested_plan === curCode) {
+    et = 'renew'; tp = {};
+  } else if (req.requested_plan === 'yearly') {
+    et = 'convert_yearly'; tp = {};
+  } else if (req.requested_plan === 'monthly') {
+    et = 'convert_monthly'; tp = {};
+  } else {
+    et = 'convert_plan'; tp = { planCode: req.requested_plan };
+  }
   var result = await transitionAccount(et, tr, tp);
   if (!result || !result.ok) {
     alert('فشل التفعيل: ' + ((result && result.error) || 'خطأ غير معروف'));
@@ -8687,7 +8717,7 @@ function renderList() {
     // so the operator can see at a glance which plan is in force.
     var planPillHtml = '';
     if ((s.state === 'paid' || s.state === 'grace') && !s.isPermanent) {
-      var planLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : s.plan;
+      var planLabel = planDisplayName(s.plan);
       planPillHtml = '<span class="req-plan-pill">' + planLabel + '</span>';
     }
     var stateBadge = '<div style="display:flex;align-items:center;">' + adminBadgeHtml + planPillHtml +
@@ -8751,7 +8781,7 @@ function renderList() {
     if (s.state === 'paid' && !s.isPermanent && r.phone && r.trial_end) {
       var rnPhone = jsAttr(r.phone || '');
       var rnName  = jsAttr(r.name || '');
-      var rnPlanLabel = s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : (s.plan || '');
+      var rnPlanLabel = planDisplayName(s.plan);
       var rnPlan  = jsAttr(rnPlanLabel);
       var rnEnd   = jsAttr(r.trial_end || '');
       var rnPrice = jsAttr(String(r.price_paid == null ? '' : r.price_paid));
@@ -9329,7 +9359,7 @@ function c360BuildActions(r) {
     waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaWelcome(\'' + safePhone + '\',\'' + safeName + '\',\'' + safeEmail + '\',event)">👋 ترحيب</a>');
   }
   if (s.state === 'paid' && !s.isPermanent) {
-    var planLabel = jsAttr(s.plan === 'yearly' ? 'سنوي' : s.plan === 'monthly' ? 'شهري' : (s.plan || ''));
+    var planLabel = jsAttr(planDisplayName(s.plan));
     var safeEnd2 = jsAttr(r.trial_end || '');
     var pricePaid = (r.price_paid != null && Number(r.price_paid) > 0) ? Number(r.price_paid) : 'null';
     waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaRenewed(\'' + safePhone + '\',\'' + safeName + '\',\'' + planLabel + '\',\'' + safeEnd2 + '\',' + pricePaid + ',event)">✅ تجديد</a>');

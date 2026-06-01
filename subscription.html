@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b02"></script>
+<script src="theme.js?v=20260601b03"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b02"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b02">
+<script src="supabase-init.js?v=20260601b03"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b03">
 <style>
 :root {
   --bg:        #0a1628;
@@ -200,7 +200,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b02"></script>
+<script src="sidebar.js?v=20260601b03"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -307,7 +307,10 @@ body {
   function planRelation(targetCode) {
     var cur = curPlanCode();
     if (targetCode === cur) return 'renew';
-    return (planPrice(targetCode) >= planPrice(cur)) ? 'upgrade' : 'downgrade';
+    var pc = planPrice(cur), pr = planPrice(targetCode);
+    if (pr > pc) return 'upgrade';
+    if (pr < pc) return 'downgrade';
+    return 'change';
   }
   function methodLabel(v) {
     var m = PAYMENT_METHODS.filter(function (x) { return x.v === v; })[0];
@@ -430,7 +433,7 @@ body {
     if (!ST.pending) { el.style.display = 'none'; return; }
     var pc = planPrice(ST.pending.current_plan), pr = planPrice(ST.pending.requested_plan);
     var kindAr = (ST.pending.current_plan === ST.pending.requested_plan) ? 'تجديد'
-               : (pr < pc) ? 'تغيير' : 'ترقية';
+               : (pr > pc) ? 'ترقية' : 'تغيير';
     el.innerHTML =
       '<div class="sub-pending-text">⏳ لديك طلب <b>' + escHtml(kindAr) + '</b> إلى خطة <b>' +
         escHtml(planLabel(ST.pending.requested_plan)) + '</b> قيد المراجعة. سيتم التفعيل بعد تأكيد الدفع.</div>' +
@@ -473,9 +476,9 @@ body {
               ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'renew\')">🔄 تجديد</button>';
       } else {
         var relP = planRelation(p.code);
-        var bLabel = (relP === 'downgrade')
-              ? '🔽 تغيير إلى ' + escHtml(p.display_name || p.code)
-              : '⬆️ ترقية إلى ' + escHtml(p.display_name || p.code);
+        var bLabel = relP === 'upgrade'   ? ('⬆️ ترقية إلى ' + escHtml(p.display_name || p.code))
+                   : relP === 'downgrade' ? ('🔽 تغيير إلى ' + escHtml(p.display_name || p.code))
+                   :                        ('🔄 تغيير إلى ' + escHtml(p.display_name || p.code));
         btn = '<button class="sub-btn" ' + (hasPending ? 'disabled' : '') +
               ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'' + relP + '\')">' + bLabel + '</button>';
       }
@@ -509,13 +512,13 @@ body {
     var p = ST.plans.filter(function (x) { return x.code === planCode; })[0];
     if (!p) return;
     ST.selPlan = p;
-    ST.selRelation = (relation === 'renew' || relation === 'downgrade') ? relation : 'upgrade';
+    ST.selRelation = (relation === 'renew' || relation === 'downgrade' || relation === 'change') ? relation : 'upgrade';
     ST.selKind = (ST.selRelation === 'renew') ? 'renew' : 'upgrade'; // DB CHECK: upgrade|renew
     ST.selMethod = null;
 
     var titleWord = ST.selRelation === 'renew' ? 'تجديد خطة '
-                  : ST.selRelation === 'downgrade' ? 'تغيير إلى خطة '
-                  : 'الترقية إلى خطة ';
+                  : ST.selRelation === 'upgrade' ? 'الترقية إلى خطة '
+                  : 'تغيير إلى خطة ';
     document.getElementById('subModalTitle').textContent = titleWord + (p.display_name || p.code);
     document.getElementById('subModalSub').textContent =
       'السعر: ' + fmtPrice(p.price) + ' ' + (p.currency || 'SYP') +
@@ -583,7 +586,7 @@ body {
 
       // open WhatsApp to support, prefilled
       var kindAr = ST.selRelation === 'renew' ? 'تجديد'
-                 : ST.selRelation === 'downgrade' ? 'تغيير' : 'ترقية';
+                 : ST.selRelation === 'upgrade' ? 'ترقية' : 'تغيير';
       var msg = 'مرحباً، أرغب بـ' + kindAr + ' اشتراكي في SyDent إلى خطة "' +
                 (ST.selPlan.display_name || ST.selPlan.code) + '". طريقة الدفع: ' + methodLabel(ST.selMethod) + '.';
       if (note) msg += '\nملاحظة: ' + note;
