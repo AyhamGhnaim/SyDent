@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b03"></script>
+<script src="theme.js?v=20260601b04"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2160,11 +2160,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b03">
+<link rel="stylesheet" href="theme.css?v=20260601b04">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b03"></script>
+<script src="supabase-init.js?v=20260601b04"></script>
 </head>
 <body>
 
@@ -8383,22 +8383,16 @@ function renderHealthWidgets(requests) {
   // state — so we use the same computeAccountState the rest of
   // admin.html uses (single source of truth, rule #20).
   var mrrTotal = 0;
-  var nMonthly = 0;
-  var nYearly = 0;
+  var mrrByPlan = {}; // plan code -> count of contributing paid accounts (plan-agnostic)
   requests.forEach(function(r) {
     var s = computeAccountState(r);
     // Only paid AND not permanent contributes to MRR
     if (s.state !== 'paid' || s.isPermanent) return;
-    var price = Number(r.price_paid);
-    if (!isFinite(price) || price <= 0) return;
-    if (r.plan === 'monthly') {
-      mrrTotal += price;
-      nMonthly++;
-    } else if (r.plan === 'yearly') {
-      mrrTotal += (price / 12);
-      nYearly++;
-    }
-    // (Other plan values — 'trial', null — don't contribute.)
+    var me = monthlyEquivPrice(r.plan, r.price_paid);
+    if (me <= 0) return;
+    mrrTotal += me;
+    mrrByPlan[r.plan] = (mrrByPlan[r.plan] || 0) + 1;
+    // ANY current/future plan code contributes via its own duration_days.
   });
 
   var mrrValueEl = document.getElementById('hcMrrValue');
@@ -8413,17 +8407,16 @@ function renderHealthWidgets(requests) {
       mrrValueEl.classList.add('muted');
       mrrValueEl.innerHTML = '0 <span class="health-unit">ل.س</span>';
     }
-    var parts = [];
-    if (nMonthly > 0) parts.push(nMonthly + ' شهري');
-    if (nYearly > 0)  parts.push(nYearly + ' سنوي');
+    var parts = planBreakdownParts(mrrByPlan);
     mrrSubEl.textContent = parts.length > 0 ? parts.join(' · ') : 'لا يوجد اشتراك مدفوع نشط';
   }
 
   // ---- 2. Active subscriptions ----
   var nActive = 0;
+  var activeByPlan = {};
   requests.forEach(function(r) {
     var s = computeAccountState(r);
-    if (s.state === 'paid' && !s.isPermanent) nActive++;
+    if (s.state === 'paid' && !s.isPermanent) { nActive++; activeByPlan[r.plan] = (activeByPlan[r.plan] || 0) + 1; }
   });
   // Permanent accounts are tracked separately — they're "active"
   // but contribute nothing to MRR. We show them in the sub-text
@@ -8438,9 +8431,7 @@ function renderHealthWidgets(requests) {
   if (actValueEl && actSubEl) {
     actValueEl.classList.toggle('muted', nActive === 0);
     actValueEl.textContent = String(nActive);
-    var actParts = [];
-    if (nMonthly > 0) actParts.push(nMonthly + ' شهري');
-    if (nYearly > 0)  actParts.push(nYearly + ' سنوي');
+    var actParts = planBreakdownParts(activeByPlan);
     if (nPermanent > 0) actParts.push(nPermanent + ' دائم');
     actSubEl.textContent = actParts.length > 0 ? actParts.join(' · ') : 'لا اشتراكات نشطة';
   }
@@ -8504,9 +8495,9 @@ function renderHealthWidgets(requests) {
     // Count by current plan: a row that started as trial and
     // converted now has plan='monthly'/'yearly', so it counts as
     // "paid" in the funnel. A row still on trial counts as trial.
-    if (r.plan === 'monthly' || r.plan === 'yearly') {
+    if (r.plan && r.plan !== 'trial') {
       paid90++;
-    } else if (r.plan === 'trial' || !r.plan) {
+    } else {
       trial90++;
     }
   });
@@ -9528,8 +9519,12 @@ function c360ComputeHealth(r, s) {
     if (s.daysLeft !== null && s.daysLeft <= 5) { score = 45; tier = 'تجربة على وشك الانتهاء'; summary = 'متبقّي ' + s.daysLeft + ' يوم'; }
     else                                          { score = 70; tier = 'تجربة نشطة'; summary = 'في فترة التقييم'; }
   } else if (s.state === 'paid' && s.isPermanent) { score = 100; tier = 'حساب دائم'; summary = 'العميل الأمثل ⭐'; }
-  else if (s.state === 'paid' && s.plan === 'yearly')  { score = 90; tier = 'مشترك سنوي'; summary = 'التزام طويل الأجل'; }
-  else if (s.state === 'paid' && s.plan === 'monthly') { score = 80; tier = 'مشترك شهري'; summary = 'اشتراك نشط'; }
+  else if (s.state === 'paid') {
+    var durH = 30;
+    try { var cfgH = getPlanConfig(s.plan); if (cfgH && cfgH.duration_days) durH = Number(cfgH.duration_days) || 30; } catch(_) {}
+    score = durH >= 180 ? 90 : 80; // longer commitment = healthier
+    tier = 'مشترك مدفوع'; summary = planDisplayName(s.plan) + ' — اشتراك نشط';
+  }
   else { score = 50; tier = 'غير محدّد'; summary = '—'; }
 
   // Idle penalty: -10 if no sign-in within 30 days (where data exists)
@@ -9568,7 +9563,7 @@ function c360ComputeRisk(r, s) {
   if (daysSinceSignIn !== null && daysSinceSignIn >= 90) signals.push({ label: '⚠️ خامل منذ ' + daysSinceSignIn + ' يوم', severity: 'high' });
   // Healthy signals (only added when no negative signals exist)
   if (s.state === 'paid' && s.isPermanent) signals.push({ label: '⭐ حساب دائم', severity: 'low' });
-  if (s.state === 'paid' && s.plan === 'yearly' && s.daysLeft !== null && s.daysLeft > 30) signals.push({ label: '🌟 سنوي مستقر', severity: 'low' });
+  if (s.state === 'paid' && !s.isPermanent && s.daysLeft !== null && s.daysLeft > 30) signals.push({ label: '🌟 اشتراك مستقر', severity: 'low' });
 
   // Tier = max severity present
   var hasHigh = signals.some(function(x){ return x.severity === 'high'; });
@@ -9599,10 +9594,8 @@ function c360ComputeMrrFor(r, s) {
   if (!isFinite(price) || price <= 0) {
     return { text: '—', sub: 'لا توجد بيانات سعر', color: 'muted' };
   }
-  var monthly;
-  if (s.plan === 'monthly') monthly = price;
-  else if (s.plan === 'yearly') monthly = price / 12;
-  else return { text: '—', sub: 'خطة غير معروفة', color: 'muted' };
+  var monthly = monthlyEquivPrice(s.plan, price);
+  if (!(monthly > 0)) return { text: '—', sub: 'خطة بلا مساهمة شهرية', color: 'muted' };
   return {
     text: Math.round(monthly).toLocaleString('en-US') + ' ل.س',
     sub: 'مساهمة شهرية',
@@ -9829,15 +9822,35 @@ function applyAdvancedFilters(r) {
 // Per-row MRR contribution — single-row version of the Phase X5 widget
 // formula. Permanent and non-paid rows contribute 0. Used by both the
 // MRR filter and the CSV export.
+// Monthly-equivalent revenue for ANY plan (plan-agnostic). Normalizes the paid
+// price to a 30-day month using the plan's OWN duration_days, so a
+// quarterly/biannual/custom plan contributes to MRR correctly — not just the
+// legacy monthly/yearly codes. Falls back to 30/365 only if config isn't loaded.
+function monthlyEquivPrice(planCode, price) {
+  var pnum = Number(price);
+  if (!isFinite(pnum) || pnum <= 0) return 0;
+  var cfg = null;
+  try { cfg = getPlanConfig(planCode); } catch(_) {}
+  var dur = (cfg && cfg.duration_days != null && Number(cfg.duration_days) > 0)
+    ? Number(cfg.duration_days)
+    : (planCode === 'yearly' ? 365 : planCode === 'monthly' ? 30 : 0);
+  if (dur <= 0) return 0; // trial / zero-duration → no recurring revenue
+  return pnum * 30 / dur;
+}
+
+// Build a "N PlanName · M PlanName" breakdown from a {code:count} map, highest
+// tier first (by price), using the configured display names (Max/Mini/…).
+function planBreakdownParts(byPlan) {
+  return Object.keys(byPlan)
+    .sort(function(a, b){ return srqPlanPrice(b) - srqPlanPrice(a); })
+    .map(function(code){ return byPlan[code] + ' ' + planDisplayName(code); });
+}
+
 function computeRowMrr(r, s) {
   if (!s) s = computeAccountState(r);
   if (s.state !== 'paid' || s.isPermanent) return 0;
   if (s.daysLeft !== null && s.daysLeft <= 0) return 0;
-  var price = parseFloat(r.price_paid);
-  if (!isFinite(price) || price <= 0) return 0;
-  if (s.plan === 'monthly') return Math.round(price);
-  if (s.plan === 'yearly')  return Math.round(price / 12);
-  return 0;
+  return Math.round(monthlyEquivPrice(s.plan, r.price_paid));
 }
 
 // — Bulk selection state ———————————————————————————————————————————————
@@ -10249,8 +10262,14 @@ function rptCurrentState(r) {
   if (status === 'rejected') return 'rejected';
   var planCode = String(r.plan || '').toLowerCase();
   if (planCode === 'permanent' || (status === 'accepted' && !r.trial_end && planCode !== 'monthly' && planCode !== 'yearly')) return 'permanent';
-  if (planCode === 'yearly') return 'yearly';
-  if (planCode === 'monthly') return 'monthly';
+  // Any non-trial plan code (monthly / yearly / custom) — plan-agnostic.
+  if (planCode && planCode !== 'trial') {
+    if (r.trial_end) {
+      var endsPaid = new Date(r.trial_end);
+      if (isFinite(endsPaid.getTime()) && endsPaid.getTime() < Date.now()) return 'suspended';
+    }
+    return planCode;
+  }
   // Trial logic
   if (r.trial_end) {
     var ends = new Date(r.trial_end);
@@ -10437,14 +10456,11 @@ async function rptLoad() {
     });
 
     // ─── Series 3: Plan distribution (current snapshot) ──────────────────────
-    var planDist = { trial: 0, monthly: 0, yearly: 0, permanent: 0 };
+    var planDist = {}; // plan-agnostic: stateKey -> count (trial, permanent, any paid code)
     requests.forEach(function(r) {
       var st = rptCurrentState(r);
-      if (st === 'trial')     planDist.trial++;
-      else if (st === 'monthly')   planDist.monthly++;
-      else if (st === 'yearly')    planDist.yearly++;
-      else if (st === 'permanent') planDist.permanent++;
-      // suspended/rejected excluded from current distribution
+      if (st === 'rejected' || st === 'suspended') return; // excluded from current distribution
+      planDist[st] = (planDist[st] || 0) + 1;
     });
 
     // ─── Funnel: signups → accepted → converted (within range) ──────────────
@@ -10459,7 +10475,7 @@ async function rptLoad() {
       var st = String(r.status || '').toLowerCase();
       if (st === 'accepted') acceptedInRange++;
       var cur = rptCurrentState(r);
-      if (cur === 'monthly' || cur === 'yearly' || cur === 'permanent') convertedInRange++;
+      if (cur !== 'trial' && cur !== 'suspended' && cur !== 'rejected') convertedInRange++;
     });
 
     rptState.data = {
@@ -10525,7 +10541,7 @@ function rptRender() {
   // If everything is zero, show empty state.
   var hasMrr = d.mrrSeries.some(function(v) { return v > 0; });
   var hasMov = d.movementSeries.some(function(o) { return o.newMrr + o.reactMrr + o.churnMrr > 0; });
-  var hasPlans = d.planDist.trial + d.planDist.monthly + d.planDist.yearly + d.planDist.permanent > 0;
+  var hasPlans = Object.keys(d.planDist || {}).some(function(k){ return d.planDist[k] > 0; });
   var hasFunnel = d.funnel.signups > 0;
   if (!hasMrr && !hasMov && !hasPlans && !hasFunnel) {
     if (g) g.style.display = 'none';
@@ -10628,14 +10644,36 @@ function rptRenderMovementChart(d) {
   });
 }
 
+// Distribution helpers (plan-agnostic): order trial → paid plans by price → permanent.
+var RPT_DIST_PALETTE = ['rgba(56,189,248,0.85)','rgba(46,232,158,0.85)','rgba(244,114,182,0.85)','rgba(250,204,21,0.85)','rgba(129,140,248,0.85)','rgba(248,113,113,0.85)'];
+function rptDistOrder(dist) {
+  return Object.keys(dist || {}).sort(function(a, b){
+    var rank = function(k){ return k === 'trial' ? -1 : k === 'permanent' ? 1e15 : srqPlanPrice(k); };
+    return rank(a) - rank(b);
+  });
+}
+function rptDistLabel(k) {
+  if (k === 'trial') return 'تجربة';
+  if (k === 'permanent') return 'دائم';
+  return planDisplayName(k);
+}
+function rptDistColor(k, i) {
+  if (k === 'trial') return 'rgba(245,158,11,0.85)';
+  if (k === 'permanent') return 'rgba(168,85,247,0.85)';
+  return RPT_DIST_PALETTE[i % RPT_DIST_PALETTE.length];
+}
+
 // ───── Chart 3: Plans donut ──────────────────────────────────────────────────
 function rptRenderPlansChart(d) {
   var canvas = document.getElementById('rptChartPlans');
   if (!canvas) return;
   if (rptState.charts.plans) { rptState.charts.plans.destroy(); rptState.charts.plans = null; }
   var ctx = canvas.getContext('2d');
-  var values = [d.planDist.trial, d.planDist.monthly, d.planDist.yearly, d.planDist.permanent];
-  var labels = ['تجربة', 'شهري', 'سنوي', 'دائم'];
+  var dist = d.planDist || {};
+  var keys = rptDistOrder(dist);
+  var labels = keys.map(rptDistLabel);
+  var values = keys.map(function(k){ return dist[k]; });
+  var distBg = keys.map(function(k, i){ return rptDistColor(k, i); });
   var total = values.reduce(function(a,b){return a+b;}, 0);
   rptState.charts.plans = new Chart(ctx, {
     type: 'doughnut',
@@ -10643,7 +10681,7 @@ function rptRenderPlansChart(d) {
       labels: labels,
       datasets: [{
         data: values,
-        backgroundColor: ['rgba(245,158,11,0.85)', 'rgba(56,189,248,0.85)', 'rgba(46,232,158,0.85)', 'rgba(168,85,247,0.85)'],
+        backgroundColor: distBg,
         borderColor: 'rgba(15,23,42,0.9)', borderWidth: 2
       }]
     },
@@ -10735,10 +10773,9 @@ function rptExportCsv() {
   }
   rows.push([]); // blank separator
   rows.push(['التوزيع الحالي للخطط', '', '', '', '']);
-  rows.push(['تجربة',  d.planDist.trial,     '', '', '']);
-  rows.push(['شهري',   d.planDist.monthly,   '', '', '']);
-  rows.push(['سنوي',   d.planDist.yearly,    '', '', '']);
-  rows.push(['دائم',   d.planDist.permanent, '', '', '']);
+  rptDistOrder(d.planDist || {}).forEach(function(k){
+    rows.push([rptDistLabel(k), d.planDist[k], '', '', '']);
+  });
   rows.push([]);
   rows.push(['قمع التحويل', '', '', '', '']);
   rows.push(['تسجيلات', d.funnel.signups,   '', '', '']);
