@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b01"></script>
+<script src="theme.js?v=20260601b02"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b01"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b01">
+<script src="supabase-init.js?v=20260601b02"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b02">
 <style>
 :root {
   --bg:        #0a1628;
@@ -200,7 +200,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b01"></script>
+<script src="sidebar.js?v=20260601b02"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -275,7 +275,8 @@ body {
     support: SUPPORT_PHONE_FALLBACK,
     instructions: '',
     selPlan: null,        // plan being requested (in modal)
-    selKind: 'upgrade',   // 'upgrade' | 'renew'
+    selKind: 'upgrade',   // 'upgrade' | 'renew' (DB request_kind)
+    selRelation: 'upgrade', // 'upgrade' | 'renew' | 'downgrade' (display only)
     selMethod: null,
     inFlight: false       // Rule #66 — double-submit guard
   };
@@ -297,6 +298,16 @@ body {
     if (code === 'monthly') return 'Mini';
     if (code === 'yearly')  return 'Max';
     return code || '—';
+  }
+  function planPrice(code) {
+    var p = ST.plans.filter(function (x) { return x.code === code; })[0];
+    return (p && p.price != null) ? (Number(p.price) || 0) : 0;
+  }
+  // relation between current plan and a target plan code: renew / upgrade / downgrade
+  function planRelation(targetCode) {
+    var cur = curPlanCode();
+    if (targetCode === cur) return 'renew';
+    return (planPrice(targetCode) >= planPrice(cur)) ? 'upgrade' : 'downgrade';
   }
   function methodLabel(v) {
     var m = PAYMENT_METHODS.filter(function (x) { return x.v === v; })[0];
@@ -323,11 +334,20 @@ body {
     ST.user = ures.data.user;
 
     var results = await Promise.all([
-      // current subscription (by email — same key the banner/sidebar use)
-      window.sb.from('trial_requests')
-        .select('id, plan, status, trial_end')
-        .eq('email', ST.user.email).maybeSingle()
-        .then(function (r) { return r; }).catch(function () { return { data: null }; }),
+      // current subscription — resolve by user_id first (stable for @sydent.com
+      // phone accounts whose auth email differs from trial_requests.email),
+      // fall back to email for legacy rows with a null user_id.
+      (async function () {
+        try {
+          var byId = await window.sb.from('trial_requests')
+            .select('id, plan, status, trial_end').eq('user_id', ST.user.id).maybeSingle();
+          if (byId && byId.data) return byId;
+        } catch (e) {}
+        try {
+          return await window.sb.from('trial_requests')
+            .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+        } catch (e) { return { data: null }; }
+      })(),
       // active plans
       window.sb.from('subscription_plans')
         .select('*').eq('is_active', true).order('sort_order', { ascending: true })
@@ -408,7 +428,9 @@ body {
   function renderPending() {
     var el = document.getElementById('subPending');
     if (!ST.pending) { el.style.display = 'none'; return; }
-    var kindAr = ST.pending.request_kind === 'renew' ? 'تجديد' : 'ترقية';
+    var pc = planPrice(ST.pending.current_plan), pr = planPrice(ST.pending.requested_plan);
+    var kindAr = (ST.pending.current_plan === ST.pending.requested_plan) ? 'تجديد'
+               : (pr < pc) ? 'تغيير' : 'ترقية';
     el.innerHTML =
       '<div class="sub-pending-text">⏳ لديك طلب <b>' + escHtml(kindAr) + '</b> إلى خطة <b>' +
         escHtml(planLabel(ST.pending.requested_plan)) + '</b> قيد المراجعة. سيتم التفعيل بعد تأكيد الدفع.</div>' +
@@ -442,17 +464,20 @@ body {
       var sub = p.subtitle ? escHtml(p.subtitle) : '';
       var feats = planFeatures(p).map(function (f) { return '<li>' + escHtml(f) + '</li>'; }).join('');
 
-      // action button: never offer "buy trial"; renew the current plan; upgrade others
+      // action button: never offer "buy trial"; renew current plan; upgrade/downgrade others
       var btn = '';
       if (p.code === 'trial') {
-        btn = isCur ? '<div class="sub-btn-spacer"></div>'
-                    : '<div class="sub-btn-spacer"></div>';
+        btn = '<div class="sub-btn-spacer"></div>';
       } else if (isCur) {
         btn = '<button class="sub-btn renew" ' + (hasPending ? 'disabled' : '') +
               ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'renew\')">🔄 تجديد</button>';
       } else {
+        var relP = planRelation(p.code);
+        var bLabel = (relP === 'downgrade')
+              ? '🔽 تغيير إلى ' + escHtml(p.display_name || p.code)
+              : '⬆️ ترقية إلى ' + escHtml(p.display_name || p.code);
         btn = '<button class="sub-btn" ' + (hasPending ? 'disabled' : '') +
-              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'upgrade\')">⬆️ ترقية إلى ' + escHtml(p.display_name || p.code) + '</button>';
+              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'' + relP + '\')">' + bLabel + '</button>';
       }
 
       html +=
@@ -479,16 +504,19 @@ body {
   }
 
   // ---------- modal ----------
-  window.subOpenModal = function (planCode, kind) {
+  window.subOpenModal = function (planCode, relation) {
     if (ST.pending) { toast('لديك طلب قيد المراجعة بالفعل', true); return; }
     var p = ST.plans.filter(function (x) { return x.code === planCode; })[0];
     if (!p) return;
     ST.selPlan = p;
-    ST.selKind = (kind === 'renew') ? 'renew' : 'upgrade';
+    ST.selRelation = (relation === 'renew' || relation === 'downgrade') ? relation : 'upgrade';
+    ST.selKind = (ST.selRelation === 'renew') ? 'renew' : 'upgrade'; // DB CHECK: upgrade|renew
     ST.selMethod = null;
 
-    document.getElementById('subModalTitle').textContent =
-      (ST.selKind === 'renew' ? 'تجديد خطة ' : 'الترقية إلى خطة ') + (p.display_name || p.code);
+    var titleWord = ST.selRelation === 'renew' ? 'تجديد خطة '
+                  : ST.selRelation === 'downgrade' ? 'تغيير إلى خطة '
+                  : 'الترقية إلى خطة ';
+    document.getElementById('subModalTitle').textContent = titleWord + (p.display_name || p.code);
     document.getElementById('subModalSub').textContent =
       'السعر: ' + fmtPrice(p.price) + ' ' + (p.currency || 'SYP') +
       '. اختر طريقة الدفع، ثم أرسل الطلب وتواصل معنا عبر واتساب لتأكيد التفعيل.';
@@ -554,7 +582,8 @@ body {
       }
 
       // open WhatsApp to support, prefilled
-      var kindAr = ST.selKind === 'renew' ? 'تجديد' : 'ترقية';
+      var kindAr = ST.selRelation === 'renew' ? 'تجديد'
+                 : ST.selRelation === 'downgrade' ? 'تغيير' : 'ترقية';
       var msg = 'مرحباً، أرغب بـ' + kindAr + ' اشتراكي في SyDent إلى خطة "' +
                 (ST.selPlan.display_name || ST.selPlan.code) + '". طريقة الدفع: ' + methodLabel(ST.selMethod) + '.';
       if (note) msg += '\nملاحظة: ' + note;
@@ -591,7 +620,11 @@ body {
     // re-pull only the volatile bits (current + pending), keep plans/settings
     try {
       var r1 = await window.sb.from('trial_requests')
-        .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+        .select('id, plan, status, trial_end').eq('user_id', ST.user.id).maybeSingle();
+      if (!(r1 && r1.data)) {
+        r1 = await window.sb.from('trial_requests')
+          .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+      }
       ST.current = (r1 && r1.data) || ST.current;
     } catch (e) {}
     try {

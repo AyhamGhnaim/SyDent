@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b01"></script>
+<script src="theme.js?v=20260601b02"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1462,6 +1462,7 @@ header{
 .srq-name{font-size:15px;font-weight:800;flex:1;min-width:140px;}
 .srq-kind{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;background:rgba(46,232,158,0.15);color:var(--green,#2ee89e);white-space:nowrap;}
 .srq-kind.renew{background:rgba(245,200,66,0.15);color:var(--yellow,#f5c842);}
+.srq-kind.down{background:rgba(239,83,80,0.15);color:var(--red,#ef5350);}
 .srq-meta{font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.7;}
 .srq-meta b{color:var(--text);font-weight:700;}
 .srq-note{font-size:12.5px;color:var(--text2);margin-top:6px;font-style:italic;}
@@ -2159,11 +2160,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b01">
+<link rel="stylesheet" href="theme.css?v=20260601b02">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b01"></script>
+<script src="supabase-init.js?v=20260601b02"></script>
 </head>
 <body>
 
@@ -6608,6 +6609,21 @@ function srqPlanLabel(code) {
   return code || '—';
 }
 
+// Derive the real relationship by comparing plan prices (request_kind in the
+// DB only distinguishes renew vs change; the precise up/down direction is
+// computed here from the two stored plan codes so the label is always right).
+function srqPlanPrice(code) {
+  try { var c = getPlanConfig(code); if (c && c.price != null) return Number(c.price) || 0; } catch(_) {}
+  return 0;
+}
+function srqRelation(curCode, reqCode) {
+  if (curCode === reqCode) return { label: 'تجديد', cls: 'renew' };
+  var pc = srqPlanPrice(curCode), pr = srqPlanPrice(reqCode);
+  if (pr > pc) return { label: 'ترقية', cls: '' };
+  if (pr < pc) return { label: 'تنزيل', cls: 'down' };
+  return { label: 'تغيير', cls: '' };
+}
+
 async function loadSubRequests() {
   var listEl = document.getElementById('srqList');
   if (!window.sb) return;
@@ -6657,16 +6673,18 @@ function renderSubRequests() {
   var html = '';
   SRQ_CACHE.forEach(function(req){
     var tr = SRQ_TR_MAP[req.user_id] || SRQ_TR_BY_ID[req.trial_request_id] || {};
-    var who = tr.name || tr.email || '(مستأجر)';
-    var kindAr = req.request_kind === 'renew' ? 'تجديد' : 'ترقية';
+    var who = tr.name || tr.email || '(مستأجر غير معروف)';
+    var curCode = req.current_plan || (tr.plan || '');
+    var rel = srqRelation(curCode, req.requested_plan);
     var when = req.created_at ? new Date(req.created_at).toLocaleString('en-GB') : '';
     html += '<div class="srq-row">' +
       '<div class="srq-row-top">' +
         '<span class="srq-name">' + srqEsc(who) + '</span>' +
-        '<span class="srq-kind' + (req.request_kind === 'renew' ? ' renew' : '') + '">' + kindAr + '</span>' +
+        '<span class="srq-kind' + (rel.cls ? ' ' + rel.cls : '') + '">' + srqEsc(rel.label) + '</span>' +
       '</div>' +
       '<div class="srq-meta">' +
-        'الخطة: <b>' + srqEsc(srqPlanLabel(req.current_plan)) + '</b> ← <b>' + srqEsc(srqPlanLabel(req.requested_plan)) + '</b><br>' +
+        'الخطة الحالية: <b>' + srqEsc(srqPlanLabel(curCode)) + '</b><br>' +
+        'الخطة المطلوبة: <b>' + srqEsc(srqPlanLabel(req.requested_plan)) + '</b><br>' +
         'طريقة الدفع: <b>' + srqEsc(SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '</b><br>' +
         'التاريخ: ' + srqEsc(when) +
       '</div>' +
@@ -9111,10 +9129,13 @@ function c360BuildOverview(r) {
   var mrr = c360ComputeMrrFor(r, s);
 
   // Format helpers
-  var planLabel = s.isPermanent ? '♾️ دائم'
-                  : s.plan === 'yearly' ? 'سنوي'
-                  : s.plan === 'monthly' ? 'شهري'
-                  : s.plan === 'trial' ? 'تجربة' : (s.plan || '—');
+  var planLabel = s.isPermanent ? '♾️ دائم' : srqPlanLabel(s.plan);
+  var statusWord = s.state === 'paid' ? 'نشط'
+                 : s.state === 'trial' ? 'تجربة'
+                 : s.state === 'grace' ? 'فترة سماح'
+                 : s.state === 'expired' ? 'منتهي'
+                 : s.state === 'suspended' ? 'موقوف'
+                 : s.state === 'new' ? 'قيد المراجعة' : (s.label || '—');
   var expiryText = !r.trial_end ? '—' : evfFormatTimestamp(r.trial_end);
   var daysLeftText = s.daysLeft === null ? '—' : (s.daysLeft > 0 ? (s.daysLeft + ' يوم') : 'منتهي');
   var priceText = (r.price_paid != null && Number(r.price_paid) > 0)
@@ -9157,7 +9178,7 @@ function c360BuildOverview(r) {
     +   '<div class="c360-card-title">📋 الاشتراك</div>'
     +   c360Row('الخطة', planLabel)
     +   c360Row('السعر المدفوع', priceText)
-    +   c360Row('الحالة', c360EscapeHtml(s.label || '—'))
+    +   c360Row('الحالة', c360EscapeHtml(statusWord))
     +   c360Row('ينتهي في', expiryText)
     +   c360Row('متبقّي', daysLeftText)
     + '</div>'
