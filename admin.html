@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a98"></script>
+<script src="theme.js?v=20260601b01"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1454,6 +1454,22 @@ header{
   display:flex; align-items:center; gap:8px;
 }
 .ps-card-desc{font-size:12.5px; color:var(--text2); line-height:1.6;}
+/* Phase X12 — subscription requests queue (srq-* namespace) */
+.srq-badge{display:inline-block;min-width:20px;text-align:center;background:var(--red,#ef5350);color:#fff;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;margin-inline-start:6px;}
+.srq-empty{color:var(--text2);font-size:13px;text-align:center;padding:24px;}
+.srq-row{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+.srq-row-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.srq-name{font-size:15px;font-weight:800;flex:1;min-width:140px;}
+.srq-kind{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;background:rgba(46,232,158,0.15);color:var(--green,#2ee89e);white-space:nowrap;}
+.srq-kind.renew{background:rgba(245,200,66,0.15);color:var(--yellow,#f5c842);}
+.srq-meta{font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.7;}
+.srq-meta b{color:var(--text);font-weight:700;}
+.srq-note{font-size:12.5px;color:var(--text2);margin-top:6px;font-style:italic;}
+.srq-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.srq-btn{border:none;border-radius:8px;padding:9px 16px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:800;cursor:pointer;}
+.srq-btn.ok{background:var(--green,#2ee89e);color:#062018;}
+.srq-btn.no{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.srq-btn:disabled{opacity:.5;cursor:not-allowed;}
 .ps-subcard{
   background:var(--card); border:1px solid var(--border); border-radius:10px;
   padding:14px 14px 10px; margin-top:12px;
@@ -2143,11 +2159,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a98">
+<link rel="stylesheet" href="theme.css?v=20260601b01">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260529a98"></script>
+<script src="supabase-init.js?v=20260601b01"></script>
 </head>
 <body>
 
@@ -2595,6 +2611,18 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
       </div>
     </div>
 
+    <!-- Phase X12: Subscription upgrade/renew requests queue -->
+    <div class="rpt-section" id="srqSection">
+      <div class="rpt-section-header" onclick="srqToggle()" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();srqToggle();}">
+        <span class="rpt-section-title">📥 طلبات الترقية/التجديد <span id="srqBadge" class="srq-badge" style="display:none;"></span></span>
+        <span class="rpt-section-toggle">▶</span>
+      </div>
+      <div class="rpt-section-body">
+        <div id="srqList"><div class="srq-empty">جارٍ التحميل…</div></div>
+      </div>
+    </div>
+
     <!-- Phase X11: Platform Settings (Section H) — admin-only config panel -->
     <!-- Reuses rpt-section visual pattern for consistency; ps-* namespace -->
     <!-- isolated from rpt-/tpl-/plan-/flt-/c360-. Three cards: support info -->
@@ -2686,6 +2714,22 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
           </div>
           <div class="ps-actions">
             <button type="button" class="ps-btn-save" id="btnPsSavePlatform" onclick="savePsPlatformInfo()" disabled>💾 حفظ معلومات المنصة</button>
+          </div>
+        </div>
+
+        <!-- Card 4: Payment instructions (TENANT-VISIBLE — shown in subscription.html) -->
+        <div class="ps-card">
+          <div class="ps-card-head">
+            <h3 class="ps-card-title">💳 تعليمات الدفع</h3>
+            <div class="ps-card-desc">تظهر للمستأجرين في صفحة الاشتراك عند طلب ترقية/تجديد. اذكر تفاصيل: شام كاش، حوالة داخلية، كرت بنك، كاش.</div>
+          </div>
+          <div class="ps-field">
+            <label for="psPaymentInstructions">نص تعليمات الدفع</label>
+            <textarea id="psPaymentInstructions" rows="7" autocomplete="off" style="width:100%;font-family:'Cairo',sans-serif;resize:vertical;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:10px 12px;font-size:13px;line-height:1.7;" placeholder="• شام كاش: ...&#10;• حوالة داخلية: ...&#10;• كرت بنك: ...&#10;• كاش: ..."></textarea>
+            <div class="ps-field-hint">يظهر للمستأجر داخل نافذة طلب الاشتراك. اتركه فارغاً لإخفائه.</div>
+          </div>
+          <div class="ps-actions">
+            <button type="button" class="ps-btn-save" id="btnPsSavePayment" onclick="savePsPaymentInstructions()">💾 حفظ تعليمات الدفع</button>
           </div>
         </div>
 
@@ -3635,6 +3679,8 @@ window.addEventListener('DOMContentLoaded', async function() {
   // template send (💬 تذكير / 👋 ترحيب / etc.) renders with the saved
   // support_phone without waiting on a DB round trip mid-build.
   loadPlatformSettings();
+  // Phase X12: load the tenant upgrade/renew request queue.
+  loadSubRequests();
   loadAndRender();
 });
 
@@ -6534,6 +6580,204 @@ function psToggle() {
   if (sec) sec.classList.toggle('open');
 }
 
+// ===== Phase X12 — Subscription upgrade/renew requests queue =====
+// Tenants submit requests from subscription.html (Migration 42). This queue
+// shows PENDING requests; approving reuses the EXISTING transitionAccount
+// machinery (same as the plan-picker modal) so the financial event lands in
+// subscription_events exactly as a manual admin upgrade would.
+var SRQ_CACHE = [];      // pending subscription_requests rows
+var SRQ_TR_MAP = {};     // user_id -> trial_requests row (for transitionAccount)
+var SRQ_TR_BY_ID = {};   // trial_requests.id -> row (fallback when user_id is null on legacy rows)
+var _srqInFlight = false;
+var SRQ_METHOD_AR = { sham_cash:'شام كاش', transfer:'حوالة داخلية', bank_card:'كرت بنك', cash:'كاش' };
+
+function srqToggle() {
+  var sec = document.getElementById('srqSection');
+  if (sec) sec.classList.toggle('open');
+}
+
+function srqEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function srqPlanLabel(code) {
+  try { var c = getPlanConfig(code); if (c && c.display_name) return c.display_name; } catch(_) {}
+  if (code === 'trial') return 'تجريبي';
+  if (code === 'monthly') return 'Mini';
+  if (code === 'yearly') return 'Max';
+  return code || '—';
+}
+
+async function loadSubRequests() {
+  var listEl = document.getElementById('srqList');
+  if (!window.sb) return;
+  try {
+    var res = await window.sb.from('subscription_requests')
+      .select('*').eq('status', 'pending').order('created_at', { ascending: true });
+    if (res.error) throw res.error;
+    SRQ_CACHE = res.data || [];
+    SRQ_TR_MAP = {};
+    SRQ_TR_BY_ID = {};
+    var ids = SRQ_CACHE.map(function(r){ return r.user_id; }).filter(Boolean);
+    if (ids.length) {
+      var tr = await window.sb.from('trial_requests')
+        .select('id, user_id, name, email, plan, status, trial_end').in('user_id', ids);
+      (tr.data || []).forEach(function(row){
+        if (row.user_id) SRQ_TR_MAP[row.user_id] = row;
+        if (row.id) SRQ_TR_BY_ID[row.id] = row;
+      });
+    }
+    // Fallback: any request whose user_id didn't resolve (e.g. legacy row with
+    // NULL trial_requests.user_id) — resolve by the stored trial_request_id.
+    var missTrIds = SRQ_CACHE
+      .filter(function(r){ return !SRQ_TR_MAP[r.user_id] && r.trial_request_id; })
+      .map(function(r){ return r.trial_request_id; });
+    if (missTrIds.length) {
+      var tr2 = await window.sb.from('trial_requests')
+        .select('id, user_id, name, email, plan, status, trial_end').in('id', missTrIds);
+      (tr2.data || []).forEach(function(row){ if (row.id) SRQ_TR_BY_ID[row.id] = row; });
+    }
+    renderSubRequests();
+  } catch (e) {
+    console.warn('loadSubRequests error:', e);
+    if (listEl) listEl.innerHTML = '<div class="srq-empty">تعذّر تحميل الطلبات.</div>';
+  }
+}
+
+function renderSubRequests() {
+  var listEl = document.getElementById('srqList');
+  var badge = document.getElementById('srqBadge');
+  if (!listEl) return;
+  var n = SRQ_CACHE.length;
+  if (badge) {
+    if (n > 0) { badge.textContent = n; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  }
+  if (!n) { listEl.innerHTML = '<div class="srq-empty">لا توجد طلبات قيد المراجعة.</div>'; return; }
+  var html = '';
+  SRQ_CACHE.forEach(function(req){
+    var tr = SRQ_TR_MAP[req.user_id] || SRQ_TR_BY_ID[req.trial_request_id] || {};
+    var who = tr.name || tr.email || '(مستأجر)';
+    var kindAr = req.request_kind === 'renew' ? 'تجديد' : 'ترقية';
+    var when = req.created_at ? new Date(req.created_at).toLocaleString('en-GB') : '';
+    html += '<div class="srq-row">' +
+      '<div class="srq-row-top">' +
+        '<span class="srq-name">' + srqEsc(who) + '</span>' +
+        '<span class="srq-kind' + (req.request_kind === 'renew' ? ' renew' : '') + '">' + kindAr + '</span>' +
+      '</div>' +
+      '<div class="srq-meta">' +
+        'الخطة: <b>' + srqEsc(srqPlanLabel(req.current_plan)) + '</b> ← <b>' + srqEsc(srqPlanLabel(req.requested_plan)) + '</b><br>' +
+        'طريقة الدفع: <b>' + srqEsc(SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '</b><br>' +
+        'التاريخ: ' + srqEsc(when) +
+      '</div>' +
+      (req.note ? '<div class="srq-note">📝 ' + srqEsc(req.note) + '</div>' : '') +
+      '<div class="srq-actions">' +
+        '<button class="srq-btn ok" onclick="srqApprove(\'' + srqEsc(req.id) + '\')">✅ موافقة وتفعيل</button>' +
+        '<button class="srq-btn no" onclick="srqReject(\'' + srqEsc(req.id) + '\')">✖ رفض</button>' +
+      '</div>' +
+    '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+async function _srqAdminEmail() {
+  try {
+    var s = await window.sb.auth.getSession();
+    if (s && s.data && s.data.session && s.data.session.user) return s.data.session.user.email || 'admin';
+  } catch(_) {}
+  return 'admin';
+}
+
+async function srqApprove(reqId) {
+  if (_srqInFlight) return;
+  var req = SRQ_CACHE.filter(function(x){ return x.id === reqId; })[0];
+  if (!req) return;
+  var tr = SRQ_TR_MAP[req.user_id] || SRQ_TR_BY_ID[req.trial_request_id];
+  if (!tr || !tr.id) { alert('لم يُعثر على حساب المستأجر المرتبط بالطلب.'); return; }
+
+  var who = tr.name || tr.email || '';
+  if (!confirm('تأكيد تفعيل الطلب؟\n\n' + who + '\n' +
+               srqPlanLabel(req.current_plan) + ' ← ' + srqPlanLabel(req.requested_plan) + '\n' +
+               'طريقة الدفع: ' + (SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '\n\n' +
+               '⚠️ تأكّد من استلام الدفع قبل التفعيل.')) return;
+
+  _srqInFlight = true;
+  // Same event-type mapping as the plan-picker modal (event_type CHECK honored).
+  var et = (req.requested_plan === 'yearly') ? 'convert_yearly'
+         : (req.requested_plan === 'monthly') ? 'convert_monthly'
+         : 'convert_plan';
+  var tp = (et === 'convert_plan') ? { planCode: req.requested_plan } : {};
+  var result = await transitionAccount(et, tr, tp);
+  if (!result || !result.ok) {
+    alert('فشل التفعيل: ' + ((result && result.error) || 'خطأ غير معروف'));
+    _srqInFlight = false;
+    return;
+  }
+  try {
+    var by = await _srqAdminEmail();
+    await window.sb.from('subscription_requests')
+      .update({ status:'approved', resolved_at:new Date().toISOString(), resolved_by:by })
+      .eq('id', reqId);
+  } catch (e) { console.warn('srqApprove: mark approved failed (plan already changed):', e); }
+  _srqInFlight = false;
+  await loadSubRequests();
+  loadAndRender();
+  alert('✅ تم تفعيل الاشتراك.');
+}
+
+async function srqReject(reqId) {
+  if (_srqInFlight) return;
+  var req = SRQ_CACHE.filter(function(x){ return x.id === reqId; })[0];
+  if (!req) return;
+  var note = prompt('سبب الرفض (اختياري):', '');
+  if (note === null) return; // operator cancelled
+  _srqInFlight = true;
+  try {
+    var by = await _srqAdminEmail();
+    var res = await window.sb.from('subscription_requests')
+      .update({ status:'rejected', admin_note:(note || null), resolved_at:new Date().toISOString(), resolved_by:by })
+      .eq('id', reqId);
+    if (res.error) throw res.error;
+  } catch (e) {
+    console.error('srqReject error:', e);
+    alert('فشل الرفض: ' + (e && e.message ? e.message : String(e)));
+  }
+  _srqInFlight = false;
+  await loadSubRequests();
+}
+
+// Phase X12 — save tenant-visible payment instructions (platform_settings).
+// Self-contained (no dirty-tracking framework) — save button always enabled.
+var _savePaymentInFlight = false;
+async function savePsPaymentInstructions() {
+  if (_savePaymentInFlight) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+  var ta = document.getElementById('psPaymentInstructions');
+  var btn = document.getElementById('btnPsSavePayment');
+  if (!ta) return;
+  var val = ta.value || '';
+  _savePaymentInFlight = true;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
+  try {
+    var payload = { key:'payment_instructions_ar', value: val };
+    try {
+      var s = await window.sb.auth.getSession();
+      if (s && s.data && s.data.session && s.data.session.user) payload.updated_by = s.data.session.user.email || 'admin';
+    } catch(_) {}
+    var res = await window.sb.from('platform_settings').upsert(payload, { onConflict:'key' }).select().maybeSingle();
+    if (res.error) { console.error('savePsPaymentInstructions:', res.error); alert('❌ فشل الحفظ: ' + (res.error.message || '')); return; }
+    if (!res.data) { alert('❌ لم يُحفَظ — قد تكون الصلاحيات مرفوضة.\nتأكّد من تشغيل Migration 42 وأن دورك admin.'); return; }
+    PLATFORM_SETTINGS_CACHE.payment_instructions_ar = val;
+    alert('✅ تم حفظ تعليمات الدفع.');
+  } catch (ex) {
+    console.error('savePsPaymentInstructions exception:', ex);
+    alert('❌ خطأ غير متوقع: ' + (ex && ex.message ? ex.message : String(ex)));
+  } finally {
+    _savePaymentInFlight = false;
+    if (btn) { btn.textContent = '💾 حفظ تعليمات الدفع'; btn.disabled = false; }
+  }
+}
+
 // Hydrate the new Section H UI from PLATFORM_SETTINGS_CACHE.
 // Called from initAdmin AFTER loadPlatformSettings() resolves the cache.
 // Safe to re-call (idempotent — overwrites inputs with cached values,
@@ -6548,6 +6792,7 @@ function hydratePsUI() {
   set('psSupportEmail',   c.support_email);
   set('psPlatformName',   c.platform_name);
   set('psRenewalMessage', c.renewal_message);
+  set('psPaymentInstructions', c.payment_instructions_ar);
 
   // Sync current admin email display
   try {

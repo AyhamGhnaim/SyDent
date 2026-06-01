@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<title>SyDent — الاشتراك</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260601b01"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js?v=20260601b01"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b01">
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --red:       #ef5350;
+  --yellow:    #f5c842;
+  --orange:    #ffa726;
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --radius:    12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+}
+.main {
+  flex: 1;
+  margin-right: var(--sb-width, 240px);
+  display: flex; flex-direction: column;
+  min-height: 100vh;
+}
+.topbar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 28px;
+  display: flex; align-items: center; gap: 16px;
+  position: sticky; top: 0; z-index: 50;
+}
+.topbar-title { font-size: 20px; font-weight: 700; flex: 1; }
+.topbar-title span { color: var(--green); }
+.content { padding: 28px; flex: 1; }
+
+.sub-wrap { max-width: 920px; margin: 0 auto; }
+
+/* ---- current plan card ---- */
+.sub-current {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+  margin-bottom: 18px;
+}
+.sub-current-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.sub-current-icon { font-size: 30px; }
+.sub-current-name { font-size: 21px; font-weight: 800; }
+.sub-badge {
+  font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 999px;
+  white-space: nowrap;
+}
+.sub-badge.ok   { background: rgba(46,232,158,0.15); color: var(--green); }
+.sub-badge.warn { background: rgba(255,167,38,0.15); color: var(--orange); }
+.sub-badge.bad  { background: rgba(239,83,80,0.15);  color: var(--red); }
+.sub-current-meta {
+  margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+  gap: 12px;
+}
+.sub-meta-item { background: var(--bg3); border-radius: 10px; padding: 12px 14px; }
+.sub-meta-label { font-size: 11px; color: var(--text2); font-weight: 700; margin-bottom: 4px; }
+.sub-meta-value { font-size: 16px; font-weight: 800; }
+
+/* ---- pending banner ---- */
+.sub-pending {
+  background: rgba(255,167,38,0.10);
+  border: 1px solid rgba(255,167,38,0.35);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.sub-pending-text { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.6; min-width: 200px; }
+.sub-pending-text b { color: var(--orange); }
+
+/* ---- plans grid ---- */
+.sub-section-title { font-size: 14px; font-weight: 800; color: var(--text2); margin: 8px 2px 14px; }
+.sub-grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.sub-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  position: relative;
+}
+.sub-card.current { border-color: var(--green); box-shadow: 0 0 0 1px var(--green) inset; }
+.sub-card-cur-badge {
+  position: absolute; top: -10px; inset-inline-start: 16px;
+  background: var(--green); color: #062018; font-size: 11px; font-weight: 800;
+  padding: 3px 12px; border-radius: 999px;
+}
+.sub-card-icon { font-size: 26px; }
+.sub-card-name { font-size: 18px; font-weight: 800; }
+.sub-card-sub { font-size: 12px; color: var(--text2); min-height: 16px; }
+.sub-card-price { font-size: 24px; font-weight: 800; margin-top: 6px; }
+.sub-card-price small { font-size: 12px; font-weight: 600; color: var(--text2); }
+.sub-card-features { list-style: none; margin: 12px 0; display: flex; flex-direction: column; gap: 7px; }
+.sub-card-features li { font-size: 13px; color: var(--text); padding-inline-start: 20px; position: relative; }
+.sub-card-features li::before { content: '✓'; position: absolute; inset-inline-start: 0; color: var(--green); font-weight: 800; }
+.sub-btn {
+  margin-top: auto; border: none; border-radius: 10px; padding: 12px;
+  font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 800; cursor: pointer;
+  background: var(--green); color: #062018; transition: opacity .15s;
+}
+.sub-btn:hover { opacity: .88; }
+.sub-btn.renew { background: var(--bg3); color: var(--green); border: 1px solid var(--border); }
+.sub-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sub-btn-spacer { margin-top: auto; height: 0; }
+
+/* ---- states ---- */
+.sub-state { text-align: center; padding: 60px 20px; color: var(--text2); }
+.sub-state-icon { font-size: 46px; margin-bottom: 12px; }
+
+/* ---- modal ---- */
+.sub-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.6); align-items: center; justify-content: center; padding: 18px;
+}
+.sub-overlay.show { display: flex; }
+.sub-modal {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 16px;
+  width: 100%; max-width: 460px; padding: 24px; max-height: 90vh; overflow-y: auto;
+}
+.sub-modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.sub-modal-sub { font-size: 13px; color: var(--text2); margin-bottom: 18px; line-height: 1.6; }
+.sub-field-label { font-size: 12px; font-weight: 800; color: var(--text2); margin: 14px 0 8px; }
+.sub-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sub-method {
+  border: 1px solid var(--border); border-radius: 10px; padding: 12px; cursor: pointer;
+  font-size: 13px; font-weight: 700; text-align: center; background: var(--bg3); transition: all .12s;
+}
+.sub-method.sel { border-color: var(--green); background: rgba(46,232,158,0.12); color: var(--green); }
+.sub-note {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 12px; color: var(--text); font-family: 'Cairo', sans-serif; font-size: 13px; resize: vertical; min-height: 64px;
+}
+.sub-instructions {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; font-size: 12.5px; color: var(--text); white-space: pre-wrap; line-height: 1.7; margin-top: 8px;
+}
+.sub-modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.sub-modal-actions button {
+  flex: 1; border-radius: 10px; padding: 12px; font-family: 'Cairo', sans-serif;
+  font-size: 14px; font-weight: 800; cursor: pointer; border: none;
+}
+.sub-confirm { background: var(--green); color: #062018; }
+.sub-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.sub-cancel { background: transparent; color: var(--text2); border: 1px solid var(--border) !important; }
+.sub-link-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 8px; padding: 8px 14px; font-family: 'Cairo', sans-serif; font-size: 12px;
+  font-weight: 700; cursor: pointer;
+}
+
+/* toast */
+.sub-toast {
+  position: fixed; bottom: 24px; inset-inline: 0; margin: auto; width: max-content; max-width: 90vw;
+  background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+  padding: 12px 20px; border-radius: 10px; font-size: 13px; font-weight: 700;
+  z-index: 300; opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.sub-toast.show { opacity: 1; }
+.sub-toast.err { border-color: var(--red); color: var(--red); }
+
+@media (max-width: 768px) {
+  .main { margin-right: 0; margin-bottom: 64px; }
+  .topbar { padding: 12px 14px; }
+  .topbar-title { font-size: 17px; }
+  .content { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<script src="sidebar.js?v=20260601b01"></script>
+
+<div class="main" id="sbMainContent">
+
+  <div class="topbar">
+    <div class="topbar-title"><span>الاشتراك</span></div>
+  </div>
+
+  <div class="content">
+    <div class="sub-wrap">
+
+      <!-- current plan card -->
+      <div id="subCurrent" class="sub-current" style="display:none;"></div>
+
+      <!-- pending request banner -->
+      <div id="subPending" class="sub-pending" style="display:none;"></div>
+
+      <!-- plans -->
+      <div class="sub-section-title">الخطط المتاحة</div>
+      <div id="subPlans" class="sub-grid">
+        <div class="sub-state"><div class="sub-state-icon">⏳</div>جارٍ تحميل الخطط…</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- request modal -->
+<div id="subOverlay" class="sub-overlay">
+  <div class="sub-modal">
+    <div id="subModalTitle" class="sub-modal-title">طلب اشتراك</div>
+    <div id="subModalSub" class="sub-modal-sub"></div>
+
+    <div class="sub-field-label">طريقة الدفع</div>
+    <div class="sub-methods" id="subMethods"></div>
+
+    <div class="sub-field-label">ملاحظة (اختياري)</div>
+    <textarea id="subNote" class="sub-note" placeholder="أي تفاصيل تودّ إضافتها…"></textarea>
+
+    <div class="sub-field-label">تعليمات الدفع</div>
+    <div id="subInstructions" class="sub-instructions">—</div>
+
+    <div class="sub-modal-actions">
+      <button class="sub-cancel" onclick="window.subCloseModal()">إلغاء</button>
+      <button id="subConfirmBtn" class="sub-confirm" onclick="window.subSubmit()">إرسال الطلب وفتح واتساب</button>
+    </div>
+  </div>
+</div>
+
+<div id="subToast" class="sub-toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  initSidebar('subscription');
+
+  var SUPPORT_PHONE_FALLBACK = '963934012433';
+
+  var PAYMENT_METHODS = [
+    { v: 'sham_cash', label: 'شام كاش' },
+    { v: 'transfer',  label: 'حوالة داخلية' },
+    { v: 'bank_card', label: 'كرت بنك' },
+    { v: 'cash',      label: 'كاش' }
+  ];
+
+  // page state
+  var ST = {
+    user: null,
+    current: null,        // { id, plan, status, trial_end }
+    plans: [],            // active subscription_plans sorted
+    pending: null,        // pending subscription_requests row (or null)
+    support: SUPPORT_PHONE_FALLBACK,
+    instructions: '',
+    selPlan: null,        // plan being requested (in modal)
+    selKind: 'upgrade',   // 'upgrade' | 'renew'
+    selMethod: null,
+    inFlight: false       // Rule #66 — double-submit guard
+  };
+
+  function escHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function fmtPrice(n) {
+    var num = Number(n);
+    if (!isFinite(num) || num <= 0) return '—';
+    return num.toLocaleString('en-US');
+  }
+  function planLabel(code) {
+    var p = ST.plans.filter(function (x) { return x.code === code; })[0];
+    if (p) return p.display_name || code;
+    if (code === 'trial')   return 'تجريبي';
+    if (code === 'monthly') return 'Mini';
+    if (code === 'yearly')  return 'Max';
+    return code || '—';
+  }
+  function methodLabel(v) {
+    var m = PAYMENT_METHODS.filter(function (x) { return x.v === v; })[0];
+    return m ? m.label : v;
+  }
+
+  var _toastTimer = null;
+  function toast(msg, isErr) {
+    var t = document.getElementById('subToast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'sub-toast show' + (isErr ? ' err' : '');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function () { t.className = 'sub-toast'; }, 3200);
+  }
+
+  // ---------- data load ----------
+  async function loadAll() {
+    var ures = await window.sb.auth.getUser();
+    if (!ures || !ures.data || !ures.data.user) {
+      window.location.replace('auth.html');
+      return false;
+    }
+    ST.user = ures.data.user;
+
+    var results = await Promise.all([
+      // current subscription (by email — same key the banner/sidebar use)
+      window.sb.from('trial_requests')
+        .select('id, plan, status, trial_end')
+        .eq('email', ST.user.email).maybeSingle()
+        .then(function (r) { return r; }).catch(function () { return { data: null }; }),
+      // active plans
+      window.sb.from('subscription_plans')
+        .select('*').eq('is_active', true).order('sort_order', { ascending: true })
+        .then(function (r) { return r; }).catch(function () { return { data: [] }; }),
+      // platform settings (support phone + payment instructions)
+      window.sb.from('platform_settings')
+        .select('key, value').in('key', ['support_phone', 'payment_instructions_ar'])
+        .then(function (r) { return r; }).catch(function () { return { data: [] }; }),
+      // existing pending request
+      window.sb.from('subscription_requests')
+        .select('*').eq('user_id', ST.user.id).eq('status', 'pending')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        .then(function (r) { return r; }).catch(function () { return { data: null }; })
+    ]);
+
+    ST.current = (results[0] && results[0].data) || null;
+    ST.plans   = (results[1] && results[1].data) || [];
+    ST.pending = (results[3] && results[3].data) || null;
+
+    var ps = (results[2] && results[2].data) || [];
+    ps.forEach(function (row) {
+      if (row.key === 'support_phone') {
+        var v = String(row.value || '').trim();
+        if (/^\d{8,15}$/.test(v)) ST.support = v;
+      } else if (row.key === 'payment_instructions_ar') {
+        ST.instructions = String(row.value || '');
+      }
+    });
+    return true;
+  }
+
+  // ---------- render ----------
+  function curPlanCode() { return (ST.current && ST.current.plan) || 'trial'; }
+
+  function daysLeft() {
+    if (!ST.current || !ST.current.trial_end) return null; // permanent
+    return Math.ceil((new Date(ST.current.trial_end) - new Date()) / (1000 * 60 * 60 * 24));
+  }
+
+  function renderCurrent() {
+    var el = document.getElementById('subCurrent');
+    var code = curPlanCode();
+    var plan = ST.plans.filter(function (p) { return p.code === code; })[0];
+    var icon = (plan && plan.icon) ? plan.icon : (code === 'trial' ? '🆓' : code === 'yearly' ? '💎' : '💵');
+    var name = planLabel(code);
+    var dl = daysLeft();
+
+    var badge, badgeCls, expVal;
+    if (dl === null) {
+      badge = 'اشتراك دائم'; badgeCls = 'ok'; expVal = 'بدون انتهاء';
+    } else if (dl <= 0) {
+      badge = 'منتهي'; badgeCls = 'bad'; expVal = 'انتهى';
+    } else if (dl <= 7) {
+      badge = 'ينتهي قريباً'; badgeCls = 'bad'; expVal = dl + ' يوم';
+    } else if (dl <= 30) {
+      badge = 'ينتهي قريباً'; badgeCls = 'warn'; expVal = dl + ' يوم';
+    } else {
+      badge = (code === 'trial') ? 'تجريبي' : 'نشط'; badgeCls = 'ok'; expVal = dl + ' يوم';
+    }
+
+    var expDate = (ST.current && ST.current.trial_end)
+      ? new Date(ST.current.trial_end).toLocaleDateString('en-GB') : '—';
+
+    el.innerHTML =
+      '<div class="sub-current-top">' +
+        '<span class="sub-current-icon">' + escHtml(icon) + '</span>' +
+        '<span class="sub-current-name">' + escHtml(name) + '</span>' +
+        '<span class="sub-badge ' + badgeCls + '">' + escHtml(badge) + '</span>' +
+      '</div>' +
+      '<div class="sub-current-meta">' +
+        '<div class="sub-meta-item"><div class="sub-meta-label">المتبقّي</div><div class="sub-meta-value">' + escHtml(String(expVal)) + '</div></div>' +
+        '<div class="sub-meta-item"><div class="sub-meta-label">تاريخ الانتهاء</div><div class="sub-meta-value">' + escHtml(expDate) + '</div></div>' +
+        (plan ? '<div class="sub-meta-item"><div class="sub-meta-label">السعر</div><div class="sub-meta-value">' + escHtml(fmtPrice(plan.price)) + ' ' + escHtml(plan.currency || 'SYP') + '</div></div>' : '') +
+      '</div>';
+    el.style.display = 'block';
+  }
+
+  function renderPending() {
+    var el = document.getElementById('subPending');
+    if (!ST.pending) { el.style.display = 'none'; return; }
+    var kindAr = ST.pending.request_kind === 'renew' ? 'تجديد' : 'ترقية';
+    el.innerHTML =
+      '<div class="sub-pending-text">⏳ لديك طلب <b>' + escHtml(kindAr) + '</b> إلى خطة <b>' +
+        escHtml(planLabel(ST.pending.requested_plan)) + '</b> قيد المراجعة. سيتم التفعيل بعد تأكيد الدفع.</div>' +
+      '<button class="sub-link-btn" onclick="window.subCancelPending()">إلغاء الطلب</button>';
+    el.style.display = 'flex';
+  }
+
+  function planFeatures(p) {
+    var feats = [];
+    if (Array.isArray(p.features)) feats = p.features;
+    else if (typeof p.features === 'string') {
+      try { var j = JSON.parse(p.features); if (Array.isArray(j)) feats = j; } catch (e) {}
+    }
+    return feats.slice(0, 6);
+  }
+
+  function renderPlans() {
+    var wrap = document.getElementById('subPlans');
+    if (!ST.plans.length) {
+      wrap.innerHTML = '<div class="sub-state"><div class="sub-state-icon">📭</div>لا توجد خطط متاحة حالياً.</div>';
+      return;
+    }
+    var cur = curPlanCode();
+    var hasPending = !!ST.pending;
+    var html = '';
+
+    ST.plans.forEach(function (p) {
+      var isCur = (p.code === cur);
+      var icon = (p.icon && String(p.icon).trim()) ? (escHtml(p.icon) + ' ') : '';
+      var period = p.price_period_label ? escHtml(p.price_period_label) : '';
+      var sub = p.subtitle ? escHtml(p.subtitle) : '';
+      var feats = planFeatures(p).map(function (f) { return '<li>' + escHtml(f) + '</li>'; }).join('');
+
+      // action button: never offer "buy trial"; renew the current plan; upgrade others
+      var btn = '';
+      if (p.code === 'trial') {
+        btn = isCur ? '<div class="sub-btn-spacer"></div>'
+                    : '<div class="sub-btn-spacer"></div>';
+      } else if (isCur) {
+        btn = '<button class="sub-btn renew" ' + (hasPending ? 'disabled' : '') +
+              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'renew\')">🔄 تجديد</button>';
+      } else {
+        btn = '<button class="sub-btn" ' + (hasPending ? 'disabled' : '') +
+              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'upgrade\')">⬆️ ترقية إلى ' + escHtml(p.display_name || p.code) + '</button>';
+      }
+
+      html +=
+        '<div class="sub-card' + (isCur ? ' current' : '') + '">' +
+          (isCur ? '<span class="sub-card-cur-badge">خطتك الحالية</span>' : '') +
+          '<span class="sub-card-icon">' + (icon || (p.code === 'yearly' ? '💎' : p.code === 'monthly' ? '💵' : '🆓')) + '</span>' +
+          '<span class="sub-card-name">' + escHtml(p.display_name || p.code) + '</span>' +
+          '<span class="sub-card-sub">' + sub + '</span>' +
+          '<div class="sub-card-price">' + escHtml(fmtPrice(p.price)) +
+            (Number(p.price) > 0 ? ' <small>' + escHtml(p.currency || 'SYP') + (period ? ' / ' + period : '') + '</small>' : '') +
+          '</div>' +
+          (feats ? '<ul class="sub-card-features">' + feats + '</ul>' : '<div style="flex:1"></div>') +
+          btn +
+        '</div>';
+    });
+
+    wrap.innerHTML = html;
+  }
+
+  function renderAll() {
+    renderCurrent();
+    renderPending();
+    renderPlans();
+  }
+
+  // ---------- modal ----------
+  window.subOpenModal = function (planCode, kind) {
+    if (ST.pending) { toast('لديك طلب قيد المراجعة بالفعل', true); return; }
+    var p = ST.plans.filter(function (x) { return x.code === planCode; })[0];
+    if (!p) return;
+    ST.selPlan = p;
+    ST.selKind = (kind === 'renew') ? 'renew' : 'upgrade';
+    ST.selMethod = null;
+
+    document.getElementById('subModalTitle').textContent =
+      (ST.selKind === 'renew' ? 'تجديد خطة ' : 'الترقية إلى خطة ') + (p.display_name || p.code);
+    document.getElementById('subModalSub').textContent =
+      'السعر: ' + fmtPrice(p.price) + ' ' + (p.currency || 'SYP') +
+      '. اختر طريقة الدفع، ثم أرسل الطلب وتواصل معنا عبر واتساب لتأكيد التفعيل.';
+
+    // payment methods
+    document.getElementById('subMethods').innerHTML = PAYMENT_METHODS.map(function (m) {
+      return '<div class="sub-method" data-m="' + m.v + '" onclick="window.subPickMethod(\'' + m.v + '\')">' + escHtml(m.label) + '</div>';
+    }).join('');
+
+    document.getElementById('subNote').value = '';
+    document.getElementById('subInstructions').textContent = ST.instructions || 'سيتم تزويدك بتفاصيل الدفع عبر واتساب.';
+    syncConfirm();
+    document.getElementById('subOverlay').classList.add('show');
+  };
+
+  window.subPickMethod = function (v) {
+    ST.selMethod = v;
+    Array.prototype.forEach.call(document.querySelectorAll('#subMethods .sub-method'), function (el) {
+      el.classList.toggle('sel', el.getAttribute('data-m') === v);
+    });
+    syncConfirm();
+  };
+
+  function syncConfirm() {
+    var b = document.getElementById('subConfirmBtn');
+    if (b) b.disabled = !ST.selMethod || ST.inFlight;
+  }
+
+  window.subCloseModal = function () {
+    if (ST.inFlight) return;
+    document.getElementById('subOverlay').classList.remove('show');
+  };
+
+  window.subSubmit = async function () {
+    if (ST.inFlight) return;
+    if (!ST.selPlan || !ST.selMethod) { toast('اختر طريقة الدفع أولاً', true); return; }
+    ST.inFlight = true; syncConfirm();
+
+    var note = (document.getElementById('subNote').value || '').trim();
+    var payload = {
+      user_id: ST.user.id,
+      trial_request_id: (ST.current && ST.current.id) ? ST.current.id : null,
+      request_kind: ST.selKind,
+      requested_plan: ST.selPlan.code,
+      current_plan: curPlanCode(),
+      payment_method: ST.selMethod,
+      note: note || null,
+      status: 'pending'
+    };
+
+    try {
+      var res = await window.sb.from('subscription_requests').insert(payload).select().maybeSingle();
+      if (res.error) {
+        // unique partial index → duplicate pending
+        if (res.error.code === '23505' || /duplicate|unique/i.test(res.error.message || '')) {
+          toast('لديك طلب قيد المراجعة بالفعل', true);
+          ST.inFlight = false;
+          window.subCloseModal();
+          await refresh();
+          return;
+        }
+        throw res.error;
+      }
+
+      // open WhatsApp to support, prefilled
+      var kindAr = ST.selKind === 'renew' ? 'تجديد' : 'ترقية';
+      var msg = 'مرحباً، أرغب بـ' + kindAr + ' اشتراكي في SyDent إلى خطة "' +
+                (ST.selPlan.display_name || ST.selPlan.code) + '". طريقة الدفع: ' + methodLabel(ST.selMethod) + '.';
+      if (note) msg += '\nملاحظة: ' + note;
+      window.open('https://wa.me/' + ST.support + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+
+      ST.inFlight = false;
+      document.getElementById('subOverlay').classList.remove('show');
+      toast('✅ تم إرسال طلبك — سيتم التفعيل بعد تأكيد الدفع');
+      await refresh();
+    } catch (e) {
+      console.error('subSubmit error:', e);
+      ST.inFlight = false; syncConfirm();
+      toast('تعذّر إرسال الطلب. حاول مجدداً.', true);
+    }
+  };
+
+  window.subCancelPending = async function () {
+    if (!ST.pending) return;
+    if (!confirm('إلغاء طلب الاشتراك الحالي؟')) return;
+    try {
+      var res = await window.sb.from('subscription_requests')
+        .update({ status: 'cancelled', resolved_at: new Date().toISOString() })
+        .eq('id', ST.pending.id);
+      if (res.error) throw res.error;
+      toast('تم إلغاء الطلب');
+      await refresh();
+    } catch (e) {
+      console.error('subCancelPending error:', e);
+      toast('تعذّر الإلغاء. حاول مجدداً.', true);
+    }
+  };
+
+  async function refresh() {
+    // re-pull only the volatile bits (current + pending), keep plans/settings
+    try {
+      var r1 = await window.sb.from('trial_requests')
+        .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+      ST.current = (r1 && r1.data) || ST.current;
+    } catch (e) {}
+    try {
+      var r2 = await window.sb.from('subscription_requests')
+        .select('*').eq('user_id', ST.user.id).eq('status', 'pending')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      ST.pending = (r2 && r2.data) || null;
+    } catch (e) {}
+    renderAll();
+  }
+
+  // close modal on overlay click / Escape
+  document.getElementById('subOverlay').addEventListener('click', function (e) {
+    if (e.target === this) window.subCloseModal();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') window.subCloseModal();
+  });
+
+  // ---------- boot ----------
+  (async function boot() {
+    try {
+      var ok = await loadAll();
+      if (ok) renderAll();
+    } catch (e) {
+      console.error('subscription boot error:', e);
+      document.getElementById('subPlans').innerHTML =
+        '<div class="sub-state"><div class="sub-state-icon">⚠️</div>تعذّر تحميل بيانات الاشتراك. حدّث الصفحة.</div>';
+    }
+  })();
+
+})();
+</script>
+
+</body>
+</html>

@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260529a98"></script>
+<script src="theme.js?v=20260601b01"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -577,10 +577,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260529a98">
+<link rel="stylesheet" href="theme.css?v=20260601b01">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260529a98"></script>
-<script src="sidebar.js?v=20260529a98"></script>
+<script src="supabase-init.js?v=20260601b01"></script>
+<script src="sidebar.js?v=20260601b01"></script>
 </head>
 <body>
 <script>
@@ -662,10 +662,10 @@
         <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
           <div style="font-size:60px;margin-bottom:16px;">⏰</div>
           <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">${expiredTitle}</div>
-          <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، تواصل معنا عبر واتساب.</div>
-          <a href="https://wa.me/${supportPhone}?text=${encodeURIComponent('مرحباً، أريد تجديد اشتراكي في SyDent')}" target="_blank"
-            style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
-            💬 تواصل معنا عبر واتساب
+          <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، اختر خطتك من صفحة الاشتراك.</div>
+          <a href="subscription.html"
+            style="padding:14px 28px;background:#2ee89e;border-radius:12px;color:#062018;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+            💎 تجديد الاشتراك
           </a>
           <button onclick="window.sb.auth.signOut().then(()=>window.location.href='landing.html')"
             style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
@@ -684,28 +684,28 @@
       // تجربة: banner دائم بألوان تدريجية (السلوك القديم)
       showBanner = true;
       bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
-      bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
+      bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
     } else if (plan === 'yearly') {
       // سنوي: banner فقط ≤30 يوم (Notion/Stripe pattern)
       if (daysLeft <= 7) {
         showBanner = true;
         bannerColor = '#ef5350';
-        bannerText = '🚨 اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+        bannerText = '🚨 اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
       } else if (daysLeft <= 30) {
         showBanner = true;
         bannerColor = '#ffa726';
-        bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+        bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
     } else if (plan === 'monthly') {
       // شهري: banner فقط ≤14 يوم (دورة قصيرة، تحذير أبكر نسبياً)
       if (daysLeft <= 3) {
         showBanner = true;
         bannerColor = '#ef5350';
-        bannerText = '🚨 اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+        bannerText = '🚨 اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
       } else if (daysLeft <= 14) {
         showBanner = true;
         bannerColor = '#ffa726';
-        bannerText = '⏰ اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+        bannerText = '⏰ اشتراكك الشهري ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
     } else {
       // Phase X11: any custom/added plan (not trial/monthly/yearly). Use the
@@ -714,11 +714,11 @@
       if (daysLeft <= 3) {
         showBanner = true;
         bannerColor = '#ef5350';
-        bannerText = '🚨 اشتراكك ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
+        bannerText = '🚨 اشتراكك ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد فوراً</a>';
       } else if (daysLeft <= 14) {
         showBanner = true;
         bannerColor = '#ffa726';
-        bannerText = '⏰ اشتراكك ينتهي خلال ' + daysLeft + ' يوم — <a href="https://wa.me/' + supportPhone + '" target="_blank" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
+        bannerText = '⏰ اشتراكك ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
     }
 
