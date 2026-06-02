@@ -37,6 +37,9 @@ jobs:
     steps:
       - name: Checkout (full history — needed to read last commit date)
         uses: actions/checkout@v4
+        env:
+          # يُشغّل الـ action على Node 24 بدل Node 20 المهجور — يزيل تحذير الإهمال.
+          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node24
         with:
           fetch-depth: 0
 
