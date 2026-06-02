@@ -1,0 +1,80 @@
+name: Supabase Keep-Alive
+
+# ─────────────────────────────────────────────────────────────────────────────
+# الهدف: منع نوم مشروع Supabase على الخطة المجانية.
+#   Supabase ينام مشروع الخطة المجانية بعد 7 أيام بلا أي query فعلية تصل للـ DB.
+#   عند النوم: المنصة تظهر ميتة لكل العيادات حتى Restore يدوي، والخطة المجانية
+#   بلا backups — فالنوم الطويل خطر على بيانات العيادات.
+#
+# آلية مزدوجة (كلاهما ضروري للفترة الخامدة 3-4 شهور قبل الإطلاق):
+#   (1) PING مرتين بالأسبوع على REST API  → يصفّر عدّاد خمول Supabase (حد 7 أيام).
+#   (2) MARKER COMMIT إن مرّ ≥45 يوماً بلا commit → يصفّر عدّاد خمول GitHub Actions
+#       (GitHub يعطّل الـ schedule تلقائياً بعد 60 يوم خمول للريبو، فيتوقف الـ ping).
+#
+# ملاحظة أمنية: المفتاح أدناه هو الـ publishable/anon key العام، موجود أصلاً
+#   بشكل علني في supabase-init.js بالفرونت إند — ليس سرّاً ولا يتجاوز RLS.
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # كل ثلاثاء وجمعة الساعة 06:17 UTC. الفجوة القصوى بين تشغيلين = 4 أيام < 7.
+    # (GitHub cron دائماً UTC، وقد يتأخر التشغيل 10-30 دقيقة وقت الذروة — لا يضرّنا.)
+    - cron: '17 6 * * 2,5'
+  workflow_dispatch:   # تشغيل يدوي للاختبار من تبويب Actions
+
+# نحتاج صلاحية الكتابة فقط من أجل خطوة الـ marker commit (الخطوة 2).
+permissions:
+  contents: write
+
+# منع تراكب التشغيلات
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history — needed to read last commit date)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── الخطوة 1: ping على Supabase لتصفير عدّاد الـ 7 أيام ──
+      - name: Ping Supabase (reset 7-day pause timer)
+        run: |
+          set -euo pipefail
+          URL="https://rycqzpdhxabpqrdgtdzg.supabase.co/rest/v1/subscription_plans?select=id&limit=1"
+          KEY="sb_publishable_7LjceYIlrRrHt86sLpCwPg_TlMO8VJu"
+          HTTP=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" "$URL" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY")
+          echo "Supabase HTTP status: $HTTP"
+          echo "Response body: $(cat /tmp/resp.txt)"
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Supabase keep-alive ping failed (HTTP $HTTP)"
+            exit 1
+          fi
+          echo "✅ Supabase pinged successfully — 7-day inactivity timer reset."
+
+      # ── الخطوة 2: marker commit لتصفير عدّاد الـ 60 يوم (فقط عند الحاجة) ──
+      - name: Keep GitHub Actions schedule alive (reset 60-day timer)
+        run: |
+          set -euo pipefail
+          LAST=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DAYS=$(( (NOW - LAST) / 86400 ))
+          echo "Days since last commit: $DAYS"
+          if [ "$DAYS" -ge 45 ]; then
+            echo "≥45 days idle — creating marker commit to keep the schedule from being disabled."
+            mkdir -p .github
+            date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/keepalive-marker
+            git config user.name "AyhamGhnaim"
+            git config user.email "drayhamghnaim@gmail.com"
+            git add .github/keepalive-marker
+            git commit -m "chore: keep-alive marker [skip ci]"
+            git push
+            echo "✅ Marker commit pushed — GitHub 60-day timer reset."
+          else
+            echo "Recent commit exists (<45 days) — no marker commit needed."
+          fi
