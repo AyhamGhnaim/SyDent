@@ -46,9 +46,10 @@ jobs:
           set -euo pipefail
           URL="https://rycqzpdhxabpqrdgtdzg.supabase.co/rest/v1/subscription_plans?select=id&limit=1"
           KEY="sb_publishable_7LjceYIlrRrHt86sLpCwPg_TlMO8VJu"
+          # المفتاح الجديد sb_publishable_ ليس JWT — يُرسَل في ترويسة apikey فقط.
+          # إرساله في Authorization: Bearer يسبب HTTP 400 (البوابة تحاول فكّه كـ JWT وتفشل).
           HTTP=$(curl -sS -o /tmp/resp.txt -w "%{http_code}" "$URL" \
-            -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY")
+            -H "apikey: $KEY")
           echo "Supabase HTTP status: $HTTP"
           echo "Response body: $(cat /tmp/resp.txt)"
           if [ "$HTTP" != "200" ]; then
