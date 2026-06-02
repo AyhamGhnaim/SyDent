@@ -44,7 +44,8 @@ jobs:
       - name: Ping Supabase (reset 7-day pause timer)
         run: |
           set -euo pipefail
-          URL="https://rycqzpdhxabpqrdgtdzg.supabase.co/rest/v1/subscription_plans?select=id&limit=1"
+          # subscription_plans مفتاحها 'code' (لا يوجد عمود 'id') — طلب عمود غير موجود يسبب 400.
+          URL="https://rycqzpdhxabpqrdgtdzg.supabase.co/rest/v1/subscription_plans?select=code&limit=1"
           KEY="sb_publishable_7LjceYIlrRrHt86sLpCwPg_TlMO8VJu"
           # المفتاح الجديد sb_publishable_ ليس JWT — يُرسَل في ترويسة apikey فقط.
           # إرساله في Authorization: Bearer يسبب HTTP 400 (البوابة تحاول فكّه كـ JWT وتفشل).
