@@ -31,15 +31,18 @@ concurrency:
   group: keep-alive
   cancel-in-progress: false
 
+# يُجبر JavaScript actions على Node 24 بدل Node 20 المهجور (الاسم الصحيح حسب GitHub).
+# ملاحظة: بسبب bug معروف في GitHub (actions/runner#4295) تبقى شارة التحذير الصفرا ظاهرة
+# رغم أن الـ action يعمل فعلاً على Node 24؛ ستختفي تلقائياً حين يصبح Node 24 افتراضياً (16 يونيو 2026).
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   keep-alive:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout (full history — needed to read last commit date)
         uses: actions/checkout@v4
-        env:
-          # يُشغّل الـ action على Node 24 بدل Node 20 المهجور — يزيل تحذير الإهمال.
-          ACTIONS_RUNNER_FORCE_ACTIONS_NODE_VERSION: node24
         with:
           fetch-depth: 0
 
