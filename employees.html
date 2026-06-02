@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b07"></script>
+<script src="theme.js?v=20260601b08"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b07"></script>
-<script src="sidebar.js?v=20260601b07"></script>
+<script src="supabase-init.js?v=20260601b08"></script>
+<script src="sidebar.js?v=20260601b08"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -263,7 +263,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b07">
+<link rel="stylesheet" href="theme.css?v=20260601b08">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -2163,6 +2163,30 @@ async function toggleActive(id) {
       '• يمكنه فقط تصفّح البيانات الموجودة\n' +
       '• لإعادة تفعيل الحساب لاحقاً، اضغط "تفعيل الحساب"'
     )) return;
+  }
+
+  // Re-activation CONSUMES a seat → subject to the same plan limit as adding.
+  // Mirrors the trigger (Migration 44) exactly: active + owner-excluded. Instant
+  // UX feedback before the DB round-trip; the trigger is the hard gate.
+  if (newState) {
+    try {
+      if (window.SyDentPlan) {
+        await window.SyDentPlan.load();
+        var reEmpLimit = window.SyDentPlan.limit('employees');
+        if (reEmpLimit != null) {
+          var reEc = await window.sb.from('clinic_employees')
+            .select('id', { count:'exact', head:true })
+            .eq('owner_id', currentUser.id)
+            .not('is_active', 'is', false)
+            .or('role.is.null,role.neq.owner');
+          var reUsed = (reEc && typeof reEc.count === 'number') ? reEc.count : 0;
+          if (reUsed >= reEmpLimit) {
+            showToast('🔒 خطتك تسمح بـ ' + reEmpLimit + ' موظف نشط (المالك لا يُحتسب). عطّل موظفاً آخر أو رقِّ خطتك.', true);
+            return;
+          }
+        }
+      }
+    } catch(reLimErr) { console.warn('[employees] reactivate limit check skipped:', reLimErr && reLimErr.message); }
   }
 
   var res = await window.sb.from('clinic_employees')
