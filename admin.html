@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b13"></script>
+<script src="theme.js?v=20260601b14"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2164,13 +2164,67 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
   }
 }
 
+/* ═══ Phase A — Subscription payments ledger + receipt ═══ */
+#payModal{z-index:2000;}                 /* above c360 drawer (z-index 1501) */
+.pay-ctx{color:var(--muted);font-size:12px;margin-inline-start:6px;}
+.pay-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+.pay-field{display:flex;flex-direction:column;gap:5px;}
+.pay-field-full{grid-column:1 / -1;}
+.pay-field label{font-size:12px;font-weight:700;color:var(--text);}
+.pay-field input,.pay-field select,.pay-field textarea{
+  font-family:'Cairo',sans-serif;font-size:13px;background:var(--card);
+  border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:9px 11px;box-sizing:border-box;width:100%;resize:vertical;}
+.pay-field input:focus,.pay-field select:focus,.pay-field textarea:focus{
+  outline:none;border-color:color-mix(in srgb,var(--green) 55%,transparent);}
+.btn-pay{
+  flex:1 1 auto;min-width:90px;padding:9px 14px;border-radius:8px;
+  font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;line-height:1.4;
+  cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;
+  justify-content:center;gap:5px;text-decoration:none;box-sizing:border-box;
+  background:color-mix(in srgb,var(--green) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--green) 42%,transparent);color:var(--green);}
+.btn-pay:hover{background:color-mix(in srgb,var(--green) 22%,transparent);}
+.c360-pay-head{margin-bottom:12px;}
+.c360-pay-summary{display:flex;justify-content:space-between;align-items:center;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text);}
+.c360-pay-list{display:flex;flex-direction:column;gap:8px;}
+.c360-pay-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
+.c360-pay-voided{opacity:.55;}
+.c360-pay-amt{font-size:14px;font-weight:800;color:var(--text);}
+.c360-pay-meta{font-size:11.5px;color:var(--muted);margin-top:3px;}
+.c360-pay-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+.c360-pay-vreason{color:var(--red,#e06a6a);}
+.c360-pay-vbadge{font-size:10px;background:color-mix(in srgb,var(--red,#e06a6a) 16%,transparent);
+  color:var(--red,#e06a6a);border-radius:6px;padding:1px 6px;font-weight:700;}
+.c360-pay-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+.c360-pay-btn{font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;
+  border-radius:7px;padding:6px 10px;border:1px solid var(--border);background:var(--bg);
+  color:var(--text);transition:all .15s;white-space:nowrap;}
+.c360-pay-btn:hover{border-color:var(--green);color:var(--green);}
+.c360-pay-btn-void:hover{border-color:var(--red,#e06a6a);color:var(--red,#e06a6a);}
+#receiptPrintArea{display:none;}
+@media print{
+  body *{visibility:hidden !important;}
+  #receiptPrintArea,#receiptPrintArea *{visibility:visible !important;}
+  #receiptPrintArea{display:block !important;position:absolute;top:0;right:0;left:0;
+    padding:28px;direction:rtl;font-family:'Cairo',sans-serif;color:#000;background:#fff;}
+  .rcpt-title{font-size:20px;font-weight:800;text-align:center;margin-bottom:18px;
+    padding-bottom:12px;border-bottom:2px solid #000;}
+  .rcpt-body{font-size:14px;line-height:2;}
+  .rcpt-line{padding:2px 0;}
+  .rcpt-gap{height:14px;}
+}
+
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b13">
+<link rel="stylesheet" href="theme.css?v=20260601b14">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b13"></script>
+<script src="supabase-init.js?v=20260601b14"></script>
 </head>
 <body>
 
@@ -2886,6 +2940,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
     <button type="button" class="c360-tab" data-tab="risk" onclick="c360SwitchTab('risk')" role="tab">⚠️ المخاطر</button>
     <button type="button" class="c360-tab" data-tab="actions" onclick="c360SwitchTab('actions')" role="tab">🔧 إجراءات</button>
     <button type="button" class="c360-tab" data-tab="comm" onclick="c360SwitchTab('comm')" role="tab">💬 الاتصالات</button>
+    <button type="button" class="c360-tab" data-tab="payments" onclick="c360SwitchTab('payments')" role="tab">💵 المدفوعات</button>
   </div>
   <div class="c360-body" id="c360Body"></div>
   <div class="c360-footer">
@@ -2953,6 +3008,53 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
     </div>
   </div>
 </div>
+
+<!-- ═══ Phase A — Record-payment modal + receipt print target ═══ -->
+<div class="modal-backdrop" id="payModal" onclick="onPayModalBackdropClick(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div class="modal-head">
+      <div class="modal-title">💵 تسجيل دفعة مستلمة</div>
+      <button type="button" class="modal-close" onclick="closePayModal()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="modal-state-hint">العيادة: <strong id="payTenantName">—</strong> <span id="payCtxLine" class="pay-ctx"></span></div>
+    <div class="pay-form">
+      <div class="pay-field">
+        <label for="payAmount">المبلغ المستلم (ل.س)</label>
+        <input type="number" id="payAmount" min="1" step="1" inputmode="numeric" autocomplete="off" placeholder="مثلاً 15000">
+      </div>
+      <div class="pay-field">
+        <label for="payMethod">طريقة الدفع</label>
+        <select id="payMethod">
+          <option value="sham_cash">شام كاش</option>
+          <option value="transfer">حوالة داخلية</option>
+          <option value="bank_card">كرت بنك</option>
+          <option value="cash">كاش</option>
+          <option value="other">أخرى</option>
+        </select>
+      </div>
+      <div class="pay-field">
+        <label for="payDate">تاريخ الدفع</label>
+        <input type="date" id="payDate" autocomplete="off">
+      </div>
+      <div class="pay-field">
+        <label for="payRef">مرجع الحوالة (اختياري)</label>
+        <input type="text" id="payRef" autocomplete="off" placeholder="رقم الحوالة / الإيصال">
+      </div>
+      <div class="pay-field pay-field-full">
+        <label for="payNote">ملاحظة (اختياري)</label>
+        <textarea id="payNote" rows="2" autocomplete="off"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closePayModal()">إلغاء</button>
+      <button type="button" class="btn-save" onclick="recordPayment(false)">💾 حفظ</button>
+      <button type="button" class="btn-save" onclick="recordPayment(true)">🧾 حفظ وإصدار إيصال</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt print target — hidden on screen, revealed only by @media print -->
+<div id="receiptPrintArea" aria-hidden="true"></div>
 
 <script>
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
@@ -5919,7 +6021,7 @@ async function transitionAccount(eventType, r, params) {
     toTrialEndForEvent = fromTrialEnd;
   }
   var toStatus = updatePayload.status || fromStatus;
-  await logSubscriptionEvent({
+  var __evId = await logSubscriptionEvent({
     trial_request_id: r.id,
     user_id: newUserId,
     event_type: dbEventType,
@@ -5930,7 +6032,7 @@ async function transitionAccount(eventType, r, params) {
     notes: dbNotes
   });
 
-  return { ok:true, error:null, newRow:newRow };
+  return { ok:true, error:null, newRow:newRow, eventId: (typeof __evId === 'string' ? __evId : null) };
 }
 
 // === logSubscriptionEvent — append-only audit log writer ===
@@ -5948,12 +6050,15 @@ async function logSubscriptionEvent(ev) {
       }
     } catch(e) { /* fall through with default 'admin' */ }
     var payload = Object.assign({}, ev, { performed_by: performedBy });
-    var res = await window.sb.from('subscription_events').insert(payload);
+    var res = await window.sb.from('subscription_events').insert(payload).select('id').maybeSingle();
     if (res.error) {
       console.warn('logSubscriptionEvent error:', res.error);
       return false;
     }
-    return true;
+    // Phase A: return the inserted event id (for payment↔event linking).
+    // Falls back to `true` if RLS blocks the readback. All existing callers
+    // only await it without inspecting the value, so this is backward-compatible.
+    return (res.data && res.data.id) ? res.data.id : true;
   } catch(e) {
     console.warn('logSubscriptionEvent exception:', e);
     return false;
@@ -6822,6 +6927,321 @@ function srqToggle() {
   if (sec) sec.classList.toggle('open');
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// === Phase A — Subscription Payments Ledger (Migration 47 + 47.1) ===
+// Platform cash-received ledger + receipt issuance. Manual Syrian payment model:
+// records ACTUAL received payments (date/amount/method/reference), SEPARATE from
+// the lifecycle transition (transitionAccount). Payment↔event link via event_id
+// (best-effort, nullable). Soft-void only — never hard-delete a financial record
+// (matches Migration 25 immutable-audit philosophy). Vocabulary aligned to the
+// existing request vocabulary ('transfer', not 'bank_transfer') via Migration 47.1.
+// ════════════════════════════════════════════════════════════════════════════
+var PAY_METHOD_AR = Object.assign({}, SRQ_METHOD_AR, { other: 'أخرى' });
+var _recordPaymentInFlight = false;            // double-submit guard (rule #66)
+var _isPaymentsTableMissing = false;           // graceful if Migration 47 not run
+var payModalContext = null;                    // { reqId, tenantUserId, name, phone, planCode, cycle, eventId }
+var C360_PAYMENTS = { userId: null, loaded: false, loading: false, rows: [] };
+
+function payMethodLabel(m) { return PAY_METHOD_AR[m] || PAY_METHOD_AR.other; }
+
+// Local YYYY-MM-DD (avoids UTC drift from toISOString on the date alone).
+function payTodayYmd() {
+  var d = new Date();
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+// Stable receipt number derived from id + paid_at — no sequence machinery (KISS).
+function payReceiptNo(p) {
+  var d = String(p.paid_at || '').replace(/-/g, '');
+  var tail = String(p.id || '').replace(/-/g, '').slice(0, 6).toUpperCase();
+  return 'RCPT-' + d + '-' + tail;
+}
+
+// Informational period end = covers_from + CYCLE_DAYS[cycle].
+function payCoversTo(fromYmd, cycle) {
+  if (!fromYmd) return null;
+  var days = CYCLE_DAYS[normCycle(cycle)] || 30;
+  var d = new Date(fromYmd + 'T00:00:00');
+  if (isNaN(d.getTime())) return null;
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' +
+         String(d.getMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getDate()).padStart(2, '0');
+}
+
+// ── Open / close the record-payment modal ──
+// opts (all optional): { amount, method, planCode, cycle, eventId }. Explicit
+// opts win; otherwise inferred from the account's current plan/cycle.
+function openPayModal(reqId, opts) {
+  opts = opts || {};
+  var r = allRequests.find(function(x){ return x.id === reqId; });
+  if (!r || !r.user_id) { alert('لم يُعثر على حساب المستأجر.'); return; }
+
+  var planCode = opts.planCode || r.plan || '';
+  var cycle = normCycle(opts.cycle || r.billing_cycle || 'monthly');
+  var amount = (opts.amount != null) ? opts.amount
+             : planPriceForCycle(getPlanConfig(planCode), cycle);
+  var method = opts.method || r.payment_method || 'transfer';
+  if (!PAY_METHOD_AR[method]) method = 'other';
+
+  payModalContext = {
+    reqId: reqId,
+    tenantUserId: r.user_id,
+    name: r.name || r.email || '',
+    phone: r.phone || '',
+    planCode: planCode,
+    cycle: cycle,
+    eventId: (typeof opts.eventId === 'string') ? opts.eventId : null
+  };
+
+  document.getElementById('payTenantName').textContent = payModalContext.name || '—';
+  var ctxBits = [];
+  if (planCode) ctxBits.push(planDisplayName(planCode));
+  ctxBits.push(cycle === 'yearly' ? 'سنوي' : 'شهري');
+  document.getElementById('payCtxLine').textContent = ctxBits.join(' — ');
+
+  document.getElementById('payAmount').value = (amount != null && !isNaN(Number(amount))) ? Number(amount) : '';
+  document.getElementById('payMethod').value = method;
+  var dt = document.getElementById('payDate');
+  dt.value = payTodayYmd();
+  dt.max = payTodayYmd();                       // block future-dated payments
+  document.getElementById('payRef').value = '';
+  document.getElementById('payNote').value = '';
+
+  document.getElementById('payModal').classList.add('show');
+  setTimeout(function(){ var a = document.getElementById('payAmount'); if (a) a.focus(); }, 30);
+}
+
+function closePayModal() {
+  payModalContext = null;
+  var m = document.getElementById('payModal');
+  if (m) m.classList.remove('show');
+}
+function onPayModalBackdropClick(e) { if (e.target && e.target.id === 'payModal') closePayModal(); }
+
+// ── Record the payment (INSERT) — optionally issue a receipt afterwards ──
+async function recordPayment(issueReceipt) {
+  if (_recordPaymentInFlight) return;
+  if (!payModalContext) return;
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+
+  var amount = Number(document.getElementById('payAmount').value);
+  if (!isFinite(amount) || amount <= 0) { alert('أدخل مبلغاً صحيحاً أكبر من صفر.'); return; }
+  var method = document.getElementById('payMethod').value;
+  if (!PAY_METHOD_AR[method]) method = 'other';
+  var paidAt = document.getElementById('payDate').value || payTodayYmd();
+  if (paidAt > payTodayYmd()) { alert('تاريخ الدفع لا يمكن أن يكون في المستقبل.'); return; }
+  var reference = (document.getElementById('payRef').value || '').trim() || null;
+  var note = (document.getElementById('payNote').value || '').trim() || null;
+
+  var by = 'admin';
+  try {
+    var sess = await window.sb.auth.getSession();
+    if (sess && sess.data && sess.data.session && sess.data.session.user) {
+      by = sess.data.session.user.email || sess.data.session.user.id;
+    }
+  } catch (e) { /* fall through with 'admin' */ }
+
+  var isTrial = (payModalContext.planCode === 'trial');
+  var cycle = normCycle(payModalContext.cycle);
+  var row = {
+    tenant_user_id: payModalContext.tenantUserId,
+    amount: Math.round(amount),
+    currency: 'SYP',
+    method: method,
+    reference: reference,
+    paid_at: paidAt,
+    plan_code: payModalContext.planCode || null,
+    billing_cycle: isTrial ? null : cycle,
+    covers_from: paidAt,
+    covers_to: isTrial ? null : payCoversTo(paidAt, cycle),
+    event_id: payModalContext.eventId || null,
+    note: note,
+    recorded_by: by
+  };
+
+  _recordPaymentInFlight = true;
+  try {
+    var res = await window.sb.from('subscription_payments').insert(row).select().maybeSingle();
+    if (res.error) {
+      _recordPaymentInFlight = false;
+      alert('فشل تسجيل الدفعة: ' + res.error.message);
+      return;
+    }
+    var saved = res.data || Object.assign({ id: 'local-' + Date.now() }, row);
+    var ctxName = payModalContext.name, ctxPhone = payModalContext.phone;
+    _recordPaymentInFlight = false;
+    closePayModal();
+
+    // Invalidate the payments cache for this tenant + re-render if the drawer
+    // is open on the payments tab (rule #55).
+    if (C360_PAYMENTS.userId === saved.tenant_user_id) C360_PAYMENTS.loaded = false;
+    if (typeof c360State === 'object' && c360State && c360State.activeTab === 'payments') {
+      c360RenderTab('payments');
+    }
+
+    if (issueReceipt) issuePaymentReceipt(saved, ctxName, ctxPhone);
+    else alert('✅ تم تسجيل الدفعة.');
+  } catch (e) {
+    _recordPaymentInFlight = false;
+    alert('فشل تسجيل الدفعة: ' + (e && e.message ? e.message : 'خطأ غير معروف'));
+  }
+}
+
+// ── Soft-void a payment (never hard-delete a financial record) ──
+async function voidPayment(payId) {
+  if (!window.sb) { alert('Supabase غير متاح حالياً.'); return; }
+  var reason = prompt('سبب إبطال الدفعة؟ (يبقى السطر محفوظاً، مستثنى من المجاميع)');
+  if (reason === null) return;
+  var by = 'admin';
+  try {
+    var sess = await window.sb.auth.getSession();
+    if (sess && sess.data && sess.data.session && sess.data.session.user) {
+      by = sess.data.session.user.email || sess.data.session.user.id;
+    }
+  } catch (e) { /* fall through */ }
+  try {
+    var res = await window.sb.from('subscription_payments')
+      .update({ voided_at: new Date().toISOString(), voided_by: by,
+                void_reason: (reason || '').trim() || 'إبطال يدوي' })
+      .eq('id', payId).select().maybeSingle();
+    if (res.error || !res.data) {
+      alert('فشل الإبطال: ' + ((res.error && res.error.message) || 'لم يُحدَّث أي صف'));
+      return;
+    }
+    C360_PAYMENTS.loaded = false;
+    if (typeof c360State === 'object' && c360State && c360State.activeTab === 'payments') c360RenderTab('payments');
+  } catch (e) { alert('فشل الإبطال: ' + (e && e.message ? e.message : 'خطأ')); }
+}
+
+// ── Load a tenant's payments (graceful if table missing) ──
+async function loadTenantPayments(userId) {
+  C360_PAYMENTS = { userId: userId, loaded: false, loading: true, rows: [] };
+  if (!window.sb) { C360_PAYMENTS.loading = false; C360_PAYMENTS.loaded = true; return; }
+  try {
+    var res = await window.sb.from('subscription_payments')
+      .select('id, tenant_user_id, amount, currency, method, reference, paid_at, plan_code, billing_cycle, covers_from, covers_to, note, voided_at, void_reason, recorded_by')
+      .eq('tenant_user_id', userId)
+      .order('paid_at', { ascending: false });
+    if (res.error) {
+      if (/relation .* does not exist|subscription_payments/i.test(res.error.message || '')) _isPaymentsTableMissing = true;
+      C360_PAYMENTS.rows = [];
+    } else {
+      C360_PAYMENTS.rows = res.data || [];
+    }
+  } catch (e) { C360_PAYMENTS.rows = []; }
+  C360_PAYMENTS.loading = false;
+  C360_PAYMENTS.loaded = true;
+}
+
+// ── Render the "payments" tab ──
+function c360BuildPayments(r) {
+  var id = r.id;
+  var head = '<div class="c360-pay-head">'
+           +   '<button class="btn-pay" onclick="openPayModal(\'' + id + '\')">💵 تسجيل دفعة مستلمة</button>'
+           + '</div>';
+
+  if (_isPaymentsTableMissing) {
+    return head + '<div class="c360-empty">⚠️ جدول المدفوعات غير مفعّل بعد (شغّل Migration 47).</div>';
+  }
+  if (C360_PAYMENTS.userId !== r.user_id || C360_PAYMENTS.loading || !C360_PAYMENTS.loaded) {
+    return head + '<div class="c360-empty">⏳ جارٍ تحميل المدفوعات…</div>';
+  }
+  var rows = C360_PAYMENTS.rows || [];
+  if (!rows.length) {
+    return head + '<div class="c360-empty">لا توجد دفعات مسجّلة بعد.</div>';
+  }
+
+  var total = 0, n = 0;
+  rows.forEach(function(p){ if (!p.voided_at) { total += Number(p.amount) || 0; n++; } });
+  var summary = '<div class="c360-pay-summary">'
+              +   '<span>المحصّل: <strong>' + formatPrice(total, 'SYP') + '</strong></span>'
+              +   '<span>' + n + ' دفعة</span>'
+              + '</div>';
+
+  var list = rows.map(function(p){
+    var voided = !!p.voided_at;
+    var cls = 'c360-pay-row' + (voided ? ' c360-pay-voided' : '');
+    var period = (p.covers_from && p.covers_to) ? (p.covers_from + ' ← ' + p.covers_to) : '';
+    var planBit = p.plan_code
+      ? (planDisplayName(p.plan_code) + (p.billing_cycle ? (' · ' + (p.billing_cycle === 'yearly' ? 'سنوي' : 'شهري')) : ''))
+      : '';
+    return '<div class="' + cls + '">'
+         +   '<div class="c360-pay-main">'
+         +     '<div class="c360-pay-amt">' + formatPrice(p.amount, p.currency || 'SYP') + (voided ? ' <span class="c360-pay-vbadge">مُبطلة</span>' : '') + '</div>'
+         +     '<div class="c360-pay-meta">' + escapeHtml(p.paid_at || '') + ' · ' + escapeHtml(payMethodLabel(p.method)) + (p.reference ? (' · ' + escapeHtml(p.reference)) : '') + '</div>'
+         +     (planBit ? '<div class="c360-pay-sub">' + escapeHtml(planBit) + (period ? (' · ' + escapeHtml(period)) : '') + '</div>' : '')
+         +     (voided && p.void_reason ? '<div class="c360-pay-sub c360-pay-vreason">سبب الإبطال: ' + escapeHtml(p.void_reason) + '</div>' : '')
+         +   '</div>'
+         +   '<div class="c360-pay-actions">'
+         +     '<button class="c360-pay-btn" onclick="issuePaymentReceiptById(\'' + jsAttr(p.id) + '\')">🧾 إيصال</button>'
+         +     (voided ? '' : '<button class="c360-pay-btn c360-pay-btn-void" onclick="voidPayment(\'' + jsAttr(p.id) + '\')">✕ إبطال</button>')
+         +   '</div>'
+         + '</div>';
+  }).join('');
+
+  return head + summary + '<div class="c360-pay-list">' + list + '</div>';
+}
+
+// ── Receipt issuance ──
+function issuePaymentReceiptById(payId) {
+  var p = (C360_PAYMENTS.rows || []).filter(function(x){ return x.id === payId; })[0];
+  if (!p) { alert('لم يُعثر على الدفعة.'); return; }
+  var r = allRequests.find(function(x){ return x.user_id === C360_PAYMENTS.userId; });
+  issuePaymentReceipt(p, (r && (r.name || r.email)) || '', (r && r.phone) || '');
+}
+
+function issuePaymentReceipt(p, name, phone) {
+  var openWa = confirm('إصدار إيصال بمبلغ ' + formatPrice(p.amount, p.currency || 'SYP') +
+                       '.\n\n«موافق» = فتح واتساب،  «إلغاء» = طباعة.');
+  if (openWa) openReceiptWa(p, name, phone);
+  else printReceipt(p, name);
+}
+
+function receiptLines(p, name) {
+  var pf = PLATFORM_SETTINGS_CACHE.platform_name || 'SyDent';
+  var sp = PLATFORM_SETTINGS_CACHE.support_phone || '';
+  var L = [];
+  L.push(pf + ' — إيصال اشتراك');
+  L.push('رقم الإيصال: ' + payReceiptNo(p));
+  L.push('التاريخ: ' + (p.paid_at || ''));
+  if (name) L.push('العيادة: ' + name);
+  var desc = p.plan_code
+    ? (planDisplayName(p.plan_code) + (p.billing_cycle ? (' — ' + (p.billing_cycle === 'yearly' ? 'سنوي' : 'شهري')) : ''))
+    : 'اشتراك';
+  L.push('الوصف: ' + desc);
+  if (p.covers_from && p.covers_to) L.push('الفترة: ' + p.covers_from + ' ← ' + p.covers_to);
+  L.push('الطريقة: ' + payMethodLabel(p.method) + (p.reference ? (' (' + p.reference + ')') : ''));
+  L.push('المبلغ: ' + formatPrice(p.amount, p.currency || 'SYP'));
+  L.push('');
+  L.push('شكراً' + (sp ? (' — للدعم: ' + sp) : ''));
+  return L;
+}
+
+function openReceiptWa(p, name, phone) {
+  var num = normalizeWaPhone(phone || '');
+  if (!num) { alert('لا يوجد رقم هاتف لهذه العيادة. سيتم فتح الطباعة بدلاً من ذلك.'); printReceipt(p, name); return; }
+  var url = 'https://wa.me/' + num + '?text=' + encodeURIComponent(receiptLines(p, name).join('\n'));
+  window.open(url, '_blank');
+}
+
+function printReceipt(p, name) {
+  var area = document.getElementById('receiptPrintArea');
+  if (!area) { alert('تعذّر تجهيز الإيصال للطباعة.'); return; }
+  var lines = receiptLines(p, name);
+  var html = '<div class="rcpt-title">' + escapeHtml(lines[0]) + '</div><div class="rcpt-body">';
+  for (var i = 1; i < lines.length; i++) {
+    html += (lines[i] === '') ? '<div class="rcpt-gap"></div>'
+                              : '<div class="rcpt-line">' + escapeHtml(lines[i]) + '</div>';
+  }
+  html += '</div>';
+  area.innerHTML = html;
+  window.print();
+}
+// ════════════════════════ end Phase A — Payments Ledger ═════════════════════
+
 function srqEsc(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -6991,6 +7411,20 @@ async function srqApprove(reqId) {
   await loadSubRequests();
   loadAndRender();
   alert('✅ تم تفعيل الاشتراك.');
+  // Phase A: prompt to record the received payment, prefilled from the request
+  // (amount = approved tier price for the chosen cycle, method from the request,
+  // event_id = the lifecycle event just written). Best-effort — never blocks.
+  try {
+    var _payCycle = reqCycle || 'monthly';
+    var _payAmt = planPriceForCycle(getPlanConfig(req.requested_plan), _payCycle);
+    openPayModal(tr.id, {
+      amount: _payAmt,
+      method: req.payment_method,
+      planCode: req.requested_plan,
+      cycle: _payCycle,
+      eventId: result.eventId
+    });
+  } catch (e) { console.warn('srqApprove: payModal prefill skipped:', e); }
 }
 
 async function srqReject(reqId) {
@@ -9358,6 +9792,19 @@ function c360RenderTab(tab) {
     body.innerHTML = c360BuildActions(r);
   } else if (tab === 'comm') {
     body.innerHTML = c360BuildComm(r);
+  } else if (tab === 'payments') {
+    body.innerHTML = c360BuildPayments(r);
+    // Lazy-load this tenant's payments on first visit / when cache is for
+    // a different tenant. Re-render only if still on this tab + tenant (rule #55).
+    if (r.user_id && (C360_PAYMENTS.userId !== r.user_id || (!C360_PAYMENTS.loaded && !C360_PAYMENTS.loading))) {
+      var curPayId = c360State.requestId;
+      loadTenantPayments(r.user_id).then(function(){
+        if (c360State.activeTab === 'payments' && c360State.requestId === curPayId) {
+          var b = document.getElementById('c360Body');
+          if (b) b.innerHTML = c360BuildPayments(r);
+        }
+      }).catch(function(err){ console.warn('c360 payments lazy-load failed:', err); });
+    }
   }
 }
 
@@ -9579,6 +10026,11 @@ function c360BuildActions(r) {
     waBtns.push('<a href="#" class="btn-whatsapp" onclick="return openWaSuspended(\'' + safePhone + '\',\'' + safeName + '\',event)">⏸ إيقاف</a>');
   }
   if (waBtns.length) groups.push({ title: '💬 رسائل واتساب', buttons: waBtns });
+
+  // Payment recording (Phase A) — record a received subscription payment.
+  groups.push({ title: '💵 المدفوعات', buttons: [
+    '<button class="btn-pay" onclick="openPayModal(\'' + id + '\')">💵 تسجيل دفعة مستلمة</button>'
+  ]});
 
   // Edit (always available)
   groups.push({ title: '✏️ تحرير', buttons: [
