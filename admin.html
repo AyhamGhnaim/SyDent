@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b12"></script>
+<script src="theme.js?v=20260601b13"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2166,11 +2166,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b12">
+<link rel="stylesheet" href="theme.css?v=20260601b13">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b12"></script>
+<script src="supabase-init.js?v=20260601b13"></script>
 </head>
 <body>
 
@@ -10530,6 +10530,26 @@ function rptPlanBucket(planCode) {
 // True when a bucket represents a paying subscriber (excludes null, trial, permanent).
 function rptIsPaidBucket(b) { return !!b && b !== 'permanent'; }
 
+// Resolve the normalized bucket for a subscription_event row (single source of
+// truth for the MRR replay, so the rule can't drift across loops — Rule #66):
+//   1) bucket from to_plan (plan-agnostic);
+//   2) legacy fallback — derive the cycle from convert_monthly/convert_yearly
+//      when to_plan is absent on an old row;
+//   3) H7 permanent override — a paid-plan event whose to_trial_end is NULL is a
+//      lifetime admin override (make_permanent records as convert_yearly with a
+//      NULL trial_end). It carries NO recurring revenue, so bucket it as
+//      'permanent' instead of the paid tier (otherwise it inflates MRR).
+function rptEventBucket(ev) {
+  var type = String((ev && ev.event_type) || '').toLowerCase();
+  var b = rptPlanBucket(ev && ev.to_plan);
+  if (!b) {
+    if (type === 'convert_monthly') b = 'monthly';
+    else if (type === 'convert_yearly') b = 'yearly';
+  }
+  if (b && b !== 'permanent' && (ev && ev.to_trial_end == null)) b = 'permanent';
+  return b;
+}
+
 // ───── Main loader ───────────────────────────────────────────────────────────
 async function rptLoad() {
   if (rptState.loading) return;
@@ -10550,7 +10570,7 @@ async function rptLoad() {
       // Note: no gte filter on created_at — we need full history so that
       // the "New vs Reactivation" classification at the start of the range
       // has correct prior-paid context (D8 fix).
-      window.sb.from('subscription_events').select('user_id, event_type, from_plan, to_plan, created_at, notes').order('created_at', { ascending: true }).limit(20000),
+      window.sb.from('subscription_events').select('user_id, event_type, from_plan, to_plan, to_trial_end, created_at, notes').order('created_at', { ascending: true }).limit(20000),
       window.sb.from('subscription_plans').select('code, price, price_monthly, price_yearly, duration_days, is_active').limit(50)
     ];
 
@@ -10596,11 +10616,7 @@ async function rptLoad() {
           // tier + cycle); convert_monthly/convert_yearly are legacy and only
           // appear on historical rows. Use the event's to_plan; else derive the
           // cycle from the legacy event type. The bucket is the paid tier code.
-          var bucket = rptPlanBucket(ev.to_plan);
-          if (!bucket) {
-            if (type === 'convert_monthly') bucket = 'monthly';
-            else if (type === 'convert_yearly') bucket = 'yearly';
-          }
+          var bucket = rptEventBucket(ev);
           if (bucket) planAtEnd[uid] = bucket;
           else if (type === 'accept' && !planAtEnd[uid]) planAtEnd[uid] = 'trial';
         } else if (type === 'shorten' || type === 'enter_grace') {
@@ -10646,11 +10662,7 @@ async function rptLoad() {
         if (!uid) return;
         if (!paidHistory[uid]) paidHistory[uid] = { wasPaid: false, currentlyPaid: false, currentPlan: null };
         var type = String(ev.event_type || '').toLowerCase();
-        var bucket = rptPlanBucket(ev.to_plan);
-        if (!bucket) {
-          if (type === 'convert_monthly') bucket = 'monthly';
-          else if (type === 'convert_yearly') bucket = 'yearly';
-        }
+        var bucket = rptEventBucket(ev);
         if (type === 'suspend' || type === 'reject' || type === 'delete') {
           paidHistory[uid].currentlyPaid = false; paidHistory[uid].currentPlan = null;
         } else if (rptIsPaidBucket(bucket)) { // any paid tier (plan-agnostic)
@@ -10668,11 +10680,7 @@ async function rptLoad() {
         if (!uid) return;
         if (!paidHistory[uid]) paidHistory[uid] = { wasPaid: false, currentlyPaid: false, currentPlan: null };
         var type = String(ev.event_type || '').toLowerCase();
-        var bucket = rptPlanBucket(ev.to_plan);
-        if (!bucket) {
-          if (type === 'convert_monthly') bucket = 'monthly';
-          else if (type === 'convert_yearly') bucket = 'yearly';
-        }
+        var bucket = rptEventBucket(ev);
         if (type === 'suspend' || type === 'reject' || type === 'delete') {
           if (paidHistory[uid].currentlyPaid && paidHistory[uid].currentPlan) {
             var planRow = planMap[paidHistory[uid].currentPlan] || null;
