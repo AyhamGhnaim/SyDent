@@ -415,6 +415,7 @@ var paymentSplits  = [];
 var expenses       = [];
 var payouts        = [];
 var labOrders      = [];
+var adjustments    = [];   // account_adjustments (Migration 45): discount / write_off / refund
 
 // Status of EVERY ledger_session referenced by an in-range split (id → status),
 // fetched regardless of date/status. Needed to apply the canonical planned-session
@@ -738,7 +739,8 @@ async function loadAllInRange(from, to) {
     loadPayments(from, to),
     loadExpenses(from, to),
     loadPayouts(from, to),
-    loadLabOrders(from, to)
+    loadLabOrders(from, to),
+    loadAdjustments(from, to)
   ]);
 
   // After payments load, fetch their splits (filtered by payment_id).
@@ -879,6 +881,24 @@ async function loadExpenses(from, to) {
     return;
   }
   expenses = res.data || [];
+}
+
+// account_adjustments (Migration 45): discount / write_off / refund. DATE column
+// (direct compare, no timezone widening). Graceful on a pre-Migration-45 DB.
+async function loadAdjustments(from, to) {
+  adjustments = [];
+  try {
+    var res = await window.sb.from('account_adjustments')
+      .select('id, patient_id, kind, amount, date')
+      .eq('doctor_id', currentUser.id)
+      .gte('date', from)
+      .lte('date', to);
+    if (res.error) {
+      if (!isMigrationMissing(res.error)) console.warn('loadAdjustments:', res.error);
+      return;
+    }
+    adjustments = res.data || [];
+  } catch(e) { console.warn('loadAdjustments threw:', e); }
 }
 
 async function loadPayouts(from, to) {
@@ -1452,22 +1472,56 @@ function runIdentityTests(summary, totals, providerRows) {
 }
 
 // ─── Rendering ─────────────────────────────────────────────────────────────
+// Account adjustments (Migration 45). discount/write_off reduce the charge
+// (net production); refunds reduce collected cash (net revenue + net profit).
+// These are CLINIC-LEVEL deductions shown separately — they are NOT attributed
+// per provider, so the gross per-provider conservation (Test A/B) is untouched.
+function computeAdjustmentTotals() {
+  var chargeReductions = 0;  // discount + write_off
+  var refundsTotal     = 0;  // refund
+  for (var i = 0; i < adjustments.length; i++) {
+    var a = adjustments[i];
+    var amt = Number(a.amount) || 0;
+    if (amt <= 0) continue;
+    if (a.kind === 'refund')                                  refundsTotal     += amt;
+    else if (a.kind === 'discount' || a.kind === 'write_off') chargeReductions += amt;
+  }
+  return {
+    chargeReductions: chargeReductions,
+    refundsTotal: refundsTotal,
+    adjTotal: chargeReductions + refundsTotal
+  };
+}
+
 function render(from, to) {
   var summary = computeSummary();
   var totals  = computeExpenseTotals();
   var breakdown = computeExpenseBreakdown(totals);
   var providerRows = computeProviderPerformance();
+  var adj = computeAdjustmentTotals();
 
-  var netProfit = summary.revenue - totals.totalExpenses;
-  var profitMargin = (summary.revenue > 0) ? (netProfit / summary.revenue) * 100 : null;
+  // Gross figures (used by identity tests — conservation is on GROSS).
+  var grossRevenue    = summary.revenue;
+  var grossProduction = summary.production;
+  // Net figures (cash-basis): refunds are cash out → reduce revenue + profit.
+  // Discounts/write-offs are NOT cash → reduce only the charge (net production
+  // and thus the collection-rate denominator), never net profit directly.
+  var netRevenue    = grossRevenue - adj.refundsTotal;
+  var netProduction = grossProduction - adj.chargeReductions;
 
-  // Run identity tests for debug panel
+  var netProfit = netRevenue - totals.totalExpenses;
+  var profitMargin = (netRevenue > 0) ? (netProfit / netRevenue) * 100 : null;
+  // Collection rate = collected cash ÷ NET charge (you can't collect a discount).
+  var collectionRate = (netProduction > 0) ? (grossRevenue / netProduction) * 100 : null;
+
+  // Run identity tests for debug panel (GROSS — unaffected by adjustments).
   lastIdentities = runIdentityTests(summary, totals, providerRows);
 
   // Build HTML
   var html = '';
-  html += renderSummaryCards(summary, totals, netProfit, profitMargin);
+  html += renderSummaryCards(summary, totals, netProfit, profitMargin, adj, netRevenue, netProduction, collectionRate);
   html += renderExpenseSection(breakdown, totals);
+  html += renderAdjustmentsSection(adj);
   html += renderProviderSection(providerRows);
   html += renderUnearnedSection(summary);
 
@@ -1485,30 +1539,43 @@ function render(from, to) {
   refreshDebugPanel();
 }
 
-function renderSummaryCards(s, t, netProfit, profitMargin) {
+function renderSummaryCards(s, t, netProfit, profitMargin, adj, netRevenue, netProduction, collectionRate) {
+  adj = adj || { chargeReductions: 0, refundsTotal: 0 };
   var netClass = netProfit >= 0 ? 'green' : 'red';
   var marginClass = (profitMargin === null) ? 'dim' : (profitMargin >= 0 ? 'green' : 'red');
-  var collectionRateStr = (s.collectionRate === null) ? '—' : fmtPct(s.collectionRate);
+  var cr = (typeof collectionRate === 'undefined') ? s.collectionRate : collectionRate;
+  var collectionRateStr = (cr === null) ? '—' : fmtPct(cr);
+  var revSub  = (adj.refundsTotal > 0 && netRevenue >= 0)
+    ? 'صافي بعد الاسترداد: ' + fmtSY(netRevenue)
+    : 'مدفوعات مُخصّصة للإنتاج (cash basis)';
+  var prodSub = (adj.chargeReductions > 0 && netProduction >= 0)
+    ? 'صافي بعد الخصم: ' + fmtSY(netProduction)
+    : 'الجلسات المكتملة في الفترة';
+  var crSub = (cr === null) ? 'لا يوجد إنتاج'
+            : (adj.chargeReductions > 0 ? 'الإيراد ÷ صافي الإنتاج' : 'الإيراد ÷ الإنتاج');
+  var netSub = (adj.refundsTotal > 0) ? 'صافي الإيراد − المصروفات' : 'الإيرادات − المصروفات';
+  var marginSub = (profitMargin === null) ? 'لا يوجد إيراد'
+                : (adj.refundsTotal > 0 ? 'الصافي ÷ صافي الإيراد' : 'الصافي ÷ الإيراد');
 
   return '' +
     '<div class="summary-grid">' +
-      // Revenue (cash collected, allocated)
+      // Revenue (cash collected, allocated) — gross; net shown in sub when refunds exist
       '<div class="card green">' +
         '<div class="label">💰 الإيرادات المحصّلة</div>' +
         '<div class="value">' + fmtSY(s.revenue) + '</div>' +
-        '<div class="sub">مدفوعات مُخصّصة للإنتاج (cash basis)</div>' +
+        '<div class="sub">' + revSub + '</div>' +
       '</div>' +
-      // Production
+      // Production — gross; net (after discounts/write-offs) shown in sub when present
       '<div class="card blue">' +
         '<div class="label">💎 الإنتاج المنجز</div>' +
         '<div class="value">' + fmtSY(s.production) + '</div>' +
-        '<div class="sub">الجلسات المكتملة في الفترة</div>' +
+        '<div class="sub">' + prodSub + '</div>' +
       '</div>' +
-      // Collection rate
+      // Collection rate (collected ÷ net production)
       '<div class="card yellow">' +
         '<div class="label">📊 معدّل التحصيل</div>' +
         '<div class="value">' + collectionRateStr + '</div>' +
-        '<div class="sub">' + (s.collectionRate === null ? 'لا يوجد إنتاج' : 'الإيراد ÷ الإنتاج') + '</div>' +
+        '<div class="sub">' + crSub + '</div>' +
       '</div>' +
       // Total expenses
       '<div class="card red">' +
@@ -1516,18 +1583,46 @@ function renderSummaryCards(s, t, netProfit, profitMargin) {
         '<div class="value">' + fmtSY(t.totalExpenses) + '</div>' +
         '<div class="sub">مصاريف + مدفوعات + مخابر</div>' +
       '</div>' +
-      // Net profit
+      // Net profit (net revenue − expenses)
       '<div class="card ' + netClass + '">' +
         '<div class="label">' + (netProfit >= 0 ? '🟢 صافي الربح' : '🔴 صافي الخسارة') + '</div>' +
         '<div class="value">' + fmtSY(Math.abs(netProfit)) + '</div>' +
-        '<div class="sub">الإيرادات − المصروفات</div>' +
+        '<div class="sub">' + netSub + '</div>' +
       '</div>' +
       // Profit margin
       '<div class="card ' + marginClass + '">' +
         '<div class="label">📐 هامش الربح</div>' +
         '<div class="value">' + (profitMargin === null ? '—' : fmtPct(profitMargin)) + '</div>' +
-        '<div class="sub">' + (profitMargin === null ? 'لا يوجد إيراد' : 'الصافي ÷ الإيراد') + '</div>' +
+        '<div class="sub">' + marginSub + '</div>' +
       '</div>' +
+    '</div>';
+}
+
+// Adjustments section (Migration 45) — shown only when adjustments exist in the
+// period. Makes the discount/write-off and refund impact explicit for the owner.
+function renderAdjustmentsSection(adj) {
+  if (!adj || adj.adjTotal <= 0) return '';
+  var rows = '';
+  if (adj.chargeReductions > 0) {
+    rows += '<div class="exp-row">' +
+      '<div class="ico">🏷️</div>' +
+      '<div class="name">خصومات وإعدام ديون <span style="color:var(--text2);font-size:11px;">(تخفيض على الإنتاج — ليس نقداً)</span></div>' +
+      '<div class="amt">− ' + fmtSY(adj.chargeReductions) + '</div>' +
+      '<div class="pct"></div>' +
+    '</div>';
+  }
+  if (adj.refundsTotal > 0) {
+    rows += '<div class="exp-row">' +
+      '<div class="ico">💸</div>' +
+      '<div class="name">مبالغ مستردّة <span style="color:var(--text2);font-size:11px;">(نقد خارج — يُخصم من الإيراد)</span></div>' +
+      '<div class="amt">− ' + fmtSY(adj.refundsTotal) + '</div>' +
+      '<div class="pct"></div>' +
+    '</div>';
+  }
+  return '' +
+    '<div class="section">' +
+      '<h2>🧾 التسويات</h2>' +
+      '<div class="exp-list">' + rows + '</div>' +
     '</div>';
 }
 
