@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b11"></script>
+<script src="theme.js?v=20260601b12"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b11"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b11">
+<script src="supabase-init.js?v=20260601b12"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b12">
 <style>
 :root {
   --bg:        #0a1628;
@@ -96,6 +96,14 @@ body {
 }
 .sub-pending-text { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.6; min-width: 200px; }
 .sub-pending-text b { color: var(--orange); }
+.sub-perm-note {
+  background: rgba(46,232,158,0.10);
+  border: 1px solid rgba(46,232,158,0.30);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 18px;
+  font-size: 14px; font-weight: 700; line-height: 1.6; color: var(--text);
+}
 
 /* ---- plans grid ---- */
 .sub-section-title { font-size: 14px; font-weight: 800; color: var(--text2); margin: 8px 2px 14px; }
@@ -223,7 +231,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b11"></script>
+<script src="sidebar.js?v=20260601b12"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -560,6 +568,12 @@ body {
     var cur = curPlanCode();
     var hasPending = !!ST.pending;
     var cycle = normCycle(ST.cycle);
+    // Phase X13: permanent (lifetime) account — has a non-trial plan but no
+    // expiry (daysLeft === null). Self-service renew/change is disabled: a renew
+    // would set a finite expiry and silently destroy the lifetime status (the
+    // transitionAccount renew branch also rejects this as a backstop). Such
+    // accounts are admin-managed; changes are handled via support.
+    var isPerm = (cur !== 'trial' && daysLeft() === null);
     var html = '';
 
     ST.plans.forEach(function (p) {
@@ -593,6 +607,9 @@ body {
       var btn = '';
       if (p.code === 'trial') {
         btn = '<div class="sub-btn-spacer"></div>';
+      } else if (isPerm) {
+        // Lifetime account: no self-service renew/change (see isPerm note above).
+        btn = '<button class="sub-btn" disabled>' + (isCur ? '♾️ اشتراك دائم' : 'غير متاح') + '</button>';
       } else if (!offered) {
         btn = '<button class="sub-btn" disabled>غير متاح بهذه الدورة</button>';
       } else if (isCur) {
@@ -619,7 +636,9 @@ body {
         '</div>';
     });
 
-    wrap.innerHTML = html;
+    wrap.innerHTML = (isPerm
+      ? '<div class="sub-perm-note">♾️ لديك اشتراك دائم بدون انتهاء — لا حاجة للتجديد. لأي تغيير في الخطة تواصل معنا.</div>'
+      : '') + html;
   }
 
   function renderAll() {

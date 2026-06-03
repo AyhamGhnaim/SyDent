@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b11"></script>
+<script src="theme.js?v=20260601b12"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2166,11 +2166,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b11">
+<link rel="stylesheet" href="theme.css?v=20260601b12">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b11"></script>
+<script src="supabase-init.js?v=20260601b12"></script>
 </head>
 <body>
 
@@ -5625,9 +5625,15 @@ async function transitionAccount(eventType, r, params) {
     }
     case 'convert_monthly':
     case 'convert_yearly': {
-      // Legacy direct converts: here the tier code matches the cycle name (the
-      // pre-X13 world where 'monthly'/'yearly' WERE the cycle). New flows use
-      // convert_plan + params.cycle instead, but these stay for back-compat.
+      // LEGACY (Phase X13): these were the pre-X13 converts, where the tier code
+      // ('monthly'/'yearly') WAS the cycle. As of X13 NO UI path emits them —
+      // both the manual plan picker (confirmPlanChoice) and request approval
+      // (srqApprove) now use 'convert_plan' + params.cycle. So this write branch
+      // is effectively DEAD (no caller). It's RETAINED as defensive back-compat
+      // (harmless if ever invoked) and because the strings 'convert_monthly' /
+      // 'convert_yearly' are still LIVE on the READ side: the reports MRR replay
+      // and the event-feed label map must keep interpreting historical rows that
+      // were written with these event types before X13. Do NOT remove those reads.
       var planCode = (eventType === 'convert_monthly') ? 'monthly' : 'yearly';
       var cycleC = (eventType === 'convert_monthly') ? 'monthly' : 'yearly';
       var cfgC = getPlanConfig(planCode);
@@ -5713,6 +5719,16 @@ async function transitionAccount(eventType, r, params) {
       break;
     }
     case 'renew': {
+      // Phase X13 guard: a permanent account (trial_end = NULL) has no billing
+      // period to extend. Renewing it would set a finite trial_end and silently
+      // DESTROY its lifetime status — so we reject it here, mirroring the same
+      // guard on extend/shorten. To move a permanent account onto a billed plan,
+      // use an explicit plan change (convert_plan) instead.
+      if (!r.trial_end) {
+        return { ok:false, error:'permanent_account_no_renew',
+          userMessage: 'هذا حساب دائم (بدون انتهاء) ولا يحتاج تجديداً. لنقله إلى خطة مدفوعة محددة استخدم «تغيير الخطة».',
+          newRow:null };
+      }
       // Extend trial_end by the tier's CURRENT cycle period. If expired, base is
       // "now"; if still active, base is existing trial_end (fresh period on top
       // of remaining time — Stripe renew-now). The cycle can be SWITCHED at
@@ -6380,12 +6396,16 @@ async function renewAccount(id) {
   var r = allRequests.find(function(x){ return x.id === id; });
   if (!r) return;
   var cfg = getPlanConfig(r.plan || 'monthly');
-  var dur = cfg ? cfg.duration_days : 30;
   var label = cfg ? cfg.display_name : (r.plan || 'الاشتراك');
-  if (!confirm('هل تم استلام دفعة التجديد لحساب ' + (r.name || '—') + '؟\nسيُمدّد الاشتراك (' + label + ') بـ ' + dur + ' يوم.')) return;
+  // Phase X13: a tier can be billed monthly OR yearly. The renewal period is the
+  // subscription's CURRENT billing cycle (not the tier's native duration_days),
+  // so show the cycle + its real day count to match what transitionAccount does.
+  var cyc = r.billing_cycle ? normCycle(r.billing_cycle) : 'monthly';
+  var dur = planDurationForCycle(cfg || { code: r.plan }, cyc);
+  if (!confirm('هل تم استلام دفعة التجديد لحساب ' + (r.name || '—') + '؟\nسيُمدّد الاشتراك (' + label + ' · ' + cycleLabelAr(cyc) + ') بـ ' + dur + ' يوم.')) return;
   var result = await transitionAccount('renew', r, {});
   if (!result.ok) {
-    alert('فشل التجديد: ' + (result.error || 'خطأ غير معروف'));
+    alert(result.userMessage ? result.userMessage : ('فشل التجديد: ' + (result.error || 'خطأ غير معروف')));
   }
   loadAndRender();
 }
@@ -6813,13 +6833,17 @@ function srqPlanLabel(code) {
 // Derive the real relationship by comparing plan prices (request_kind in the
 // DB only distinguishes renew vs change; the precise up/down direction is
 // computed here from the two stored plan codes so the label is always right).
-function srqPlanPrice(code) {
-  try { var c = getPlanConfig(code); if (c && c.price != null) return Number(c.price) || 0; } catch(_) {}
-  return 0;
+// Phase X13: rank tiers by sort_order (the SAME canonical ordering the tenant
+// subscription page uses), NOT by legacy `price`. A tier now carries two cycle
+// prices, so price is no longer a single reliable cross-tier rank — and the
+// admin/tenant relation labels must agree. Lower sort_order = lower tier.
+function srqPlanSort(code) {
+  try { var c = getPlanConfig(code); if (c && c.sort_order != null) return Number(c.sort_order) || 0; } catch(_) {}
+  return 999;
 }
 function srqRelation(curCode, reqCode) {
   if (curCode === reqCode) return { label: 'تجديد', cls: 'renew' };
-  var pc = srqPlanPrice(curCode), pr = srqPlanPrice(reqCode);
+  var pc = srqPlanSort(curCode), pr = srqPlanSort(reqCode);
   if (pr > pc) return { label: 'ترقية', cls: '' };
   if (pr < pc) return { label: 'تنزيل', cls: 'down' };
   return { label: 'تغيير', cls: '' };
@@ -10042,10 +10066,10 @@ function monthlyEquivPrice(planCode, price, cycle) {
 }
 
 // Build a "N PlanName · M PlanName" breakdown from a {code:count} map, highest
-// tier first (by price), using the configured display names (Max/Mini/…).
+// tier first (by sort_order), using the configured display names (Max/Mini/…).
 function planBreakdownParts(byPlan) {
   return Object.keys(byPlan)
-    .sort(function(a, b){ return srqPlanPrice(b) - srqPlanPrice(a); })
+    .sort(function(a, b){ return srqPlanSort(b) - srqPlanSort(a); })
     .map(function(code){ return byPlan[code] + ' ' + planDisplayName(code); });
 }
 
@@ -10486,16 +10510,25 @@ function rptCurrentState(r) {
 }
 
 // ───── Map a plan code (case-insensitive) to a normalized bucket ─────────────
-// Actual values in DB columns (trial_requests.plan, subscription_events.to_plan,
-// subscription_plans.code) are: 'monthly' | 'yearly' | 'permanent' | 'trial' | NULL.
+// Values in DB columns (trial_requests.plan, subscription_events.to_plan,
+// subscription_plans.code) are 'trial' | 'permanent' | any paid tier code
+// ('monthly'/'yearly' are legacy ids; custom tiers like 'pro' are possible) | NULL.
+//
+// Phase X13: PLAN-AGNOSTIC. Returns:
+//   • null         → trial / empty / unknown (no recurring revenue bucket)
+//   • 'permanent'  → lifetime admin override (no recurring revenue)
+//   • <code>       → ANY paid tier code (monthly, yearly, OR a custom tier)
+// Callers resolve the code against planMap and compute MRR via rptPlanMrr, so a
+// custom tier now contributes to MRR/movement just like monthly/yearly. The
+// only buckets excluded from recurring revenue are null and 'permanent'.
 function rptPlanBucket(planCode) {
   var p = String(planCode || '').toLowerCase().trim();
-  if (!p) return null;
-  if (p === 'permanent') return 'permanent';
-  if (p === 'yearly')    return 'yearly';
-  if (p === 'monthly')   return 'monthly';
-  return null;
+  if (!p || p === 'trial') return null;
+  if (p === 'permanent')   return 'permanent';
+  return p; // any paid tier code (monthly / yearly / custom)
 }
+// True when a bucket represents a paying subscriber (excludes null, trial, permanent).
+function rptIsPaidBucket(b) { return !!b && b !== 'permanent'; }
 
 // ───── Main loader ───────────────────────────────────────────────────────────
 async function rptLoad() {
@@ -10558,8 +10591,11 @@ async function rptLoad() {
         var type = String(ev.event_type || '').toLowerCase();
         if (type === 'suspend' || type === 'reject' || type === 'delete') {
           planAtEnd[uid] = null;
-        } else if (type === 'accept' || type === 'reactivate' || type === 'convert_monthly' || type === 'convert_yearly' || type === 'renew' || type === 'extend') {
-          // Use the event's to_plan if present, else derive from the event type itself.
+        } else if (type === 'accept' || type === 'reactivate' || type === 'convert_plan' || type === 'convert_monthly' || type === 'convert_yearly' || type === 'renew' || type === 'extend') {
+          // Phase X13: 'convert_plan' is now the PRIMARY conversion event (any
+          // tier + cycle); convert_monthly/convert_yearly are legacy and only
+          // appear on historical rows. Use the event's to_plan; else derive the
+          // cycle from the legacy event type. The bucket is the paid tier code.
           var bucket = rptPlanBucket(ev.to_plan);
           if (!bucket) {
             if (type === 'convert_monthly') bucket = 'monthly';
@@ -10577,11 +10613,10 @@ async function rptLoad() {
         var created = new Date(r.created_at);
         if (!isFinite(created.getTime()) || created.getTime() >= m.end.getTime()) return;
         var st = rptCurrentState(r);
+        // Plan-agnostic: rptCurrentState returns the paid tier code itself for
+        // any paid account (monthly / yearly / custom), plus 'permanent' / 'trial'.
         if (st === 'suspended' || st === 'rejected') planAtEnd[r.user_id] = null;
-        else if (st === 'monthly') planAtEnd[r.user_id] = 'monthly';
-        else if (st === 'yearly')  planAtEnd[r.user_id] = 'yearly';
-        else if (st === 'permanent') planAtEnd[r.user_id] = 'permanent';
-        else if (st === 'trial')   planAtEnd[r.user_id] = 'trial';
+        else planAtEnd[r.user_id] = st; // paid code | 'permanent' | 'trial'
       });
       var total = 0;
       Object.keys(planAtEnd).forEach(function(uid) {
@@ -10618,7 +10653,7 @@ async function rptLoad() {
         }
         if (type === 'suspend' || type === 'reject' || type === 'delete') {
           paidHistory[uid].currentlyPaid = false; paidHistory[uid].currentPlan = null;
-        } else if (bucket === 'monthly' || bucket === 'yearly') {
+        } else if (rptIsPaidBucket(bucket)) { // any paid tier (plan-agnostic)
           paidHistory[uid].wasPaid = true;
           paidHistory[uid].currentlyPaid = true;
           paidHistory[uid].currentPlan = bucket;
@@ -10645,7 +10680,7 @@ async function rptLoad() {
           }
           paidHistory[uid].currentlyPaid = false;
           paidHistory[uid].currentPlan = null;
-        } else if (bucket === 'monthly' || bucket === 'yearly') {
+        } else if (rptIsPaidBucket(bucket)) { // any paid tier (plan-agnostic)
           if (!paidHistory[uid].currentlyPaid) {
             var planRow2 = planMap[bucket] || null;
             if (planRow2) {
@@ -10851,11 +10886,11 @@ function rptRenderMovementChart(d) {
   });
 }
 
-// Distribution helpers (plan-agnostic): order trial → paid plans by price → permanent.
+// Distribution helpers (plan-agnostic): order trial → paid plans by sort_order → permanent.
 var RPT_DIST_PALETTE = ['rgba(56,189,248,0.85)','rgba(46,232,158,0.85)','rgba(244,114,182,0.85)','rgba(250,204,21,0.85)','rgba(129,140,248,0.85)','rgba(248,113,113,0.85)'];
 function rptDistOrder(dist) {
   return Object.keys(dist || {}).sort(function(a, b){
-    var rank = function(k){ return k === 'trial' ? -1 : k === 'permanent' ? 1e15 : srqPlanPrice(k); };
+    var rank = function(k){ return k === 'trial' ? -1 : k === 'permanent' ? 1e15 : srqPlanSort(k); };
     return rank(a) - rank(b);
   });
 }
