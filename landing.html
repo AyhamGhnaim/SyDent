@@ -34,7 +34,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b10"></script>
+<script src="theme.js?v=20260601b11"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -358,6 +358,13 @@ nav{
   gap:20px;
   max-width:1100px;margin:0 auto;
 }
+/* Phase X13: monthly/yearly toggle on the public pricing page */
+.pricing-cycle-toggle{display:inline-flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(46,232,158,0.18);border-radius:999px;padding:5px;margin:0 auto 26px;}
+.pricing-cycle-opt{border:none;background:transparent;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;padding:9px 22px;border-radius:999px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px;}
+.pricing-cycle-opt.active{background:#2ee89e;color:#062018;}
+.pricing-cycle-save{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(46,232,158,0.18);color:#2ee89e;}
+.pricing-cycle-opt.active .pricing-cycle-save{background:rgba(6,32,24,0.18);color:#062018;}
+.pricing-card-save{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(46,232,158,0.15);color:#2ee89e;margin-inline-start:6px;}
 .pricing-card{
   position:relative;
   background:var(--bg2);
@@ -582,9 +589,9 @@ footer{
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b10">
+<link rel="stylesheet" href="theme.css?v=20260601b11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b10"></script>
+<script src="supabase-init.js?v=20260601b11"></script>
 </head>
 <body>
 
@@ -764,6 +771,7 @@ footer{
   <div class="section-label">الأسعار</div>
   <h2 class="section-title">خطط مرنة تناسب عيادتك</h2>
   <p class="section-sub">ابدأ مجاناً ثم اختر ما يناسبك. لا التزامات، لا رسوم خفية.</p>
+  <div id="pricingCycleToggle" style="text-align:center;"></div>
   <div id="pricingGrid" class="pricing-grid">
     <div class="pricing-loading">⏳ جارٍ تحميل الخطط...</div>
   </div>
@@ -841,12 +849,70 @@ footer{
       '<br><br><a href="auth.html?tab=register" style="color:#2ee89e;text-decoration:underline;">تواصل معنا</a> لمعرفة المزيد.' +
       '</div>';
   }
+  // ---- Phase X13: billing-cycle state + helpers (public pricing) ----
+  var PRICING_PLANS = [];
+  var PRICING_CYCLE = 'yearly';
+  function normCycle(c){ return c === 'yearly' ? 'yearly' : 'monthly'; }
+  function cycleLabelAr(c){ return normCycle(c) === 'yearly' ? 'سنوي' : 'شهري'; }
+  function planPriceForCycle(p, cycle){
+    if (!p) return null; cycle = normCycle(cycle);
+    var d = (cycle === 'yearly') ? p.price_yearly : p.price_monthly;
+    if (d != null && !isNaN(Number(d))) return Number(d);
+    if (p.price != null && !isNaN(Number(p.price))) {
+      var dur = Number(p.duration_days);
+      var native = (isFinite(dur) && dur >= 182) ? 'yearly' : 'monthly';
+      if (native === cycle) return Number(p.price);
+    }
+    return null;
+  }
+  function annualSavingsPct(p){
+    if (!p) return 0;
+    var pm = Number(p.price_monthly), py = Number(p.price_yearly);
+    if (!isFinite(pm) || !isFinite(py) || pm <= 0 || py <= 0) return 0;
+    var full = pm * 12; if (py >= full) return 0;
+    var pct = Math.round((1 - py / full) * 100);
+    return (pct > 0 && pct < 100) ? pct : 0;
+  }
+  window.setPricingCycle = function(cycle){
+    PRICING_CYCLE = normCycle(cycle);
+    renderPricingToggle();
+    renderPricingCards();
+  };
+  function renderPricingToggle(){
+    var el = document.getElementById('pricingCycleToggle');
+    if (!el) return;
+    var anyM = false, anyY = false, best = 0;
+    PRICING_PLANS.forEach(function(p){
+      if (!p || p.is_active === false || p.code === 'trial') return;
+      if (planPriceForCycle(p,'monthly') != null) anyM = true;
+      if (planPriceForCycle(p,'yearly')  != null) anyY = true;
+      var s = annualSavingsPct(p); if (s > best) best = s;
+    });
+    if (!(anyM && anyY)) {
+      if (anyM && !anyY) PRICING_CYCLE = 'monthly';
+      else if (anyY && !anyM) PRICING_CYCLE = 'yearly';
+      el.innerHTML = ''; el.style.display = 'none'; return;
+    }
+    el.style.display = '';
+    var save = best > 0 ? '<span class="pricing-cycle-save">وفّر ~' + best + '%</span>' : '';
+    el.innerHTML =
+      '<div class="pricing-cycle-toggle">' +
+        '<button type="button" class="pricing-cycle-opt' + (PRICING_CYCLE === 'monthly' ? ' active' : '') + '" onclick="window.setPricingCycle(\'monthly\')">شهري</button>' +
+        '<button type="button" class="pricing-cycle-opt' + (PRICING_CYCLE === 'yearly'  ? ' active' : '') + '" onclick="window.setPricingCycle(\'yearly\')">سنوي' + (save ? ' ' + save : '') + '</button>' +
+      '</div>';
+  }
   function renderPlans(plans){
+    PRICING_PLANS = (plans || []).slice();
+    if (!PRICING_PLANS.length) { renderEmpty(); return; }
+    renderPricingToggle();
+    renderPricingCards();
+  }
+  function renderPricingCards(){
     var grid = document.getElementById('pricingGrid');
     if (!grid) return;
-    if (!plans || plans.length === 0) { renderEmpty(); return; }
+    var cycle = normCycle(PRICING_CYCLE);
     // Sort by sort_order ascending, then by code as tie-breaker.
-    plans = plans.slice().sort(function(a,b){
+    var plans = PRICING_PLANS.slice().sort(function(a,b){
       var sa = a.sort_order == null ? 999 : Number(a.sort_order);
       var sb = b.sort_order == null ? 999 : Number(b.sort_order);
       if (sa !== sb) return sa - sb;
@@ -857,13 +923,33 @@ footer{
       if (p.is_active === false) return; // skip inactive — admin hid it
       var name = escHtml(p.display_name || p.code || '—');
       var iconStr = (p.icon && String(p.icon).trim()) ? (escHtml(p.icon) + ' ') : '';
-      var price = fmtPrice(p.price);
-      var dur = (p.duration_days == null ? '—' : Number(p.duration_days));
       var curr = escHtml(p.currency || 'SYP');
-      // Phase X11: tagline + period come from editable DB columns now.
       var subtitle = (p.subtitle && String(p.subtitle).trim()) ? escHtml(p.subtitle) : '';
-      var period = (p.price_period_label && String(p.price_period_label).trim())
-        ? escHtml(p.price_period_label) : ('لمدة ' + dur + ' يوم');
+
+      // ---- price row + period (cycle-aware) ----
+      var priceRowHtml, periodHtml;
+      if (p.code === 'trial') {
+        priceRowHtml = '<div class="pricing-card-price-row"><span class="pricing-card-price">مجاناً</span></div>';
+        var durT = (p.duration_days == null ? '—' : Number(p.duration_days));
+        periodHtml = '<div class="pricing-card-period">' +
+          ((p.price_period_label && String(p.price_period_label).trim()) ? escHtml(p.price_period_label) : ('لمدة ' + durT + ' يوم')) + '</div>';
+      } else {
+        var cp = planPriceForCycle(p, cycle);
+        if (cp == null) {
+          priceRowHtml = '<div class="pricing-card-price-row"><span class="pricing-card-price" style="font-size:22px;">—</span></div>';
+          periodHtml = '<div class="pricing-card-period">غير متاح (' + cycleLabelAr(cycle) + ')</div>';
+        } else if (cycle === 'yearly') {
+          var sv = annualSavingsPct(p);
+          var svBadge = sv > 0 ? '<span class="pricing-card-save">وفّر ~' + sv + '%</span>' : '';
+          var perMo = Math.round(cp / 12);
+          priceRowHtml = '<div class="pricing-card-price-row"><span class="pricing-card-price">' + fmtPrice(cp) + '</span><span class="pricing-card-currency">' + curr + ' / سنة</span>' + svBadge + '</div>';
+          periodHtml = '<div class="pricing-card-period">≈ ' + fmtPrice(perMo) + ' ' + curr + ' / شهر</div>';
+        } else {
+          priceRowHtml = '<div class="pricing-card-price-row"><span class="pricing-card-price">' + fmtPrice(cp) + '</span><span class="pricing-card-currency">' + curr + ' / شهر</span></div>';
+          periodHtml = '<div class="pricing-card-period">يُدفع شهرياً</div>';
+        }
+      }
+
       // Limits chips — from the enforced max_employees / max_patients.
       var limits = '';
       if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
@@ -896,11 +982,8 @@ footer{
           featuredBadge +
           '<div class="pricing-card-name">' + iconStr + name + '</div>' +
           (subtitle ? '<div class="pricing-card-tagline">' + subtitle + '</div>' : '') +
-          '<div class="pricing-card-price-row">' +
-            '<span class="pricing-card-price">' + price + '</span>' +
-            '<span class="pricing-card-currency">' + curr + '</span>' +
-          '</div>' +
-          '<div class="pricing-card-period">' + period + '</div>' +
+          priceRowHtml +
+          periodHtml +
           '<div class="pricing-card-limits">' + limits + '</div>' +
           '<ul class="pricing-features">' + featsHtml + '</ul>' +
           '<a href="' + ctaHref + '" class="' + ctaClass + '">' + ctaLabel + '</a>' +

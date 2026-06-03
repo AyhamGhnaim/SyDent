@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b10"></script>
+<script src="theme.js?v=20260601b11"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -578,10 +578,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b10">
+<link rel="stylesheet" href="theme.css?v=20260601b11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b10"></script>
-<script src="sidebar.js?v=20260601b10"></script>
+<script src="supabase-init.js?v=20260601b11"></script>
+<script src="sidebar.js?v=20260601b11"></script>
 </head>
 <body>
 <script>
@@ -623,7 +623,7 @@
   //   • daysLeft ≤ 0 → block screen (نص حسب trial/paid)
   const userEmail = session.user.email;
   const { data: trialData } = await window.sb.from('trial_requests')
-    .select('trial_end, plan')
+    .select('trial_end, plan, billing_cycle')
     .eq('email', userEmail)
     .eq('status', 'accepted')
     .maybeSingle();
@@ -633,6 +633,12 @@
     const plan = trialData.plan || 'trial'; // fallback آمن للحسابات القديمة
     const isTrial = (plan === 'trial');
     const isPaid = (plan !== 'trial'); // Phase X11: any non-trial plan is a paid subscription
+    // Phase X13: the renewal cadence is the subscription's billing_cycle (a tier
+    // can be billed monthly OR yearly). Fall back to the legacy tier-as-cycle
+    // mapping for rows from before Migration 46.
+    const cycle = trialData.billing_cycle
+      ? (trialData.billing_cycle === 'yearly' ? 'yearly' : 'monthly')
+      : (plan === 'yearly' ? 'yearly' : plan === 'monthly' ? 'monthly' : null);
 
     // Phase X11 — read vendor support_phone from platform_settings (Migration 33
     // table + Migration 34 public-read policy for the support_phone row only).
@@ -686,7 +692,7 @@
       showBanner = true;
       bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
       bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
-    } else if (plan === 'yearly') {
+    } else if (cycle === 'yearly') {
       // سنوي: banner فقط ≤30 يوم (Notion/Stripe pattern)
       if (daysLeft <= 7) {
         showBanner = true;
@@ -697,7 +703,7 @@
         bannerColor = '#ffa726';
         bannerText = '⏰ اشتراكك السنوي ينتهي خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">جدّد الآن</a>';
       }
-    } else if (plan === 'monthly') {
+    } else if (cycle === 'monthly') {
       // شهري: banner فقط ≤14 يوم (دورة قصيرة، تحذير أبكر نسبياً)
       if (daysLeft <= 3) {
         showBanner = true;

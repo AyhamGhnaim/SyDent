@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b10"></script>
+<script src="theme.js?v=20260601b11"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b10"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b10">
+<script src="supabase-init.js?v=20260601b11"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b11">
 <style>
 :root {
   --bg:        #0a1628;
@@ -122,6 +122,29 @@ body {
 .sub-card-sub { font-size: 12px; color: var(--text2); min-height: 16px; }
 .sub-card-price { font-size: 24px; font-weight: 800; margin-top: 6px; }
 .sub-card-price small { font-size: 12px; font-weight: 600; color: var(--text2); }
+/* ---- Phase X13: billing cycle toggle (monthly/yearly) ---- */
+.sub-cycle-toggle {
+  display: inline-flex; gap: 6px; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px; margin: 0 2px 16px;
+}
+.sub-cycle-opt {
+  border: none; background: transparent; color: var(--text2);
+  font-family: 'Cairo', sans-serif; font-size: 13px; font-weight: 800;
+  padding: 8px 18px; border-radius: 999px; cursor: pointer; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.sub-cycle-opt.active { background: var(--green); color: #062018; }
+.sub-cycle-save {
+  font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
+  background: rgba(46,232,158,0.18); color: var(--green);
+}
+.sub-cycle-opt.active .sub-cycle-save { background: rgba(6,32,24,0.18); color: #062018; }
+.plan-savings {
+  display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px;
+  border-radius: 999px; background: rgba(46,232,158,0.15); color: var(--green); margin-inline-start: 6px;
+}
+.sub-card-permo { font-size: 12px; color: var(--text2); font-weight: 600; margin-top: 2px; }
+.sub-card-na    { font-size: 14px; color: var(--text2); font-weight: 700; margin-top: 6px; }
 .sub-card-features { list-style: none; margin: 12px 0; display: flex; flex-direction: column; gap: 7px; }
 .sub-card-features li { font-size: 13px; color: var(--text); padding-inline-start: 20px; position: relative; }
 .sub-card-features li::before { content: '✓'; position: absolute; inset-inline-start: 0; color: var(--green); font-weight: 800; }
@@ -200,7 +223,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b10"></script>
+<script src="sidebar.js?v=20260601b11"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -219,6 +242,7 @@ body {
 
       <!-- plans -->
       <div class="sub-section-title">الخطط المتاحة</div>
+      <div id="subCycleToggle"></div>
       <div id="subPlans" class="sub-grid">
         <div class="sub-state"><div class="sub-state-icon">⏳</div>جارٍ تحميل الخطط…</div>
       </div>
@@ -269,14 +293,16 @@ body {
   // page state
   var ST = {
     user: null,
-    current: null,        // { id, plan, status, trial_end }
+    current: null,        // { id, plan, status, trial_end, billing_cycle }
     plans: [],            // active subscription_plans sorted
     pending: null,        // pending subscription_requests row (or null)
     support: SUPPORT_PHONE_FALLBACK,
     instructions: '',
+    cycle: 'yearly',      // Phase X13 — global card toggle (default yearly: best-practice)
     selPlan: null,        // plan being requested (in modal)
     selKind: 'upgrade',   // 'upgrade' | 'renew' (DB request_kind)
     selRelation: 'upgrade', // 'upgrade' | 'renew' | 'downgrade' (display only)
+    selCycle: 'monthly',  // Phase X13 — cycle chosen for the in-flight request
     selMethod: null,
     inFlight: false       // Rule #66 — double-submit guard
   };
@@ -299,15 +325,42 @@ body {
     if (code === 'yearly')  return 'Max';
     return code || '—';
   }
-  function planPrice(code) {
-    var p = ST.plans.filter(function (x) { return x.code === code; })[0];
-    return (p && p.price != null) ? (Number(p.price) || 0) : 0;
+  // ---- Phase X13: cycle helpers (mirror admin.html) ----
+  var CYCLE_DAYS = { monthly: 30, yearly: 365 };
+  function normCycle(c) { return (c === 'yearly') ? 'yearly' : 'monthly'; }
+  function cycleLabelAr(c) { return normCycle(c) === 'yearly' ? 'سنوي' : 'شهري'; }
+  function planByCode(code) { return ST.plans.filter(function (x) { return x.code === code; })[0] || null; }
+  // Price of a tier for a cycle; falls back to the legacy single price when the
+  // cycle column is absent AND the tier's native period matches. null = not offered.
+  function planPriceForCycle(p, cycle) {
+    if (!p) return null;
+    cycle = normCycle(cycle);
+    var d = (cycle === 'yearly') ? p.price_yearly : p.price_monthly;
+    if (d != null && !isNaN(Number(d))) return Number(d);
+    if (p.price != null && !isNaN(Number(p.price))) {
+      var dur = Number(p.duration_days);
+      var native = (isFinite(dur) && dur >= 182) ? 'yearly' : 'monthly';
+      if (native === cycle) return Number(p.price);
+    }
+    return null;
   }
-  // relation between current plan and a target plan code: renew / upgrade / downgrade
+  function annualSavingsPct(p) {
+    if (!p) return 0;
+    var pm = Number(p.price_monthly), py = Number(p.price_yearly);
+    if (!isFinite(pm) || !isFinite(py) || pm <= 0 || py <= 0) return 0;
+    var full = pm * 12; if (py >= full) return 0;
+    var pct = Math.round((1 - py / full) * 100);
+    return (pct > 0 && pct < 100) ? pct : 0;
+  }
+  // relation between current TIER and a target TIER. Ranked by sort_order (the
+  // admin's explicit tier ordering) so it's cadence-independent — a yearly-only
+  // tier never looks like a "downgrade" just because its per-month figure is low.
   function planRelation(targetCode) {
     var cur = curPlanCode();
     if (targetCode === cur) return 'renew';
-    var pc = planPrice(cur), pr = planPrice(targetCode);
+    var cp = planByCode(cur), tp = planByCode(targetCode);
+    var pc = cp ? (Number(cp.sort_order) || 999) : 999;
+    var pr = tp ? (Number(tp.sort_order) || 999) : 999;
     if (pr > pc) return 'upgrade';
     if (pr < pc) return 'downgrade';
     return 'change';
@@ -343,12 +396,12 @@ body {
       (async function () {
         try {
           var byId = await window.sb.from('trial_requests')
-            .select('id, plan, status, trial_end').eq('user_id', ST.user.id).maybeSingle();
+            .select('id, plan, status, trial_end, billing_cycle').eq('user_id', ST.user.id).maybeSingle();
           if (byId && byId.data) return byId;
         } catch (e) {}
         try {
           return await window.sb.from('trial_requests')
-            .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+            .select('id, plan, status, trial_end, billing_cycle').eq('email', ST.user.email).maybeSingle();
         } catch (e) { return { data: null }; }
       })(),
       // active plans
@@ -414,16 +467,28 @@ body {
     var expDate = (ST.current && ST.current.trial_end)
       ? new Date(ST.current.trial_end).toLocaleDateString('en-GB') : '—';
 
+    // Phase X13: current billing cycle (paid, non-permanent only) + its price.
+    var curCycle = (dl !== null && code !== 'trial' && ST.current && ST.current.billing_cycle)
+      ? normCycle(ST.current.billing_cycle) : null;
+    var curPrice = (plan && curCycle) ? planPriceForCycle(plan, curCycle) : null;
+    var cycleMeta = curCycle
+      ? '<div class="sub-meta-item"><div class="sub-meta-label">الدورة</div><div class="sub-meta-value">' + escHtml(cycleLabelAr(curCycle)) + '</div></div>'
+      : '';
+    var priceMeta = (curPrice != null)
+      ? '<div class="sub-meta-item"><div class="sub-meta-label">السعر</div><div class="sub-meta-value">' + escHtml(fmtPrice(curPrice)) + ' ' + escHtml(plan.currency || 'SYP') + (curCycle === 'yearly' ? ' / سنة' : ' / شهر') + '</div></div>'
+      : '';
+
     el.innerHTML =
       '<div class="sub-current-top">' +
         '<span class="sub-current-icon">' + escHtml(icon) + '</span>' +
-        '<span class="sub-current-name">' + escHtml(name) + '</span>' +
+        '<span class="sub-current-name">' + escHtml(name) + (curCycle ? ' <span style="font-size:13px;color:var(--text2);font-weight:700;">· ' + escHtml(cycleLabelAr(curCycle)) + '</span>' : '') + '</span>' +
         '<span class="sub-badge ' + badgeCls + '">' + escHtml(badge) + '</span>' +
       '</div>' +
       '<div class="sub-current-meta">' +
         '<div class="sub-meta-item"><div class="sub-meta-label">المتبقّي</div><div class="sub-meta-value">' + escHtml(String(expVal)) + '</div></div>' +
         '<div class="sub-meta-item"><div class="sub-meta-label">تاريخ الانتهاء</div><div class="sub-meta-value">' + escHtml(expDate) + '</div></div>' +
-        (plan ? '<div class="sub-meta-item"><div class="sub-meta-label">السعر</div><div class="sub-meta-value">' + escHtml(fmtPrice(plan.price)) + ' ' + escHtml(plan.currency || 'SYP') + '</div></div>' : '') +
+        cycleMeta +
+        priceMeta +
       '</div>';
     el.style.display = 'block';
   }
@@ -431,12 +496,15 @@ body {
   function renderPending() {
     var el = document.getElementById('subPending');
     if (!ST.pending) { el.style.display = 'none'; return; }
-    var pc = planPrice(ST.pending.current_plan), pr = planPrice(ST.pending.requested_plan);
+    var cp = planByCode(ST.pending.current_plan), tp = planByCode(ST.pending.requested_plan);
+    var pc = cp ? (Number(cp.sort_order) || 999) : 999;
+    var pr = tp ? (Number(tp.sort_order) || 999) : 999;
     var kindAr = (ST.pending.current_plan === ST.pending.requested_plan) ? 'تجديد'
                : (pr > pc) ? 'ترقية' : 'تغيير';
+    var pcyc = ST.pending.billing_cycle ? (' (' + cycleLabelAr(ST.pending.billing_cycle) + ')') : '';
     el.innerHTML =
       '<div class="sub-pending-text">⏳ لديك طلب <b>' + escHtml(kindAr) + '</b> إلى خطة <b>' +
-        escHtml(planLabel(ST.pending.requested_plan)) + '</b> قيد المراجعة. سيتم التفعيل بعد تأكيد الدفع.</div>' +
+        escHtml(planLabel(ST.pending.requested_plan)) + escHtml(pcyc) + '</b> قيد المراجعة. سيتم التفعيل بعد تأكيد الدفع.</div>' +
       '<button class="sub-link-btn" onclick="window.subCancelPending()">إلغاء الطلب</button>';
     el.style.display = 'flex';
   }
@@ -450,6 +518,39 @@ body {
     return feats.slice(0, 6);
   }
 
+  // ---- Phase X13: billing-cycle toggle (monthly / yearly) ----
+  function renderCycleToggle() {
+    var el = document.getElementById('subCycleToggle');
+    if (!el) return;
+    var anyMonthly = false, anyYearly = false, bestSave = 0;
+    ST.plans.forEach(function (p) {
+      if (p.code === 'trial') return;
+      if (planPriceForCycle(p, 'monthly') != null) anyMonthly = true;
+      if (planPriceForCycle(p, 'yearly')  != null) anyYearly = true;
+      var s = annualSavingsPct(p); if (s > bestSave) bestSave = s;
+    });
+    // Nothing to toggle between → snap cycle to whichever exists and hide the UI.
+    if (!(anyMonthly && anyYearly)) {
+      if (anyMonthly && !anyYearly) ST.cycle = 'monthly';
+      else if (anyYearly && !anyMonthly) ST.cycle = 'yearly';
+      el.innerHTML = ''; el.style.display = 'none';
+      return;
+    }
+    el.style.display = '';
+    var saveBadge = bestSave > 0 ? '<span class="sub-cycle-save">وفّر ~' + bestSave + '%</span>' : '';
+    el.innerHTML =
+      '<div class="sub-cycle-toggle">' +
+        '<button type="button" class="sub-cycle-opt' + (ST.cycle === 'monthly' ? ' active' : '') + '" onclick="window.subSetCycle(\'monthly\')">شهري</button>' +
+        '<button type="button" class="sub-cycle-opt' + (ST.cycle === 'yearly'  ? ' active' : '') + '" onclick="window.subSetCycle(\'yearly\')">سنوي' + (saveBadge ? ' ' + saveBadge : '') + '</button>' +
+      '</div>';
+  }
+
+  window.subSetCycle = function (cycle) {
+    ST.cycle = normCycle(cycle);
+    renderCycleToggle();
+    renderPlans();
+  };
+
   function renderPlans() {
     var wrap = document.getElementById('subPlans');
     if (!ST.plans.length) {
@@ -458,40 +559,61 @@ body {
     }
     var cur = curPlanCode();
     var hasPending = !!ST.pending;
+    var cycle = normCycle(ST.cycle);
     var html = '';
 
     ST.plans.forEach(function (p) {
       var isCur = (p.code === cur);
       var icon = (p.icon && String(p.icon).trim()) ? (escHtml(p.icon) + ' ') : '';
-      var period = p.price_period_label ? escHtml(p.price_period_label) : '';
       var sub = p.subtitle ? escHtml(p.subtitle) : '';
       var feats = planFeatures(p).map(function (f) { return '<li>' + escHtml(f) + '</li>'; }).join('');
+      var curr = escHtml(p.currency || 'SYP');
 
-      // action button: never offer "buy trial"; renew current plan; upgrade/downgrade others
+      // ---- price block (cycle-aware) ----
+      var priceHtml, offered = true;
+      if (p.code === 'trial') {
+        priceHtml = '<div class="sub-card-price">مجاناً</div>';
+      } else {
+        var price = planPriceForCycle(p, cycle);
+        if (price == null) {
+          offered = false;
+          priceHtml = '<div class="sub-card-na">غير متاح (' + cycleLabelAr(cycle) + ')</div>';
+        } else if (cycle === 'yearly') {
+          var sv = annualSavingsPct(p);
+          var svBadge = sv > 0 ? '<span class="plan-savings">وفّر ~' + sv + '%</span>' : '';
+          var perMo = Math.round(price / 12);
+          priceHtml = '<div class="sub-card-price">' + escHtml(fmtPrice(price)) + ' <small>' + curr + ' / سنة</small>' + svBadge + '</div>' +
+                      '<div class="sub-card-permo">≈ ' + escHtml(fmtPrice(perMo)) + ' ' + curr + ' / شهر</div>';
+        } else {
+          priceHtml = '<div class="sub-card-price">' + escHtml(fmtPrice(price)) + ' <small>' + curr + ' / شهر</small></div>';
+        }
+      }
+
+      // ---- action button ----
       var btn = '';
       if (p.code === 'trial') {
         btn = '<div class="sub-btn-spacer"></div>';
+      } else if (!offered) {
+        btn = '<button class="sub-btn" disabled>غير متاح بهذه الدورة</button>';
       } else if (isCur) {
         btn = '<button class="sub-btn renew" ' + (hasPending ? 'disabled' : '') +
-              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'renew\')">🔄 تجديد</button>';
+              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'renew\',\'' + cycle + '\')">🔄 تجديد (' + cycleLabelAr(cycle) + ')</button>';
       } else {
         var relP = planRelation(p.code);
         var bLabel = relP === 'upgrade'   ? ('⬆️ ترقية إلى ' + escHtml(p.display_name || p.code))
                    : relP === 'downgrade' ? ('🔽 تغيير إلى ' + escHtml(p.display_name || p.code))
                    :                        ('🔄 تغيير إلى ' + escHtml(p.display_name || p.code));
         btn = '<button class="sub-btn" ' + (hasPending ? 'disabled' : '') +
-              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'' + relP + '\')">' + bLabel + '</button>';
+              ' onclick="window.subOpenModal(\'' + escHtml(p.code) + '\',\'' + relP + '\',\'' + cycle + '\')">' + bLabel + '</button>';
       }
 
       html +=
         '<div class="sub-card' + (isCur ? ' current' : '') + '">' +
           (isCur ? '<span class="sub-card-cur-badge">خطتك الحالية</span>' : '') +
-          '<span class="sub-card-icon">' + (icon || (p.code === 'yearly' ? '💎' : p.code === 'monthly' ? '💵' : '🆓')) + '</span>' +
+          '<span class="sub-card-icon">' + (icon || (p.code === 'trial' ? '🆓' : '💳')) + '</span>' +
           '<span class="sub-card-name">' + escHtml(p.display_name || p.code) + '</span>' +
           '<span class="sub-card-sub">' + sub + '</span>' +
-          '<div class="sub-card-price">' + escHtml(fmtPrice(p.price)) +
-            (Number(p.price) > 0 ? ' <small>' + escHtml(p.currency || 'SYP') + (period ? ' / ' + period : '') + '</small>' : '') +
-          '</div>' +
+          priceHtml +
           (feats ? '<ul class="sub-card-features">' + feats + '</ul>' : '<div style="flex:1"></div>') +
           btn +
         '</div>';
@@ -503,14 +625,18 @@ body {
   function renderAll() {
     renderCurrent();
     renderPending();
+    renderCycleToggle();
     renderPlans();
   }
 
   // ---------- modal ----------
-  window.subOpenModal = function (planCode, relation) {
+  window.subOpenModal = function (planCode, relation, cycle) {
     if (ST.pending) { toast('لديك طلب قيد المراجعة بالفعل', true); return; }
     var p = ST.plans.filter(function (x) { return x.code === planCode; })[0];
     if (!p) return;
+    ST.selCycle = normCycle(cycle || ST.cycle);
+    var price = planPriceForCycle(p, ST.selCycle);
+    if (price == null) { toast('هذه الخطة غير متاحة بدورة ' + cycleLabelAr(ST.selCycle), true); return; }
     ST.selPlan = p;
     ST.selRelation = (relation === 'renew' || relation === 'downgrade' || relation === 'change') ? relation : 'upgrade';
     ST.selKind = (ST.selRelation === 'renew') ? 'renew' : 'upgrade'; // DB CHECK: upgrade|renew
@@ -519,9 +645,10 @@ body {
     var titleWord = ST.selRelation === 'renew' ? 'تجديد خطة '
                   : ST.selRelation === 'upgrade' ? 'الترقية إلى خطة '
                   : 'تغيير إلى خطة ';
-    document.getElementById('subModalTitle').textContent = titleWord + (p.display_name || p.code);
+    document.getElementById('subModalTitle').textContent = titleWord + (p.display_name || p.code) + ' (' + cycleLabelAr(ST.selCycle) + ')';
     document.getElementById('subModalSub').textContent =
-      'السعر: ' + fmtPrice(p.price) + ' ' + (p.currency || 'SYP') +
+      'الدورة: ' + cycleLabelAr(ST.selCycle) + ' — السعر: ' + fmtPrice(price) + ' ' + (p.currency || 'SYP') +
+      (ST.selCycle === 'yearly' ? ' / سنة' : ' / شهر') +
       '. اختر طريقة الدفع، ثم أرسل الطلب وتواصل معنا عبر واتساب لتأكيد التفعيل.';
 
     // payment methods
@@ -565,6 +692,7 @@ body {
       request_kind: ST.selKind,
       requested_plan: ST.selPlan.code,
       current_plan: curPlanCode(),
+      billing_cycle: normCycle(ST.selCycle),
       payment_method: ST.selMethod,
       note: note || null,
       status: 'pending'
@@ -606,7 +734,7 @@ body {
       var kindAr = ST.selRelation === 'renew' ? 'تجديد'
                  : ST.selRelation === 'upgrade' ? 'ترقية' : 'تغيير';
       var msg = 'مرحباً، أرغب بـ' + kindAr + ' اشتراكي في SyDent إلى خطة "' +
-                (ST.selPlan.display_name || ST.selPlan.code) + '". طريقة الدفع: ' + methodLabel(ST.selMethod) + '.';
+                (ST.selPlan.display_name || ST.selPlan.code) + '" (' + cycleLabelAr(ST.selCycle) + '). طريقة الدفع: ' + methodLabel(ST.selMethod) + '.';
       if (note) msg += '\nملاحظة: ' + note;
       window.open('https://wa.me/' + ST.support + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 
@@ -641,10 +769,10 @@ body {
     // re-pull only the volatile bits (current + pending), keep plans/settings
     try {
       var r1 = await window.sb.from('trial_requests')
-        .select('id, plan, status, trial_end').eq('user_id', ST.user.id).maybeSingle();
+        .select('id, plan, status, trial_end, billing_cycle').eq('user_id', ST.user.id).maybeSingle();
       if (!(r1 && r1.data)) {
         r1 = await window.sb.from('trial_requests')
-          .select('id, plan, status, trial_end').eq('email', ST.user.email).maybeSingle();
+          .select('id, plan, status, trial_end, billing_cycle').eq('email', ST.user.email).maybeSingle();
       }
       ST.current = (r1 && r1.data) || ST.current;
     } catch (e) {}

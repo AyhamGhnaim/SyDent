@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b10"></script>
+<script src="theme.js?v=20260601b11"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -889,6 +889,12 @@ header{
 }
 .plan-option:hover{border-color:var(--border2);background:var(--bg4);}
 .plan-option.selected{border-color:var(--green);background:rgba(46,232,158,0.06);}
+/* Phase X13: monthly/yearly cycle toggle inside the manual plan picker */
+.plan-cycle-toggle{display:flex;gap:6px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:14px;}
+.plan-cycle-opt{flex:1;border:none;background:transparent;color:var(--text2);font-family:'Cairo',sans-serif;font-size:13px;font-weight:800;padding:9px;border-radius:8px;cursor:pointer;transition:all .15s;}
+.plan-cycle-opt.active{background:var(--green);color:#062018;}
+.plan-option.plan-option-disabled{opacity:.45;cursor:not-allowed;}
+.plan-option.plan-option-disabled:hover{border-color:var(--border);background:var(--bg3);}
 /* Phase 7.6E-Part 2.1: permanent option — yellow accent + warning treatment
    to visually distinguish from regular paid plans. The yellow conveys
    "exceptional path, proceed with care" — matches the warning copy in the
@@ -2160,11 +2166,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b10">
+<link rel="stylesheet" href="theme.css?v=20260601b11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b10"></script>
+<script src="supabase-init.js?v=20260601b11"></script>
 </head>
 <body>
 
@@ -2305,20 +2311,27 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
               <label for="planFldDisplayName">اسم العرض</label>
               <input type="text" id="planFldDisplayName" oninput="onPlanFieldChange()" autocomplete="off">
             </div>
-            <div class="plan-field-row3">
+            <div class="plan-field-row">
               <div class="plan-field">
-                <label for="planFldDuration">المدة (يوم)</label>
+                <label for="planFldDuration">المدة (يوم) <span style="color:var(--text3);font-weight:400;">(للتجربة)</span></label>
                 <input type="number" id="planFldDuration" min="1" oninput="onPlanFieldChange()" autocomplete="off">
-              </div>
-              <div class="plan-field">
-                <label for="planFldPrice">السعر</label>
-                <input type="number" id="planFldPrice" min="0" oninput="onPlanFieldChange()" autocomplete="off">
               </div>
               <div class="plan-field">
                 <label for="planFldSort">ترتيب العرض</label>
                 <input type="number" id="planFldSort" min="1" oninput="onPlanFieldChange()" autocomplete="off">
               </div>
             </div>
+            <div class="plan-field-row">
+              <div class="plan-field">
+                <label for="planFldPriceMonthly">السعر الشهري <span style="color:var(--text3);font-weight:400;">(فارغ = لا يُعرض شهري)</span></label>
+                <input type="number" id="planFldPriceMonthly" min="0" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+              <div class="plan-field">
+                <label for="planFldPriceYearly">السعر السنوي <span style="color:var(--text3);font-weight:400;">(فارغ = لا يُعرض سنوي)</span></label>
+                <input type="number" id="planFldPriceYearly" min="0" oninput="onPlanFieldChange()" autocomplete="off">
+              </div>
+            </div>
+            <div class="plan-field-hint" id="planCycleHint" style="margin-bottom:14px;">💡 الطبيب يختار شهري أو سنوي عند الاشتراك/التجديد. الدورة الشهرية = 30 يوم، السنوية = 365 يوم (تلقائياً). التجربة تستخدم «المدة (يوم)» أعلاه.</div>
             <div class="plan-field-row">
               <div class="plan-field">
                 <label for="planFldMaxEmp">حد الموظفين <span style="color:var(--text3);font-weight:400;">(فارغ = بلا حد)</span></label>
@@ -3849,17 +3862,17 @@ async function loadPlanConfig() {
       // populated (features / is_active / sort_order / limits) so the
       // Phase X2 plan editor renders correctly even in this degraded state.
       planConfigCache = {
-        trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       currency:'SYP',
+        trial:   { code:'trial',   display_name:'تجربة',     duration_days:30,  price:0,       price_monthly:0,      price_yearly:0,       currency:'SYP',
                    features:['كل الميزات','حتى 5 موظفين','حتى 50 مريض','بدون التزام'],
                    max_employees:5, max_patients:50, is_active:true, sort_order:1,
                    icon:'🆓', subtitle:'جرّب كل الميزات بدون التزام أو بطاقة ائتمان.', price_period_label:'لمدة 30 يوم',
                    is_featured:false, featured_label:'الأكثر شعبية' },
-        monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  currency:'SYP',
+        monthly: { code:'monthly', display_name:'شهري',      duration_days:30,  price:200000,  price_monthly:200000, price_yearly:null,    currency:'SYP',
                    features:['كل الميزات','موظفين بلا حدود','مرضى بلا حدود','دعم فني','نسخ احتياطي يومي'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:2,
                    icon:'💵', subtitle:'دفعة شهرية مرنة. أوقف متى شئت.', price_period_label:'شهرياً',
                    is_featured:false, featured_label:'الأكثر شعبية' },
-        yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, currency:'SYP',
+        yearly:  { code:'yearly',  display_name:'سنوي',      duration_days:365, price:2000000, price_monthly:null,   price_yearly:2000000, currency:'SYP',
                    features:['كل ميزات الشهري','خصم ~16%','أولوية الدعم','ميزات حصرية قادمة'],
                    max_employees:null, max_patients:null, is_active:true, sort_order:3,
                    icon:'💎', subtitle:'الأنسب للعيادات المستقرة — وفّر أكثر بدفعة سنوية.', price_period_label:'سنوياً',
@@ -3882,6 +3895,57 @@ async function loadPlanConfig() {
 
 function getPlanConfig(code) {
   return planConfigCache[code] || null;
+}
+
+// ============================================================================
+// === Phase X13: billing-cycle helpers =======================================
+// ============================================================================
+// A tier (subscription_plans row) now carries BOTH a monthly price and a yearly
+// price (price_monthly / price_yearly). The billing CYCLE lives on the
+// subscription itself (trial_requests.billing_cycle). Tier codes stay opaque
+// stable ids ('monthly'/'yearly' are legacy ids predating the cycle split).
+// Cycle periods are standard; trial is single-cycle (its own duration_days).
+var CYCLE_DAYS = { monthly: 30, yearly: 365 };
+
+function normCycle(c) { return (c === 'yearly') ? 'yearly' : 'monthly'; }
+function cycleLabelAr(cycle) { return normCycle(cycle) === 'yearly' ? 'سنوي' : 'شهري'; }
+
+// Price for a tier + cycle. Falls back to the legacy single `price` ONLY when
+// the requested cycle's dedicated price is absent AND the tier's native period
+// matches that cycle (keeps pre-Migration-46 rows readable). Returns null when
+// the cycle is not offered for the tier.
+function planPriceForCycle(plan, cycle) {
+  if (!plan) return null;
+  cycle = normCycle(cycle);
+  var dedicated = (cycle === 'yearly') ? plan.price_yearly : plan.price_monthly;
+  if (dedicated != null && !isNaN(Number(dedicated))) return Number(dedicated);
+  if (plan.price != null && !isNaN(Number(plan.price))) {
+    var dur = Number(plan.duration_days);
+    var nativeCycle = (isFinite(dur) && dur >= 182) ? 'yearly' : 'monthly';
+    if (nativeCycle === cycle) return Number(plan.price);
+  }
+  return null;
+}
+
+// Days a given cycle adds. trial uses its own duration_days (single-cycle).
+function planDurationForCycle(plan, cycle) {
+  if (plan && plan.code === 'trial') {
+    var d = Number(plan.duration_days);
+    return (isFinite(d) && d > 0) ? d : 30;
+  }
+  return CYCLE_DAYS[normCycle(cycle)];
+}
+
+// Annual savings % of a tier's yearly price vs 12× its monthly price.
+// Returns an integer 1..99, or 0 when not applicable (missing/zero prices).
+function planAnnualSavingsPct(plan) {
+  if (!plan) return 0;
+  var pm = Number(plan.price_monthly), py = Number(plan.price_yearly);
+  if (!isFinite(pm) || !isFinite(py) || pm <= 0 || py <= 0) return 0;
+  var full = pm * 12;
+  if (py >= full) return 0;
+  var pct = Math.round((1 - py / full) * 100);
+  return (pct > 0 && pct < 100) ? pct : 0;
 }
 
 // Format price for display (Arabic locale with Western digits)
@@ -4165,7 +4229,8 @@ function selectPlanTab(code, btnEl) {
 function renderPlanEditorFields(p) {
   document.getElementById('planFldDisplayName').value = p.display_name || '';
   document.getElementById('planFldDuration').value    = (p.duration_days == null ? '' : String(p.duration_days));
-  document.getElementById('planFldPrice').value       = (p.price == null ? '' : String(p.price));
+  document.getElementById('planFldPriceMonthly').value = (p.price_monthly == null ? '' : String(p.price_monthly));
+  document.getElementById('planFldPriceYearly').value  = (p.price_yearly == null ? '' : String(p.price_yearly));
   document.getElementById('planFldSort').value        = (p.sort_order == null ? '' : String(p.sort_order));
   document.getElementById('planFldMaxEmp').value      = (p.max_employees == null ? '' : String(p.max_employees));
   document.getElementById('planFldMaxPat').value      = (p.max_patients == null ? '' : String(p.max_patients));
@@ -4268,8 +4333,14 @@ function readEditorIntoState() {
   ed.display_name  = (document.getElementById('planFldDisplayName').value || '').trim();
   var dur = document.getElementById('planFldDuration').value;
   ed.duration_days = dur === '' ? null : Number(dur);
-  var pr = document.getElementById('planFldPrice').value;
-  ed.price = pr === '' ? null : Number(pr);
+  var prM = document.getElementById('planFldPriceMonthly').value;
+  ed.price_monthly = prM === '' ? null : Number(prM);
+  var prY = document.getElementById('planFldPriceYearly').value;
+  ed.price_yearly = prY === '' ? null : Number(prY);
+  // Keep the legacy single `price` synced to the monthly price (or yearly if no
+  // monthly) so any reader still on `price` degrades sensibly.
+  ed.price = (ed.price_monthly != null) ? ed.price_monthly
+           : (ed.price_yearly != null) ? ed.price_yearly : 0;
   var srt = document.getElementById('planFldSort').value;
   ed.sort_order = srt === '' ? null : Number(srt);
   var me = document.getElementById('planFldMaxEmp').value;
@@ -4336,7 +4407,7 @@ function computePlanDirty() {
   var e = planEditorState.edited;
   if (!o || !e) { planEditorState.isDirty = false; return; }
   // Compare each editable field. JSON.stringify on features handles arrays.
-  var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
+  var keys = ['display_name','duration_days','price','price_monthly','price_yearly','sort_order','max_employees','max_patients','is_active',
               'icon','subtitle','price_period_label','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var a = o[keys[i]]; var b = e[keys[i]];
@@ -4375,6 +4446,27 @@ function renderPlanPreview(p) {
   var priceStr = priceNum.toLocaleString('en-US');
   var dur = (p.duration_days == null || isNaN(Number(p.duration_days))) ? '—' : String(p.duration_days);
   var curr = escapeHtml(p.currency || 'SYP');
+  // Phase X13: dual-cycle price preview (monthly + yearly with savings).
+  var _pmRaw = (p.price_monthly == null || isNaN(Number(p.price_monthly))) ? null : Number(p.price_monthly);
+  var _pyRaw = (p.price_yearly  == null || isNaN(Number(p.price_yearly)))  ? null : Number(p.price_yearly);
+  var priceHtml;
+  if (p.code === 'trial') {
+    priceHtml = '<div class="preview-card-price">مجاناً</div>';
+  } else {
+    var _pp = [];
+    if (_pmRaw != null && _pmRaw > 0) {
+      _pp.push('<div class="preview-card-price">' + _pmRaw.toLocaleString('en-US') +
+               ' <span class="preview-card-currency">' + curr + ' / شهر</span></div>');
+    }
+    if (_pyRaw != null && _pyRaw > 0) {
+      var _sav = planAnnualSavingsPct(p);
+      var _savBadge = _sav > 0 ? ' <span class="plan-savings">وفّر ~' + _sav + '%</span>' : '';
+      _pp.push('<div class="preview-card-price">' + _pyRaw.toLocaleString('en-US') +
+               ' <span class="preview-card-currency">' + curr + ' / سنة</span>' + _savBadge + '</div>');
+    }
+    if (!_pp.length) _pp.push('<div class="preview-card-price">—</div>');
+    priceHtml = _pp.join('');
+  }
   // Phase X11: display-layer overrides.
   var subtitleHtml = (p.subtitle && String(p.subtitle).trim())
     ? '<div class="preview-card-subtitle">' + escapeHtml(p.subtitle) + '</div>' : '';
@@ -4415,8 +4507,8 @@ function renderPlanPreview(p) {
     inactive + featuredHtml +
     '<div class="preview-card-name">' + iconStr + name + '</div>' +
     subtitleHtml +
-    '<div class="preview-card-price">' + priceStr + ' <span class="preview-card-currency">' + curr + '</span></div>' +
-    '<div class="preview-card-duration">' + periodLbl + '</div>' +
+    priceHtml +
+    (p.code === 'trial' ? '<div class="preview-card-duration">' + periodLbl + '</div>' : '') +
     '<div class="preview-card-limits">' + limits + '</div>' +
     '<ul class="preview-features">' + featsHtml + '</ul>' +
     disabledHtml;
@@ -4439,8 +4531,19 @@ function validatePlanEdits(p) {
   if (Number(p.duration_days) > 3650) {
     return { ok:false, error:'المدة (يوم) كبيرة بشكل غير معقول (الحد الأقصى 3650 يوم = 10 سنوات).' };
   }
-  if (p.price == null || isNaN(Number(p.price)) || Number(p.price) < 0) {
-    return { ok:false, error:'السعر يجب أن يكون رقماً ≥ 0.' };
+  if (p.price_monthly != null && (isNaN(Number(p.price_monthly)) || Number(p.price_monthly) < 0)) {
+    return { ok:false, error:'السعر الشهري يجب أن يكون رقماً ≥ 0 أو فارغاً.' };
+  }
+  if (p.price_yearly != null && (isNaN(Number(p.price_yearly)) || Number(p.price_yearly) < 0)) {
+    return { ok:false, error:'السعر السنوي يجب أن يكون رقماً ≥ 0 أو فارغاً.' };
+  }
+  // A paid tier must offer at least one cycle priced > 0 (trial is free on both).
+  if (p.code !== 'trial') {
+    var _hasM = (p.price_monthly != null && Number(p.price_monthly) > 0);
+    var _hasY = (p.price_yearly  != null && Number(p.price_yearly)  > 0);
+    if (!_hasM && !_hasY) {
+      return { ok:false, error:'يجب تحديد سعر شهري أو سنوي (أو كليهما) أكبر من صفر لهذه الخطة.' };
+    }
   }
   if (p.sort_order == null || isNaN(Number(p.sort_order)) || Number(p.sort_order) < 1) {
     return { ok:false, error:'الترتيب يجب أن يكون رقماً ≥ 1.' };
@@ -4481,7 +4584,7 @@ function buildPlanDiff(orig, edited) {
   // "Price: 200000 → 250000" delta without parsing two full rows.
   if (!orig || !edited) return {};
   var diff = {};
-  var keys = ['display_name','duration_days','price','sort_order','max_employees','max_patients','is_active',
+  var keys = ['display_name','duration_days','price','price_monthly','price_yearly','sort_order','max_employees','max_patients','is_active',
               'icon','subtitle','price_period_label','is_featured','featured_label'];
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
@@ -4568,6 +4671,8 @@ async function savePlanEdits() {
     display_name:'الاسم',
     duration_days:'المدة',
     price:'السعر',
+    price_monthly:'السعر الشهري',
+    price_yearly:'السعر السنوي',
     sort_order:'الترتيب',
     max_employees:'حد الموظفين',
     max_patients:'حد المرضى',
@@ -4603,6 +4708,15 @@ async function savePlanEdits() {
       features:      p.features,
       is_active:     !!p.is_active
     };
+    // Phase X13: per-cycle prices. Guard with the price_monthly sentinel — post-
+    // Migration 46 the columns exist; pre-migration o.price_monthly is undefined
+    // → omit them so the legacy `price` edit still saves cleanly on an un-migrated DB.
+    if (o.price_monthly !== undefined) {
+      updatePayload.price_monthly = (p.price_monthly == null || isNaN(Number(p.price_monthly))) ? null : Number(p.price_monthly);
+      updatePayload.price_yearly  = (p.price_yearly  == null || isNaN(Number(p.price_yearly)))  ? null : Number(p.price_yearly);
+    } else if (diff.price_monthly || diff.price_yearly) {
+      alert('⚠️ السعر الشهري/السنوي لن يُحفظ — أعمدته غير موجودة بعد في قاعدة البيانات.\n\nشغّل Migration 46 في Supabase ثم أعد المحاولة.\n\n(الاسم وبقية الحقول الأساسية ستُحفظ الآن.)');
+    }
     // Resilience: only send entitlements if the loaded row actually had the
     // column (i.e. Migration 35 ran). Pre-migration, o.entitlements is
     // undefined → we omit it so name/price/etc. edits still save cleanly.
@@ -5511,15 +5625,21 @@ async function transitionAccount(eventType, r, params) {
     }
     case 'convert_monthly':
     case 'convert_yearly': {
+      // Legacy direct converts: here the tier code matches the cycle name (the
+      // pre-X13 world where 'monthly'/'yearly' WERE the cycle). New flows use
+      // convert_plan + params.cycle instead, but these stay for back-compat.
       var planCode = (eventType === 'convert_monthly') ? 'monthly' : 'yearly';
+      var cycleC = (eventType === 'convert_monthly') ? 'monthly' : 'yearly';
       var cfgC = getPlanConfig(planCode);
-      var durC = cfgC ? cfgC.duration_days : (planCode === 'yearly' ? 365 : 30);
-      var priceC = cfgC ? cfgC.price : (planCode === 'yearly' ? 2000000 : 200000);
+      var durC = planDurationForCycle(cfgC || { code: planCode }, cycleC);
+      var priceC = planPriceForCycle(cfgC, cycleC);
+      if (priceC == null) priceC = (cycleC === 'yearly') ? 2000000 : 200000;
       toPlan = planCode;
       amount = priceC;
       updatePayload = {
         status: 'accepted',
         plan: planCode,
+        billing_cycle: cycleC,
         trial_end: todayPlus(durC),
         grace_until: null,
         price_paid: priceC,
@@ -5530,22 +5650,27 @@ async function transitionAccount(eventType, r, params) {
       break;
     }
     case 'convert_plan': {
-      // Phase X11 part 2: generic paid conversion for ANY plan code (added
-      // plans included). Same enforcement math as convert_monthly/yearly —
-      // reads the plan's OWN duration_days + price from config — just not
-      // hardcoded to one code. This is what guarantees an added/edited plan
-      // applies correctly on upgrade: trial_end = today + that plan's duration,
-      // price_paid = that plan's price, trial_requests.plan = that plan's code.
+      // Phase X13: generic paid conversion for ANY tier + chosen billing cycle.
+      // Reads the tier's OWN cycle price (price_monthly/price_yearly) and the
+      // standard cycle period. trial_end = today + cycle period, price_paid =
+      // that cycle's price, plan = tier code, billing_cycle = chosen cycle.
       var planCodeG = params.planCode;
       var cfgG = planCodeG ? getPlanConfig(planCodeG) : null;
       if (!cfgG) return { ok:false, error:'unknown_plan' + (planCodeG ? (':' + planCodeG) : ''), newRow:null };
-      var durG = (cfgG.duration_days != null && !isNaN(Number(cfgG.duration_days))) ? Number(cfgG.duration_days) : 30;
-      var priceG = (cfgG.price != null && !isNaN(Number(cfgG.price))) ? Number(cfgG.price) : 0;
+      var cycleG = normCycle(params.cycle);
+      var durG = planDurationForCycle(cfgG, cycleG);
+      var priceG = planPriceForCycle(cfgG, cycleG);
+      if (priceG == null) {
+        return { ok:false, error:'cycle_not_offered',
+          userMessage: 'خطة ' + (cfgG.display_name || planCodeG) + ' لا تملك سعراً ' + cycleLabelAr(cycleG) + '. اضبط السعر في «الخطط والأسعار» أولاً.',
+          newRow:null };
+      }
       toPlan = planCodeG;
       amount = priceG;
       updatePayload = {
         status: 'accepted',
         plan: planCodeG,
+        billing_cycle: cycleG,
         trial_end: todayPlus(durG),
         grace_until: null,
         price_paid: priceG,
@@ -5577,6 +5702,7 @@ async function transitionAccount(eventType, r, params) {
       updatePayload = {
         status: 'accepted',
         plan: 'yearly',
+        billing_cycle: null,
         trial_end: null,
         grace_until: null,
         price_paid: 0,
@@ -5587,13 +5713,17 @@ async function transitionAccount(eventType, r, params) {
       break;
     }
     case 'renew': {
-      // Extend trial_end by plan.duration_days. If currently expired,
-      // base is "now"; if still active, base is the existing trial_end
-      // (so we add a fresh period on top of remaining time — same UX
-      // as Stripe's renew-now).
+      // Extend trial_end by the tier's CURRENT cycle period. If expired, base is
+      // "now"; if still active, base is existing trial_end (fresh period on top
+      // of remaining time — Stripe renew-now). The cycle can be SWITCHED at
+      // renewal: params.cycle (if given) overrides the stored billing_cycle, so
+      // the new cycle's price + period apply from now on.
       var cfgR = getPlanConfig(fromPlan);
-      var durR = cfgR ? cfgR.duration_days : 30;
-      var priceR = cfgR ? cfgR.price : 0;
+      var cycleR = params.cycle ? normCycle(params.cycle)
+                 : (r.billing_cycle ? normCycle(r.billing_cycle) : 'monthly');
+      var durR = planDurationForCycle(cfgR || { code: fromPlan }, cycleR);
+      var priceR = planPriceForCycle(cfgR, cycleR);
+      if (priceR == null) priceR = 0;
       var nowD = new Date();
       var baseR = (r.trial_end && new Date(r.trial_end) > nowD)
         ? new Date(r.trial_end)
@@ -5605,6 +5735,8 @@ async function transitionAccount(eventType, r, params) {
         grace_until: null,
         price_paid: priceR
       };
+      // Only paid tiers carry a billing cycle (trial has none).
+      if (fromPlan !== 'trial') updatePayload.billing_cycle = cycleR;
       authAction = 'unban';
       break;
     }
@@ -5817,12 +5949,12 @@ async function logSubscriptionEvent(ev) {
 // vs yearly: convert (trial→paid), upgrade (change plan), and the
 // initial paid-plan choice from a 'new' request (rare but supported).
 // State: planModalContext holds the in-flight transition until confirm.
-var planModalContext = null; // { reqId, eventType, selectedPlan }
+var planModalContext = null; // { reqId, eventType, selectedPlan, cycle }
 
 function openPlanModal(reqId, eventType) {
   var r = allRequests.find(function(x){ return x.id === reqId; });
   if (!r) return;
-  planModalContext = { reqId: reqId, eventType: eventType, selectedPlan: null };
+  planModalContext = { reqId: reqId, eventType: eventType, selectedPlan: null, cycle: 'monthly' };
   var titleMap = {
     convert: '💎 ترقية إلى اشتراك مدفوع',
     upgrade: '💎 تغيير الخطة'
@@ -5843,48 +5975,58 @@ function openPlanModal(reqId, eventType) {
     hint += state.label;
   }
   document.getElementById('planModalHint').innerHTML = hint;
-  // Render plan options — every ACTIVE plan except trial (trial isn't a paid
-  // choice; it's the accept path). Phase X11 part 2: was hardcoded to
-  // monthly+yearly; now lists all paid plans so ADDED plans are assignable on
-  // upgrade. The actual enforcement (trial_end/price) happens generically in
-  // transitionAccount('convert_plan') which reads each plan's own config.
-  var optionsHtml = '';
+  // Phase X13: render the tier options + a monthly/yearly cycle toggle. Each
+  // tier shows its price for the selected cycle; tiers without that cycle's
+  // price are shown disabled. Extracted so the toggle can re-render in place.
+  renderPlanModalOptions();
+  var confirmBtn = document.getElementById('planConfirmBtn');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = '✅ تأكيد';
+  document.getElementById('planModal').classList.add('show');
+}
+
+// Phase X13: (re)build the manual plan-picker options for the current cycle.
+function renderPlanModalOptions() {
+  if (!planModalContext) return;
+  var cycle = normCycle(planModalContext.cycle);
   var paidPlans = Object.keys(planConfigCache)
     .map(function(k){ return planConfigCache[k]; })
     .filter(function(pp){ return pp && pp.code !== 'trial' && pp.is_active !== false; })
     .sort(function(a,b){ return (Number(a.sort_order) || 999) - (Number(b.sort_order) || 999); });
-  var mP = getPlanConfig('monthly'), yP = getPlanConfig('yearly');
+  var optionsHtml =
+    '<div class="plan-cycle-toggle">' +
+      '<button type="button" class="plan-cycle-opt' + (cycle === 'monthly' ? ' active' : '') + '" onclick="setPlanModalCycle(\'monthly\')">شهري</button>' +
+      '<button type="button" class="plan-cycle-opt' + (cycle === 'yearly'  ? ' active' : '') + '" onclick="setPlanModalCycle(\'yearly\')">سنوي</button>' +
+    '</div>';
   paidPlans.forEach(function(pp){
-    var savingsBadge = '';
-    if (pp.code === 'yearly' && mP && yP && yP.price && mP.price) {
-      var monthlyEq = mP.price * 12;
-      if (yP.price < monthlyEq) {
-        var pct = Math.round((1 - yP.price / monthlyEq) * 100);
-        if (pct > 0) savingsBadge = ' <span class="plan-savings">وفّر ~' + pct + '%</span>';
-      }
+    var price = planPriceForCycle(pp, cycle);
+    var offered = (price != null);
+    var savBadge = '';
+    if (cycle === 'yearly') {
+      var sp = planAnnualSavingsPct(pp);
+      if (sp > 0) savBadge = ' <span class="plan-savings">وفّر ~' + sp + '%</span>';
     }
     var ico = (pp.icon && String(pp.icon).trim()) ? (escapeHtml(pp.icon) + ' ') : '';
     var meta = (pp.subtitle && String(pp.subtitle).trim())
-      ? escapeHtml(pp.subtitle) : 'دفعة واحدة. التجديد يدوي.';
-    var durTxt = (pp.duration_days == null || isNaN(Number(pp.duration_days))) ? '—' : Number(pp.duration_days);
+      ? escapeHtml(pp.subtitle) : (cycle === 'yearly' ? 'دفعة سنوية.' : 'دفعة شهرية.');
+    var isSel = (planModalContext.selectedPlan === pp.code);
+    var priceLine = offered
+      ? (formatPrice(price, pp.currency) + ' / ' + cycleLabelAr(cycle))
+      : ('— غير متاح (' + cycleLabelAr(cycle) + ')');
     optionsHtml +=
-      '<div class="plan-option" data-plan="' + escapeHtml(pp.code) + '" onclick="selectPlanOption(\'' + jsAttr(pp.code) + '\')">' +
+      '<div class="plan-option' + (isSel ? ' selected' : '') + (offered ? '' : ' plan-option-disabled') + '" data-plan="' + escapeHtml(pp.code) + '"' +
+        (offered ? (' onclick="selectPlanOption(\'' + jsAttr(pp.code) + '\')"') : '') + '>' +
         '<div class="plan-radio"></div>' +
         '<div class="plan-body">' +
-          '<div class="plan-name">' + ico + escapeHtml(pp.display_name || pp.code) + savingsBadge + '</div>' +
-          '<div class="plan-price">' + formatPrice(pp.price, pp.currency) + ' / ' + durTxt + ' يوم</div>' +
+          '<div class="plan-name">' + ico + escapeHtml(pp.display_name || pp.code) + savBadge + '</div>' +
+          '<div class="plan-price">' + priceLine + '</div>' +
           '<div class="plan-meta">' + meta + '</div>' +
         '</div>' +
       '</div>';
   });
-  // Phase 7.6E-Part 2.1: 'permanent' option — admin override outside the
-  // subscription billing model. Visually distinguished (yellow accent +
-  // warning copy) so it doesn't get picked by accident. Use cases:
-  // personal/test accounts, demo accounts for prospects, VIP / lifetime
-  // partnerships, promotional comp. Sets trial_end=NULL; audit row
-  // records it as convert_yearly + notes='permanent (admin override)'.
+  // 'permanent' override — cycle-independent (admin override outside billing).
   optionsHtml +=
-    '<div class="plan-option plan-permanent" data-plan="permanent" onclick="selectPlanOption(\'permanent\')">' +
+    '<div class="plan-option plan-permanent' + (planModalContext.selectedPlan === 'permanent' ? ' selected' : '') + '" data-plan="permanent" onclick="selectPlanOption(\'permanent\')">' +
       '<div class="plan-radio"></div>' +
       '<div class="plan-body">' +
         '<div class="plan-name">♾️ دائم — استخدام داخلي</div>' +
@@ -5893,10 +6035,22 @@ function openPlanModal(reqId, eventType) {
       '</div>' +
     '</div>';
   document.getElementById('planModalOptions').innerHTML = optionsHtml;
-  var confirmBtn = document.getElementById('planConfirmBtn');
-  confirmBtn.disabled = true;
-  confirmBtn.textContent = '✅ تأكيد';
-  document.getElementById('planModal').classList.add('show');
+  var cbtn = document.getElementById('planConfirmBtn');
+  if (cbtn) cbtn.disabled = !planModalContext.selectedPlan;
+}
+
+// Phase X13: switch the manual picker's cycle; drop a selection the new cycle
+// can't satisfy (e.g. picked a yearly-only tier then flipped to monthly).
+function setPlanModalCycle(cycle) {
+  if (!planModalContext) return;
+  planModalContext.cycle = normCycle(cycle);
+  if (planModalContext.selectedPlan && planModalContext.selectedPlan !== 'permanent') {
+    var sel = getPlanConfig(planModalContext.selectedPlan);
+    if (sel && planPriceForCycle(sel, planModalContext.cycle) == null) {
+      planModalContext.selectedPlan = null;
+    }
+  }
+  renderPlanModalOptions();
 }
 
 function selectPlanOption(planCode) {
@@ -5938,18 +6092,18 @@ async function confirmPlanChoice() {
   var btn = document.getElementById('planConfirmBtn');
   btn.disabled = true;
   btn.textContent = '⏳ جارٍ...';
-  // event_type wire format:
-  //   yearly    → convert_yearly
-  //   monthly   → convert_monthly
-  //   permanent → make_permanent (internal; translated to convert_yearly
-  //               + notes in transitionAccount before the DB write so the
-  //               event_type CHECK constraint is honored)
-  var eventType;
-  if (ctx.selectedPlan === 'permanent')      eventType = 'make_permanent';
-  else if (ctx.selectedPlan === 'yearly')    eventType = 'convert_yearly';
-  else if (ctx.selectedPlan === 'monthly')   eventType = 'convert_monthly';
-  else                                       eventType = 'convert_plan'; // any added plan
-  var tParams = (eventType === 'convert_plan') ? { planCode: ctx.selectedPlan } : {};
+  // event_type wire format (Phase X13):
+  //   permanent → make_permanent (internal; translated to convert_yearly +
+  //               notes in transitionAccount before the DB write)
+  //   any tier  → convert_plan with { planCode, cycle } — the generic
+  //               cycle-aware path that reads price_monthly / price_yearly.
+  var eventType, tParams;
+  if (ctx.selectedPlan === 'permanent') {
+    eventType = 'make_permanent'; tParams = {};
+  } else {
+    eventType = 'convert_plan';
+    tParams = { planCode: ctx.selectedPlan, cycle: normCycle(ctx.cycle) };
+  }
   var result = await transitionAccount(eventType, r, tParams);
   closePlanModal();
   if (!result.ok) {
@@ -6684,7 +6838,7 @@ async function loadSubRequests() {
     var ids = SRQ_CACHE.map(function(r){ return r.user_id; }).filter(Boolean);
     if (ids.length) {
       var tr = await window.sb.from('trial_requests')
-        .select('id, user_id, name, email, plan, status, trial_end').in('user_id', ids);
+        .select('id, user_id, name, email, plan, status, trial_end, billing_cycle').in('user_id', ids);
       (tr.data || []).forEach(function(row){
         if (row.user_id) SRQ_TR_MAP[row.user_id] = row;
         if (row.id) SRQ_TR_BY_ID[row.id] = row;
@@ -6697,7 +6851,7 @@ async function loadSubRequests() {
       .map(function(r){ return r.trial_request_id; });
     if (missTrIds.length) {
       var tr2 = await window.sb.from('trial_requests')
-        .select('id, user_id, name, email, plan, status, trial_end').in('id', missTrIds);
+        .select('id, user_id, name, email, plan, status, trial_end, billing_cycle').in('id', missTrIds);
       (tr2.data || []).forEach(function(row){ if (row.id) SRQ_TR_BY_ID[row.id] = row; });
     }
     renderSubRequests();
@@ -6762,9 +6916,11 @@ async function srqApprove(reqId) {
 
   var who = tr.name || tr.email || '';
   var relC = srqRelation(req.current_plan || tr.plan || '', req.requested_plan);
+  var _reqCycleLbl = (req.billing_cycle === 'yearly') ? ' (سنوي)'
+                   : (req.billing_cycle === 'monthly') ? ' (شهري)' : '';
   if (!confirm('تأكيد ' + relC.label + ' الاشتراك؟\n\n' + who + '\n' +
                'من خطة ' + srqPlanLabel(req.current_plan || tr.plan || '') +
-               ' إلى خطة ' + srqPlanLabel(req.requested_plan) + '\n' +
+               ' إلى خطة ' + srqPlanLabel(req.requested_plan) + _reqCycleLbl + '\n' +
                'طريقة الدفع: ' + (SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '\n\n' +
                '⚠️ تأكّد من استلام الدفع قبل التفعيل.')) return;
 
@@ -6782,19 +6938,18 @@ async function srqApprove(reqId) {
     }
   } catch (e) { /* network hiccup — proceed */ }
 
-  // Event mapping. F1: a RENEW (same plan) uses the 'renew' event, which extends
-  // trial_end from the CURRENT end (preserves remaining days, Stripe-style). A
-  // plan CHANGE (upgrade/downgrade) uses convert_*, starting a fresh period.
+  // Event mapping. F1: a RENEW (same tier) uses the 'renew' event, which extends
+  // trial_end from the CURRENT end (preserves remaining days, Stripe-style) and
+  // can SWITCH the billing cycle. A tier CHANGE uses convert_plan (generic, any
+  // tier) starting a fresh period. Both carry the doctor's requested cycle.
   var curCode = req.current_plan || tr.plan || '';
+  var reqCycle = (req.billing_cycle === 'yearly') ? 'yearly'
+               : (req.billing_cycle === 'monthly') ? 'monthly' : null;
   var et, tp;
   if (req.requested_plan === curCode) {
-    et = 'renew'; tp = {};
-  } else if (req.requested_plan === 'yearly') {
-    et = 'convert_yearly'; tp = {};
-  } else if (req.requested_plan === 'monthly') {
-    et = 'convert_monthly'; tp = {};
+    et = 'renew'; tp = reqCycle ? { cycle: reqCycle } : {};
   } else {
-    et = 'convert_plan'; tp = { planCode: req.requested_plan };
+    et = 'convert_plan'; tp = { planCode: req.requested_plan, cycle: reqCycle || 'monthly' };
   }
   var result = await transitionAccount(et, tr, tp);
   if (!result || !result.ok) {
@@ -8429,7 +8584,7 @@ function renderHealthWidgets(requests) {
     var s = computeAccountState(r);
     // Only paid AND not permanent contributes to MRR
     if (s.state !== 'paid' || s.isPermanent) return;
-    var me = monthlyEquivPrice(r.plan, r.price_paid);
+    var me = monthlyEquivPrice(r.plan, r.price_paid, r.billing_cycle);
     if (me <= 0) return;
     mrrTotal += me;
     mrrByPlan[r.plan] = (mrrByPlan[r.plan] || 0) + 1;
@@ -9635,7 +9790,7 @@ function c360ComputeMrrFor(r, s) {
   if (!isFinite(price) || price <= 0) {
     return { text: '—', sub: 'لا توجد بيانات سعر', color: 'muted' };
   }
-  var monthly = monthlyEquivPrice(s.plan, price);
+  var monthly = monthlyEquivPrice(s.plan, price, r.billing_cycle);
   if (!(monthly > 0)) return { text: '—', sub: 'خطة بلا مساهمة شهرية', color: 'muted' };
   return {
     text: Math.round(monthly).toLocaleString('en-US') + ' ل.س',
@@ -9867,14 +10022,21 @@ function applyAdvancedFilters(r) {
 // price to a 30-day month using the plan's OWN duration_days, so a
 // quarterly/biannual/custom plan contributes to MRR correctly — not just the
 // legacy monthly/yearly codes. Falls back to 30/365 only if config isn't loaded.
-function monthlyEquivPrice(planCode, price) {
+function monthlyEquivPrice(planCode, price, cycle) {
   var pnum = Number(price);
   if (!isFinite(pnum) || pnum <= 0) return 0;
-  var cfg = null;
-  try { cfg = getPlanConfig(planCode); } catch(_) {}
-  var dur = (cfg && cfg.duration_days != null && Number(cfg.duration_days) > 0)
-    ? Number(cfg.duration_days)
-    : (planCode === 'yearly' ? 365 : planCode === 'monthly' ? 30 : 0);
+  var dur;
+  if (cycle === 'monthly' || cycle === 'yearly') {
+    // Phase X13: the subscriber's actual billing cycle is authoritative — a tier
+    // can be billed either way, so we can't infer the period from the tier alone.
+    dur = CYCLE_DAYS[cycle];
+  } else {
+    var cfg = null;
+    try { cfg = getPlanConfig(planCode); } catch(_) {}
+    dur = (cfg && cfg.duration_days != null && Number(cfg.duration_days) > 0)
+      ? Number(cfg.duration_days)
+      : (planCode === 'yearly' ? 365 : planCode === 'monthly' ? 30 : 0);
+  }
   if (dur <= 0) return 0; // trial / zero-duration → no recurring revenue
   return pnum * 30 / dur;
 }
@@ -9891,7 +10053,7 @@ function computeRowMrr(r, s) {
   if (!s) s = computeAccountState(r);
   if (s.state !== 'paid' || s.isPermanent) return 0;
   if (s.daysLeft !== null && s.daysLeft <= 0) return 0;
-  return Math.round(monthlyEquivPrice(s.plan, r.price_paid));
+  return Math.round(monthlyEquivPrice(s.plan, r.price_paid, r.billing_cycle));
 }
 
 // — Bulk selection state ———————————————————————————————————————————————
@@ -10283,14 +10445,18 @@ function rptBuildMonths(months) {
 // ───── Normalize a plan price into monthly recurring SYP ────────────────────
 function rptPlanMrr(plan) {
   if (!plan) return 0;
-  // subscription_plans.price is the actual column (not price_syp).
+  var code = String(plan.code || '').toLowerCase();
+  if (code === 'permanent' || code === 'trial') return 0; // no recurring revenue
+  // Phase X13: a tier carries both cycle prices. Use the monthly price as the
+  // representative monthly MRR; if a tier is yearly-only, normalize yearly/12.
+  var pm = Number(plan.price_monthly), py = Number(plan.price_yearly);
+  if (isFinite(pm) && pm > 0) return Math.round(pm);
+  if (isFinite(py) && py > 0) return Math.round(py / 12);
+  // Legacy fallback (pre-Migration 46 rows): single `price` at native cadence.
   var price = Number(plan.price || 0);
   if (!isFinite(price) || price <= 0) return 0;
-  var code = String(plan.code || '').toLowerCase();
-  if (code === 'yearly')  return Math.round(price / 12);
-  if (code === 'monthly') return Math.round(price);
-  // permanent / trial / unknown → 0 recurring
-  return 0;
+  if (code === 'yearly') return Math.round(price / 12);
+  return Math.round(price); // monthly / other short-cycle tier
 }
 
 // ───── Compute current state from a trial_request row ────────────────────────
@@ -10347,12 +10513,12 @@ async function rptLoad() {
     var rangeStart = months[0].start;
 
     var promises = [
-      window.sb.from('trial_requests').select('id, user_id, status, plan, trial_end, created_at, price_paid').limit(5000),
+      window.sb.from('trial_requests').select('id, user_id, status, plan, trial_end, created_at, price_paid, billing_cycle').limit(5000),
       // Note: no gte filter on created_at — we need full history so that
       // the "New vs Reactivation" classification at the start of the range
       // has correct prior-paid context (D8 fix).
       window.sb.from('subscription_events').select('user_id, event_type, from_plan, to_plan, created_at, notes').order('created_at', { ascending: true }).limit(20000),
-      window.sb.from('subscription_plans').select('code, price, duration_days, is_active').limit(50)
+      window.sb.from('subscription_plans').select('code, price, price_monthly, price_yearly, duration_days, is_active').limit(50)
     ];
 
     var results = await Promise.all(promises);
