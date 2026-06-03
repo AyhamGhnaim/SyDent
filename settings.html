@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b08"></script>
+<script src="theme.js?v=20260601b09"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b08"></script>
+<script src="supabase-init.js?v=20260601b09"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b08">
-<script src="sidebar.js?v=20260601b08"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b09">
+<script src="sidebar.js?v=20260601b09"></script>
 </head>
 <body>
 
@@ -2816,8 +2816,13 @@ function _backfillBuildFifo(payment, sessionsList, existingSplits) {
     }
   });
 
+  // Canonical rule (parity with patient-profile.html buildFifoSplits, commit ebd5080):
+  // ONLY completed sessions are eligible. A backfill run must NOT allocate prepayments
+  // to PLANNED sessions as earned revenue — that money stays unearned until the session
+  // is completed (then an automatic income transfer reallocates it). Without this filter
+  // the maintenance tool could corrupt many patients at once. Legacy default '' → completed.
   var eligible = (sessionsList || []).slice().filter(function(s){
-    return s && s.id && (parseFloat(s.cost) || 0) > 0;
+    return s && s.id && (s.status || 'completed') === 'completed' && (parseFloat(s.cost) || 0) > 0;
   });
   eligible.sort(function(a, b){
     var aDone = a.status === 'completed' ? 0 : 1;

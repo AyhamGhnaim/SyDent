@@ -18,7 +18,7 @@
 <title>SyDent — المحاسبة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b08"></script>
+<script src="theme.js?v=20260601b09"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -312,15 +312,15 @@ table.providers tr:hover td { background: rgba(255,255,255,0.02); }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b08">
+<link rel="stylesheet" href="theme.css?v=20260601b09">
 <!-- CRITICAL: Supabase CDN MUST load BEFORE supabase-init.js. The init
      script accesses window.supabase synchronously to expose sbGetUser and
      window.sb on the global. If the CDN loads later (e.g. at end of body),
      init() will throw "sbGetUser is not a function". This 3-line block
      matches the exact pattern used in expenses.html, payouts.html, etc. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b08"></script>
-<script src="sidebar.js?v=20260601b08"></script>
+<script src="supabase-init.js?v=20260601b09"></script>
+<script src="sidebar.js?v=20260601b09"></script>
 </head>
 <body>
 
@@ -415,6 +415,14 @@ var paymentSplits  = [];
 var expenses       = [];
 var payouts        = [];
 var labOrders      = [];
+
+// Status of EVERY ledger_session referenced by an in-range split (id → status),
+// fetched regardless of date/status. Needed to apply the canonical planned-session
+// rule directly in this read path: a non-unearned split is only EARNED revenue if it
+// sits on a COMPLETED session. This makes the clinic summary correct by construction,
+// independent of whether each writer produced clean splits or whether patient-profile
+// self-heal has run. Legacy sessions (status '' / null) fold to 'completed'.
+var splitSessionStatus = {};
 
 // Computed identities (for debug panel)
 var lastIdentities = null;
@@ -787,6 +795,7 @@ async function loadPaymentSplits(from, to) {
   //
   // Pre-Migration-3 fallback: empty array (raw payments serve as the source).
   paymentSplits = [];
+  splitSessionStatus = {};
   if (!payments.length) return;
   try {
     var paymentIds = payments.map(function(p){ return p.id; });
@@ -802,9 +811,59 @@ async function loadPaymentSplits(from, to) {
       return;
     }
     paymentSplits = res.data || [];
+    // Fetch the status of every session referenced by these splits so revenue can
+    // exclude allocations sitting on planned (not-yet-done) sessions.
+    await loadSplitSessionStatuses();
   } catch(e) {
     console.warn('loadPaymentSplits threw:', e);
   }
+}
+
+// Populate splitSessionStatus for every distinct session_id referenced by the
+// loaded splits. Fetched independently of the in-range `sessions` array because a
+// split's session may be completed-but-out-of-range (must still count as earned) or
+// planned (must count as unearned) — neither is reliably present in `sessions`.
+// Chunked to keep the PostgREST .in() URL within length limits.
+async function loadSplitSessionStatuses() {
+  var idSet = {};
+  for (var i = 0; i < paymentSplits.length; i++) {
+    var sid = paymentSplits[i].session_id;
+    if (sid) idSet[sid] = true;
+  }
+  var ids = Object.keys(idSet);
+  if (!ids.length) return;
+  var CHUNK = 150;
+  for (var c = 0; c < ids.length; c += CHUNK) {
+    var slice = ids.slice(c, c + CHUNK);
+    try {
+      var res = await window.sb.from('ledger_sessions')
+        .select('id, status')
+        .eq('doctor_id', currentUser.id)
+        .in('id', slice);
+      if (res.error) {
+        // On error, leave these ids unmapped. splitIsEarned() then treats them as
+        // NOT-completed (conservative: avoids inflating revenue). A migration-missing
+        // DB has no splits anyway, so this path is benign.
+        if (!isMigrationMissing(res.error)) console.warn('loadSplitSessionStatuses:', res.error);
+        continue;
+      }
+      (res.data || []).forEach(function(row){
+        // Legacy sessions with empty/null status fold to 'completed' (system-wide convention).
+        splitSessionStatus[row.id] = row.status || 'completed';
+      });
+    } catch(e) {
+      console.warn('loadSplitSessionStatuses threw:', e);
+    }
+  }
+}
+
+// Canonical earned-split test (parity with patient-profile.html computeFinancials):
+// a split is EARNED revenue only when it is not unearned AND it is allocated to a
+// COMPLETED session. Non-unearned splits on planned sessions (or with no session_id)
+// are treated as unearned credit — money received for work not yet done.
+function splitIsEarned(sp) {
+  if (!sp || sp.is_unearned) return false;
+  return !!sp.session_id && splitSessionStatus[sp.session_id] === 'completed';
 }
 
 async function loadExpenses(from, to) {
@@ -910,11 +969,12 @@ function computeSummary() {
   var splitPaymentIds = {};
   for (var i = 0; i < paymentSplits.length; i++) {
     var sp = paymentSplits[i];
-    splitPaymentIds[sp.payment_id] = true;
-    if (sp.is_unearned) {
-      unearnedTotal += Number(sp.amount) || 0;
-    } else {
+    splitPaymentIds[sp.payment_id] = true;   // mark for legacy de-dup regardless of earned/unearned
+    if (splitIsEarned(sp)) {
       splitsRevenue += Number(sp.amount) || 0;
+    } else {
+      // is_unearned OR allocated to a planned session → mobile credit (liability), NOT revenue.
+      unearnedTotal += Number(sp.amount) || 0;
     }
   }
 
@@ -1105,7 +1165,7 @@ function computeProviderPerformance() {
   sessions.forEach(function(s){ if (s.provider_id) providerIdsInData[s.provider_id] = true; });
   payouts.forEach(function(p){ if (p.provider_id) providerIdsInData[p.provider_id] = true; });
   paymentSplits.forEach(function(sp){
-    if (sp.provider_id && !sp.is_unearned) providerIdsInData[sp.provider_id] = true;
+    if (splitIsEarned(sp) && sp.provider_id) providerIdsInData[sp.provider_id] = true;
   });
 
   // Track which provider_ids are matched by a doctor row. Splits referencing
@@ -1163,9 +1223,9 @@ function computeProviderPerformance() {
         orphanLabCost += Number(lo.cost) || 0;
       });
     });
-    // Splits — direct attribution to orphan provider_id.
+    // Splits — direct attribution to orphan provider_id (earned only).
     paymentSplits.forEach(function(sp){
-      if (sp.is_unearned) return;
+      if (!splitIsEarned(sp)) return;
       if (sp.provider_id === pid) orphanCollection += Number(sp.amount) || 0;
     });
     // Legacy proportional — for each in-range patient with sessions on this
@@ -1214,7 +1274,7 @@ function computeProviderPerformance() {
   //   - orphan legacy payments (patient has no in-range sessions).
   var hasUnassignedSessions = sessions.some(function(s){ return !s.provider_id; });
   var hasUnassignedSplits = paymentSplits.some(function(sp){
-    return !sp.is_unearned && !sp.provider_id;
+    return splitIsEarned(sp) && !sp.provider_id;
   });
   if (hasUnassignedSessions || hasUnassignedSplits || orphanLegacyRevenue > 0) {
     var unassignedRow = computeOneProviderRow(
@@ -1270,7 +1330,7 @@ function computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
   var collection = 0;
   for (var k = 0; k < paymentSplits.length; k++) {
     var sp = paymentSplits[k];
-    if (sp.is_unearned) continue;
+    if (!splitIsEarned(sp)) continue;   // unearned OR on a planned session → not collected revenue
     var matchesProv = isUnassigned ? !sp.provider_id : (sp.provider_id === provId);
     if (matchesProv) collection += Number(sp.amount) || 0;
   }
