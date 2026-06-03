@@ -231,11 +231,11 @@
     var planName = (window.SyDentPlan && window.SyDentPlan.getPlan() && window.SyDentPlan.getPlan().display_name) || '';
     var nameLine = planName ? ('خطتك الحالية: ' + planName) : 'هذه الميزة غير متاحة في خطتك الحالية.';
     document.body.innerHTML =
-      '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;">' +
+      '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg,#0a1628);padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;">' +
         '<div style="font-size:60px;margin-bottom:16px;">🔒</div>' +
-        '<div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">هذه الميزة غير متاحة في خطتك</div>' +
-        '<div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:340px;line-height:1.7;">' + nameLine + '<br>للترقية والوصول لكل الميزات، تواصل معنا.</div>' +
-        '<a href="index.html" style="padding:14px 28px;background:#2ee89e;border-radius:12px;color:#062a1c;font-size:15px;font-weight:800;text-decoration:none;">← العودة للوحة التحكم</a>' +
+        '<div style="font-size:22px;font-weight:800;color:var(--text,#e1f4ee);margin-bottom:10px;">هذه الميزة غير متاحة في خطتك</div>' +
+        '<div style="font-size:14px;color:var(--text2,#8a9ab5);margin-bottom:28px;max-width:340px;line-height:1.7;">' + nameLine + '<br>للترقية والوصول لكل الميزات، تواصل معنا.</div>' +
+        '<a href="index.html" style="padding:14px 28px;background:var(--green,#2ee89e);border-radius:12px;color:#062a1c;font-size:15px;font-weight:800;text-decoration:none;">← العودة للوحة التحكم</a>' +
       '</div>';
   };
 
@@ -480,6 +480,32 @@
   function isOwner()     { return getRole() === 'owner'; }
   function isDoctor()    { return getRole() === 'doctor'; }
   function isSecretary() { return getRole() === 'secretary'; }
+
+  // ── Owner's real person name (dynamic, no static "المالك") ─────
+  // The owner identity must display the actual person's name, NOT the
+  // literal role word "المالك". Resolution order (uses already-loaded
+  // caches, no extra query):
+  //   1. clinic_employees row with role='owner' (same name shown in the
+  //      switch picker — keeps pill + modal in perfect agreement)
+  //   2. clinic_doctors row with is_owner=true (fallback)
+  //   3. null → callers fall back to ROLE_LABELS.owner
+  // Name is used as-is (the stored name already carries the "د" title
+  // when the owner is a doctor — avoids double-prefix like "د. د أيهم").
+  function getOwnerPersonName() {
+    try {
+      var eSrc = _employeesListCache || _allEmployeesListCache;
+      if (eSrc) {
+        var oe = eSrc.find(function(e){ return e.role === 'owner' && e.name; });
+        if (oe) return oe.name;
+      }
+      var dSrc = _doctorsListCache || _allDoctorsListCache;
+      if (dSrc) {
+        var od = dSrc.find(function(d){ return d.is_owner === true && d.name; });
+        if (od) return od.name;
+      }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
 
   // Sync check: is a PIN configured in the DB?
   // Returns false if cache hasn't loaded yet OR if no PIN is set.
@@ -756,16 +782,16 @@
   function showBlockedScreen(role) {
     try {
       document.body.innerHTML =
-        '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;direction:rtl;">' +
+        '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg,#0a1628);padding:24px;font-family:\'Cairo\',sans-serif;text-align:center;direction:rtl;">' +
           '<div style="font-size:72px;margin-bottom:16px;">🔒</div>' +
-          '<div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">لا تملك صلاحية</div>' +
-          '<div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:360px;line-height:1.7;">' +
+          '<div style="font-size:22px;font-weight:800;color:var(--text,#e1f4ee);margin-bottom:10px;">لا تملك صلاحية</div>' +
+          '<div style="font-size:14px;color:var(--text2,#8a9ab5);margin-bottom:28px;max-width:360px;line-height:1.7;">' +
             'الوضع الحالي (' + (ROLE_LABELS[role] || role) + ') لا يسمح بالوصول إلى هذه الصفحة.' +
           '</div>' +
-          '<a href="index.html" style="padding:12px 24px;background:#2ee89e;border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:10px;">' +
+          '<a href="index.html" style="padding:12px 24px;background:var(--green,#2ee89e);border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:10px;">' +
             '↩ العودة للصفحة الرئيسية' +
           '</a>' +
-          '<button onclick="window.SyDentLock.openSwitchModal()" style="padding:10px 22px;background:transparent;border:1px solid rgba(255,255,255,0.18);border-radius:10px;color:#8a9ab5;font-family:\'Cairo\',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">' +
+          '<button onclick="window.SyDentLock.openSwitchModal()" style="padding:10px 22px;background:transparent;border:1px solid var(--border2,rgba(255,255,255,0.18));border-radius:10px;color:var(--text2,#8a9ab5);font-family:\'Cairo\',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">' +
             '🔓 تبديل الوضع' +
           '</button>' +
         '</div>';
@@ -784,7 +810,7 @@
       var user = await window.sbGetUser();
       if (!user) return [];
       var res = await window.sb.from('clinic_doctors')
-        .select('id, name, is_active')
+        .select('id, name, is_active, is_owner')
         .eq('owner_id', user.id)
         .order('name');
       if (res.error) {
@@ -881,22 +907,22 @@
     style.textContent =
       '.sd-lock-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:transform .15s,filter .15s;border:1.5px solid transparent;background:transparent;white-space:nowrap;}' +
       '.sd-lock-btn:hover{transform:translateY(-1px);filter:brightness(1.1);}' +
-      '.sd-lock-btn.sd-owner{background:rgba(46,232,158,0.14);border-color:rgba(46,232,158,0.40);color:#2ee89e;}' +
-      '.sd-lock-btn.sd-doctor{background:rgba(99,179,237,0.14);border-color:rgba(99,179,237,0.40);color:#63b3ed;}' +
-      '.sd-lock-btn.sd-secretary{background:rgba(255,167,38,0.14);border-color:rgba(255,167,38,0.40);color:#ffa726;}' +
+      '.sd-lock-btn.sd-owner{background:rgba(46,232,158,0.14);border-color:rgba(46,232,158,0.40);color:var(--green,#2ee89e);}' +
+      '.sd-lock-btn.sd-doctor{background:rgba(99,179,237,0.14);border-color:rgba(99,179,237,0.40);color:var(--blue,#63b3ed);}' +
+      '.sd-lock-btn.sd-secretary{background:rgba(255,167,38,0.14);border-color:rgba(255,167,38,0.40);color:var(--orange,#ffa726);}' +
       '.sd-lock-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;direction:rtl;font-family:\'Cairo\',sans-serif;}' +
-      '.sd-lock-modal{background:#0f2038;border:1.5px solid rgba(46,232,158,0.25);border-radius:14px;padding:24px;max-width:440px;width:100%;color:#e1f4ee;max-height:90vh;overflow-y:auto;}' +
-      '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:#2ee89e;}' +
-      '.sd-lock-modal .sd-cur{font-size:13px;color:#8a9ab5;margin-bottom:16px;padding:10px 12px;background:rgba(46,232,158,0.06);border-radius:8px;}' +
-      '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:#132840;border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;' +
+      '.sd-lock-modal{background:var(--bg2,#0f2038);border:1.5px solid var(--border2,rgba(46,232,158,0.25));border-radius:14px;padding:24px;max-width:440px;width:100%;color:var(--text,#e1f4ee);max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-modal,0 20px 60px rgba(0,0,0,0.4));}' +
+      '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--green,#2ee89e);}' +
+      '.sd-lock-modal .sd-cur{font-size:13px;color:var(--text2,#8a9ab5);margin-bottom:16px;padding:10px 12px;background:var(--green-dim,rgba(46,232,158,0.06));border-radius:8px;}' +
+      '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:var(--bg3,#132840);border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;' +
         // Defense vs global label rules (patients.html: label{font-size:13px;
         // font-weight:600;color:var(--text2)}, appointments.html: label{
         // font-size:12px;font-weight:700;color:var(--text2)}). Since .sd-opt
         // IS a <label>, those global rules apply and dim the text + shrink it.
         // Force the modal's own typography explicitly.
-        'color:#e1f4ee;font-size:14px;font-weight:600;line-height:1.5;}' +
+        'color:var(--text,#e1f4ee);font-size:14px;font-weight:600;line-height:1.5;}' +
       '.sd-lock-modal .sd-opt:hover{border-color:rgba(46,232,158,0.30);background:rgba(46,232,158,0.05);}' +
-      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:#2ee89e;' +
+      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:var(--green,#2ee89e);' +
         // Defense vs global input resets (patients.html / appointments.html
         // define `input, select, textarea { width:100%; appearance:none }`
         // which would otherwise hide the radio circle AND stretch it to
@@ -909,17 +935,17 @@
       '.sd-lock-modal .sd-opt.sd-active{border-color:rgba(46,232,158,0.55);background:rgba(46,232,158,0.08);}' +
       '.sd-lock-modal .sd-sub{padding:8px 12px 8px 28px;margin-top:6px;display:none;}' +
       '.sd-lock-modal .sd-opt.sd-active .sd-sub{display:block;}' +
-      '.sd-lock-modal select{width:100%;padding:9px 10px;background:#0a1628;border:1px solid rgba(46,232,158,0.20);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:13px;}' +
+      '.sd-lock-modal select{width:100%;padding:9px 10px;background:var(--bg,#0a1628);border:1px solid rgba(46,232,158,0.20);border-radius:8px;color:var(--text,#e1f4ee);font-family:\'Cairo\',sans-serif;font-size:13px;}' +
       '.sd-lock-modal .sd-pin-row{margin-top:14px;padding:12px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;}' +
-      '.sd-lock-modal .sd-pin-row label{display:block;font-size:12px;color:#8a9ab5;margin-bottom:6px;font-weight:700;}' +
-      '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:#0a1628;border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:#e1f4ee;font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;-webkit-appearance:none;appearance:none;}' +
-      '.sd-lock-modal .sd-msg{font-size:12px;color:#ef5350;margin-top:8px;min-height:18px;font-weight:700;}' +
-      '.sd-lock-modal .sd-msg.sd-ok{color:#2ee89e;}' +
+      '.sd-lock-modal .sd-pin-row label{display:block;font-size:12px;color:var(--text2,#8a9ab5);margin-bottom:6px;font-weight:700;}' +
+      '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:var(--bg,#0a1628);border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:var(--text,#e1f4ee);font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;-webkit-appearance:none;appearance:none;}' +
+      '.sd-lock-modal .sd-msg{font-size:12px;color:var(--red,#ef5350);margin-top:8px;min-height:18px;font-weight:700;}' +
+      '.sd-lock-modal .sd-msg.sd-ok{color:var(--green,#2ee89e);}' +
       '.sd-lock-modal .sd-actions{display:flex;gap:10px;margin-top:18px;}' +
       '.sd-lock-modal .sd-btn{flex:1;padding:11px 14px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;border:1.5px solid transparent;}' +
-      '.sd-lock-modal .sd-btn-cancel{background:transparent;border-color:rgba(255,255,255,0.18);color:#8a9ab5;}' +
-      '.sd-lock-modal .sd-btn-cancel:hover{background:rgba(255,255,255,0.06);}' +
-      '.sd-lock-modal .sd-btn-primary{background:#2ee89e;color:#0a1628;}' +
+      '.sd-lock-modal .sd-btn-cancel{background:transparent;border-color:var(--border2,rgba(255,255,255,0.18));color:var(--text2,#8a9ab5);}' +
+      '.sd-lock-modal .sd-btn-cancel:hover{background:var(--bg3,rgba(255,255,255,0.06));}' +
+      '.sd-lock-modal .sd-btn-primary{background:var(--green,#2ee89e);color:#0a1628;}' +
       '.sd-lock-modal .sd-btn-primary:hover{filter:brightness(1.08);}' +
       '.sd-lock-modal .sd-btn-primary:disabled{opacity:0.5;cursor:not-allowed;}';
     document.head.appendChild(style);
@@ -982,11 +1008,16 @@
       // as "(محذوف)" because the owner has no clinic_employees row by design.
       //
       // Resolution order for the owner's display name:
-      //   1. _doctorsListCache lookup by LS_DOCTOR_ID → "د. {name}"
-      //   2. _allDoctorsListCache fallback (in case the owner row is the
-      //      one and only doctor and is_active was toggled to false somehow)
-      //   3. Default ROLE_LABELS.owner ("المالك") — NEVER "(محذوف)"
-      if (_doctorsListCache) {
+      //   1. getOwnerPersonName() → real person name (employees role=owner,
+      //      else doctors is_owner=true). Works even when LS_DOCTOR_ID is
+      //      unset on a default device — this is the primary path now.
+      //   2. _doctorsListCache lookup by LS_DOCTOR_ID → "د. {name}" (legacy)
+      //   3. _allDoctorsListCache fallback (inactive owner doctor row)
+      //   4. Default ROLE_LABELS.owner ("المالك") — NEVER "(محذوف)"
+      var ownerName = getOwnerPersonName();
+      if (ownerName) {
+        label = ownerName; // name used as-is (already carries "د" title if doctor)
+      } else if (_doctorsListCache) {
         var ownerDid = getDoctorId();
         var ownerDoc = ownerDid
           ? _doctorsListCache.find(function(x){ return x.id === ownerDid; })
@@ -1191,22 +1222,39 @@
       var roleLabel = ROLE_LABELS[emp.role] || emp.role;
       var hasPinForThisEmployee = !!emp.pin_hash;
       var pinWarn = (!hasPinForThisEmployee)
-        ? '<span style="color:#f5c842;font-size:11px;margin-right:6px;">⚠ بدون PIN</span>'
+        ? '<span style="color:var(--yellow,#f5c842);font-size:11px;margin-right:6px;">⚠ بدون PIN</span>'
         : '';
+      // Owner row: the 👑 crown already signals ownership — omit the
+      // "المالك" word badge entirely. Doctors/secretaries keep their badge.
+      var roleBadge = (emp.role === 'owner')
+        ? ''
+        : '<span style="color:var(--text2,#8a9ab5);font-size:11px;margin-right:8px;">' + escapeHtmlLock(roleLabel) + '</span>';
       optionsHtml +=
         '<label class="sd-opt' + (current ? ' sd-active' : '') + '" data-employee-id="' + escapeHtmlLock(emp.id) + '">' +
           '<input type="radio" name="sdEmpSel" value="' + escapeHtmlLock(emp.id) + '"' + (current ? ' checked' : '') + '>' +
           '<span style="font-weight:800;">' + icon + ' ' + escapeHtmlLock(emp.name) + '</span>' +
-          '<span style="color:#8a9ab5;font-size:11px;margin-right:8px;">' + escapeHtmlLock(roleLabel) + '</span>' +
+          roleBadge +
           pinWarn +
         '</label>';
     });
 
-    // Current employee display
+    // Current employee display.
+    // Owner → show the real name WITHOUT the "(المالك)" suffix (crown only).
+    // Other roles keep "name (role)". If no current employee row resolved,
+    // fall back to the owner's real name (getOwnerPersonName) before the
+    // static role word.
     var curEmp = sorted.find(isCurrent);
-    var curDisplay = curEmp
-      ? ((ROLE_ICONS[curEmp.role] || '') + ' ' + curEmp.name + ' (' + (ROLE_LABELS[curEmp.role] || curEmp.role) + ')')
-      : ((ROLE_ICONS[curRole] || '') + ' ' + (ROLE_LABELS[curRole] || curRole));
+    var curDisplay;
+    if (curEmp) {
+      curDisplay = (curEmp.role === 'owner')
+        ? ((ROLE_ICONS[curEmp.role] || '') + ' ' + curEmp.name)
+        : ((ROLE_ICONS[curEmp.role] || '') + ' ' + curEmp.name + ' (' + (ROLE_LABELS[curEmp.role] || curEmp.role) + ')');
+    } else if (curRole === 'owner') {
+      var curOwnerName = getOwnerPersonName();
+      curDisplay = (ROLE_ICONS.owner || '') + ' ' + (curOwnerName || ROLE_LABELS.owner);
+    } else {
+      curDisplay = (ROLE_ICONS[curRole] || '') + ' ' + (ROLE_LABELS[curRole] || curRole);
+    }
 
     ov.innerHTML =
       '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الموظف" aria-labelledby="sdModalTitle">' +
@@ -1442,7 +1490,7 @@
 
     var doctorBlock = doctors.length > 0
       ? '<select id="sdDoctorSel">' + doctorOptions + '</select>'
-      : '<div style="color:#ef5350;font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
+      : '<div style="color:var(--red,#ef5350);font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
 
     ov.innerHTML =
       '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع" aria-labelledby="sdLegacyTitle">' +
