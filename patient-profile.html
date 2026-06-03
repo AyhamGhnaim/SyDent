@@ -13,10 +13,10 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b08"></script>
+<script src="theme.js?v=20260601b09"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b08"></script>
-<script src="sidebar.js?v=20260601b08"></script>
+<script src="supabase-init.js?v=20260601b09"></script>
+<script src="sidebar.js?v=20260601b09"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +646,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b08">
+<link rel="stylesheet" href="theme.css?v=20260601b09">
 </head>
 <body>
 <script>
@@ -817,6 +817,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="paymentsContent"></div>
       <div class="balance-summary" id="balanceSummary"></div>
     </div>
+    <div class="card" id="adjustmentsCard">
+      <div class="card-head">
+        <span class="card-title">🧾 التسويات</span>
+        <button class="btn btn-sm" onclick="openAdjustmentModal()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);">＋ خصم / إعدام / استرداد</button>
+      </div>
+      <div id="adjustmentsContent"></div>
+    </div>
   </div>
 
   <!-- Tab: المخابر -->
@@ -888,8 +895,29 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<!-- Modal: جلسة -->
-<div class="modal-overlay" id="sessionModal">
+<!-- Modal: تسوية (خصم / إعدام / استرداد) — Migration 45 -->
+<div class="modal-overlay" id="adjModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3>🧾 تسوية حساب</h3><button class="modal-close" onclick="closeModal('adjModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>النوع</label>
+          <select id="adjKind" onchange="onAdjKindChange()">
+            <option value="discount">خصم (تخفيض على المريض)</option>
+            <option value="write_off">إعدام دين (مبلغ متعذّر تحصيله)</option>
+            <option value="refund">استرداد (إعادة مبلغ نقداً للمريض)</option>
+          </select>
+        </div>
+        <div class="form-group"><label>المبلغ (ل.س)</label><input type="number" id="adjAmount" placeholder="مثال: 20000" min="0" inputmode="numeric"></div>
+      </div>
+      <div id="adjHint" style="font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;"></div>
+      <div class="form-group"><label>التاريخ</label><input type="date" id="adjDate"></div>
+      <div class="form-group"><label>السبب / ملاحظة (اختياري)</label><textarea id="adjNote" placeholder="مثال: خصم مجاملة، أو إعادة دفعة زائدة…"></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn-cancel-m" onclick="closeModal('adjModal')">إلغاء</button><button class="btn-save-m" id="adjModalSaveBtn" onclick="saveAdjustment()">حفظ التسوية</button></div>
+  </div>
+</div>
+
   <div class="modal-box">
     <div class="modal-head"><h3>🦷 إضافة جلسة / علاج</h3><button class="modal-close" onclick="closeModal('sessionModal')">✕</button></div>
     <div class="modal-body">
@@ -1341,6 +1369,7 @@ var patients  = [];   // all doctor's patients (for seq numbering)
 var sessions  = [];
 var payments  = [];
 var paymentSplits = [];   // payment_splits for current patient (OpenDental-style allocation)
+var adjustments = [];     // account_adjustments for current patient (discount / write_off / refund)
 var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: null, L: null, I: null } }
 var labOrders = [];   // lab orders for current patient
 var allLabs   = [];   // all labs for the doctor
@@ -1793,6 +1822,19 @@ function _isPaymentSplitsTableMissing(err) {
   if (err.code === '42P01' || err.code === 'PGRST205') return true; // undefined_table / not in schema cache
   var m = (err.message || '').toLowerCase();
   return m.indexOf('payment_splits') !== -1
+      && (m.indexOf('does not exist') !== -1
+       || m.indexOf('not found') !== -1
+       || m.indexOf('schema cache') !== -1
+       || m.indexOf('relation') !== -1);
+}
+
+// Same graceful-degradation detector for the account_adjustments table
+// (Migration 45). Lets the profile work unchanged on a pre-Migration-45 DB.
+function _isAdjustmentsTableMissing(err) {
+  if (!err) return false;
+  if (err.code === '42P01' || err.code === 'PGRST205') return true;
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('account_adjustments') !== -1
       && (m.indexOf('does not exist') !== -1
        || m.indexOf('not found') !== -1
        || m.indexOf('schema cache') !== -1
@@ -2973,6 +3015,23 @@ async function loadAll() {
     }
   } catch(e) { console.warn('payment_splits fetch:', e); }
 
+  // account_adjustments (Migration 45) — discount / write_off / refund.
+  // Graceful: skip silently if the table is missing (pre-Migration-45 DB).
+  adjustments = [];
+  try {
+    var adjRes = await window.sb.from('account_adjustments').select('*')
+      .eq('patient_id', patientId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (adjRes.error) {
+      if (!_isAdjustmentsTableMissing(adjRes.error)) {
+        console.warn('account_adjustments load error:', adjRes.error);
+      }
+    } else {
+      adjustments = adjRes.data || [];
+    }
+  } catch(e) { console.warn('account_adjustments fetch:', e); }
+
   // teeth — group by tooth_num then by surface
   const { data: td } = await window.sb.from('teeth_status').select('*')
     .eq('patient_id', patientId);
@@ -3125,19 +3184,42 @@ function computeFinancials() {
     // No splits → assume all paid is "allocated" (legacy behavior)
     allocatedToProduction = paid;
   }
+  // ── Account adjustments (Migration 45) ──────────────────────────────────
+  // discount / write_off REDUCE the charge (not cash) → lower what's owed.
+  // refund is cash returned → eats into the patient's credit first, and any
+  // excess (refunding earned money) re-opens the balance as owed.
+  var chargeReductions = 0;   // discount + write_off (magnitude)
+  var refundsTotal     = 0;   // refund (magnitude)
+  (Array.isArray(adjustments) ? adjustments : []).forEach(function(a){
+    var amt = parseFloat(a.amount) || 0;
+    if (amt <= 0) return;
+    if (a.kind === 'refund')                                 refundsTotal     += amt;
+    else if (a.kind === 'discount' || a.kind === 'write_off') chargeReductions += amt;
+  });
+  // A refund consumes mobile credit first; the rest re-opens owed production.
+  var refundFromUnearned = Math.min(refundsTotal, unearnedCredit);
+  var refundFromEarned   = refundsTotal - refundFromUnearned;
+  unearnedCredit = unearnedCredit - refundFromUnearned;          // effective credit after refund
+
   // Balance is on COMPLETED production only — planned work is an estimate, never owed yet.
-  var trueBalance = completedTotal - allocatedToProduction;
+  // Charge reductions lower it; refunds of earned money raise it back.
+  var netCompleted = completedTotal - chargeReductions;          // effective charge after discounts/write-offs
+  var trueBalance  = netCompleted - allocatedToProduction + refundFromEarned;
 
   return {
     total: total,                       // all sessions (kept for reference)
-    paid: paid,
+    paid: paid,                         // gross payments received (refunds shown separately)
     balance: completedTotal - paid,     // legacy field — now production-based
     plannedTotal: plannedTotal,
-    completedTotal: completedTotal,
+    completedTotal: completedTotal,     // gross completed production (before reductions)
     // New (OpenDental-precise) fields:
     allocatedToProduction: allocatedToProduction,
-    unearnedCredit: unearnedCredit,
-    trueBalance: trueBalance      // remaining due on COMPLETED production, ignoring prepayments
+    unearnedCredit: unearnedCredit,     // effective (after refund consumes credit)
+    trueBalance: trueBalance,           // remaining due on COMPLETED production, net of adjustments
+    // Adjustment fields (Migration 45):
+    chargeReductions: chargeReductions, // discount + write_off
+    refundsTotal: refundsTotal,         // refunds (cash out)
+    netCompleted: netCompleted          // completedTotal − chargeReductions
   };
 }
 
@@ -6350,13 +6432,24 @@ function renderPayments() {
     // Settled — only show when there's actual production (otherwise hide for new patients)
     balanceCard = '<div class="bs-item" title="كل العلاجات مدفوعة بالكامل"><div class="bs-val" style="color:var(--green)">✓</div><div class="bs-lbl">الحساب مكتمل</div></div>';
   }
+  // Adjustment cards (Migration 45) — shown only when present, so they don't
+  // clutter the common case. They explain WHY the balance differs from raw paid.
+  var reductionHtml = (f.chargeReductions > EPS)
+    ? '<div class="bs-item" title="إجمالي الخصومات وإعدام الديون — تخفيض على قيمة العلاج (ليس نقداً)"><div class="bs-val" style="color:var(--amber)">− ' + fmt(f.chargeReductions) + ' ل.س</div><div class="bs-lbl">خصم / إعدام</div></div>'
+    : '';
+  var refundHtml = (f.refundsTotal > EPS)
+    ? '<div class="bs-item" title="إجمالي المبالغ المستردّة نقداً للمريض"><div class="bs-val" style="color:var(--red)">− ' + fmt(f.refundsTotal) + ' ل.س</div><div class="bs-lbl">ردّ مبالغ</div></div>'
+    : '';
   // When unearned > 0, the unearnedHtml card carries the message; no balance card needed.
   document.getElementById('balanceSummary').innerHTML =
     '<div class="bs-item"><div class="bs-val" style="color:var(--text)">'   + fmt(f.completedTotal) + ' ل.س</div><div class="bs-lbl">العلاج المنجز</div></div>'
   + plannedHtml
   + '<div class="bs-item"><div class="bs-val" style="color:var(--green)">'  + fmt(f.paid)  + ' ل.س</div><div class="bs-lbl">إجمالي المدفوع</div></div>'
+  + reductionHtml
+  + refundHtml
   + unearnedHtml
   + balanceCard;
+  renderAdjustments();
   if (!payments.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div>لا توجد مدفوعات مسجّلة بعد</div>';
     return;
@@ -6379,6 +6472,143 @@ function renderPayments() {
       + '</tr>';
   });
   el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>طريقة الدفع</th><th>ملاحظات</th><th style="text-align:left;">المبلغ</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+/* ── Account Adjustments (Migration 45) — discount / write_off / refund ── */
+var _adjSaveInFlight = false;
+
+function adjKindLabel(kind) {
+  if (kind === 'discount')  return 'خصم';
+  if (kind === 'write_off') return 'إعدام دين';
+  if (kind === 'refund')    return 'استرداد';
+  return kind || '—';
+}
+
+function onAdjKindChange() {
+  var kind = document.getElementById('adjKind').value;
+  var hint = '';
+  if (kind === 'discount')       hint = 'تخفيض على قيمة العلاج المنجز — يقلّل ما هو مستحق على المريض. ليس نقداً.';
+  else if (kind === 'write_off') hint = 'شطب مبلغ متعذّر تحصيله — يقلّل المستحق على المريض. ليس نقداً.';
+  else if (kind === 'refund')    hint = 'إعادة مبلغ نقداً للمريض — يقلّل رصيده المقدّم أولاً، وأي فائض يعيد فتح المستحق، ويُخصم من إيراد العيادة.';
+  var el = document.getElementById('adjHint');
+  if (el) el.textContent = hint;
+}
+
+function openAdjustmentModal() {
+  // Defense-in-depth: block if the locked doctor account is inactive (mirrors payments).
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إضافة تسويات');
+    return;
+  }
+  document.getElementById('adjKind').value   = 'discount';
+  document.getElementById('adjAmount').value = '';
+  document.getElementById('adjNote').value   = '';
+  document.getElementById('adjDate').value   = toDay();
+  onAdjKindChange();
+  openModal('adjModal');
+}
+
+async function saveAdjustment() {
+  if (_adjSaveInFlight) return;
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن إضافة تسويات');
+    return;
+  }
+  var kind   = document.getElementById('adjKind').value;
+  var amount = parseFloat(document.getElementById('adjAmount').value);
+  var date   = document.getElementById('adjDate').value;
+  var note   = document.getElementById('adjNote').value.trim();
+  if (['discount','write_off','refund'].indexOf(kind) === -1) { showToast('⚠️ اختر نوع التسوية'); return; }
+  if (!amount || amount <= 0) { showToast('⚠️ أدخل مبلغاً صحيحاً'); return; }
+  if (!date) { showToast('⚠️ اختر التاريخ'); return; }
+  var saveBtn = document.getElementById('adjModalSaveBtn');
+  _adjSaveInFlight = true;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    var res = await window.sb.from('account_adjustments').insert({
+      doctor_id: currentUser.id, patient_id: patientId,
+      kind: kind, amount: Math.round(amount), note: note, date: date
+    }).select().single();
+    if (res.error || !res.data) {
+      if (_isAdjustmentsTableMissing(res.error)) {
+        showToast('⚠️ ميزة التسويات غير مفعّلة — شغّل Migration 45');
+      } else {
+        console.warn('saveAdjustment failed:', res.error);
+        showToast('⚠️ فشل حفظ التسوية: ' + (res.error && res.error.message ? res.error.message : 'سبب غير معروف'));
+      }
+      return;
+    }
+    adjustments.unshift(res.data);
+    sortByDateDesc(adjustments);
+    await syncPaymentStatus();
+    renderStats(); renderInfo(); renderPayments();
+    closeModal('adjModal');
+    if (window.logAudit) {
+      window.logAudit('adjustment.create', {
+        entityId: res.data.id,
+        patientId: patientId,
+        patientName: (patient && patient.name) || '',
+        description: 'تسوية (' + adjKindLabel(kind) + '): ' + Math.round(amount) + ' ل.س',
+        newValue: { kind: kind, amount: Math.round(amount), date: date, note: note }
+      });
+    }
+    showToast('✅ تم حفظ التسوية');
+  } finally {
+    _adjSaveInFlight = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ التسوية'; }
+  }
+}
+
+async function delAdjustment(id) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن حذف التسويات');
+    return;
+  }
+  var orig = adjustments.find(function(a){ return a.id === id; });
+  if (!confirm('حذف هذه التسوية؟')) return;
+  try {
+    var res = await window.sb.from('account_adjustments').delete()
+      .eq('id', id).eq('doctor_id', currentUser.id);
+    if (res.error) { console.warn('delAdjustment failed:', res.error); showToast('⚠️ فشل حذف التسوية'); return; }
+  } catch(e) { console.warn('delAdjustment threw:', e); showToast('⚠️ فشل حذف التسوية'); return; }
+  if (window.logAudit && orig) {
+    window.logAudit('adjustment.delete', {
+      entityId: id,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'حذف تسوية (' + adjKindLabel(orig.kind) + '): ' + (orig.amount || 0) + ' ل.س',
+      oldValue: { kind: orig.kind, amount: orig.amount, date: orig.date, note: orig.note, created_at: orig.created_at }
+    });
+  }
+  adjustments = adjustments.filter(function(a){ return a.id !== id; });
+  await syncPaymentStatus();
+  renderStats(); renderInfo(); renderPayments();
+  showToast('🗑️ تم حذف التسوية');
+}
+
+function renderAdjustments() {
+  var el = document.getElementById('adjustmentsContent');
+  if (!el) return;
+  if (!Array.isArray(adjustments) || !adjustments.length) {
+    el.innerHTML = '<div class="empty" style="padding:20px 16px;"><div style="font-size:13px;color:var(--text2)">لا توجد تسويات. استخدم الزر أعلاه لإضافة خصم أو إعدام دين أو استرداد.</div></div>';
+    return;
+  }
+  var tagFor = function(kind){
+    if (kind === 'refund')    return '<span class="tag" style="background:rgba(239,83,80,0.15);color:var(--red);">استرداد</span>';
+    if (kind === 'write_off') return '<span class="tag" style="background:rgba(245,158,11,0.15);color:var(--amber);">إعدام دين</span>';
+    return '<span class="tag" style="background:rgba(245,158,11,0.15);color:var(--amber);">خصم</span>';
+  };
+  var rows = '';
+  adjustments.forEach(function(a){
+    rows += '<tr>'
+      + '<td' + dtHoverAttrs(a.created_at) + '>' + fmtD(a.date) + '</td>'
+      + '<td>' + tagFor(a.kind) + '</td>'
+      + '<td style="color:var(--text2)">' + escapeHtml(a.note || '—') + '</td>'
+      + '<td style="text-align:left;color:var(--amber);font-weight:700;white-space:nowrap;">− ' + fmt(a.amount) + ' ل.س</td>'
+      + '<td style="white-space:nowrap;"><button class="del-btn" onclick="delAdjustment(\'' + a.id + '\')">🗑</button></td>'
+      + '</tr>';
+  });
+  el.innerHTML = '<table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>ملاحظة</th><th style="text-align:left;">المبلغ</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 /* ── Recent Sessions ── */

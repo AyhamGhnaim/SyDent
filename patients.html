@@ -13,7 +13,7 @@
 <title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b08"></script>
+<script src="theme.js?v=20260601b09"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -480,10 +480,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b08">
+<link rel="stylesheet" href="theme.css?v=20260601b09">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b08"></script>
-<script src="sidebar.js?v=20260601b08"></script>
+<script src="supabase-init.js?v=20260601b09"></script>
+<script src="sidebar.js?v=20260601b09"></script>
 </head>
 <body>
 <script>
@@ -716,14 +716,15 @@ async function loadFinancials() {
   finMap = {};
   if (!patients.length) return;
   const ids = patients.map(p => p.id);
-  ids.forEach(id => { finMap[id] = { completedTotal:0, plannedTotal:0, paid:0, allocated:0, unearned:0, hasSplits:false }; });
+  ids.forEach(id => { finMap[id] = { completedTotal:0, plannedTotal:0, paid:0, allocated:0, unearned:0, hasSplits:false, chargeReductions:0, refunds:0 }; });
 
-  let sRes, pRes, spRes;
+  let sRes, pRes, spRes, aRes;
   try {
-    [sRes, pRes, spRes] = await Promise.all([
+    [sRes, pRes, spRes, aRes] = await Promise.all([
       window.sb.from('ledger_sessions').select('id,patient_id,cost,status').in('patient_id', ids),
       window.sb.from('ledger_payments').select('patient_id,amount').in('patient_id', ids),
-      window.sb.from('payment_splits').select('patient_id,session_id,amount,is_unearned').in('patient_id', ids)
+      window.sb.from('payment_splits').select('patient_id,session_id,amount,is_unearned').in('patient_id', ids),
+      window.sb.from('account_adjustments').select('patient_id,kind,amount').in('patient_id', ids)
     ]);
   } catch (e) {
     console.warn('loadFinancials fetch error:', e);
@@ -753,12 +754,25 @@ async function loadFinancials() {
     if (sp.is_unearned || !onCompleted) b.unearned += a;
     else                                b.allocated += a;
   });
+  // account_adjustments (Migration 45) — discount/write_off reduce the charge;
+  // refund returns cash (eats credit first, excess re-opens owed). Graceful:
+  // if the table is missing, aRes.error is set and we simply skip.
+  if (aRes && !aRes.error) (aRes.data || []).forEach(a => {
+    const b = finMap[a.patient_id]; if (!b) return;
+    const amt = parseFloat(a.amount) || 0; if (amt <= 0) return;
+    if (a.kind === 'refund')                                  b.refunds          += amt;
+    else if (a.kind === 'discount' || a.kind === 'write_off') b.chargeReductions += amt;
+  });
 
-  // Finalize per-patient: no splits → allocated = paid (legacy). Balance on completed only.
+  // Finalize per-patient: no splits → allocated = paid (legacy). Balance on completed only,
+  // net of charge reductions; refunds of earned money re-open the balance.
   ids.forEach(id => {
     const b = finMap[id];
     if (!b.hasSplits) b.allocated = b.paid;
-    b.trueBalance = b.completedTotal - b.allocated;   // remaining due on COMPLETED production
+    const refundFromUnearned = Math.min(b.refunds, b.unearned);
+    const refundFromEarned   = b.refunds - refundFromUnearned;
+    b.unearned = b.unearned - refundFromUnearned;
+    b.trueBalance = (b.completedTotal - b.chargeReductions) - b.allocated + refundFromEarned;
   });
 }
 
