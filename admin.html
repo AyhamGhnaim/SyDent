@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b18"></script>
+<script src="theme.js?v=20260601b19"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2246,11 +2246,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b18">
+<link rel="stylesheet" href="theme.css?v=20260601b19">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b18"></script>
+<script src="supabase-init.js?v=20260601b19"></script>
 </head>
 <body>
 
@@ -3992,6 +3992,13 @@ var CYCLE_DAYS = { monthly: 30, yearly: 365 };
 
 function normCycle(c) { return (c === 'yearly') ? 'yearly' : 'monthly'; }
 function cycleLabelAr(cycle) { return normCycle(cycle) === 'yearly' ? 'سنوي' : 'شهري'; }
+// Null-safe cycle label for DISPLAY. Returns 'شهري'/'سنوي' only for a set cycle;
+// '' for none. Trial and permanent accounts have billing_cycle = NULL and must
+// NOT default to 'شهري' (that is what cycleLabelAr/normCycle would wrongly do).
+// DB CHECK (Migration 46) restricts billing_cycle to 'monthly'|'yearly'|NULL.
+function cycleLabelArOrEmpty(cycle) {
+  return cycle === 'yearly' ? 'سنوي' : (cycle === 'monthly' ? 'شهري' : '');
+}
 
 // Price for a tier + cycle. Falls back to the legacy single `price` ONLY when
 // the requested cycle's dedicated price is absent AND the tier's native period
@@ -7348,6 +7355,7 @@ function renderSubRequests() {
     var who = tr.name || tr.email || '(مستأجر غير معروف)';
     var curCode = req.current_plan || (tr.plan || '');
     var rel = srqRelation(curCode, req.requested_plan);
+    var reqCyc = cycleLabelArOrEmpty(req.billing_cycle);
     var when = req.created_at ? new Date(req.created_at).toLocaleString('en-GB') : '';
     html += '<div class="srq-row">' +
       '<div class="srq-row-top">' +
@@ -7357,6 +7365,7 @@ function renderSubRequests() {
       '<div class="srq-meta">' +
         'الخطة الحالية: <b>' + srqEsc(srqPlanLabel(curCode)) + '</b><br>' +
         'الخطة المطلوبة: <b>' + srqEsc(srqPlanLabel(req.requested_plan)) + '</b><br>' +
+        (reqCyc ? 'الدورة المطلوبة: <b>' + reqCyc + '</b><br>' : '') +
         'طريقة الدفع: <b>' + srqEsc(SRQ_METHOD_AR[req.payment_method] || req.payment_method) + '</b><br>' +
         'التاريخ: ' + srqEsc(when) +
       '</div>' +
@@ -9395,7 +9404,10 @@ function renderList() {
     var planPillHtml = '';
     if ((s.state === 'paid' || s.state === 'grace') && !s.isPermanent) {
       var planLabel = planDisplayName(s.plan);
-      planPillHtml = '<span class="req-plan-pill">' + planLabel + '</span>';
+      // Post-X13 a tier (Mini/Max) can be billed monthly OR yearly, so the tier
+      // name alone no longer implies the cycle — surface billing_cycle here.
+      var planCyc = cycleLabelArOrEmpty(r.billing_cycle);
+      planPillHtml = '<span class="req-plan-pill">' + planLabel + (planCyc ? ' · ' + planCyc : '') + '</span>';
     }
     var stateBadge = '<div style="display:flex;align-items:center;">' + adminBadgeHtml + planPillHtml +
                      '<span class="req-state ' + s.state + '">' + s.label + '</span></div>';
@@ -9897,6 +9909,7 @@ function c360BuildOverview(r) {
     + '<div class="c360-card">'
     +   '<div class="c360-card-title">📋 الاشتراك</div>'
     +   c360Row('الخطة', planLabel)
+    +   (cycleLabelArOrEmpty(r.billing_cycle) ? c360Row('الدورة', cycleLabelArOrEmpty(r.billing_cycle)) : '')
     +   c360Row('السعر المدفوع', priceText)
     +   c360Row('الحالة', c360EscapeHtml(statusWord))
     +   c360Row('ينتهي في', expiryText)
