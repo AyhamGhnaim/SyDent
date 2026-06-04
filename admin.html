@@ -5903,13 +5903,12 @@ async function transitionAccount(eventType, r, params) {
       if (del.error) {
         return { ok:false, error:del.error.message, newRow:null };
       }
-      if (newUserId && SERVICE_KEY) {
-        try {
-          await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + newUserId, {
-            method: 'DELETE',
-            headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY }
-          });
-        } catch(e) { console.warn('delete auth user failed:', e); }
+      if (newUserId) {
+        // Phase E2: delete auth user via admin-ops Edge Function (was a
+        // service-key DELETE). Best-effort — the trial_requests row is already
+        // gone; a failure here only leaves an orphaned auth user (logged).
+        var _delRes = await callAdminFn('delete_auth_user', { userId: newUserId });
+        if (!_delRes.ok) console.warn('delete auth user failed:', _delRes.error);
       }
       // Log delete event (best-effort; row is already gone, the FK is
       // ON DELETE SET NULL or similar, so trial_request_id may be null)
@@ -6220,49 +6219,21 @@ async function confirmPlanChoice() {
 // the admin API enforces the conversion + audit semantics.
 
 async function unbanUserIfBanned(uid) {
-  if (!uid || !SERVICE_KEY) return false;
-  try {
-    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SERVICE_KEY,
-        'Authorization': 'Bearer ' + SERVICE_KEY
-      },
-      body: JSON.stringify({ ban_duration: 'none' })
-    });
-    if (!res.ok) {
-      console.warn('unbanUserIfBanned: PUT returned', res.status);
-      return false;
-    }
-    return true;
-  } catch(e) {
-    console.warn('unbanUserIfBanned error:', e);
-    return false;
-  }
+  if (!uid) return false;
+  // Phase E2: lift ban via admin-ops Edge Function (was a service-key PUT).
+  // Graceful: returns false on any failure, never throws.
+  var res = await callAdminFn('unban_user', { userId: uid });
+  if (!res.ok) { console.warn('unbanUserIfBanned failed:', res.error); return false; }
+  return true;
 }
 
 async function banUserPermanently(uid) {
-  if (!uid || !SERVICE_KEY) return false;
-  try {
-    var res = await fetch(SUPABASE_URL + '/auth/v1/admin/users/' + uid, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SERVICE_KEY,
-        'Authorization': 'Bearer ' + SERVICE_KEY
-      },
-      body: JSON.stringify({ ban_duration: '876600h' })
-    });
-    if (!res.ok) {
-      console.warn('banUserPermanently: PUT returned', res.status);
-      return false;
-    }
-    return true;
-  } catch(e) {
-    console.warn('banUserPermanently error:', e);
-    return false;
-  }
+  if (!uid) return false;
+  // Phase E2: permanent ban via admin-ops Edge Function (was a service-key PUT).
+  // Graceful: returns false on any failure, never throws.
+  var res = await callAdminFn('ban_user', { userId: uid });
+  if (!res.ok) { console.warn('banUserPermanently failed:', res.error); return false; }
+  return true;
 }
 
 // ============================================================
