@@ -3116,6 +3116,37 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <script>
 var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
 var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
+// ── Phase E: privileged-ops backend bridge ─────────────────────────────
+// All operations that require the service_role key route through the
+// `admin-ops` Edge Function (the service key now lives server-side only,
+// read from Deno.env). The admin's OWN session JWT authorizes the call;
+// the function verifies platform_admins before any privileged work.
+// supabase-js (window.sb) attaches the Authorization JWT + publishable
+// apikey automatically — nothing to wire here.
+//
+// Migration state: helper added in E0 (not yet wired — the SERVICE_KEY
+// raw-fetch paths are still live). E1 wires the reads, E2 the writes, and
+// E3 removes SERVICE_KEY from this file entirely + rotates the key.
+//
+// Returns a uniform { ok, error, data } shape. On any transport/invoke
+// error it returns { ok:false } so read callers can fail-open (null),
+// exactly like the previous raw-fetch helpers did.
+async function callAdminFn(action, params) {
+  try {
+    var resp = await window.sb.functions.invoke('admin-ops', {
+      body: Object.assign({ action: action }, params || {})
+    });
+    if (resp && resp.error) {
+      console.warn('[admin-ops] ' + action + ' error:', (resp.error && resp.error.message) || resp.error);
+      return { ok: false, error: (resp.error && resp.error.message) || 'invoke_error', data: null };
+    }
+    return { ok: true, error: null, data: (resp && resp.data) || null };
+  } catch (e) {
+    console.warn('[admin-ops] ' + action + ' exception:', e && e.message);
+    return { ok: false, error: (e && e.message) || 'exception', data: null };
+  }
+}
+
 var currentFilter = 'all';
 var allRequests = [];
 // owner_id (= trial_requests.user_id) → live clinic_settings.clinic_name.
