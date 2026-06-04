@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b17"></script>
+<script src="theme.js?v=20260601b18"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2246,11 +2246,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b17">
+<link rel="stylesheet" href="theme.css?v=20260601b18">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b17"></script>
+<script src="supabase-init.js?v=20260601b18"></script>
 </head>
 <body>
 
@@ -3114,8 +3114,6 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 <div id="receiptPrintArea" aria-hidden="true"></div>
 
 <script>
-var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
-var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5Y3F6cGRoeGFicHFyZGd0ZHpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3Njk2NzU3NywiZXhwIjoyMDkyNTQzNTc3fQ.z2u0QSMRBCrcTjUGgjOsNMxVEnyPy4iEvTBVFhSU3bw';
 // ── Phase E: privileged-ops backend bridge ─────────────────────────────
 // All operations that require the service_role key route through the
 // `admin-ops` Edge Function (the service key now lives server-side only,
@@ -3124,9 +3122,10 @@ var SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 // supabase-js (window.sb) attaches the Authorization JWT + publishable
 // apikey automatically — nothing to wire here.
 //
-// Migration state: helper added in E0 (not yet wired — the SERVICE_KEY
-// raw-fetch paths are still live). E1 wires the reads, E2 the writes, and
-// E3 removes SERVICE_KEY from this file entirely + rotates the key.
+// Migration COMPLETE (Phase E): E0 added this bridge + the admin-ops function;
+// E1 routed all privileged reads; E2 routed all privileged writes; E3 removed
+// the client-side service_role key from this file entirely. No raw service-key
+// fetch remains in admin.html — every privileged op goes through admin-ops.
 //
 // Returns a uniform { ok, error, data } shape. On any transport/invoke
 // error it returns { ok:false } so read callers can fail-open (null),
