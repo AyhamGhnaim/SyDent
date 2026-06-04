@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b15"></script>
+<script src="theme.js?v=20260601b16"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -294,9 +294,16 @@ header{
    Lives in its own row above the search bar; on mobile it stays the
    full visible width so the icon + label never wrap. */
 .export-row{
-  display:flex;justify-content:flex-end;
+  display:flex;justify-content:flex-end;gap:8px;
   margin-bottom:12px;
 }
+/* Full-backup variant: muted/secondary so it's distinct from the filtered export. */
+.btn-export-all{
+  background:color-mix(in srgb, var(--green) 10%, transparent) !important;
+  border-color:color-mix(in srgb, var(--green) 32%, transparent) !important;
+  color:var(--green) !important;
+}
+.btn-export-all:hover{ background:color-mix(in srgb, var(--green) 18%, transparent) !important; }
 .btn-export-csv{
   padding:9px 14px;
   background:rgba(77,208,225,0.10);
@@ -2229,11 +2236,11 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b15">
+<link rel="stylesheet" href="theme.css?v=20260601b16">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b15"></script>
+<script src="supabase-init.js?v=20260601b16"></script>
 </head>
 <body>
 
@@ -2328,8 +2335,14 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
     </div>
 
     <!-- Phase 7.6C-Step2: Export CSV (respects current filter + search) -->
+    <!-- + filter-independent FULL backup (all accounts, all states) -->
     <div class="export-row">
-      <button type="button" class="btn-export-csv" id="exportCsvBtn" onclick="exportCSV()">
+      <button type="button" class="btn-export-csv btn-export-all" id="exportAllCsvBtn" onclick="exportCSV(true)"
+              title="تصدير كل الحسابات بكل الحالات (نشط/موقوف/منتهٍ/مرفوض/دائم) — نسخة احتياطية كاملة مستقلة عن الفلتر والبحث.">
+        <span>📥</span><span>تصدير الكل</span>
+      </button>
+      <button type="button" class="btn-export-csv" id="exportCsvBtn" onclick="exportCSV()"
+              title="تصدير القائمة الظاهرة حالياً (حسب الفلتر + البحث).">
         <span>📥</span><span>تصدير CSV</span>
       </button>
     </div>
@@ -8372,13 +8385,15 @@ function todayYmdLocal() {
   return y + '-' + mo + '-' + dd;
 }
 
-async function exportCSV() {
-  var btn = document.getElementById('exportCsvBtn');
-  // Defensive: button is reusable, no need to gate on disabled state
-  // when the user can already see the filter results.
-  var rows = getFilteredRequestsForExport();
+async function exportCSV(exportAll) {
+  var btn = document.getElementById(exportAll ? 'exportAllCsvBtn' : 'exportCsvBtn');
+  // exportAll = filter-independent FULL backup: every account in every state
+  // (active / suspended / expired / rejected / permanent), ignoring the current
+  // filter + search. Supabase free tier has no automated backups, so this is the
+  // manual backup mechanism (mirrors Partner Center "Export all subscriptions").
+  var rows = exportAll ? allRequests.slice() : getFilteredRequestsForExport();
   if (rows.length === 0) {
-    alert('لا توجد نتائج للتصدير. عدّل الفلتر أو البحث وحاول مرة أخرى.');
+    alert(exportAll ? 'لا توجد حسابات للتصدير.' : 'لا توجد نتائج للتصدير. عدّل الفلتر أو البحث وحاول مرة أخرى.');
     return;
   }
 
@@ -8387,7 +8402,7 @@ async function exportCSV() {
   // appreciates seeing the state change even if it's <100ms.
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<span>⏳</span><span>جارٍ التصدير...</span>';
+    btn.innerHTML = '<span>⏳</span><span>' + (exportAll ? 'جارٍ تصدير الكل...' : 'جارٍ التصدير...') + '</span>';
   }
 
   // Hoisted to outer scope so finally can clean them up even on error
@@ -8453,7 +8468,7 @@ async function exportCSV() {
     url = URL.createObjectURL(blob);
     a = document.createElement('a');
     a.href = url;
-    a.download = 'sydent-tenants-' + todayYmdLocal() + '.csv';
+    a.download = 'sydent-tenants' + (exportAll ? '-ALL' : '') + '-' + todayYmdLocal() + '.csv';
     // Some browsers require the anchor to be in the DOM for the click
     // to be honored; we attach, click, then remove immediately.
     document.body.appendChild(a);
@@ -8478,7 +8493,7 @@ async function exportCSV() {
     }
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<span>📥</span><span>تصدير CSV</span>';
+      btn.innerHTML = '<span>📥</span><span>' + (exportAll ? 'تصدير الكل' : 'تصدير CSV') + '</span>';
     }
   }
 }
