@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b16"></script>
+<script src="theme.js?v=20260601b17"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2234,13 +2234,23 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 .rpt-kpi-value.kpi-churn{color:var(--red,#e06a6a);}
 .rpt-kpi-value.muted{color:var(--muted);}
 
+/* ═══ Settings audit list (platform_settings change log) ═══ */
+.ps-audit-list{display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;}
+.ps-audit-row{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:9px 12px;}
+.ps-audit-key{font-size:12.5px;font-weight:800;color:var(--text);}
+.ps-audit-change{font-size:12px;color:var(--text2);margin-top:3px;word-break:break-word;}
+.ps-audit-arrow{color:var(--green);font-weight:700;}
+.ps-audit-empty-val{color:var(--muted);font-style:italic;}
+.ps-audit-meta{font-size:11px;color:var(--muted);margin-top:4px;}
+.ps-audit-empty{font-size:12.5px;color:var(--muted);padding:10px 4px;}
+
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b16">
+<link rel="stylesheet" href="theme.css?v=20260601b17">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b16"></script>
+<script src="supabase-init.js?v=20260601b17"></script>
 </head>
 <body>
 
@@ -2837,6 +2847,15 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
           <div class="ps-actions">
             <button type="button" class="ps-btn-save" id="btnPsSavePayment" onclick="savePsPaymentInstructions()">💾 حفظ تعليمات الدفع</button>
           </div>
+        </div>
+
+        <!-- Card 5: Settings change log (append-only audit — Migration 48) -->
+        <div class="ps-card">
+          <div class="ps-card-head">
+            <h3 class="ps-card-title">📜 سجل تغييرات الإعدادات</h3>
+            <div class="ps-card-desc">آخر التغييرات على إعدادات المنصّة (مين غيّر شو، من القيمة القديمة للجديدة، وإيمتى). سجل للقراءة فقط — لا يشمل إيميل/كلمة سرّ الأدمن.</div>
+          </div>
+          <div id="psAuditList" class="ps-audit-list"><div class="ps-audit-empty">افتح القسم لعرض السجل…</div></div>
         </div>
 
       </div>
@@ -6946,8 +6965,92 @@ var _psSavePasswordInFlight  = false;
 
 function psToggle() {
   var sec = document.getElementById('psSection');
-  if (sec) sec.classList.toggle('open');
+  if (!sec) return;
+  sec.classList.toggle('open');
+  if (sec.classList.contains('open')) loadSettingsAudit();   // refresh the settings change-log on open
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// === Settings audit (Migration 48) — append-only platform_settings change log ===
+// Records who changed which platform_settings key, old→new value, when. Graceful
+// if the table is missing (logs to console, never blocks the save). Does NOT log
+// admin email/password (those go through Supabase Auth, not platform_settings).
+// ════════════════════════════════════════════════════════════════════════════
+var _isSettingsAuditTableMissing = false;
+var _settingsAuditLoading = false;
+var SETTINGS_KEY_AR = {
+  payment_instructions_ar: 'تعليمات الدفع',
+  support_phone: 'هاتف الدعم',
+  support_email: 'إيميل الدعم',
+  platform_name: 'اسم المنصّة',
+  renewal_message: 'رسالة التجديد'
+};
+
+// Insert audit rows for CHANGED keys. rows = [{ key, value }]. Old value read from
+// PLATFORM_SETTINGS_CACHE (call BEFORE updating the cache). Best-effort.
+async function logSettingChanges(rows) {
+  if (!window.sb || !Array.isArray(rows) || !rows.length || _isSettingsAuditTableMissing) return;
+  var by = 'admin';
+  try {
+    var s = await window.sb.auth.getSession();
+    if (s && s.data && s.data.session && s.data.session.user) by = s.data.session.user.email || 'admin';
+  } catch (_) {}
+  var audit = [];
+  rows.forEach(function(r) {
+    var oldVal = (PLATFORM_SETTINGS_CACHE && PLATFORM_SETTINGS_CACHE[r.key] != null) ? String(PLATFORM_SETTINGS_CACHE[r.key]) : '';
+    var newVal = (r.value == null) ? '' : String(r.value);
+    if (oldVal === newVal) return;   // unchanged → skip
+    audit.push({ setting_key: r.key, old_value: oldVal, new_value: newVal, changed_by: by });
+  });
+  if (!audit.length) return;
+  try {
+    var res = await window.sb.from('platform_settings_audit').insert(audit);
+    if (res.error) {
+      if (/relation .* does not exist|platform_settings_audit/i.test(res.error.message || '')) _isSettingsAuditTableMissing = true;
+      console.warn('logSettingChanges:', res.error);
+    }
+  } catch (e) { console.warn('logSettingChanges exception:', e); }
+}
+
+async function loadSettingsAudit() {
+  var listEl = document.getElementById('psAuditList');
+  if (!listEl || !window.sb || _settingsAuditLoading) return;
+  if (_isSettingsAuditTableMissing) { listEl.innerHTML = '<div class="ps-audit-empty">⚠️ سجل التغييرات غير مفعّل (شغّل Migration 48).</div>'; return; }
+  _settingsAuditLoading = true;
+  listEl.innerHTML = '<div class="ps-audit-empty">⏳ جارٍ التحميل…</div>';
+  try {
+    var res = await window.sb.from('platform_settings_audit')
+      .select('setting_key, old_value, new_value, changed_by, changed_at')
+      .order('changed_at', { ascending: false }).limit(50);
+    if (res.error) {
+      if (/relation .* does not exist|platform_settings_audit/i.test(res.error.message || '')) _isSettingsAuditTableMissing = true;
+      listEl.innerHTML = '<div class="ps-audit-empty">⚠️ تعذّر تحميل السجل' + (_isSettingsAuditTableMissing ? ' (شغّل Migration 48)' : '') + '.</div>';
+      return;
+    }
+    renderSettingsAudit(res.data || []);
+  } catch (e) {
+    listEl.innerHTML = '<div class="ps-audit-empty">⚠️ تعذّر تحميل السجل.</div>';
+  } finally { _settingsAuditLoading = false; }
+}
+
+function renderSettingsAudit(rows) {
+  var listEl = document.getElementById('psAuditList');
+  if (!listEl) return;
+  if (!rows.length) { listEl.innerHTML = '<div class="ps-audit-empty">لا تغييرات مسجّلة بعد.</div>'; return; }
+  listEl.innerHTML = rows.map(function(r) {
+    var label = SETTINGS_KEY_AR[r.setting_key] || r.setting_key;
+    var when = '';
+    try { when = new Date(r.changed_at).toLocaleString('ar-EG'); } catch (_) { when = r.changed_at || ''; }
+    var oldT = (r.old_value && String(r.old_value).length) ? escapeHtml(_truncAudit(r.old_value)) : '<span class="ps-audit-empty-val">(فارغ)</span>';
+    var newT = (r.new_value && String(r.new_value).length) ? escapeHtml(_truncAudit(r.new_value)) : '<span class="ps-audit-empty-val">(فارغ)</span>';
+    return '<div class="ps-audit-row">'
+      +   '<div class="ps-audit-key">' + escapeHtml(label) + '</div>'
+      +   '<div class="ps-audit-change">' + oldT + ' <span class="ps-audit-arrow">←</span> ' + newT + '</div>'
+      +   '<div class="ps-audit-meta">' + escapeHtml(r.changed_by || '—') + ' · ' + escapeHtml(when) + '</div>'
+      + '</div>';
+  }).join('');
+}
+function _truncAudit(s) { s = String(s); return s.length > 80 ? s.slice(0, 80) + '…' : s; }
 
 // ===== Phase X12 — Subscription upgrade/renew requests queue =====
 // Tenants submit requests from subscription.html (Migration 42). This queue
@@ -7507,6 +7610,7 @@ async function savePsPaymentInstructions() {
     var res = await window.sb.from('platform_settings').upsert(payload, { onConflict:'key' }).select().maybeSingle();
     if (res.error) { console.error('savePsPaymentInstructions:', res.error); alert('❌ فشل الحفظ: ' + (res.error.message || '')); return; }
     if (!res.data) { alert('❌ لم يُحفَظ — قد تكون الصلاحيات مرفوضة.\nتأكّد من تشغيل Migration 42 وأن دورك admin.'); return; }
+    await logSettingChanges([{ key: 'payment_instructions_ar', value: val }]);
     PLATFORM_SETTINGS_CACHE.payment_instructions_ar = val;
     alert('✅ تم حفظ تعليمات الدفع.');
   } catch (ex) {
@@ -7646,6 +7750,7 @@ async function savePsSupportInfo() {
     var phoneSaved = rows.some(function(r){ return r.key === 'support_phone'; });
 
     // Sync cache + clear dirty flags for keys that were saved
+    await logSettingChanges(rows);
     rows.forEach(function(r){
       PLATFORM_SETTINGS_CACHE[r.key] = r.value;
       _psFieldDirty[r.key] = false;
@@ -7721,6 +7826,7 @@ async function savePsPlatformInfo() {
       return;
     }
 
+    await logSettingChanges(rows);
     rows.forEach(function(r){
       PLATFORM_SETTINGS_CACHE[r.key] = r.value;
       _psFieldDirty[r.key] = false;
