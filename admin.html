@@ -13,7 +13,7 @@
 <title>SyDent — لوحة الإدارة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b14"></script>
+<script src="theme.js?v=20260601b15"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2218,13 +2218,22 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
   .rcpt-gap{height:14px;}
 }
 
+/* ═══ KPIs: ARPU + revenue churn rate (reports dashboard) ═══ */
+.rpt-kpi-strip{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;}
+.rpt-kpi-cell{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.rpt-kpi-label{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+.rpt-kpi-value{font-size:20px;font-weight:800;margin-top:4px;}
+.rpt-kpi-value.kpi-arpu{color:var(--green);}
+.rpt-kpi-value.kpi-churn{color:var(--red,#e06a6a);}
+.rpt-kpi-value.muted{color:var(--muted);}
+
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b14">
+<link rel="stylesheet" href="theme.css?v=20260601b15">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Phase X8: Chart.js for Reports Dashboard (defer = loads in parallel, executes after HTML parse) -->
 <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="supabase-init.js?v=20260601b14"></script>
+<script src="supabase-init.js?v=20260601b15"></script>
 </head>
 <body>
 
@@ -2614,6 +2623,22 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
 
         <!-- 4 chart cards -->
         <div class="rpt-grid" id="rptGrid" style="display:none;">
+
+          <!-- KPI strip (ARPU + revenue churn rate) — full-width, top of dashboard -->
+          <div class="rpt-kpi-strip">
+            <div class="rpt-kpi-cell">
+              <div class="rpt-kpi-label">💵 ARPU <span class="health-info" title="متوسط الإيراد الشهري لكل عميل نشط مدفوع = MRR الحالي ÷ عدد الاشتراكات المدفوعة النشطة (شهري/سنوي، غير دائم).">ⓘ</span></div>
+              <div class="rpt-kpi-value kpi-arpu muted" id="kpiArpu">—</div>
+            </div>
+            <div class="rpt-kpi-cell">
+              <div class="rpt-kpi-label">📉 تسرّب الإيراد (آخر شهر) <span class="health-info" title="نسبة الإيراد الشهري المتكرّر المفقود في آخر شهر = MRR مفقود ÷ MRR بداية الشهر (الشهر السابق).">ⓘ</span></div>
+              <div class="rpt-kpi-value kpi-churn muted" id="kpiChurnLatest">—</div>
+            </div>
+            <div class="rpt-kpi-cell">
+              <div class="rpt-kpi-label">📉 متوسط تسرّب الإيراد <span class="health-info" title="متوسط معدّل تسرّب الإيراد الشهري على كامل الفترة المحدّدة.">ⓘ</span></div>
+              <div class="rpt-kpi-value kpi-churn muted" id="kpiChurnAvg">—</div>
+            </div>
+          </div>
 
           <!-- Chart 1: MRR over time (line) — wide -->
           <div class="rpt-card rpt-card-wide">
@@ -11052,7 +11077,7 @@ async function rptLoad() {
     // For historical accuracy we replay subscription_events up to month_end to
     // determine each user's plan at that moment. If no events, fall back to the
     // current row state.
-    var mrrSeries = months.map(function(m) {
+    var mrrSeriesObj = months.map(function(m) {
       // Walk through events to build a "current plan code" per user_id at m.end
       var planAtEnd = {}; // user_id -> plan bucket ('monthly'/'yearly'/'permanent'/'trial') | null (suspended) | undefined (never seen)
       events.forEach(function(ev) {
@@ -11086,16 +11111,21 @@ async function rptLoad() {
         if (st === 'suspended' || st === 'rejected') planAtEnd[r.user_id] = null;
         else planAtEnd[r.user_id] = st; // paid code | 'permanent' | 'trial'
       });
-      var total = 0;
+      var total = 0, activeCount = 0;
       Object.keys(planAtEnd).forEach(function(uid) {
         var p = planAtEnd[uid];
         if (!p || p === 'trial' || p === 'permanent') return;
         var planRow = planMap[p] || null;
         if (!planRow) return;
         total += rptPlanMrr(planRow);
+        activeCount++;   // count MRR-contributing (paid recurring) tenants — denominator for ARPU
       });
-      return Math.round(total);
+      return { mrr: Math.round(total), active: activeCount };
     });
+    // KPIs (ARPU + churn): keep mrrSeries a number[] (zero downstream ripple);
+    // derive activeSeries in parallel (count of paid recurring tenants per month).
+    var mrrSeries    = mrrSeriesObj.map(function(x) { return x.mrr; });
+    var activeSeries = mrrSeriesObj.map(function(x) { return x.active; });
 
     // ─── Series 2: MRR movement per month ────────────────────────────────────
     // For each month: New (first time becoming paid in this month),
@@ -11180,12 +11210,34 @@ async function rptLoad() {
       if (cur !== 'trial' && cur !== 'suspended' && cur !== 'rejected') convertedInRange++;
     });
 
+    // ─── KPIs: ARPU (current) + revenue churn rate (latest month + avg over range) ──
+    // ARPU = current MRR / current active paid count (last month of the replay).
+    var _lastIdx   = mrrSeries.length - 1;
+    var _curMrr    = _lastIdx >= 0 ? mrrSeries[_lastIdx] : 0;
+    var _curActive = (_lastIdx >= 0 && activeSeries[_lastIdx]) ? activeSeries[_lastIdx] : 0;
+    var _arpu = _curActive > 0 ? Math.round(_curMrr / _curActive) : null;
+    // Revenue churn rate per month = churned MRR / MRR at start of month (= MRR[m-1]).
+    var _churnRates = [];
+    for (var _ci = 1; _ci < mrrSeries.length; _ci++) {
+      var _base = mrrSeries[_ci - 1];
+      if (_base > 0) _churnRates.push((movementSeries[_ci].churnMrr / _base) * 100);
+    }
+    var _churnLatest = null;
+    if (mrrSeries.length >= 2 && mrrSeries[mrrSeries.length - 2] > 0) {
+      _churnLatest = (movementSeries[mrrSeries.length - 1].churnMrr / mrrSeries[mrrSeries.length - 2]) * 100;
+    }
+    var _churnAvg = _churnRates.length
+      ? (_churnRates.reduce(function(a, b) { return a + b; }, 0) / _churnRates.length)
+      : null;
+
     rptState.data = {
       months: months,
       mrrSeries: mrrSeries,
+      activeSeries: activeSeries,
       movementSeries: movementSeries,
       planDist: planDist,
-      funnel: { signups: signupsInRange, accepted: acceptedInRange, converted: convertedInRange }
+      funnel: { signups: signupsInRange, accepted: acceptedInRange, converted: convertedInRange },
+      kpi: { arpu: _arpu, churnLatest: _churnLatest, churnAvg: _churnAvg }
     };
 
     if (myToken !== rptState.loadToken) return;
@@ -11266,6 +11318,7 @@ function rptRender() {
   rptRenderPlansChart(d);
   rptRenderFunnel(d);
   rptRenderMrrSummary(d);
+  rptRenderKpis(d);
 
   var btn = document.getElementById('rptBtnRefresh');
   if (btn) btn.disabled = false;
@@ -11455,6 +11508,31 @@ function rptRenderMrrSummary(d) {
   setText('rptSumMrrPeak',    rptFmtSypShort(peak)    + ' ل.س');
   var delta = (deltaPct >= 0 ? '+' : '') + deltaPct + '%';
   setText('rptSumMrrDelta', delta);
+}
+
+// ───── KPIs: ARPU + revenue churn rate ───────────────────────────────────────
+function rptRenderKpis(d) {
+  var k = (d && d.kpi) || {};
+  var set = function(id, txt, muted) {
+    var n = document.getElementById(id);
+    if (!n) return;
+    n.textContent = txt;
+    n.classList.toggle('muted', !!muted);
+  };
+  // ARPU (current MRR ÷ current active paid count)
+  if (k.arpu != null && isFinite(k.arpu)) set('kpiArpu', rptFmtSypShort(k.arpu) + ' ل.س', false);
+  else set('kpiArpu', '—', true);
+  // Revenue churn rate — latest month
+  if (k.churnLatest != null && isFinite(k.churnLatest)) set('kpiChurnLatest', rptFmtPct(k.churnLatest), false);
+  else set('kpiChurnLatest', '—', true);
+  // Revenue churn rate — average over range
+  if (k.churnAvg != null && isFinite(k.churnAvg)) set('kpiChurnAvg', rptFmtPct(k.churnAvg), false);
+  else set('kpiChurnAvg', '—', true);
+}
+
+function rptFmtPct(n) {
+  var v = Math.round(n * 10) / 10;   // one decimal place
+  return (Number.isInteger(v) ? String(v) : v.toFixed(1)) + '%';
 }
 
 // ───── CSV export ────────────────────────────────────────────────────────────
