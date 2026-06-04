@@ -3235,117 +3235,19 @@ async function fetchActivityFor(userId, reqId) {
                             lastSignIn: null };
   renderList(); // show loader immediately
 
-  // Helper for a single count query — returns the count or null on error.
-  // PERF: GET with limit=0 + Prefer:count=exact returns an empty array but
-  // Content-Range header carries the total count (no row payload).
-  // RLS: uses SERVICE_KEY directly to bypass per-tenant RLS policies — the
-  // admin is NOT the owner of these rows, so window.sb (which uses the
-  // publishable anon key) would be filtered out by RLS.
-  //
-  // IMPORTANT: column names differ between tables in the SyDent schema!
-  //   patients.doctor_id     = owner's auth.users.id  (NOT owner_id)
-  //   appointments.doctor_id = owner's auth.users.id  (NOT owner_id)
-  //   clinic_employees.owner_id = owner's auth.users.id
-  // The owner's doctors.id is intentionally identical to auth.users.id
-  // (Phase 1 canonical design) so userId works as both.
-  async function safeCount(table, filterCol) {
-    try {
-      var url = SUPABASE_URL + '/rest/v1/' + table +
-                '?select=id&' + filterCol + '=eq.' + encodeURIComponent(userId) +
-                '&limit=0';
-      var resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': SERVICE_KEY,
-          'Authorization': 'Bearer ' + SERVICE_KEY,
-          'Prefer': 'count=exact'
-        }
-      });
-      if (!resp.ok && resp.status !== 206) {
-        console.warn(table + ' count HTTP', resp.status);
-        return null;
-      }
-      // Content-Range looks like "0-0/42" — the part after "/" is the total
-      var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
-      var slash = cr.lastIndexOf('/');
-      if (slash < 0) {
-        console.warn(table + ' count: no Content-Range header (cr=', cr, ')');
-        return null;
-      }
-      var totalStr = cr.slice(slash + 1).trim();
-      if (totalStr === '*') return null;
-      var n = parseInt(totalStr, 10);
-      return isNaN(n) ? null : n;
-    } catch(e) {
-      console.warn(table + ' count exception:', e && e.message);
-      return null;
-    }
-  }
-
-  // employees: also filter is_active=true to match Phase 5 model.
-  async function safeActiveEmployees() {
-    try {
-      var url = SUPABASE_URL + '/rest/v1/clinic_employees' +
-                '?select=id&owner_id=eq.' + encodeURIComponent(userId) +
-                '&is_active=eq.true&limit=0';
-      var resp = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': SERVICE_KEY,
-          'Authorization': 'Bearer ' + SERVICE_KEY,
-          'Prefer': 'count=exact'
-        }
-      });
-      if (!resp.ok && resp.status !== 206) {
-        console.warn('employees count HTTP', resp.status);
-        return null;
-      }
-      var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
-      var slash = cr.lastIndexOf('/');
-      if (slash < 0) return null;
-      var totalStr = cr.slice(slash + 1).trim();
-      if (totalStr === '*') return null;
-      var n = parseInt(totalStr, 10);
-      return isNaN(n) ? null : n;
-    } catch(e) {
-      console.warn('employees count exception:', e && e.message);
-      return null;
-    }
-  }
-
-  // last_sign_in: admin API user lookup. Returns ISO string or null.
-  async function safeLastSignIn() {
-    try {
-      var resp = await fetch(
-        SUPABASE_URL + '/auth/v1/admin/users/' + encodeURIComponent(userId),
-        { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
-      );
-      if (!resp.ok) {
-        console.warn('last_sign_in lookup HTTP', resp.status);
-        return null;
-      }
-      var data = await resp.json();
-      return (data && data.last_sign_in_at) || null;
-    } catch(e) {
-      console.warn('last_sign_in exception:', e && e.message);
-      return null;
-    }
-  }
-
-  // Run all four in parallel for speed.
-  var results = await Promise.all([
-    safeCount('patients', 'doctor_id'),       // patients.doctor_id
-    safeCount('appointments', 'doctor_id'),   // appointments.doctor_id
-    safeActiveEmployees(),                    // clinic_employees.owner_id (specialized)
-    safeLastSignIn()
-  ]);
+  // Phase E1: counts + last_sign_in now come from the admin-ops Edge Function
+  // in ONE round-trip (was four separate service-key fetches). The function
+  // performs the RLS-bypassing reads server-side; each field fails soft to
+  // null exactly like before, so the UI degrades gracefully on any error.
+  var _act = await callAdminFn('tenant_activity', { userId: userId });
+  var _ad = (_act && _act.ok && _act.data && typeof _act.data === 'object') ? _act.data : {};
 
   activityCache[reqId] = {
     loading: false, loaded: true, error: null,
-    patients:     results[0],
-    appointments: results[1],
-    employees:    results[2],
-    lastSignIn:   results[3]
+    patients:     (typeof _ad.patients     === 'number' ? _ad.patients     : null),
+    appointments: (typeof _ad.appointments === 'number' ? _ad.appointments : null),
+    employees:    (typeof _ad.employees    === 'number' ? _ad.employees    : null),
+    lastSignIn:   (_ad.lastSignIn || null)
   };
   renderList();
 }
@@ -3940,29 +3842,21 @@ async function loadAndRender() {
   } catch (e) { clinicNameByUid = {}; }
 
   // Resolve each owner's live personal name (clinic_employees.name of the
-  // role='owner' row, kept synced to auth full_name). Single batched query via
-  // SERVICE_KEY — clinic_employees is RLS-protected per tenant and the admin is
-  // not the owner, so window.sb (anon key) would be filtered out; the same
-  // service-key REST pattern is used by safeCount/safeActiveEmployees below.
-  // On any error/empty we keep the map empty and the contact falls back to the
-  // signup name (trial_requests.name) — no regression.
+  // role='owner' row, kept synced to auth full_name). Phase E1: batched via the
+  // admin-ops Edge Function (was a service-key REST query). On any error/empty
+  // we keep the map empty and the contact falls back to the signup name
+  // (trial_requests.name) — no regression.
   ownerNameByUid = {};
   try {
-    if (_uids.length && SERVICE_KEY) {
-      var _inList = _uids.map(function(u){ return encodeURIComponent(u); }).join(',');
-      var _onResp = await fetch(
-        SUPABASE_URL + '/rest/v1/clinic_employees' +
-        '?select=owner_id,name&role=eq.owner&owner_id=in.(' + _inList + ')',
-        { headers: { 'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY } }
-      );
-      if (_onResp.ok) {
-        var _onData = await _onResp.json();
-        (Array.isArray(_onData) ? _onData : []).forEach(function(row){
-          if (row && row.owner_id && row.name && String(row.name).trim()) {
-            ownerNameByUid[row.owner_id] = String(row.name).trim();
-          }
-        });
-      }
+    if (_uids.length) {
+      var _onRes = await callAdminFn('owner_names', { userIds: _uids });
+      var _onMap = (_onRes && _onRes.ok && _onRes.data && _onRes.data.map &&
+                    typeof _onRes.data.map === 'object') ? _onRes.data.map : {};
+      Object.keys(_onMap).forEach(function(uid){
+        if (uid && _onMap[uid] && String(_onMap[uid]).trim()) {
+          ownerNameByUid[uid] = String(_onMap[uid]).trim();
+        }
+      });
     }
   } catch (e) { ownerNameByUid = {}; }
   // Phase X1: refresh admin Set so renderList can show 👑 badges and
@@ -5729,23 +5623,14 @@ function computeAccountState(r) {
 // Returns: { ok: bool, error: string|null, newRow: object|null }
 // Count ACTIVE staff for a tenant, EXCLUDING the owner (role='owner') — the
 // canonical "seat usage" for plan employee limits (owner never counts).
-// Returns a number, or null on failure (callers fail-open). Uses SERVICE_KEY
-// because the admin is not the owner of these rows (RLS would deny window.sb).
+// Returns a number, or null on failure (callers fail-open). Phase E1: routed
+// through the admin-ops Edge Function (was a service-key REST count).
 async function countActiveStaff(ownerUserId) {
-  if (!ownerUserId || !SERVICE_KEY) return null;
-  try {
-    var url = SUPABASE_URL + '/rest/v1/clinic_employees?select=id' +
-              '&owner_id=eq.' + encodeURIComponent(ownerUserId) +
-              '&is_active=eq.true&role=neq.owner&limit=0';
-    var resp = await fetch(url, { method:'GET', headers:{
-      'apikey': SERVICE_KEY, 'Authorization': 'Bearer ' + SERVICE_KEY, 'Prefer': 'count=exact'
-    }});
-    if (!resp.ok && resp.status !== 206) return null;
-    var cr = resp.headers.get('content-range') || resp.headers.get('Content-Range') || '';
-    var slash = cr.lastIndexOf('/'); if (slash < 0) return null;
-    var totalStr = cr.slice(slash + 1).trim(); if (totalStr === '*') return null;
-    var n = parseInt(totalStr, 10); return isNaN(n) ? null : n;
-  } catch(e) { console.warn('countActiveStaff:', e && e.message); return null; }
+  if (!ownerUserId) return null;
+  var res = await callAdminFn('count_active_staff', { ownerUserId: ownerUserId });
+  if (!res || !res.ok || !res.data) return null;
+  var n = res.data.count;
+  return (typeof n === 'number' && !isNaN(n)) ? n : null;
 }
 
 async function transitionAccount(eventType, r, params) {
