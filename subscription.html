@@ -13,10 +13,10 @@
 <title>SyDent — الاشتراك</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b20"></script>
+<script src="theme.js?v=20260601b21"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b20"></script>
-<link rel="stylesheet" href="theme.css?v=20260601b20">
+<script src="supabase-init.js?v=20260601b21"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b21">
 <style>
 :root {
   --bg:        #0a1628;
@@ -231,7 +231,7 @@ body {
 </head>
 <body>
 
-<script src="sidebar.js?v=20260601b20"></script>
+<script src="sidebar.js?v=20260601b21"></script>
 
 <div class="main" id="sbMainContent">
 
@@ -288,6 +288,19 @@ body {
   'use strict';
 
   initSidebar('subscription');
+
+  // زر hamburger للـ topbar (عالموبايل) — نفس النمط بباقي الصفحات
+  document.addEventListener('DOMContentLoaded', function() {
+    var btn = document.createElement('button');
+    btn.className = 'sb-hamburger';
+    btn.id = 'sbHamburgerBtn';
+    btn.setAttribute('aria-label', 'القائمة');
+    btn.innerHTML = '<span></span><span></span><span></span>';
+    btn.onclick = function() { window.sbToggle(); };
+    window._sbBtn = btn;
+    var topbar = document.querySelector('.topbar');
+    if (topbar) topbar.insertBefore(btn, topbar.firstChild);
+  });
 
   var SUPPORT_PHONE_FALLBACK = '963934012433';
 
