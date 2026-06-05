@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b29"></script>
+<script src="theme.js?v=20260601b30"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b29">
+<link rel="stylesheet" href="theme.css?v=20260601b30">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b29"></script>
-<script src="sidebar.js?v=20260601b29"></script>
-<script src="timepicker.js?v=20260601b29"></script>
+<script src="supabase-init.js?v=20260601b30"></script>
+<script src="sidebar.js?v=20260601b30"></script>
+<script src="timepicker.js?v=20260601b30"></script>
 </head>
 <body>
 <script>
@@ -6095,7 +6095,7 @@ async function submitAppt(e) {
           patientId: patientId,
           patientName: _pname2,
           description: 'إضافة موعد جديد للمريض: ' + _pname2
-                       + (apptData.date ? ' (' + apptData.date + ' ' + (apptData.time || '') + ')' : ' (مخطّط)'),
+                       + (apptData.date ? ' (' + apptData.date + ' ' + fmtTime12(apptData.time) + ')' : ' (مخطّط)'),
           newValue: { date: apptData.date, time: apptData.time, status: apptData.status, is_planned: !!apptData.is_planned }
         });
       }
@@ -6123,7 +6123,7 @@ async function deleteAppt(id) {
       entityId: id,
       patientId: origAppt.patient_id,
       patientName: _pname,
-      description: 'حذف موعد المريض: ' + _pname + ' (' + (origAppt.date || 'مخطّط') + ' ' + (origAppt.time || '') + ')',
+      description: 'حذف موعد المريض: ' + _pname + ' (' + (origAppt.date || 'مخطّط') + ' ' + fmtTime12(origAppt.time) + ')',
       oldValue: { date: origAppt.date, time: origAppt.time, status: origAppt.status }
     });
   }

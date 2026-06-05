@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b29"></script>
+<script src="theme.js?v=20260601b30"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b29"></script>
+<script src="supabase-init.js?v=20260601b30"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b29">
-<script src="sidebar.js?v=20260601b29"></script>
+<link rel="stylesheet" href="theme.css?v=20260601b30">
+<script src="sidebar.js?v=20260601b30"></script>
 </head>
 <body>
 
@@ -920,9 +920,8 @@ function previewTemplate() {
   const rendered = applyPlaceholders(tpl, sample);
   document.getElementById('waPreviewBubble').textContent = rendered;
   const now = new Date();
-  const hh = String(now.getHours()).padStart(2,'0');
-  const mm = String(now.getMinutes()).padStart(2,'0');
-  document.getElementById('waPreviewTime').textContent = hh + ':' + mm + '  ✓✓';
+  const tm = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  document.getElementById('waPreviewTime').textContent = tm + '  ✓✓';
   document.getElementById('waPreviewModal').classList.add('open');
 }
 function closeWaPreview() {

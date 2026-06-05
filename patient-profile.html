@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b29"></script>
+<script src="theme.js?v=20260601b30"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b29"></script>
-<script src="sidebar.js?v=20260601b29"></script>
-<script src="timepicker.js?v=20260601b29"></script>
+<script src="supabase-init.js?v=20260601b30"></script>
+<script src="sidebar.js?v=20260601b30"></script>
+<script src="timepicker.js?v=20260601b30"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -647,7 +647,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b29">
+<link rel="stylesheet" href="theme.css?v=20260601b30">
 </head>
 <body>
 <script>
@@ -1475,7 +1475,7 @@ function ppBuildPlaceholderData(appt) {
     patient_first_name: firstName,
     date: ppFormatArabicDate(appt && appt.date),
     day_of_week: dow,
-    time: ((appt && appt.time) || '').slice(0,5),
+    time: fmtTime12((appt && appt.time) || ''),
     doctor_name: doctorName || '—',
     clinic_name:  (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_name)  || 'عيادتنا',
     clinic_phone: (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_phone) || ''
@@ -2656,9 +2656,8 @@ function tlFormatDateTime(ts) {
     var day = d.getDate();
     var mon = PP_MONTHS_AR[d.getMonth()];
     var yr  = d.getFullYear();
-    var hh  = String(d.getHours()).padStart(2, '0');
-    var mm  = String(d.getMinutes()).padStart(2, '0');
-    return day + ' ' + mon + ' ' + yr + ' — ' + hh + ':' + mm;
+    var tm  = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return day + ' ' + mon + ' ' + yr + ' — ' + tm;
   } catch(_) { return '—'; }
 }
 
@@ -2721,7 +2720,7 @@ function renderTimelineRow(e) {
     // event in the DB) appears separately on the right via tl-row-time, sourced
     // from a.created_at — see buildTimelineEvents() above.
     var dateLabel = a.date
-      ? ('📅 ' + escapeHtml(String(a.date)) + (a.time ? ' الساعة ' + escapeHtml(String(a.time).slice(0,5)) : ''))
+      ? ('📅 ' + escapeHtml(String(a.date)) + (a.time ? ' الساعة ' + escapeHtml(fmtTime12(String(a.time))) : ''))
       : '📋 موعد مخطّط (بلا تاريخ)';
     title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
     var stColor = '#63b3ed';
@@ -9485,7 +9484,7 @@ async function loadPatientAuditLog() {
       var d = r.created_at ? new Date(r.created_at) : null;
       var months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
       var dateStr = d
-        ? (d.getDate() + ' ' + months[d.getMonth()] + ' • ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'))
+        ? (d.getDate() + ' ' + months[d.getMonth()] + ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }))
         : '—';
       var actLabel = actionLabels[r.action_type] || r.action_type;
       var roleLabel = roleLabels[r.employee_role_snapshot] || (r.employee_role_snapshot || '');
