@@ -13,10 +13,10 @@
 <title>سجل النشاطات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b21"></script>
+<script src="theme.js?v=20260601b22"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b21"></script>
-<script src="sidebar.js?v=20260601b21"></script>
+<script src="supabase-init.js?v=20260601b22"></script>
+<script src="sidebar.js?v=20260601b22"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -94,7 +94,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .filters{
   background:var(--bg2);border:1px solid var(--border);
   border-radius:var(--radius);padding:14px 16px;margin-bottom:18px;
-  display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;
+  display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;
 }
 .filter-group label{
   display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:700;
@@ -118,6 +118,28 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .log-row.alert{border-color:rgba(239,83,80,0.4);background:rgba(239,83,80,0.05);}
 .log-row:hover{border-color:rgba(46,232,158,0.30);}
+/* Archived rows: dimmed + purple left accent */
+.log-row.archived{
+  opacity:0.78;border-color:rgba(167,139,250,0.30);
+  border-right:3px solid var(--purple);
+}
+.log-row.archived:hover{opacity:1;border-color:rgba(167,139,250,0.55);}
+.ld-arch-tag{
+  display:inline-block;font-size:10px;font-weight:800;
+  padding:1px 6px;border-radius:4px;margin-right:6px;
+  background:rgba(167,139,250,0.18);color:var(--purple);
+}
+.btn-restore{
+  background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.4);color:var(--purple);
+}
+.btn-restore:hover{background:rgba(167,139,250,0.26);}
+/* Archived-view notice bar */
+.arch-notice{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  background:rgba(167,139,250,0.10);border:1px solid rgba(167,139,250,0.30);
+  border-radius:10px;padding:10px 14px;margin-bottom:12px;
+  font-size:13px;font-weight:700;color:var(--purple);
+}
 
 .log-time{font-size:11px;color:var(--text2);direction:ltr;text-align:left;}
 .log-time .lt-date{display:block;font-weight:700;color:var(--text);}
@@ -241,7 +263,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   .page{padding:14px 12px;}
   .stats-row{grid-template-columns:repeat(2, 1fr);}
   .filters{grid-template-columns:1fr 1fr;}
-  .filters > .filter-group:nth-child(5){grid-column:1/-1;}
+  .filters > .filter-apply{grid-column:1/-1;}
   .log-row{
     grid-template-columns:1fr;gap:6px;padding:12px;
   }
@@ -254,7 +276,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b21">
+<link rel="stylesheet" href="theme.css?v=20260601b22">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -342,7 +364,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="only">⚠ تنبيهات فقط</option>
       </select>
     </div>
-    <div class="filter-group" style="display:flex;align-items:flex-end;">
+    <div class="filter-group">
+      <label>العرض</label>
+      <select id="filterArchive">
+        <option value="active" selected>النشطة</option>
+        <option value="archived">📂 المؤرشفة</option>
+      </select>
+    </div>
+    <div class="filter-group filter-apply" style="display:flex;align-items:flex-end;">
       <button class="btn btn-primary btn-sm" onclick="applyFilters()" style="width:100%;">🔍 تطبيق</button>
     </div>
   </div>
@@ -522,12 +551,19 @@ async function loadEmployeesCache() {
   });
 }
 
+// Returns true when the "العرض" filter is set to archived. Single source of
+// truth for the is_archived value used across stats / alerts / list / export.
+function isArchivedView() {
+  var el = $('filterArchive');
+  return !!(el && el.value === 'archived');
+}
+
 async function loadStats() {
   // Total
   var totalRes = await window.sb.from('audit_log')
     .select('id', { count: 'exact', head: true })
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false);
+    .eq('is_archived', isArchivedView());
   stats.total = totalRes.count || 0;
 
   // Today
@@ -535,7 +571,7 @@ async function loadStats() {
   var todayRes = await window.sb.from('audit_log')
     .select('id', { count: 'exact', head: true })
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false)
+    .eq('is_archived', isArchivedView())
     .gte('created_at', t.toISOString());
   stats.today = todayRes.count || 0;
 
@@ -544,7 +580,7 @@ async function loadStats() {
   var weekRes = await window.sb.from('audit_log')
     .select('id', { count: 'exact', head: true })
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false)
+    .eq('is_archived', isArchivedView())
     .gte('created_at', w.toISOString());
   stats.week = weekRes.count || 0;
 
@@ -552,7 +588,7 @@ async function loadStats() {
   var alertRes = await window.sb.from('audit_log')
     .select('id', { count: 'exact', head: true })
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false)
+    .eq('is_archived', isArchivedView())
     .eq('is_alert', true);
   stats.alerts = alertRes.count || 0;
 
@@ -567,7 +603,7 @@ async function loadAlerts() {
   var res = await window.sb.from('audit_log')
     .select('id, action_type, description, alert_reason, created_at, patient_id, patient_name_snapshot, employee_name_snapshot')
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false)
+    .eq('is_archived', isArchivedView())
     .eq('is_alert', true)
     .order('created_at', { ascending: false })
     .limit(5);
@@ -619,7 +655,7 @@ async function loadLogs(reset) {
   var q = window.sb.from('audit_log')
     .select('id, employee_id, employee_name_snapshot, employee_role_snapshot, action_type, entity_type, entity_id, patient_id, patient_name_snapshot, description, is_alert, alert_reason, created_at')
     .eq('owner_id', currentUser.id)
-    .eq('is_archived', false);
+    .eq('is_archived', isArchivedView());
 
   if (range.from) q = q.gte('created_at', range.from);
   if (employee !== 'all') q = q.eq('employee_id', employee);
@@ -665,17 +701,26 @@ async function loadLogs(reset) {
 
 function renderLogs() {
   var box = $('logContainer');
+  var arch = isArchivedView();
   if (allLogs.length === 0) {
     box.innerHTML =
       '<div class="empty">' +
-        '<div class="em-icon">📋</div>' +
-        '<div class="em-title">لا توجد سجلات</div>' +
-        '<div class="em-text">جرّب تغيير الفلاتر أو نفّذ بعض العمليات لظهور السجلات.</div>' +
+        '<div class="em-icon">' + (arch ? '📂' : '📋') + '</div>' +
+        '<div class="em-title">' + (arch ? 'لا توجد سجلات مؤرشفة' : 'لا توجد سجلات') + '</div>' +
+        '<div class="em-text">' + (arch ? 'لم تُؤرشف أي سجلات ضمن هذا الفلتر بعد.' : 'جرّب تغيير الفلاتر أو نفّذ بعض العمليات لظهور السجلات.') + '</div>' +
       '</div>';
     return;
   }
 
-  var html = '<div class="log-list">';
+  var html = '';
+  if (arch) {
+    html +=
+      '<div class="arch-notice">' +
+        '<span>📂 أنت تعرض السجلات المؤرشفة — مخفيّة عن العرض النشط.</span>' +
+        '<button class="btn btn-sm btn-restore" onclick="restoreAll()">↩ استرجاع الكل</button>' +
+      '</div>';
+  }
+  html += '<div class="log-list">';
   allLogs.forEach(function(row){
     var ft = fmtTime(row.created_at);
     var dateStr = (typeof ft === 'object' ? ft.date : '—');
@@ -693,7 +738,7 @@ function renderLogs() {
       ? '<span class="ld-alert-tag" title="' + escapeHtml(row.alert_reason || '') + '">⚠ تنبيه</span>'
       : '';
     html +=
-      '<div class="log-row' + (row.is_alert ? ' alert' : '') + '">' +
+      '<div class="log-row' + (row.is_alert ? ' alert' : '') + (arch ? ' archived' : '') + '">' +
         '<div class="log-time">' +
           '<span class="lt-date">' + escapeHtml(dateStr) + '</span>' +
           '<span class="lt-hour">' + escapeHtml(timeStr) + '</span>' +
@@ -703,12 +748,16 @@ function renderLogs() {
           '<div class="le-role ' + roleClass + '">' + escapeHtml(roleLabel(role)) + '</div>' +
         '</div>' +
         '<div class="log-desc' + (row.is_alert ? ' alert-row' : '') + '">' +
+          (arch ? '<span class="ld-arch-tag">📂 مؤرشف</span>' : '') +
           alertTag +
           '<span class="ld-text">' + escapeHtml(row.description || '—') + '</span>' +
           '<span class="ld-action">' + escapeHtml(actionTypeLabel(row.action_type)) + '</span>' +
           patientLink +
         '</div>' +
         '<div class="log-actions">' +
+          (arch
+            ? '<button class="btn btn-sm btn-restore" onclick="restoreOne(\'' + escapeHtml(row.id) + '\')">↩ استرجاع</button>'
+            : '') +
           (row.patient_id
             ? '<a class="btn btn-sm btn-outline" href="patient-profile.html?id=' + escapeHtml(row.patient_id) + '">👤 المريض</a>'
             : '') +
@@ -800,6 +849,58 @@ async function doArchive() {
   }
 }
 
+// ── Restore (un-archive) ──
+async function restoreOne(id) {
+  if (!id) return;
+  if (!confirm('استرجاع هذا السجل من الأرشيف؟ سيرجع للعرض النشط.')) return;
+  var res = await window.sb.from('audit_log')
+    .update({ is_archived: false, archived_at: null })
+    .eq('owner_id', currentUser.id)
+    .eq('id', id)
+    .select('id');
+  if (res.error) {
+    showToast('فشل الاسترجاع: ' + res.error.message, true);
+    console.error(res.error);
+    return;
+  }
+  if (window.logAudit) {
+    window.logAudit('settings.archive_audit', { description: '↩ استرجاع سجل واحد من الأرشيف' });
+  }
+  showToast('✓ تم استرجاع السجل');
+  await loadStats();
+  await loadAlerts();
+  await loadLogs(true);
+}
+
+async function restoreAll() {
+  // Count first so the confirm shows true scope (ALL archived, not just the filtered view).
+  var cntRes = await window.sb.from('audit_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', currentUser.id)
+    .eq('is_archived', true);
+  var total = cntRes.count || 0;
+  if (total === 0) { showToast('لا توجد سجلات مؤرشفة'); return; }
+  if (!confirm('استرجاع كل السجلات المؤرشفة (' + total + ' سجل)؟\n\nستعود جميعها للعرض النشط.')) return;
+  var res = await window.sb.from('audit_log')
+    .update({ is_archived: false, archived_at: null })
+    .eq('owner_id', currentUser.id)
+    .eq('is_archived', true)
+    .select('id');
+  if (res.error) {
+    showToast('فشل الاسترجاع: ' + res.error.message, true);
+    console.error(res.error);
+    return;
+  }
+  var count = (res.data || []).length;
+  if (window.logAudit) {
+    window.logAudit('settings.archive_audit', { description: '↩ استرجاع ' + count + ' سجل من الأرشيف' });
+  }
+  showToast('✓ تم استرجاع ' + count + ' سجل');
+  await loadStats();
+  await loadAlerts();
+  await loadLogs(true);
+}
+
 // ── Export CSV ──
 // Phase 6 M (Obs T): Smart export — if more rows exist beyond what's
 // already loaded, prompt the user to either:
@@ -831,7 +932,7 @@ async function loadAllForExport() {
     var q = window.sb.from('audit_log')
       .select('id, employee_id, employee_name_snapshot, employee_role_snapshot, action_type, entity_type, entity_id, patient_id, patient_name_snapshot, description, is_alert, alert_reason, created_at')
       .eq('owner_id', currentUser.id)
-      .eq('is_archived', false);
+      .eq('is_archived', isArchivedView());
     if (range.from) q = q.gte('created_at', range.from);
     if (employee !== 'all') q = q.eq('employee_id', employee);
     if (action !== 'all') {
