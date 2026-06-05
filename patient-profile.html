@@ -13,10 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b22"></script>
+<script src="theme.js?v=20260601b23"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b22"></script>
-<script src="sidebar.js?v=20260601b22"></script>
+<script src="supabase-init.js?v=20260601b23"></script>
+<script src="sidebar.js?v=20260601b23"></script>
+<script src="timepicker.js?v=20260601b23"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -646,7 +647,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b22">
+<link rel="stylesheet" href="theme.css?v=20260601b23">
 </head>
 <body>
 <script>
@@ -966,7 +967,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="form-row" id="aDateTimeRow">
         <div class="form-group"><label>التاريخ</label><input type="date" id="aDate"></div>
-        <div class="form-group"><label>الوقت</label><input type="time" id="aTime" value="09:00" lang="en-US"></div>
+        <div class="form-group"><label>الوقت</label><input type="time" id="aTime" value="09:00"></div>
       </div>
       <div class="form-group" id="aReasonGroup" style="display:none;">
         <label>السبب / نوع العلاج المخطّط</label>
@@ -1184,7 +1185,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             </div>
             <div class="form-group" style="margin:0;">
               <label>الساعة</label>
-              <input type="time" id="labNewApptTime" lang="en-US">
+              <input type="time" id="labNewApptTime">
             </div>
           </div>
           <div style="font-size:11px;color:var(--text2);margin-top:6px;">سيُنشأ موعد جديد تلقائياً (المدة 30 دقيقة، النوع = نوع العمل) ويُربط بطلب المخبر.</div>
