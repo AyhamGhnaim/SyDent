@@ -13,7 +13,7 @@
 <title>SyDent — المخابر</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b28"></script>
+<script src="theme.js?v=20260601b29"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -539,10 +539,10 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b28">
+<link rel="stylesheet" href="theme.css?v=20260601b29">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b28"></script>
-<script src="sidebar.js?v=20260601b28"></script>
+<script src="supabase-init.js?v=20260601b29"></script>
+<script src="sidebar.js?v=20260601b29"></script>
 </head>
 <body>
 <script>
@@ -901,10 +901,19 @@ function getAppointmentById(id) {
   }
   return null;
 }
+// Display a stored 24h "HH:mm" appointment time as 12h "hh:mm AM/PM" (matches
+// the picker field). Returns the input unchanged on bad data.
+function fmtTime12(t) {
+  if (!t || !/^\d{1,2}:\d{2}/.test(t)) return t || '';
+  var hp = t.split(':'), h = parseInt(hp[0], 10), m = (hp[1] || '').slice(0, 2);
+  if (isNaN(h)) return t;
+  var ap = h < 12 ? 'AM' : 'PM', h12 = h % 12; if (h12 === 0) h12 = 12;
+  return (h12 < 10 ? '0' : '') + h12 + ':' + m + ' ' + ap;
+}
 function fmtApptOption(appt) {
-  // human label for dropdown option, e.g. "2026-05-20 — 14:30 — حشوة"
+  // human label for dropdown option, e.g. "2026-05-20 — 02:30 PM — حشوة"
   var d  = appt.date || '';
-  var t  = (appt.time || '').slice(0,5);
+  var t  = fmtTime12(appt.time);
   var tp = appt.type || '';
   var parts = [d];
   if (t)  parts.push(t);

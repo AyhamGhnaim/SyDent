@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b28"></script>
+<script src="theme.js?v=20260601b29"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b28">
+<link rel="stylesheet" href="theme.css?v=20260601b29">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b28"></script>
-<script src="sidebar.js?v=20260601b28"></script>
-<script src="timepicker.js?v=20260601b28"></script>
+<script src="supabase-init.js?v=20260601b29"></script>
+<script src="sidebar.js?v=20260601b29"></script>
+<script src="timepicker.js?v=20260601b29"></script>
 </head>
 <body>
 <script>
@@ -1484,7 +1484,7 @@ function buildWaPlaceholderData(appt) {
     patient_first_name: firstName,
     date: formatArabicDate(appt.date),
     day_of_week: dow,
-    time: (appt.time || '').slice(0,5),
+    time: fmtTime12(appt.time),
     doctor_name: doctorName || '—',
     clinic_name:  (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_name)  || 'عيادتنا',
     clinic_phone: (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.clinic_phone) || ''
@@ -1657,7 +1657,7 @@ function openWaReminderModal(apptId) {
   document.getElementById('waModalPhone').textContent = phone || '⚠️ غير متوفر';
   const d = new Date((appt.date || '') + 'T12:00:00');
   const dStr = isNaN(d.getTime()) ? appt.date : (DAYS_AR_FULL[d.getDay()] + ' ' + formatArabicDate(appt.date));
-  document.getElementById('waModalDateTime').textContent = dStr + ' — ' + ((appt.time || '').slice(0,5));
+  document.getElementById('waModalDateTime').textContent = dStr + ' — ' + fmtTime12(appt.time);
 
   const warn = document.getElementById('waModalWarn');
   let warnHtml = '';
@@ -2812,15 +2812,26 @@ function getNextTimeAction(appt) {
   return null; // all 4 stamps recorded
 }
 
-// Formats an ISO timestamp as HH:MM in 24h, browser-local time. Returns '' on
-// nullish input so callers can use it directly inside template strings.
+// Formats an ISO timestamp as 12h "hh:mm AM/PM", browser-local time. Returns ''
+// on nullish input so callers can use it directly inside template strings.
 function fmtApptTime(iso) {
   if (!iso) return '';
   try {
     var d = new Date(iso);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   } catch (e) { return ''; }
+}
+
+// Display a stored 24h "HH:mm" appointment time as 12h "hh:mm AM/PM" (matches
+// the picker field + the journey stamps). Returns the input unchanged on bad
+// data so it never throws on legacy/empty values.
+function fmtTime12(t) {
+  if (!t || !/^\d{1,2}:\d{2}/.test(t)) return t || '';
+  var hp = t.split(':'), h = parseInt(hp[0], 10), m = (hp[1] || '').slice(0, 2);
+  if (isNaN(h)) return t;
+  var ap = h < 12 ? 'AM' : 'PM', h12 = h % 12; if (h12 === 0) h12 = 12;
+  return (h12 < 10 ? '0' : '') + h12 + ':' + m + ' ' + ap;
 }
 
 // Builds the inline "stamp strip" shown under the patient name listing each
@@ -3758,7 +3769,7 @@ function cellHTML(day, ds, other, today, evts) {
     var _ec = getApptColor(e);
     var lb = getApptLabBadge(e);
     var lbHtml = lb ? `<span style="margin-left:3px;" title="${lb.title}">${lb.icon}</span>` : '';
-    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${lbHtml}${(e.time||'').slice(0,5)} ${escapeHtml((e.patient_name||'').split(' ')[0])}</div>`;
+    evHTML += `<div class="cal-event" style="background:${_ec.fill}22;color:${_ec.fill};border-right:3px solid ${_ec.fill};" onclick="event.stopPropagation();editAppt('${e.id}')">${lbHtml}${fmtTime12(e.time)} ${escapeHtml((e.patient_name||'').split(' ')[0])}</div>`;
   });
   // Mobile dots
   let dotHTML = '<div class="cal-dot-row">';
@@ -3821,7 +3832,7 @@ function renderDay() {
       var opHtml = getApptOperatoryBadge(e);
       html += `
         <div class="time-slot">
-          <div class="slot-time">${(e.time||'').slice(0,5)}</div>
+          <div class="slot-time">${fmtTime12(e.time)}</div>
           <div class="slot-content">
             <div class="appt-block" style="background:${hexA(_bc.fill,0.12)};border-right:3px solid ${_bc.fill};" onclick="editAppt('${e.id}')">
               <div class="appt-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}${opHtml}</div>
@@ -4109,7 +4120,7 @@ function renderDayByChair() {
         : '';
       var safeName = escapeHtml(e.patient_name || '—');
       var safeType = escapeHtml(e.type || '—');
-      var timeStr = (e.time || '').slice(0, 5);
+      var timeStr = fmtTime12(e.time);
       var dur = parseInt(e.duration, 10) || 30;
       block.innerHTML = ''
         + '<div class="k3-appt-name">' + conflictBadge + safeName + '</div>'
@@ -4303,7 +4314,7 @@ function renderList() {
       var opHtml = getApptOperatoryBadge(e);
       html += `
         <div class="list-item" style="border-right:3px solid ${getApptColor(e).fill};" onclick="editAppt('${e.id}')">
-          <div class="list-time">${(e.time||'').slice(0,5)}</div>
+          <div class="list-time">${fmtTime12(e.time)}</div>
           <div class="list-avatar" style="background:${avatarColor(e.patient_name||'؟')}22;color:${avatarColor(e.patient_name||'؟')}">${escapeHtml(initials(e.patient_name||'؟'))}</div>
           <div class="list-info">
             <div class="list-name">${escapeHtml(e.patient_name)||'—'} ${lbHtml}${psHtml}${waHtml}${opHtml}</div>

@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b28"></script>
+<script src="theme.js?v=20260601b29"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b28"></script>
-<script src="sidebar.js?v=20260601b28"></script>
-<script src="timepicker.js?v=20260601b28"></script>
+<script src="supabase-init.js?v=20260601b29"></script>
+<script src="sidebar.js?v=20260601b29"></script>
+<script src="timepicker.js?v=20260601b29"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -647,7 +647,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b28">
+<link rel="stylesheet" href="theme.css?v=20260601b29">
 </head>
 <body>
 <script>
@@ -1688,6 +1688,16 @@ async function ppLoadReminderLogs() {
 // Also flips the button label to '✓ تم' when the nearest upcoming appt
 // already has a reminder log, mirroring the badge semantics on the
 // appointments page.
+// Display a stored 24h "HH:mm" appointment time as 12h "hh:mm AM/PM" (matches
+// the picker field). Returns the input unchanged on bad data.
+function fmtTime12(t) {
+  if (!t || !/^\d{1,2}:\d{2}/.test(t)) return t || '';
+  var hp = t.split(':'), h = parseInt(hp[0], 10), m = (hp[1] || '').slice(0, 2);
+  if (isNaN(h)) return t;
+  var ap = h < 12 ? 'AM' : 'PM', h12 = h % 12; if (h12 === 0) h12 = 12;
+  return (h12 < 10 ? '0' : '') + h12 + ':' + m + ' ' + ap;
+}
+
 function ppUpdateWaButtonVisibility() {
   var btn = document.getElementById('ppWaBtn');
   if (!btn) return;
@@ -1721,7 +1731,7 @@ function ppOpenWaModal(appt) {
   document.getElementById('ppWaPhone').textContent = phone || '⚠️ غير متوفر';
   var d = new Date((appt.date || '') + 'T12:00:00');
   var dStr = isNaN(d.getTime()) ? appt.date : (PP_DAYS_AR[d.getDay()] + ' ' + ppFormatArabicDate(appt.date));
-  document.getElementById('ppWaDateTime').textContent = dStr + ' — ' + ((appt.time || '').slice(0,5));
+  document.getElementById('ppWaDateTime').textContent = dStr + ' — ' + fmtTime12(appt.time);
 
   var warn = document.getElementById('ppWaWarn');
   var warnHtml = '';
@@ -8494,7 +8504,7 @@ function populateLabSelect(selectedLabId) {
 /* Format an appointment for display in the lab-order link dropdown. */
 function fmtLabApptOption(appt) {
   var d  = appt.date || '';
-  var t  = (appt.time || '').slice(0,5);
+  var t  = fmtTime12(appt.time);
   var tp = appt.type || '';
   var parts = [d];
   if (t)  parts.push(t);
@@ -9143,7 +9153,7 @@ function openSessionModal() {
       aGroup.style.display = 'block';
       var opts = '<option value="">— لا تربط بموعد —</option>';
       upcomingAppts.forEach(function(a){
-        var dt = a.date + (a.time ? ' ' + a.time.slice(0,5) : '');
+        var dt = a.date + (a.time ? ' ' + fmtTime12(a.time) : '');
         var typ = a.type ? ' • ' + escapeHtml(a.type) : '';
         opts += '<option value="' + a.id + '">' + dt + typ + '</option>';
       });

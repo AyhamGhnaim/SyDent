@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b28"></script>
+<script src="theme.js?v=20260601b29"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -578,10 +578,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b28">
+<link rel="stylesheet" href="theme.css?v=20260601b29">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b28"></script>
-<script src="sidebar.js?v=20260601b28"></script>
+<script src="supabase-init.js?v=20260601b29"></script>
+<script src="sidebar.js?v=20260601b29"></script>
 </head>
 <body>
 <script>
@@ -1448,6 +1448,17 @@ function renderDashActionBtn(appt) {
        + act.label + '</button>';
 }
 
+// Display a stored 24h "HH:mm" appointment time as 12h "hh:mm AM/PM" (matches
+// the picker field + the journey stamps). Returns the input unchanged on bad
+// data so it never throws on legacy/empty values.
+function fmtTime12(t) {
+  if (!t || !/^\d{1,2}:\d{2}/.test(t)) return t || '';
+  var hp = t.split(':'), h = parseInt(hp[0], 10), m = (hp[1] || '').slice(0, 2);
+  if (isNaN(h)) return t;
+  var ap = h < 12 ? 'AM' : 'PM', h12 = h % 12; if (h12 === 0) h12 = 12;
+  return (h12 < 10 ? '0' : '') + h12 + ':' + m + ' ' + ap;
+}
+
 // Builds the compact stamp strip (smaller than the appointments-page one —
 // dashboard rows are tight). Only shows the journey stamps, not confirmation.
 function renderDashStrip(appt) {
@@ -1457,7 +1468,7 @@ function renderDashStrip(appt) {
     if (appt[st.key]) {
       var d = new Date(appt[st.key]);
       if (isNaN(d.getTime())) return;
-      var t = d.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+      var t = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       parts.push(
         '<span class="dash-time-stamp" style="color:' + st.color + '">'
         + st.label.split(' ')[0] + ' ' + t + '</span>'
@@ -1588,7 +1599,7 @@ function renderTodayApptsCard() {
     var btn = renderDashActionBtn(a);
     var safeName = _dashEscapeHtml(a.patient_name || '—');
     var safeType = _dashEscapeHtml(a.type || '—');
-    var safeTime = (a.time || '').slice(0, 5) || '—';
+    var safeTime = fmtTime12(a.time) || '—';
     var waBadge = renderDashWaBadge(a);
     // Phase 6 K display: operatory chip after the WA badge, before the
     // dot. Empty string when no operatory_id, so existing layout unchanged
@@ -1929,7 +1940,7 @@ async function loadWaitingRoom(uid) {
     if (waitMin >= 25) { color = '#ef5350'; emoji = '🔴'; }
     else if (waitMin >= 15) { color = '#f5c842'; emoji = '🟡'; }
     else { color = '#8da0bd'; emoji = '⚪'; }
-    var arrivedStr = arrived.toLocaleTimeString('en-GB', { hour12: false }).slice(0, 5);
+    var arrivedStr = arrived.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     var safeName = _dashEscapeHtml(a.patient_name || '—');
     var safeType = _dashEscapeHtml(a.type || '—');
     // Phase 6 K display: chair chip so the doctor/secretary knows at a glance
