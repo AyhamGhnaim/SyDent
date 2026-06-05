@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b25"></script>
+<script src="theme.js?v=20260601b26"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b25"></script>
-<script src="sidebar.js?v=20260601b25"></script>
-<script src="timepicker.js?v=20260601b25"></script>
+<script src="supabase-init.js?v=20260601b26"></script>
+<script src="sidebar.js?v=20260601b26"></script>
+<script src="timepicker.js?v=20260601b26"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -647,7 +647,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b25">
+<link rel="stylesheet" href="theme.css?v=20260601b26">
 </head>
 <body>
 <script>
@@ -1694,9 +1694,14 @@ function ppUpdateWaButtonVisibility() {
   var enabled = CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminders_enabled;
   var hasUpcoming = Array.isArray(upcomingAppts) && upcomingAppts.length > 0;
   var hasPhone = patient && patient.phone && ppNormalizePhone(patient.phone);
-  if (enabled && hasUpcoming && hasPhone) {
+  var nearest = hasUpcoming ? upcomingAppts[0] : null;
+  // Reminder pointless once the patient has physically arrived for the nearest
+  // appt — mirrors the badge suppression on the dashboard / appointments page.
+  // The arrived appt leaves upcomingAppts once completed, so the button returns
+  // for any later appointment automatically.
+  var nearestArrived = nearest && (nearest.arrived_at || nearest.seated_at || nearest.dismissed_at);
+  if (enabled && hasUpcoming && hasPhone && !nearestArrived) {
     btn.style.display = '';
-    var nearest = upcomingAppts[0];
     var hasLog = nearest && lastReminderLogByAppt[nearest.id];
     btn.innerHTML = hasLog ? '📱 تذكير WhatsApp ✓' : '📱 تذكير WhatsApp';
     btn.title = hasLog ? 'آخر تذكير: ' + new Date(lastReminderLogByAppt[nearest.id].sent_at).toLocaleString('ar') : 'إرسال تذكير لأقرب موعد قادم';
@@ -3063,7 +3068,7 @@ async function loadAll() {
   try {
     var todayStr = toDay();
     const { data: ua, error: uaErr } = await window.sb.from('appointments')
-      .select('id, date, time, type, status, provider_id, patient_name')
+      .select('id, date, time, type, status, provider_id, patient_name, arrived_at, seated_at, dismissed_at')
       .eq('patient_id', patientId)
       .gte('date', todayStr)
       .not('status', 'in', '(cancelled,broken,no_show,completed)')
