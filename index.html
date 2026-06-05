@@ -42,7 +42,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b26"></script>
+<script src="theme.js?v=20260601b27"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -578,10 +578,10 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b26">
+<link rel="stylesheet" href="theme.css?v=20260601b27">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b26"></script>
-<script src="sidebar.js?v=20260601b26"></script>
+<script src="supabase-init.js?v=20260601b27"></script>
+<script src="sidebar.js?v=20260601b27"></script>
 </head>
 <body>
 <script>
@@ -1533,14 +1533,6 @@ function renderDashWaBadge(appt) {
   if (!_dashCfgWa || !_dashCfgWa.whatsapp_reminders_enabled) return '';
   if (!appt || !appt.id || _dashIsFinishedForWa(appt.status)) return '';
 
-  // Patient is physically present → a WhatsApp reminder is pointless, so the
-  // whole badge (prompt AND the "✓ تم التذكير" confirmation) disappears the
-  // moment they arrive. Mirrors appointments.html classifyReminderForAppt:
-  // arrival only stamps arrived_at/seated_at/dismissed_at and never changes
-  // `status`, so the finished-status check above can't catch it. Placed before
-  // the log check so an arrived patient loses the badge even if reminded earlier.
-  if (appt.arrived_at || appt.seated_at || appt.dismissed_at) return '';
-
   // Priority 1: log wins. If a reminder was sent, show "تم التذكير" badge
   // regardless of whether the appointment time has already passed today.
   var log = _dashReminderLogs[appt.id];
@@ -1549,6 +1541,14 @@ function renderDashWaBadge(appt) {
       + new Date(log.sent_at).toLocaleString('ar').replace(/"/g,'&quot;')
       + '" onclick="event.stopPropagation(); _dashGoToWaReminder(\'' + appt.id + '\')">✓ تم التذكير</span>';
   }
+
+  // "✓ تم التذكير" above is a RECORD of a sent reminder and persists even after
+  // the patient arrives — informational, not a nag. From here down we only decide
+  // whether to show the "أرسل تذكير" PROMPT, which is pointless once the patient
+  // is physically present. Suppress only the prompt the moment arrived_at /
+  // seated_at / dismissed_at is set (arrival never changes `status`, so the
+  // finished-status check can't catch it). Mirrors classifyReminderForAppt.
+  if (appt.arrived_at || appt.seated_at || appt.dismissed_at) return '';
 
   // H4 fix: skip the "أرسل تذكير" prompt for appointments whose time has
   // already passed today — the slot is gone, nagging the user about a

@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b26"></script>
+<script src="theme.js?v=20260601b27"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b26">
+<link rel="stylesheet" href="theme.css?v=20260601b27">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b26"></script>
-<script src="sidebar.js?v=20260601b26"></script>
-<script src="timepicker.js?v=20260601b26"></script>
+<script src="supabase-init.js?v=20260601b27"></script>
+<script src="sidebar.js?v=20260601b27"></script>
+<script src="timepicker.js?v=20260601b27"></script>
 </head>
 <body>
 <script>
@@ -1588,16 +1588,6 @@ function classifyReminderForAppt(appt) {
   // Uses the shared helper so Gap 1's status set stays the single source of truth.
   if (isFinishedStatus(appt.status)) return null;
 
-  // Patient is physically present → a WhatsApp reminder is pointless, so the
-  // whole badge (prompt AND the "✓ تم التذكير" confirmation) disappears the
-  // moment they arrive. Note: arrival only stamps arrived_at/seated_at/
-  // dismissed_at — it never changes `status` (which stays confirmed/scheduled),
-  // so isFinishedStatus above can't catch this case. Placed BEFORE the log
-  // check on purpose so an arrived patient who was reminded earlier still loses
-  // the badge. Confirmation (confirmed_at 📞) is deliberately NOT included — a
-  // phone confirmation and a day-before reminder are independent.
-  if (appt.arrived_at || appt.seated_at || appt.dismissed_at) return null;
-
   // Priority 1: if a reminder was already sent, show the "تم التذكير" badge
   // regardless of whether the appointment is past or future. The user wants
   // confirmation that the action was taken, especially for today's appts
@@ -1607,6 +1597,15 @@ function classifyReminderForAppt(appt) {
   if (log) {
     return { kind: 'sent', label: '✓ تم التذكير', title: 'آخر تذكير: ' + new Date(log.sent_at).toLocaleString('ar') };
   }
+
+  // "✓ تم التذكير" above is a RECORD of a sent reminder and persists even after
+  // the patient arrives — it's informational, not a nag. From here down we only
+  // decide whether to show the "أرسل تذكير" PROMPT, and that prompt is pointless
+  // once the patient is physically present. Suppress only the prompt the moment
+  // arrived_at / seated_at / dismissed_at is set (arrival only stamps the
+  // timestamp; it never changes `status`, so isFinishedStatus above can't catch
+  // it). Confirmation (confirmed_at 📞) is deliberately NOT included.
+  if (appt.arrived_at || appt.seated_at || appt.dismissed_at) return null;
 
   // H4 fix: compute against the appointment's actual moment (date + time), not
   // against midday. Previously we hard-coded 'T12:00:00', so a 10am appointment
