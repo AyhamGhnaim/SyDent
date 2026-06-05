@@ -44,6 +44,31 @@
     return o;
   }
 
+  // Inject (once) the CSS that makes the wrapper look like ONE form field and
+  // the inner selects borderless/transparent. Uses the same theme vars as the
+  // app's native inputs (--bg3/--border/--green/--text/--text2) so it matches
+  // both light and dark themes on every page.
+  function injectStyle() {
+    if (document.getElementById('tp12-style')) return;
+    var s = document.createElement('style');
+    s.id = 'tp12-style';
+    s.textContent =
+      '.tp12{display:flex;align-items:center;gap:1px;direction:ltr;width:100%;' +
+        'background:var(--bg3);border:1px solid var(--border);border-radius:9px;' +
+        'padding:9px 12px;box-sizing:border-box;}' +
+      '.tp12:focus-within{border-color:var(--green);}' +
+      '.tp12 > select.tp12-part{-webkit-appearance:none;-moz-appearance:none;appearance:none;' +
+        'background:transparent !important;background-image:none !important;' +
+        'border:0 !important;border-radius:0 !important;box-shadow:none !important;' +
+        'padding:0 1px !important;margin:0 !important;width:auto !important;min-width:0 !important;' +
+        'height:auto !important;color:var(--text);font-family:inherit;font-size:14px;' +
+        'font-weight:600;line-height:1.3;outline:none;cursor:pointer;text-align:center;' +
+        'text-align-last:center;}' +
+      '.tp12 > .tp12-colon{color:var(--text2);font-weight:700;opacity:.7;padding:0 1px;}' +
+      '.tp12 > select.tp12-ap{font-weight:700;margin-left:7px !important;}';
+    document.head.appendChild(s);
+  }
+
   function upgrade(input) {
     if (!input || input.dataset.tpUpgraded === '1') return;
     if (input.tagName !== 'INPUT') return;
@@ -51,23 +76,22 @@
 
     var initial = input.getAttribute('value') || input.value || '';
 
+    injectStyle();
+
     // Hide native control but keep it in the DOM as the value holder.
     input.style.display = 'none';
 
+    // One bordered field; the inner selects are borderless so the whole thing
+    // reads as a single time field (hour : minute  AM/PM).
     var wrap = document.createElement('div');
-    wrap.style.cssText = 'display:flex;gap:8px;align-items:center;direction:ltr;';
+    wrap.className = 'tp12';
 
-    var hourSel = document.createElement('select');
-    var minSel  = document.createElement('select');
-    var apSel   = document.createElement('select');
-    // Inline width/flex override the page rule's width:100%; colors/border are
-    // inherited from each page's existing <select> styling (theme-consistent).
-    hourSel.style.cssText = 'width:auto;flex:1 1 0;min-width:0;';
-    minSel.style.cssText  = 'width:auto;flex:1 1 0;min-width:0;';
-    apSel.style.cssText   = 'width:auto;flex:0 0 auto;min-width:0;';
+    var hourSel = document.createElement('select'); hourSel.className = 'tp12-part tp12-h';
+    var minSel  = document.createElement('select'); minSel.className  = 'tp12-part tp12-m';
+    var apSel   = document.createElement('select'); apSel.className   = 'tp12-part tp12-ap';
 
     hourSel.appendChild(mkOption('', '--'));
-    for (var h = 1; h <= 12; h++) hourSel.appendChild(mkOption(String(h), String(h)));
+    for (var h = 1; h <= 12; h++) hourSel.appendChild(mkOption(String(h), pad2(h)));
 
     minSel.appendChild(mkOption('', '--'));
     for (var m = 0; m < 60; m++) minSel.appendChild(mkOption(String(m), pad2(m)));
@@ -77,7 +101,7 @@
 
     var colon = document.createElement('span');
     colon.textContent = ':';
-    colon.style.cssText = 'flex:0 0 auto;font-weight:700;opacity:.6;';
+    colon.className = 'tp12-colon';
 
     wrap.appendChild(hourSel);
     wrap.appendChild(colon);
