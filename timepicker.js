@@ -208,8 +208,12 @@
     }
     function close() {
       if (!wrap.classList.contains('open')) return;
-      wrap.classList.remove('open');
+      // Commit WHILE the popover is still visible. A display:none element (which
+      // is what removing `.open` makes the popover) reports scrollTop === 0, so
+      // readWheels() would read the FIRST row of every wheel — "01:00 AM" — and
+      // silently discard the user's selection. Read the wheels first, then hide.
       commit();
+      wrap.classList.remove('open');
     }
 
     field.addEventListener('click', function () {
