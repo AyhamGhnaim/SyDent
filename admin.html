@@ -4615,8 +4615,8 @@ function validatePlanEdits(p) {
   if (p.display_name.length > 80) {
     return { ok:false, error:'اسم العرض طويل جداً (الحد الأقصى 80 حرف).' };
   }
-  if (p.duration_days == null || isNaN(Number(p.duration_days)) || Number(p.duration_days) < 1) {
-    return { ok:false, error:'المدة (يوم) يجب أن تكون رقماً ≥ 1.' };
+  if (p.duration_days == null || isNaN(Number(p.duration_days)) || Number(p.duration_days) < 0) {
+    return { ok:false, error:'المدة (يوم) يجب أن تكون رقماً ≥ 0.' };
   }
   if (Number(p.duration_days) > 3650) {
     return { ok:false, error:'المدة (يوم) كبيرة بشكل غير معقول (الحد الأقصى 3650 يوم = 10 سنوات).' };
