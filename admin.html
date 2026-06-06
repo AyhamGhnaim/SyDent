@@ -2398,7 +2398,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
               <input type="text" id="planFldDisplayName" oninput="onPlanFieldChange()" autocomplete="off">
             </div>
             <div class="plan-field-row">
-              <div class="plan-field">
+              <div class="plan-field" id="planFldDurationWrap">
                 <label for="planFldDuration">المدة (يوم) <span style="color:var(--text3);font-weight:400;">(للتجربة)</span></label>
                 <input type="number" id="planFldDuration" min="1" oninput="onPlanFieldChange()" autocomplete="off">
               </div>
@@ -4318,6 +4318,9 @@ function selectPlanTab(code, btnEl) {
 
 function renderPlanEditorFields(p) {
   document.getElementById('planFldDisplayName').value = p.display_name || '';
+  // Duration field only relevant for trial plan — hide for paid plans
+  var durWrap = document.getElementById('planFldDurationWrap');
+  if (durWrap) durWrap.style.display = (p.code === 'trial') ? '' : 'none';
   document.getElementById('planFldDuration').value    = (p.duration_days == null ? '' : String(p.duration_days));
   document.getElementById('planFldPriceMonthly').value = (p.price_monthly == null ? '' : String(p.price_monthly));
   document.getElementById('planFldPriceYearly').value  = (p.price_yearly == null ? '' : String(p.price_yearly));
