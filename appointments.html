@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260601b30"></script>
+<script src="theme.js?v=20260601b31"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260601b30">
+<link rel="stylesheet" href="theme.css?v=20260601b31">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260601b30"></script>
-<script src="sidebar.js?v=20260601b30"></script>
-<script src="timepicker.js?v=20260601b30"></script>
+<script src="supabase-init.js?v=20260601b31"></script>
+<script src="sidebar.js?v=20260601b31"></script>
+<script src="timepicker.js?v=20260601b31"></script>
 </head>
 <body>
 <script>
@@ -1433,7 +1433,7 @@ const DEFAULT_WA_TEMPLATE =
 // file and used by the existing calendar renderer). Keeping these separate
 // avoids any temporal-dead-zone or naming-collision surprises.
 const DAYS_AR_FULL   = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-const MONTHS_AR_FULL = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const MONTHS_AR_FULL = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
 
 // Normalize Syrian phone numbers to wa.me digits-only format with country code.
 // Accepts: 0944xxx, +963xxx, 00963xxx, 963xxx, 944xxx — and tolerates spaces/dashes.
@@ -2263,7 +2263,7 @@ function nextPeriod() {
 function goToday() { currentDate = new Date(); selectedDate = new Date(); render(); }
 
 // ─── Helpers ─────────────────────────────────────────
-const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const MONTHS_AR = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
 const DAYS_AR   = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 
 function dateStr(d) {
