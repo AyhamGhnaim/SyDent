@@ -5690,7 +5690,7 @@ async function transitionAccount(eventType, r, params) {
       // user creation outside transitionAccount and pass in the new
       // user_id via params.userId — keeps this helper focused on state.
       var cfg = getPlanConfig('trial');
-      var dur = cfg ? cfg.duration_days : 30;
+      var dur = (cfg && Number(cfg.duration_days) > 0) ? Number(cfg.duration_days) : 30;
       toPlan = 'trial';
       updatePayload = {
         status: 'accepted',
