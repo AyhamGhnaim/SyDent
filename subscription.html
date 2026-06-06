@@ -590,6 +590,7 @@ body {
     var html = '';
 
     ST.plans.forEach(function (p) {
+      if (p.code === 'trial') return; // Trial plan not shown on subscription page
       var isCur = (p.code === cur);
       var icon = (p.icon && String(p.icon).trim()) ? (escHtml(p.icon) + ' ') : '';
       var sub = p.subtitle ? escHtml(p.subtitle) : '';
