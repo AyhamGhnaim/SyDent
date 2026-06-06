@@ -1685,7 +1685,10 @@ async function saveEmployee() {
               .or('role.is.null,role.neq.owner');
             var eUsed = (ec && typeof ec.count === 'number') ? ec.count : 0;
             if (eUsed >= empLimit) {
-              showMsg('modalMsg', '🔒 بلغت حد خطتك (' + empLimit + ' موظف نشط — المالك لا يُحتسب). عطّل موظفاً أو رقِّ خطتك.', true);
+              var _limitMsg = empLimit === 0
+                ? '🔒 خطتك لا تسمح بإضافة موظفين. رقِّ خطتك للمتابعة.'
+                : '🔒 بلغت حد خطتك (' + empLimit + ' موظف نشط — المالك لا يُحتسب). عطّل موظفاً أو رقِّ خطتك.';
+              showMsg('modalMsg', _limitMsg, true);
               return;
             }
           }
@@ -2181,7 +2184,10 @@ async function toggleActive(id) {
             .or('role.is.null,role.neq.owner');
           var reUsed = (reEc && typeof reEc.count === 'number') ? reEc.count : 0;
           if (reUsed >= reEmpLimit) {
-            showToast('🔒 خطتك تسمح بـ ' + reEmpLimit + ' موظف نشط (المالك لا يُحتسب). عطّل موظفاً آخر أو رقِّ خطتك.', true);
+            var _reLimitMsg = reEmpLimit === 0
+              ? '🔒 خطتك لا تسمح بإضافة موظفين. رقِّ خطتك للمتابعة.'
+              : '🔒 خطتك تسمح بـ ' + reEmpLimit + ' موظف نشط (المالك لا يُحتسب). عطّل موظفاً آخر أو رقِّ خطتك.';
+            showToast(_reLimitMsg, true);
             return;
           }
         }

@@ -4566,7 +4566,7 @@ function renderPlanPreview(p) {
     ? '<div class="preview-card-featured">⭐ ' + escapeHtml(p.featured_label || 'الأكثر شعبية') + '</div>' : '';
   var limits = '';
   if (p.max_employees != null && !isNaN(Number(p.max_employees))) {
-    limits += '<span class="preview-card-limit">👥 حتى ' + Number(p.max_employees) + ' موظف</span>';
+    limits += '<span class="preview-card-limit">👥 ' + (Number(p.max_employees) === 0 ? 'بلا موظفين إضافيين' : 'حتى ' + Number(p.max_employees) + ' موظف') + '</span>';
   } else {
     limits += '<span class="preview-card-limit">👥 بلا حد</span>';
   }
@@ -4638,8 +4638,8 @@ function validatePlanEdits(p) {
   if (p.sort_order == null || isNaN(Number(p.sort_order)) || Number(p.sort_order) < 1) {
     return { ok:false, error:'الترتيب يجب أن يكون رقماً ≥ 1.' };
   }
-  if (p.max_employees != null && (isNaN(Number(p.max_employees)) || Number(p.max_employees) < 1)) {
-    return { ok:false, error:'حد الموظفين يجب أن يكون رقماً ≥ 1 أو فارغاً (بلا حد).' };
+  if (p.max_employees != null && (isNaN(Number(p.max_employees)) || Number(p.max_employees) < 0)) {
+    return { ok:false, error:'حد الموظفين يجب أن يكون رقماً ≥ 0 أو فارغاً (بلا حد).' };
   }
   if (p.max_patients != null && (isNaN(Number(p.max_patients)) || Number(p.max_patients) < 1)) {
     return { ok:false, error:'حد المرضى يجب أن يكون رقماً ≥ 1 أو فارغاً (بلا حد).' };
