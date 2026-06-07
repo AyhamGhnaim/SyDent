@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607d"></script>
+<script src="theme.js?v=20260607e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607d"></script>
-<script src="sidebar.js?v=20260607d"></script>
+<script src="supabase-init.js?v=20260607e"></script>
+<script src="sidebar.js?v=20260607e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -263,7 +263,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607d">
+<link rel="stylesheet" href="theme.css?v=20260607e">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -697,6 +697,16 @@ async function hashPin(pin) {
 
 // ── Data layer ──
 async function loadData() {
+  // Phase X14.2: make sure the owner has a clinic_employees row BEFORE we read
+  // the list. The owner PIN UI (saveOwnerPin) and the owner card both require
+  // it; clinics onboarded without it would otherwise show no owner card and
+  // the owner could never set a lock PIN. Idempotent self-heal in SyDentLock.
+  try {
+    if (window.SyDentLock && window.SyDentLock.ensureOwnerEmployee) {
+      await window.SyDentLock.ensureOwnerEmployee();
+    }
+  } catch (e) { /* non-fatal — the query below still runs */ }
+
   // Load employees
   // Phase 7.3 (Migration 20): clinic_employees is now the canonical HR source
   // for ALL employees (clinical + non-clinical). The 8 HR columns mirror what

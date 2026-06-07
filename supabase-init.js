@@ -888,6 +888,84 @@
     _allEmployeesListCache = null;
   }
 
+  // ── Phase X14.2: self-heal the owner's clinic_employees row ───
+  // The role-switch picker, the per-employee PIN model, and the owner PIN UI
+  // in employees.html (saveOwnerPin) all assume the owner has a
+  // clinic_employees row with role='owner'. Clinics onboarded before that row
+  // existed — or where it was never inserted — break in subtle ways: the owner
+  // disappears from the switch modal, "saveOwnerPin" reports "owner account
+  // not found", and a device can get stuck read-only. This idempotent helper
+  // creates the row exactly once. It is safe: RLS allows owner_id=auth.uid(),
+  // and a UNIQUE partial index (uq_clinic_employees_one_owner) guarantees at
+  // most one owner row — concurrent inserts collide on 23505 and are ignored.
+  // Callers should `await loadDoctors()` first so getOwnerPersonName() can
+  // resolve the owner's name from clinic_doctors.is_owner.
+  var _ownerRowEnsured = false;
+  async function ensureOwnerEmployee() {
+    if (_ownerRowEnsured) return;
+    try {
+      var user = await window.sbGetUser();
+      if (!user) return;
+
+      // Already present? Query directly (caches may be empty this early).
+      var existing = await window.sb.from('clinic_employees')
+        .select('id')
+        .eq('owner_id', user.id)
+        .eq('role', 'owner')
+        .limit(1);
+      if (existing.error) {
+        // Table missing (pre-Migration-9.1) → nothing to heal; bail quietly.
+        return;
+      }
+      if (existing.data && existing.data.length > 0) {
+        _ownerRowEnsured = true;
+        return;
+      }
+
+      // Resolve the owner's display name: clinic_doctors.is_owner (warm cache
+      // from the caller's loadDoctors()), then auth metadata, then a default.
+      var ownerNm = getOwnerPersonName();
+      if (!ownerNm) {
+        var md = (user.user_metadata || {});
+        ownerNm = md.full_name || md.name || md.clinic_name || ROLE_LABELS.owner;
+      }
+
+      // Preserve any existing clinic-level lock PIN as the owner's pin_hash so
+      // an already-configured lock keeps working once the row exists.
+      var existingPin = await loadPinHash();
+
+      var row = {
+        owner_id: user.id,
+        name: ownerNm,
+        role: 'owner',
+        pin_hash: existingPin || null,
+        is_active: true,
+        has_system_access: true
+      };
+      var ins = await window.sb.from('clinic_employees').insert(row).select('id').single();
+      if (ins.error) {
+        var m = (ins.error.message || '') + ' ' + (ins.error.code || '');
+        // has_system_access missing (pre-Migration-21) → retry without it.
+        if (/42703/.test(m)) {
+          delete row.has_system_access;
+          ins = await window.sb.from('clinic_employees').insert(row).select('id').single();
+        }
+      }
+      if (ins.error) {
+        var m2 = (ins.error.message || '') + ' ' + (ins.error.code || '');
+        // 23505 = unique violation: another tab/device created it first → fine.
+        if (!/23505/.test(m2)) {
+          console.warn('[SyDentLock] ensureOwnerEmployee insert:', ins.error);
+          return;
+        }
+      }
+      _ownerRowEnsured = true;
+      invalidateEmployeesCache();
+    } catch (e) {
+      console.warn('[SyDentLock] ensureOwnerEmployee exception:', e);
+    }
+  }
+
   // Get current employee object (or null if not set / migration not applied)
   // This is the snapshot used for audit logging.
   async function getCurrentEmployee() {
@@ -1167,28 +1245,6 @@
       return openSwitchModalLegacy();
     }
 
-    // ── Phase X14.1: the owner must ALWAYS be switchable ──
-    // The owner's identity lives in clinic_doctors.is_owner=true, and many
-    // clinics have NO clinic_employees row for the owner. Without this guard a
-    // clinic whose only employee is e.g. a secretary would render only that
-    // secretary and hide the owner entirely — locking the owner out of their
-    // own account. If no owner row is present, synthesize one (sentinel id,
-    // never persisted as an employee_id; switch-in verifies the CLINIC-level
-    // PIN, not a per-employee PIN).
-    var OWNER_SENTINEL_ID = '__owner__';
-    if (!employees.some(function(e){ return e.role === 'owner'; })) {
-      await loadDoctors(); // ensure getOwnerPersonName() can resolve from clinic_doctors
-      employees = employees.concat([{
-        id: OWNER_SENTINEL_ID,
-        name: getOwnerPersonName() || ROLE_LABELS.owner,
-        role: 'owner',
-        doctor_id: null,
-        pin_hash: null,
-        is_active: true,
-        _ownerSynthetic: true
-      }]);
-    }
-
     var curRole = getRole();
     var curDoctorId = getDoctorId();
     var curEmployeeId = getEmployeeId();
@@ -1243,9 +1299,7 @@
       var icon = ROLE_ICONS[emp.role] || '👤';
       var roleLabel = ROLE_LABELS[emp.role] || emp.role;
       var hasPinForThisEmployee = !!emp.pin_hash;
-      // Owner switch-in verifies the CLINIC-level PIN, not a per-row pin_hash,
-      // so the "بدون PIN" warning is meaningless (and misleading) for owners.
-      var pinWarn = (!hasPinForThisEmployee && emp.role !== 'owner')
+      var pinWarn = (!hasPinForThisEmployee)
         ? '<span style="color:var(--yellow,#f5c842);font-size:11px;margin-right:6px;">⚠ بدون PIN</span>'
         : '';
       // Owner row: the 👑 crown already signals ownership — omit the
@@ -1333,13 +1387,7 @@
       // - Anything else → PIN required (which means PIN of the TARGET employee)
       // - If lock not configured (no PINs anywhere) → free
       var sameEmp = isCurrent(target);
-      var targetIsOwner = (target.role === 'owner');
-      // Owner switch-in is gated by the CLINIC-level PIN (clinic_settings
-      // .lock_pin_hash via verifyPin) — the owner has no per-employee pin_hash.
-      // Non-owner targets use their own employee PIN.
-      var lockConfigured = targetIsOwner
-        ? hasPinSet
-        : (hasPinSet || employees.some(function(e){ return !!e.pin_hash; }));
+      var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
 
       var needPin;
       if (sameEmp) {
@@ -1352,10 +1400,8 @@
         needPin = true;
       }
 
-      // Edge case: a NON-owner target with no pin_hash can't be verified.
-      // Owner targets verify the clinic-level PIN, so a null per-row pin_hash
-      // is NOT a blocker for them.
-      if (needPin && !targetIsOwner && !target.pin_hash) {
+      // Edge case: target has NO pin_hash set yet → can't verify
+      if (needPin && !target.pin_hash) {
         msg.textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد. اطلب من المالك إعداده.';
         msg.className = 'sd-msg';
         pinRow.style.display = 'none';
@@ -1427,11 +1473,8 @@
           return;
         }
 
-        // PIN logic same as updateActive (owner gated by clinic-level PIN)
-        var targetIsOwner = (target.role === 'owner');
-        var lockConfigured = targetIsOwner
-          ? hasPinSet
-          : (hasPinSet || employees.some(function(e){ return !!e.pin_hash; }));
+        // PIN logic same as updateActive
+        var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
         var needPin = false;
         if (!lockConfigured) {
           needPin = false;
@@ -1442,13 +1485,12 @@
         }
 
         if (needPin) {
-          if (!targetIsOwner && !target.pin_hash) {
+          if (!target.pin_hash) {
             ov.querySelector('#sdMsg').textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد.';
             return;
           }
           var pin = (ov.querySelector('#sdPinInput').value || '').trim();
-          // Owner → clinic-level PIN (verifyPin); others → per-employee PIN.
-          var ver = targetIsOwner ? await verifyPin(pin) : await verifyEmployeePin(target, pin);
+          var ver = await verifyEmployeePin(target, pin);
           if (!ver.ok) {
             var pm = ov.querySelector('#sdPinMsg');
             if (ver.reason === 'cooldown') {
@@ -1464,20 +1506,17 @@
           }
         }
 
-        // Apply: role + doctor_id derived from the employee. The synthetic
-        // owner carries a sentinel id that must NEVER be stored as an
-        // employee_id — pass null so switching to owner clears it.
+        // Apply: role + doctor_id derived from the employee
         var newDoctorId = (target.role === 'doctor') ? (target.doctor_id || null) : null;
-        var newEmpId = target._ownerSynthetic ? null : target.id;
-        applyRole(target.role, newDoctorId, newEmpId);
+        applyRole(target.role, newDoctorId, target.id);
 
         // Log to audit before reload (best effort, fire-and-forget)
         try {
           await logAudit('lock.role_switch', {
-            entityId: target._ownerSynthetic ? null : target.id,
+            entityId: target.id,
             description: 'تبديل إلى الموظف: ' + target.name + ' (' + (ROLE_LABELS[target.role] || target.role) + ')',
             oldValue: { role: curRole, doctor_id: curDoctorId, employee_id: curEmployeeId },
-            newValue: { role: target.role, doctor_id: newDoctorId, employee_id: newEmpId }
+            newValue: { role: target.role, doctor_id: newDoctorId, employee_id: target.id }
           });
         } catch (e) { /* ignore */ }
 
@@ -1521,68 +1560,30 @@
     ov.id = 'sdLockModal';
     ov.className = 'sd-lock-modal-overlay';
 
-    // ── Phase X14: only offer roles that actually exist ──
-    // The legacy modal is reached when clinic_employees is empty — but that
-    // is NOT only the "fresh install" case. A fully-onboarded owner-only
-    // clinic (no staff added yet) also lands here. Showing phantom
-    // "طبيب"/"سكرتيرة" options the clinic doesn't have is confusing, and the
-    // owner-as-doctor record (clinic_doctors.is_owner=true) must NEVER be
-    // offered as a switchable "doctor". Resolution:
-    //   • Owner: always shown, by REAL name (getOwnerPersonName), never the
-    //     literal word "المالك".
-    //   • طبيب: only if ≥1 NON-owner active doctor exists.
-    //   • سكرتيرة: only if an active secretary employee exists (none in this
-    //     path, but checked defensively).
-    var ownerName = getOwnerPersonName() || ROLE_LABELS.owner;
-    var nonOwnerDoctors = doctors.filter(function(d){ return d.is_owner !== true; });
-    var hasSecretary = (_allEmployeesListCache || []).some(function(e){
-      return e.role === 'secretary' && e.is_active !== false;
-    });
-
     var doctorOptions = '';
-    nonOwnerDoctors.forEach(function(d){
-      var s = (d.id === curDoctorId) ? ' selected' : '';
-      doctorOptions += '<option value="'+escapeHtmlLock(d.id)+'"'+s+'>'+escapeHtmlLock(d.name)+'</option>';
+    doctors.forEach(function(d){
+      var sel = (d.id === curDoctorId) ? ' selected' : '';
+      doctorOptions += '<option value="'+d.id+'"'+sel+'>'+escapeHtmlLock(d.name)+'</option>';
     });
 
-    // Which option starts checked? The current role's — but only if it is
-    // actually rendered. Owner is always rendered, so it is the safe default
-    // whenever the current role's option is hidden (e.g. device stuck on a
-    // deleted secretary). This prevents a "no radio checked" crash in
-    // updateActive()/confirm().
-    var initSel = 'owner';
-    if (curRole === 'doctor' && nonOwnerDoctors.length > 0) initSel = 'doctor';
-    else if (curRole === 'secretary' && hasSecretary) initSel = 'secretary';
-
-    var ownerLabelHtml =
-      '<label class="sd-opt' + (initSel==='owner'?' sd-active':'') + '" data-role="owner">' +
-        '<input type="radio" name="sdRoleSel" value="owner"' + (initSel==='owner'?' checked':'') + '> 👑 ' + escapeHtmlLock(ownerName) +
-      '</label>';
-
-    var doctorLabelHtml = (nonOwnerDoctors.length > 0)
-      ? ('<label class="sd-opt' + (initSel==='doctor'?' sd-active':'') + '" data-role="doctor">' +
-           '<input type="radio" name="sdRoleSel" value="doctor"' + (initSel==='doctor'?' checked':'') + '> 👨‍⚕️ طبيب' +
-           '<div class="sd-sub"><select id="sdDoctorSel">' + doctorOptions + '</select></div>' +
-         '</label>')
-      : '';
-
-    var secretaryLabelHtml = hasSecretary
-      ? ('<label class="sd-opt' + (initSel==='secretary'?' sd-active':'') + '" data-role="secretary">' +
-           '<input type="radio" name="sdRoleSel" value="secretary"' + (initSel==='secretary'?' checked':'') + '> 👩‍💼 السكرتيرة' +
-         '</label>')
-      : '';
-
-    var curDisplay = (curRole === 'owner')
-      ? ((ROLE_ICONS.owner||'') + ' ' + ownerName)
-      : ((ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole));
+    var doctorBlock = doctors.length > 0
+      ? '<select id="sdDoctorSel">' + doctorOptions + '</select>'
+      : '<div style="color:var(--red,#ef5350);font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
 
     ov.innerHTML =
       '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع" aria-labelledby="sdLegacyTitle">' +
         '<h3 id="sdLegacyTitle">🔓 تبديل الوضع</h3>' +
-        '<div class="sd-cur">الوضع الحالي: ' + escapeHtmlLock(curDisplay) + '</div>' +
-        ownerLabelHtml +
-        doctorLabelHtml +
-        secretaryLabelHtml +
+        '<div class="sd-cur">الوضع الحالي: ' + (ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole) + '</div>' +
+        '<label class="sd-opt' + (curRole==='owner'?' sd-active':'') + '" data-role="owner">' +
+          '<input type="radio" name="sdRoleSel" value="owner"' + (curRole==='owner'?' checked':'') + '> 👑 المالك' +
+        '</label>' +
+        '<label class="sd-opt' + (curRole==='doctor'?' sd-active':'') + '" data-role="doctor">' +
+          '<input type="radio" name="sdRoleSel" value="doctor"' + (curRole==='doctor'?' checked':'') + '> 👨‍⚕️ طبيب' +
+          '<div class="sd-sub">' + doctorBlock + '</div>' +
+        '</label>' +
+        '<label class="sd-opt' + (curRole==='secretary'?' sd-active':'') + '" data-role="secretary">' +
+          '<input type="radio" name="sdRoleSel" value="secretary"' + (curRole==='secretary'?' checked':'') + '> 👩‍💼 السكرتيرة' +
+        '</label>' +
         '<div class="sd-pin-row" id="sdPinRow" style="display:none;">' +
           '<label>أدخل PIN للتأكيد:</label>' +
           '<input type="password" inputmode="numeric" maxlength="6" id="sdPinInput" autocomplete="off">' +
@@ -1696,11 +1697,7 @@
             return;
           }
         }
-        // Phase X14: the legacy path runs only when there are NO valid
-        // clinic_employees rows, so any persisted LS_EMPLOYEE_ID is stale
-        // (e.g. a deleted secretary that left the device read-only). Pass
-        // null explicitly to clear it — otherwise applyRole() preserves it.
-        applyRole(targetRole, targetDocId, null);
+        applyRole(targetRole, targetDocId);
         closeModal();
         window.location.reload();
       } finally {
@@ -1887,6 +1884,13 @@
       console.warn('[SyDentLock] admin role check skipped:', _adminCheckErr && _adminCheckErr.message);
     }
     // ──────────────────────────────────────────────────────────────────
+
+    // Phase X14.2: self-heal the owner's clinic_employees row before anything
+    // reads the employee list. loadDoctors() first so getOwnerPersonName() can
+    // resolve the owner's name from clinic_doctors.is_owner. Both are idempotent
+    // and cached, so the parallel preload below reuses the doctor cache.
+    await loadDoctors();
+    await ensureOwnerEmployee();
 
     // Preload (don't await — fire and forget for speed)
     loadPinHash();
@@ -2397,6 +2401,7 @@
     loadEmployees: loadEmployees,
     loadDoctors: loadDoctors,
     invalidateEmployeesCache: invalidateEmployeesCache,
+    ensureOwnerEmployee: ensureOwnerEmployee,
     getCurrentEmployee: getCurrentEmployee,
     // pin
     hashPin: hashPin,
