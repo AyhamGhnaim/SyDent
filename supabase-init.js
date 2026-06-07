@@ -3093,7 +3093,7 @@
     var up = await window.sb.storage.from(BUCKET).upload(path, body, { contentType: mime, upsert:false });
     if (up.error) return { ok:false, reason:'storage', error:up.error };
 
-    var ins = await window.sb.from('patient_documents').insert({
+    var docRow = {
       owner_id:       oid,
       patient_id:     patientId,
       appointment_id: opts.appointmentId || null,
@@ -3103,8 +3103,23 @@
       size_bytes:     (body && body.size) || file.size || null,
       category:       opts.category || 'other',
       note:           opts.note || null,
-      uploaded_by:    oid
-    }).select().single();
+      uploaded_by:    oid,
+      tooth_num:      opts.toothNum || null,   // P2 (Migration 55): link image/doc to a specific tooth
+      session_id:     opts.sessionId || null   // P2 (Migration 55): optional link to a ledger session
+    };
+
+    var ins = await window.sb.from('patient_documents').insert(docRow).select().single();
+
+    // Graceful pre-Migration-55 fallback: if tooth_num/session_id columns are not
+    // present yet (PGRST204 = column missing from schema cache), retry the insert
+    // without them so file upload NEVER breaks before the migration is applied.
+    // Parity with the account_adjustments graceful fallback pattern (v70).
+    if (ins.error && (ins.error.code === 'PGRST204' ||
+        /tooth_num|session_id/i.test(ins.error.message || ''))) {
+      delete docRow.tooth_num;
+      delete docRow.session_id;
+      ins = await window.sb.from('patient_documents').insert(docRow).select().single();
+    }
 
     if (ins.error) {
       // Roll back the orphaned object so storage never drifts from the table.

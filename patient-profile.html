@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607t"></script>
+<script src="theme.js?v=20260607u"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607t"></script>
-<script src="sidebar.js?v=20260607t"></script>
-<script src="timepicker.js?v=20260607t"></script>
+<script src="supabase-init.js?v=20260607u"></script>
+<script src="sidebar.js?v=20260607u"></script>
+<script src="timepicker.js?v=20260607u"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607t">
+<link rel="stylesheet" href="theme.css?v=20260607u">
 </head>
 <body>
 <script>
@@ -860,6 +860,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <option value="receipt">🧾 إيصال</option>
           <option value="other">📎 أخرى</option>
         </select>
+        <select id="pfUploadTooth" title="ربط الملف بسنّ محدد (اختياري)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-inline-start:8px;">
+          <option value="">— عام (بلا سن) —</option>
+        </select>
       </div>
       <div id="pfDropZone" onclick="document.getElementById('pfFileInput').click()"
            style="border:2px dashed var(--border);border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;color:var(--text2);transition:all .2s;margin-bottom:16px;">
@@ -870,6 +873,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <input type="file" id="pfFileInput" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
              style="display:none;" onchange="pfOnFilesPicked(this.files); this.value='';">
       <div id="pfUploadStatus" style="display:none;font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;"></div>
+      <div id="pfFilterBar" style="display:none;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--text2);">🦷 فلترة حسب السن:</span>
+        <select id="pfToothFilter" onchange="pfApplyToothFilter(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 11px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+          <option value="">الكل</option>
+        </select>
+      </div>
       <div id="pfFilesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
     </div>
   </div>
@@ -9532,9 +9541,36 @@ function showToast(msg) {
 var _pfFiles = [];          // current patient's document rows
 var _pfUrls  = {};          // storage_path -> short-lived signed URL
 var _pfLoadInFlight = false;
+var _pfToothFilter = '';    // P2: active tooth filter in the gallery ('' = all)
+
+// ── P2: tooth linkage for files (Migration 55) ──────────────
+// Build FDI tooth <option>s: permanent (18-11/21-28/48-41/31-38) + primary
+// (55-51/61-65/85-81/71-75). tooth_num is stored as TEXT (matches teeth_status).
+function pfBuildToothOptions(){
+  function span(a, b){ var out=[], step = a < b ? 1 : -1; for (var n=a; n !== b+step; n+=step) out.push(n); return out; }
+  function opts(nums){ return nums.map(function(n){ return '<option value="'+n+'">'+n+'</option>'; }).join(''); }
+  var permUpper = span(18,11).concat(span(21,28));
+  var permLower = span(48,41).concat(span(31,38));
+  var primUpper = span(55,51).concat(span(61,65));
+  var primLower = span(85,81).concat(span(71,75));
+  return '<option value="">— عام (بلا سن) —</option>' +
+    '<optgroup label="دائمة — الفك العلوي">' + opts(permUpper) + '</optgroup>' +
+    '<optgroup label="دائمة — الفك السفلي">' + opts(permLower) + '</optgroup>' +
+    '<optgroup label="لبنية — الفك العلوي">' + opts(primUpper) + '</optgroup>' +
+    '<optgroup label="لبنية — الفك السفلي">' + opts(primLower) + '</optgroup>';
+}
+function pfPopulateToothSelect(){
+  var sel = document.getElementById('pfUploadTooth');
+  if (sel && sel.options.length <= 1) sel.innerHTML = pfBuildToothOptions();
+}
+function pfApplyToothFilter(v){
+  _pfToothFilter = v || '';
+  renderPatientFiles();
+}
 
 async function loadPatientFiles(){
   if (!window.SyDentFiles || !patientId) return;
+  pfPopulateToothSelect();
   var grid = document.getElementById('pfFilesGrid');
   if (grid && !_pfFiles.length) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:24px;">جارٍ التحميل…</div>';
@@ -9566,11 +9602,45 @@ function renderPatientFiles(){
   var grid = document.getElementById('pfFilesGrid');
   if (!grid) return;
   pfUpdateBadge();
+
+  // Populate the tooth filter from teeth that actually have linked files.
+  var teeth = [];
+  _pfFiles.forEach(function(f){
+    var t = f.tooth_num != null ? String(f.tooth_num) : '';
+    if (t && teeth.indexOf(t) < 0) teeth.push(t);
+  });
+  teeth.sort(function(a,b){ return (parseInt(a,10)||0) - (parseInt(b,10)||0); });
+  var fbar = document.getElementById('pfFilterBar');
+  var fsel = document.getElementById('pfToothFilter');
+  if (fbar && fsel) {
+    if (teeth.length) {
+      // If the active filter's tooth no longer has any files, reset to "all".
+      if (_pfToothFilter && teeth.indexOf(_pfToothFilter) < 0) _pfToothFilter = '';
+      fbar.style.display = 'flex';
+      fsel.innerHTML = '<option value="">الكل</option>' + teeth.map(function(t){
+        return '<option value="' + t + '"' + (t === _pfToothFilter ? ' selected' : '') + '>السن ' + t + '</option>';
+      }).join('');
+    } else {
+      fbar.style.display = 'none';
+      _pfToothFilter = '';
+    }
+  }
+
   if (!_pfFiles.length) {
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:24px;">لا توجد ملفات بعد — ارفع أول صورة أشعة أو مستند.</div>';
     return;
   }
-  grid.innerHTML = _pfFiles.map(function(f){
+
+  var list = _pfToothFilter
+    ? _pfFiles.filter(function(f){ return String(f.tooth_num) === String(_pfToothFilter); })
+    : _pfFiles;
+
+  if (!list.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text2);padding:24px;">لا توجد ملفات مرتبطة بالسن ' + escapeHtml(_pfToothFilter) + '.</div>';
+    return;
+  }
+
+  grid.innerHTML = list.map(function(f){
     var isImg = window.SyDentFiles.isImage(f.mime_type);
     var url   = _pfUrls[f.storage_path] || '';
     var cat   = window.SyDentFiles.CAT_LABELS[f.category] || window.SyDentFiles.CAT_LABELS.other;
@@ -9578,10 +9648,14 @@ function renderPatientFiles(){
       ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" style="width:100%;height:110px;object-fit:cover;display:block;">'
       : '<div style="width:100%;height:110px;display:flex;align-items:center;justify-content:center;font-size:40px;background:var(--bg3);">📄</div>';
     var d = f.created_at ? new Date(f.created_at).toLocaleDateString('ar-SY') : '';
+    var toothBadge = (f.tooth_num != null && f.tooth_num !== '')
+      ? '<div style="font-size:10px;color:var(--green);font-weight:700;">🦷 السن ' + escapeHtml(String(f.tooth_num)) + '</div>'
+      : '';
     return '<div style="border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--bg2);display:flex;flex-direction:column;">' +
       '<div style="cursor:pointer;" onclick="pfOpenFile(\'' + f.id + '\')">' + thumb + '</div>' +
       '<div style="padding:8px 9px;flex:1;display:flex;flex-direction:column;gap:4px;">' +
         '<div style="font-size:11px;color:var(--text2);">' + cat + '</div>' +
+        toothBadge +
         '<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(f.file_name) + '">' + escapeHtml(f.file_name) + '</div>' +
         '<div style="font-size:10px;color:var(--text2);">' + escapeHtml(d) + ' · ' + escapeHtml(window.SyDentFiles.humanSize(f.size_bytes)) + '</div>' +
         '<div style="display:flex;gap:6px;margin-top:4px;">' +
@@ -9615,17 +9689,18 @@ async function pfOnFilesPicked(fileList){
   if (!fileList || !fileList.length) return;
   if (!window.SyDentFiles) { showToast('الميزة غير متاحة'); return; }
   var cat = (document.getElementById('pfUploadCategory') || {}).value || 'other';
+  var tooth = (document.getElementById('pfUploadTooth') || {}).value || '';
   var status = document.getElementById('pfUploadStatus');
   var files = Array.prototype.slice.call(fileList);
   var done = 0, failed = 0;
   if (status){ status.style.display = 'block'; }
   for (var i = 0; i < files.length; i++) {
     if (status) status.textContent = 'جارٍ الرفع… (' + (i+1) + '/' + files.length + ')';
-    var r = await window.SyDentFiles.upload(patientId, files[i], { category: cat });
+    var r = await window.SyDentFiles.upload(patientId, files[i], { category: cat, toothNum: tooth || null });
     if (r.ok) {
       done++;
       if (window.logAudit) {
-        try { window.logAudit('patient.file_upload', { patientId: patientId, patientName: (patient && patient.name) || null, description: 'رفع ملف: ' + (files[i].name || '') + ' (' + cat + ')' }); } catch(e){}
+        try { window.logAudit('patient.file_upload', { patientId: patientId, patientName: (patient && patient.name) || null, description: 'رفع ملف: ' + (files[i].name || '') + ' (' + cat + (tooth ? ' · السن ' + tooth : '') + ')' }); } catch(e){}
       }
     } else {
       failed++;
