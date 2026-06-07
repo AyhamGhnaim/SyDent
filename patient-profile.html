@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607f"></script>
+<script src="theme.js?v=20260607g"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607f"></script>
-<script src="sidebar.js?v=20260607f"></script>
-<script src="timepicker.js?v=20260607f"></script>
+<script src="supabase-init.js?v=20260607g"></script>
+<script src="sidebar.js?v=20260607g"></script>
+<script src="timepicker.js?v=20260607g"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607f">
+<link rel="stylesheet" href="theme.css?v=20260607g">
 </head>
 <body>
 <script>
@@ -706,6 +706,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
     <button class="tab" onclick="switchTab('labs',this)">🥽 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
     <button class="tab" onclick="switchTab('files',this); loadPatientFiles();">📎 الملفات <span id="filesBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('rx',this); loadPrescriptions();">💊 الروشتات <span id="rxBadge" class="lab-badge" style="display:none">0</span></button>
     <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">📋 سجل النشاطات</button>
   </div>
 
@@ -870,6 +871,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              style="display:none;" onchange="pfOnFilesPicked(this.files); this.value='';">
       <div id="pfUploadStatus" style="display:none;font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;"></div>
       <div id="pfFilesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;"></div>
+    </div>
+  </div>
+
+  <!-- Tab: الروشتات -->
+  <div class="panel" id="tab-rx">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">💊 الروشتات الطبية</span>
+        <button class="btn btn-primary" onclick="openRxModal()" style="font-size:13px;padding:8px 16px;">➕ روشتة جديدة</button>
+      </div>
+      <div id="rxList"></div>
     </div>
   </div>
 
@@ -1364,6 +1376,51 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;" onclick="doPrintRecord(true)">
         🗄️ أرشيف داخلي <span style="opacity:.8;font-weight:400;font-size:12px;">(مع الأسعار والمدفوعات)</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: روشتة جديدة -->
+<div class="modal-overlay" id="rxModal">
+  <div class="modal-box" style="max-width:680px;">
+    <div class="modal-head"><h3>💊 روشتة جديدة</h3><button class="modal-close" onclick="closeModal('rxModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group" id="rxProviderGroup" style="display:none;">
+          <label>الطبيب</label>
+          <select id="rxProvider" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
+        </div>
+        <div class="form-group">
+          <label>تعبئة من قالب</label>
+          <select id="rxTemplatePick" onchange="rxApplyTemplate(this.value)" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
+            <option value="">— بلا قالب —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="rxApptGroup" style="display:none;">
+        <label>ربط بموعد (اختياري)</label>
+        <select id="rxAppt" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;"></select>
+      </div>
+
+      <label style="display:block;font-weight:700;margin:14px 0 8px;color:var(--text);">الأدوية</label>
+      <div id="rxItemsWrap"></div>
+      <button class="btn" onclick="rxAddItemRow()" style="font-size:13px;padding:7px 14px;margin-top:6px;">➕ دواء آخر</button>
+
+      <div class="form-group" style="margin-top:14px;"><label>ملاحظات عامة (اختياري)</label><textarea id="rxNotes" placeholder="مثال: مراجعة بعد أسبوع، الامتناع عن المشروبات الساخنة…"></textarea></div>
+
+      <div style="margin-top:10px;padding-top:12px;border-top:1px solid var(--border);">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text2);">
+          <input type="checkbox" id="rxSaveAsTemplate" onchange="document.getElementById('rxTemplateNameGroup').style.display=this.checked?'block':'none'" style="width:auto;">
+          حفظ هذه الأدوية كقالب لإعادة الاستخدام
+        </label>
+        <div class="form-group" id="rxTemplateNameGroup" style="display:none;margin-top:8px;">
+          <input type="text" id="rxTemplateName" placeholder="اسم القالب (مثال: صادّ + مسكّن بعد القلع)">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('rxModal')">إلغاء</button>
+      <button class="btn-save-m" id="rxSaveBtn" onclick="savePrescription()">حفظ الروشتة</button>
     </div>
   </div>
 </div>
@@ -9547,6 +9604,496 @@ async function loadPatientAuditLog() {
   currentUser = data.user;
   await loadAll();
 })();
+
+
+/* ===== الروشتات (P1) ===== */
+/* ============================================================
+   Prescriptions (الروشتات) — P1
+   patient-profile.html. يعتمد على helpers موجودة:
+   currentUser, patientId, patient, CLINIC_DOCTORS, upcomingAppts,
+   getDefaultProviderId, escapeHtml, calcAge, openModal, closeModal,
+   toast, CLINIC_SETTINGS_WA (إن وُجد). آلية الطباعة: #printRoot + body.printing.
+   ============================================================ */
+
+var PRESCRIPTIONS = [];        // روشتات المريض الحالي
+var RX_TEMPLATES  = [];        // قوالب المالك
+var _savePrescriptionInFlight = false;
+
+/* ---------- تحميل + عرض القائمة ---------- */
+async function loadPrescriptions() {
+  if (!currentUser || !patientId) return;
+  var el = document.getElementById('rxList');
+  try {
+    var res = await window.sb.from('prescriptions')
+      .select('id, provider_id, appointment_id, notes, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+    if (res.error) {
+      // graceful: جدول غير موجود (قبل Migration 51)
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        if (el) el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text2);font-size:13px;">ميزة الروشتات غير مُفعّلة بعد.</div>';
+        return;
+      }
+      console.warn('loadPrescriptions:', res.error);
+      PRESCRIPTIONS = [];
+    } else {
+      PRESCRIPTIONS = res.data || [];
+    }
+  } catch (e) { console.warn('loadPrescriptions catch:', e); PRESCRIPTIONS = []; }
+
+  // عدّ الأدوية لكل روشتة (لعرض ملخّص)
+  var ids = PRESCRIPTIONS.map(function(p){ return p.id; });
+  var itemsByRx = {};
+  if (ids.length) {
+    try {
+      var ir = await window.sb.from('prescription_items')
+        .select('prescription_id, drug_name, dosage, frequency, duration, instructions, sort_order')
+        .in('prescription_id', ids)
+        .order('sort_order', { ascending: true });
+      if (!ir.error && ir.data) {
+        ir.data.forEach(function(it){
+          (itemsByRx[it.prescription_id] = itemsByRx[it.prescription_id] || []).push(it);
+        });
+      }
+    } catch (e) { /* graceful */ }
+  }
+  window._rxItemsByRx = itemsByRx;
+
+  // بادج
+  var badge = document.getElementById('rxBadge');
+  if (badge) {
+    if (PRESCRIPTIONS.length) { badge.textContent = PRESCRIPTIONS.length; badge.style.display = ''; }
+    else badge.style.display = 'none';
+  }
+
+  renderPrescriptions();
+}
+
+function rxProviderName(pid) {
+  if (!pid) return '';
+  for (var i=0;i<CLINIC_DOCTORS.length;i++) if (CLINIC_DOCTORS[i].id === pid) return CLINIC_DOCTORS[i].name;
+  return '';
+}
+
+function renderPrescriptions() {
+  var el = document.getElementById('rxList');
+  if (!el) return;
+  if (!PRESCRIPTIONS.length) {
+    el.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text2);">'
+      + '<div style="font-size:34px;">💊</div>'
+      + '<div style="margin-top:8px;font-size:13px;">لا توجد روشتات بعد — أنشئ أول روشتة لهذا المريض.</div></div>';
+    return;
+  }
+  var itemsByRx = window._rxItemsByRx || {};
+  var rows = PRESCRIPTIONS.map(function(p){
+    var items = itemsByRx[p.id] || [];
+    var drugs = items.map(function(it){ return escapeHtml(it.drug_name); }).join('، ');
+    if (drugs.length > 90) drugs = drugs.slice(0,90) + '…';
+    var dr = rxProviderName(p.provider_id);
+    var dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'}) : '';
+    return '<tr>'
+      + '<td style="white-space:nowrap;">' + escapeHtml(dateStr) + '</td>'
+      + '<td>' + (drugs || '<span style="color:var(--text2);">—</span>') + '</td>'
+      + '<td style="white-space:nowrap;">' + (dr ? escapeHtml(dr) : '<span style="color:var(--text2);">—</span>') + '</td>'
+      + '<td style="text-align:left;white-space:nowrap;">'
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="printPrescription(\'' + p.id + '\')">🖨️ طباعة</button> '
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="copyPrescription(\'' + p.id + '\')">📋 نسخ</button> '
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;color:var(--danger,#e5484d);" onclick="deletePrescription(\'' + p.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }).join('');
+  el.innerHTML = '<div style="overflow-x:auto;" class="no-scrollbar"><table class="data-table">'
+    + '<thead><tr><th>التاريخ</th><th>الأدوية</th><th>الطبيب</th><th style="text-align:left;"></th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+}
+
+/* ---------- فتح المودال ---------- */
+function rxItemRowHtml(it) {
+  it = it || {};
+  return '<div class="rx-item-row" style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--bg2);">'
+    + '<div style="display:flex;gap:8px;align-items:flex-start;">'
+      + '<input type="text" class="rx-drug" placeholder="اسم الدواء *" value="' + escapeHtml(it.drug_name||'') + '" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">'
+      + '<button class="btn" onclick="this.closest(\'.rx-item-row\').remove()" style="padding:8px 12px;font-size:13px;color:var(--danger,#e5484d);" title="حذف">✕</button>'
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">'
+      + '<input type="text" class="rx-dosage" placeholder="الجرعة (مثال: 500mg)" value="' + escapeHtml(it.dosage||'') + '" style="padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+      + '<input type="text" class="rx-freq" placeholder="التكرار (مثال: 3 مرات/يوم)" value="' + escapeHtml(it.frequency||'') + '" style="padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+      + '<input type="text" class="rx-dur" placeholder="المدة (مثال: 5 أيام)" value="' + escapeHtml(it.duration||'') + '" style="padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+    + '</div>'
+    + '<input type="text" class="rx-instr" placeholder="تعليمات (مثال: بعد الأكل)" value="' + escapeHtml(it.instructions||'') + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;margin-top:8px;">'
+  + '</div>';
+}
+
+function rxAddItemRow(it) {
+  var wrap = document.getElementById('rxItemsWrap');
+  if (!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', rxItemRowHtml(it));
+}
+
+async function openRxModal() {
+  // تحميل القوالب أول مرة (lazy)
+  if (!RX_TEMPLATES.length) { try { await loadRxTemplates(); } catch(e){} }
+  // إعادة ضبط
+  var saveBtn = document.getElementById('rxSaveBtn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ الروشتة'; }
+  document.getElementById('rxNotes').value = '';
+  document.getElementById('rxSaveAsTemplate').checked = false;
+  document.getElementById('rxTemplateNameGroup').style.display = 'none';
+  document.getElementById('rxTemplateName').value = '';
+  document.getElementById('rxItemsWrap').innerHTML = '';
+  rxAddItemRow(); // سطر فارغ أول
+
+  // قائمة الأطباء
+  var group = document.getElementById('rxProviderGroup');
+  var select = document.getElementById('rxProvider');
+  if (group && select) {
+    if (!CLINIC_DOCTORS || CLINIC_DOCTORS.length === 0) {
+      group.style.display = 'none';
+    } else {
+      var active = CLINIC_DOCTORS.filter(function(d){ return d.is_active !== false; });
+      var list = active.length ? active : CLINIC_DOCTORS;
+      group.style.display = 'block';
+      select.innerHTML = list.map(function(d){
+        var own = d.is_owner ? ' ⭐' : '';
+        return '<option value="' + d.id + '">' + escapeHtml(d.name) + own + '</option>';
+      }).join('');
+      select.value = getDefaultProviderId(list);
+    }
+  }
+
+  // ربط بموعد
+  var aGroup = document.getElementById('rxApptGroup');
+  var aSelect = document.getElementById('rxAppt');
+  if (aGroup && aSelect) {
+    if (!upcomingAppts || upcomingAppts.length === 0) {
+      aGroup.style.display = 'none';
+      aSelect.innerHTML = '';
+    } else {
+      aGroup.style.display = 'block';
+      var opts = '<option value="">— لا تربط بموعد —</option>';
+      upcomingAppts.forEach(function(u){
+        var d = u.date ? new Date(u.date).toLocaleDateString('ar-SY',{month:'short',day:'numeric'}) : '';
+        opts += '<option value="' + u.id + '">' + escapeHtml(d) + (u.time ? (' — ' + escapeHtml(u.time)) : '') + '</option>';
+      });
+      aSelect.innerHTML = opts;
+    }
+  }
+
+  // القوالب
+  rxPopulateTemplatePicker();
+
+  openModal('rxModal');
+}
+
+/* ---------- القوالب ---------- */
+async function loadRxTemplates() {
+  if (!currentUser) return;
+  try {
+    var res = await window.sb.from('prescription_templates')
+      .select('id, name, items, created_at')
+      .eq('owner_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    if (!res.error && res.data) RX_TEMPLATES = res.data;
+  } catch (e) { /* graceful */ RX_TEMPLATES = []; }
+}
+
+function rxPopulateTemplatePicker() {
+  var sel = document.getElementById('rxTemplatePick');
+  if (!sel) return;
+  var opts = '<option value="">— بلا قالب —</option>';
+  RX_TEMPLATES.forEach(function(t){
+    opts += '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>';
+  });
+  sel.innerHTML = opts;
+  sel.value = '';
+}
+
+function rxApplyTemplate(tid) {
+  if (!tid) return;
+  var tpl = null;
+  for (var i=0;i<RX_TEMPLATES.length;i++) if (RX_TEMPLATES[i].id === tid) { tpl = RX_TEMPLATES[i]; break; }
+  if (!tpl) return;
+  var items = Array.isArray(tpl.items) ? tpl.items : [];
+  var wrap = document.getElementById('rxItemsWrap');
+  wrap.innerHTML = '';
+  if (!items.length) { rxAddItemRow(); return; }
+  items.forEach(function(it){ rxAddItemRow(it); });
+}
+
+/* ---------- جمع الأدوية من النموذج ---------- */
+function rxCollectItems() {
+  var rows = document.querySelectorAll('#rxItemsWrap .rx-item-row');
+  var items = [];
+  for (var i=0;i<rows.length;i++) {
+    var r = rows[i];
+    var drug = (r.querySelector('.rx-drug').value || '').trim();
+    if (!drug) continue; // تجاهل الأسطر الفارغة
+    items.push({
+      drug_name:    drug,
+      dosage:       (r.querySelector('.rx-dosage').value || '').trim(),
+      frequency:    (r.querySelector('.rx-freq').value || '').trim(),
+      duration:     (r.querySelector('.rx-dur').value || '').trim(),
+      instructions: (r.querySelector('.rx-instr').value || '').trim()
+    });
+  }
+  return items;
+}
+
+/* ---------- حفظ ---------- */
+async function savePrescription() {
+  if (_savePrescriptionInFlight) return;
+  var items = rxCollectItems();
+  if (!items.length) { showToast('⚠️ أضف دواءً واحداً على الأقل'); return; }
+
+  _savePrescriptionInFlight = true;
+  var btn = document.getElementById('rxSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+
+  try {
+    var providerId = null;
+    var pg = document.getElementById('rxProviderGroup');
+    if (pg && pg.style.display !== 'none') {
+      var pv = document.getElementById('rxProvider').value;
+      providerId = pv || null;
+    }
+    var apptId = null;
+    var ag = document.getElementById('rxApptGroup');
+    if (ag && ag.style.display !== 'none') {
+      var av = document.getElementById('rxAppt').value;
+      apptId = av || null;
+    }
+    var notes = (document.getElementById('rxNotes').value || '').trim() || null;
+
+    // 1) رأس الروشتة
+    var insRx = await window.sb.from('prescriptions').insert({
+      owner_id: currentUser.id,
+      patient_id: patientId,
+      provider_id: providerId,
+      appointment_id: apptId,
+      notes: notes
+    }).select('id').single();
+    if (insRx.error) throw insRx.error;
+    var rxId = insRx.data.id;
+
+    // 2) الأدوية
+    var itemRows = items.map(function(it, idx){
+      return {
+        owner_id: currentUser.id,
+        prescription_id: rxId,
+        drug_name: it.drug_name,
+        dosage: it.dosage || null,
+        frequency: it.frequency || null,
+        duration: it.duration || null,
+        instructions: it.instructions || null,
+        sort_order: idx
+      };
+    });
+    var insItems = await window.sb.from('prescription_items').insert(itemRows);
+    if (insItems.error) throw insItems.error;
+
+    // 3) حفظ كقالب (اختياري)
+    if (document.getElementById('rxSaveAsTemplate').checked) {
+      var tname = (document.getElementById('rxTemplateName').value || '').trim();
+      if (tname) {
+        var tplItems = items.map(function(it){
+          return { drug_name: it.drug_name, dosage: it.dosage, frequency: it.frequency, duration: it.duration, instructions: it.instructions };
+        });
+        try {
+          await window.sb.from('prescription_templates').insert({
+            owner_id: currentUser.id, name: tname, items: tplItems
+          });
+          await loadRxTemplates();
+        } catch (e) { console.warn('save template:', e); }
+      }
+    }
+
+    // audit (graceful — نفس نمط الصفحة)
+    try {
+      if (typeof logAudit === 'function') {
+        await logAudit('prescription_created', 'prescription', rxId, { items: items.length });
+      }
+    } catch (e) { /* graceful */ }
+
+    closeModal('rxModal');
+    showToast('تم حفظ الروشتة ✓');
+    await loadPrescriptions();
+  } catch (e) {
+    console.error('savePrescription:', e);
+    showToast('⚠️ تعذّر حفظ الروشتة');
+  } finally {
+    _savePrescriptionInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'حفظ الروشتة'; }
+  }
+}
+
+/* ---------- حذف ---------- */
+async function deletePrescription(rxId) {
+  if (!confirm('حذف هذه الروشتة نهائياً؟')) return;
+  try {
+    // الأدوية تُحذف تلقائياً (ON DELETE CASCADE) لكن نحذفها صراحةً للأمان
+    await window.sb.from('prescription_items').delete().eq('prescription_id', rxId).eq('owner_id', currentUser.id);
+    var del = await window.sb.from('prescriptions').delete().eq('id', rxId).eq('owner_id', currentUser.id);
+    if (del.error) throw del.error;
+    try { if (typeof logAudit === 'function') await logAudit('prescription_deleted', 'prescription', rxId, {}); } catch(e){}
+    showToast('تم الحذف');
+    await loadPrescriptions();
+  } catch (e) { console.error('deletePrescription:', e); showToast('⚠️ تعذّر الحذف'); }
+}
+
+/* ---------- جلب روشتة كاملة (للطباعة/النسخ) ---------- */
+async function rxFetchFull(rxId) {
+  var head = null, items = [];
+  for (var i=0;i<PRESCRIPTIONS.length;i++) if (PRESCRIPTIONS[i].id === rxId) { head = PRESCRIPTIONS[i]; break; }
+  try {
+    var ir = await window.sb.from('prescription_items')
+      .select('drug_name, dosage, frequency, duration, instructions, sort_order')
+      .eq('prescription_id', rxId)
+      .order('sort_order', { ascending: true });
+    if (!ir.error && ir.data) items = ir.data;
+  } catch (e) { /* graceful */ }
+  return { head: head, items: items };
+}
+
+/* ---------- بيانات العيادة للرأس ---------- */
+function rxClinicInfo() {
+  var s = (typeof CLINIC_SETTINGS_WA !== 'undefined' && CLINIC_SETTINGS_WA) ? CLINIC_SETTINGS_WA : {};
+  return {
+    clinic_name: s.clinic_name || 'العيادة',
+    clinic_phone: s.clinic_phone || '',
+    license_no: s.license_no || ''
+  };
+}
+
+/* ---------- بناء HTML الطباعة ---------- */
+function buildPrescriptionHtml(rx) {
+  var c = rxClinicInfo();
+  var head = rx.head || {};
+  var dr = rxProviderName(head.provider_id);
+  var dateStr = head.created_at ? new Date(head.created_at).toLocaleDateString('ar-SY',{year:'numeric',month:'long',day:'numeric'}) : new Date().toLocaleDateString('ar-SY',{year:'numeric',month:'long',day:'numeric'});
+  var pName = (patient && patient.name) ? patient.name : '';
+  var pAge = (patient && patient.dob) ? calcAge(patient.dob) : '';
+  var pGender = (patient && patient.gender) ? patient.gender : '';
+
+  var h = '<div style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;max-width:780px;margin:0 auto;padding:24px;">';
+
+  // الرأس
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:14px;margin-bottom:6px;">';
+  h += '<div>';
+  h += '<div style="font-size:24px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
+  if (dr) h += '<div style="font-size:15px;color:#333;margin-top:4px;">' + escapeHtml(dr) + '</div>';
+  if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';
+  h += '</div>';
+  h += '<div style="text-align:left;font-size:13px;color:#444;">';
+  if (c.clinic_phone) h += '<div>📞 ' + escapeHtml(c.clinic_phone) + '</div>';
+  h += '<div style="margin-top:4px;">' + escapeHtml(dateStr) + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  // رمز الروشتة الطبي ℞
+  h += '<div style="font-size:38px;font-weight:800;color:#2ee89e;line-height:1;margin:8px 0;">℞</div>';
+
+  // بيانات المريض
+  h += '<div style="background:#f6f6f6;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:#222;">';
+  h += '<strong>المريض:</strong> ' + escapeHtml(pName);
+  if (pGender) h += ' &nbsp;•&nbsp; ' + escapeHtml(pGender);
+  if (pAge !== '') h += ' &nbsp;•&nbsp; ' + escapeHtml(String(pAge)) + ' سنة';
+  h += '</div>';
+
+  // جدول الأدوية
+  if (rx.items && rx.items.length) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
+    h += '<thead><tr style="background:#2ee89e;color:#06371f;">'
+      + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;width:34px;">#</th>'
+      + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">الدواء</th>'
+      + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">الجرعة</th>'
+      + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">التكرار</th>'
+      + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">المدة</th>'
+      + '</tr></thead><tbody>';
+    rx.items.forEach(function(it, idx){
+      h += '<tr>'
+        + '<td style="padding:9px 12px;border:1px solid #d0d0d0;color:#666;">' + (idx+1) + '</td>'
+        + '<td style="padding:9px 12px;border:1px solid #d0d0d0;font-weight:700;">' + escapeHtml(it.drug_name||'') + '</td>'
+        + '<td style="padding:9px 12px;border:1px solid #d0d0d0;">' + escapeHtml(it.dosage||'—') + '</td>'
+        + '<td style="padding:9px 12px;border:1px solid #d0d0d0;">' + escapeHtml(it.frequency||'—') + '</td>'
+        + '<td style="padding:9px 12px;border:1px solid #d0d0d0;">' + escapeHtml(it.duration||'—') + '</td>'
+        + '</tr>';
+      if (it.instructions) {
+        h += '<tr><td style="border:1px solid #d0d0d0;"></td>'
+          + '<td colspan="4" style="padding:6px 12px;border:1px solid #d0d0d0;font-size:12px;color:#555;background:#fafafa;">📌 ' + escapeHtml(it.instructions) + '</td></tr>';
+      }
+    });
+    h += '</tbody></table>';
+  }
+
+  // ملاحظات
+  if (head.notes) {
+    h += '<div style="margin-top:16px;font-size:13px;color:#333;border-right:3px solid #2ee89e;padding-right:12px;"><strong>ملاحظات:</strong> ' + escapeHtml(head.notes) + '</div>';
+  }
+
+  // التذييل
+  h += '<div style="margin-top:46px;display:flex;justify-content:space-between;font-size:13px;color:#444;">';
+  h += '<div>التوقيع: ____________________</div>';
+  h += '<div>' + escapeHtml(c.clinic_name) + '</div>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+/* ---------- طباعة (نفس آلية doPrintRecord) ---------- */
+async function printPrescription(rxId) {
+  var rx = await rxFetchFull(rxId);
+  var root = document.getElementById('printRoot');
+  if (!root) return;
+  root.innerHTML = buildPrescriptionHtml(rx);
+  document.body.classList.add('printing');
+  var cleanup = function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(function(){ window.print(); }, 80);
+  setTimeout(cleanup, 60000);
+}
+
+/* ---------- نسخ نص (للواتساب اليدوي) ---------- */
+async function copyPrescription(rxId) {
+  var rx = await rxFetchFull(rxId);
+  var c = rxClinicInfo();
+  var dr = rxProviderName((rx.head||{}).provider_id);
+  var pName = (patient && patient.name) ? patient.name : '';
+  var lines = [];
+  lines.push('💊 روشتة طبية — ' + c.clinic_name);
+  if (dr) lines.push('الطبيب: ' + dr);
+  lines.push('المريض: ' + pName);
+  lines.push('────────────');
+  (rx.items||[]).forEach(function(it, idx){
+    var parts = [(idx+1) + '. ' + it.drug_name];
+    var sub = [];
+    if (it.dosage) sub.push(it.dosage);
+    if (it.frequency) sub.push(it.frequency);
+    if (it.duration) sub.push(it.duration);
+    if (sub.length) parts.push('   ' + sub.join(' • '));
+    if (it.instructions) parts.push('   📌 ' + it.instructions);
+    lines.push(parts.join('\n'));
+  });
+  if ((rx.head||{}).notes) { lines.push('────────────'); lines.push('ملاحظات: ' + rx.head.notes); }
+  var text = lines.join('\n');
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('تم نسخ الروشتة ✓');
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('تم نسخ الروشتة ✓');
+    }
+  } catch (e) { console.warn('copy:', e); showToast('⚠️ تعذّر النسخ'); }
+}
 
 window.onPTRRefresh = function() { loadAll(); };
 </script>

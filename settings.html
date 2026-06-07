@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607f"></script>
+<script src="theme.js?v=20260607g"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607f"></script>
+<script src="supabase-init.js?v=20260607g"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607f">
-<script src="sidebar.js?v=20260607f"></script>
+<link rel="stylesheet" href="theme.css?v=20260607g">
+<script src="sidebar.js?v=20260607g"></script>
 </head>
 <body>
 
@@ -536,6 +536,11 @@ textarea::placeholder { color: var(--text2); }
           <label>رقم العيادة (يظهر في الرسالة)</label>
           <input type="text" id="fClinicPhone" placeholder="0944-123-456">
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>رقم النقابة (يظهر على الروشتة)</label>
+        <input type="text" id="fLicenseNo" placeholder="مثال: 12345" style="max-width:300px;">
       </div>
 
       <div class="form-group">
@@ -855,6 +860,8 @@ function applyWaSettingsToForm(s) {
   };
   document.getElementById('fClinicName').value  = safe.clinic_name  || '';
   document.getElementById('fClinicPhone').value = safe.clinic_phone || '';
+  var licEl = document.getElementById('fLicenseNo');
+  if (licEl) licEl.value = safe.license_no || '';
   document.getElementById('fHoursBefore').value = safe.whatsapp_reminder_hours_before || 24;
   document.getElementById('fTemplate').value    = safe.whatsapp_reminder_template || DEFAULT_WA_TEMPLATE;
   const sw = document.getElementById('waSwitch');
@@ -951,6 +958,8 @@ async function saveClinicSettings() {
     whatsapp_reminder_template: template,
     updated_at: new Date().toISOString()
   };
+  var licInput = document.getElementById('fLicenseNo');
+  if (licInput) payload.license_no = (licInput.value.trim() || null);
 
   // Phase 7.6G: any save from settings.html counts as the owner
   // explicitly confirming/editing their clinic_name — flip the
