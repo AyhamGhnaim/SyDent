@@ -51,6 +51,7 @@
 | **47 + 47_1** | subscription_payments cash ledger + method vocab | ✅ (معاد بناء 47) |
 | **48** | platform_settings_audit (append-only) | ✅ (معاد بناء) |
 | **49** | subscription_events true append-only (RLS-enforced immutability) | ✅ |
+| **50** | subscription_requests: تقييد UPDATE المستأجر على cancel-only (منع self-approval) | ⏳ (apply pending) |
 
 ## السياسات الحرجة (مؤكّدة حيّة 07 Jun 2026)
 - `is_platform_admin()` → `platform_admins`, SECURITY DEFINER, STABLE, `search_path=public`. حاجز الأدمن الوحيد، recursion-safe.
