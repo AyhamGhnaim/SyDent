@@ -172,7 +172,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
    number, so hide the occlusal copy. In "occ"-only view the attribute changes and
    these re-appear. */
 .jaw-wrap[data-occview="all"] .row-occ .tooth-num{display:none;}
-.jaw-gap{height:16px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:10px;letter-spacing:3px;margin:2px 0;}
+/* Horizontal divider between the upper (maxillary) and lower (mandibular) arches.
+   A subtle hairline that fades at both ends — no text label. Anatomically this
+   line marks where the tongue sits between the two arches. */
+.jaw-gap{position:relative;height:16px;margin:2px 0;}
+.jaw-gap::before{content:'';position:absolute;left:12px;right:12px;top:50%;height:1.5px;border-radius:2px;background:linear-gradient(to right,transparent,var(--border2) 12%,var(--border2) 88%,transparent);}
 .occ-cell{display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;transition:transform .15s;}
 .occ-cell:hover{transform:scale(1.12);z-index:5;}
 .occ-cell:hover .tooth-shape{filter:drop-shadow(0 0 4px var(--green));}
@@ -2676,9 +2680,7 @@ function renderTimelineRow(e) {
     // (defensive: future surface keys would still display, just untranslated).
     var rawSurface = s.surface;
     var surfaceShown = (rawSurface && rawSurface !== 'WHOLE')
-      ? (typeof SURFACE_LABELS !== 'undefined' && SURFACE_LABELS[rawSurface]
-          ? SURFACE_LABELS[rawSurface]
-          : rawSurface)
+      ? surfLabelFor(rawSurface, s.tooth_num)
       : null;
     var toothPart;
     if (s.tooth_num) {
@@ -3371,6 +3373,21 @@ var SURFACE_LABELS = {
   'BRIDGE': 'جسر',
   'PONTIC': 'سن وهمي (جسر)'
 };
+
+/* Returns the Arabic display name for a tooth surface. Special case: the inner
+   surface of UPPER (maxillary) teeth is anatomically the PALATAL surface
+   ("حنكي"), not lingual — the surface key stays 'L' (no data change), but the
+   label shown to the clinician is "حنكي" for quadrants 1 & 2. Lower teeth keep
+   "لساني". Pass the FDI tooth number so the quadrant can be determined; without
+   a number it falls back to the plain SURFACE_LABELS value. */
+function surfLabelFor(key, num){
+  var L = (typeof SURFACE_LABELS !== 'undefined' && SURFACE_LABELS) || {};
+  if (key === 'L' && num !== null && num !== undefined && num !== '') {
+    var q = Math.floor(parseInt(num, 10) / 10);  // FDI quadrant: 1,2 = upper
+    if (q === 1 || q === 2) return 'حنكي';
+  }
+  return L[key] || key;
+}
 
 /* Unified surface-fill opacity ("solidity") for treatment colors across BOTH
    the facial (buccal) and occlusal views. Higher = more solid / less see-through.
@@ -4514,7 +4531,7 @@ function buildTooth(num, surfaceMap, isUpper) {
     return '<rect class="crown-surface" data-tooth="' + num + '" data-surface="' + fillKey + '" '
         + 'x="' + rx + '" y="' + ry + '" width="' + rw + '" height="' + rh + '" rx="2" ry="2" '
         + 'fill="' + fill + '" fill-opacity="' + opacity + '" '
-        + 'clip-path="url(#cc' + gid + ')"><title>' + (SURFACE_LABELS[fillKey]||fillKey) + '</title></rect>';
+        + 'clip-path="url(#cc' + gid + ')"><title>' + surfLabelFor(fillKey, num) + '</title></rect>';
   }
 
   var s = anat.surfaces;
@@ -4611,7 +4628,7 @@ function buildTooth(num, surfaceMap, isUpper) {
         var tname = tobj ? tobj.name : tk;
         var tcolor = T_FILL[tk] || '#888';
         var skBadge = tipStatusBadge(sm, sk);
-        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + SURFACE_LABELS[sk] + ':</b> ' + tname + skBadge + '</div>';
+        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + surfLabelFor(sk, num) + ':</b> ' + tname + skBadge + '</div>';
       }
     }
     // Lingual (L) is recorded only from the occlusal view; surfacesFor() (facial) omits it,
@@ -4620,7 +4637,7 @@ function buildTooth(num, surfaceMap, isUpper) {
       var ltobj = getTreatment(sm['L']);
       var ltname = ltobj ? ltobj.name : sm['L'];
       var ltcolor = T_FILL[sm['L']] || '#888';
-      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + ltcolor + '"></span><b>' + (SURFACE_LABELS['L'] || 'لساني') + ':</b> ' + ltname + tipStatusBadge(sm, 'L') + '</div>';
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + ltcolor + '"></span><b>' + surfLabelFor('L', num) + ':</b> ' + ltname + tipStatusBadge(sm, 'L') + '</div>';
     }
     for (var rj = 0; rj < anat.roots.length; rj++) {
       var rk = anat.roots[rj].key;
@@ -4878,7 +4895,7 @@ function buildOcclusalTooth(num, sm, isUpper){
     var hit=function(key,rx,ry,rw,rh){
       return '<rect class="crown-surface" data-tooth="'+num+'" data-surface="'+key+'" '
            + 'x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" rx="2" ry="2" '
-           + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"><title>'+(SURFACE_LABELS[key]||key)+'</title></rect>';
+           + 'fill="#000" fill-opacity="0" clip-path="url(#cl'+gid+')"><title>'+surfLabelFor(key, num)+'</title></rect>';
     };
     if(ant){
       svg+=hit('I', antX, iEdgeY, antW, iHv);
@@ -4915,7 +4932,7 @@ function occTipRows(num, sm){
   if(cfKey){ var cft=getTreatment(cfKey); rows+=row(T_FILL[cfKey]||'#fb923c', isBr?'دعامة جسر':'التاج كامل', cft?cft.name:cfKey, badge(cf?'CROWN_FULL':'WHOLE')); }
   if(whole && !isExtractionKey(whole) && !isImplantKey(whole) && !isBr && wtp!=='crown_full'){ var wtt=getTreatment(whole); rows+=row(T_FILL[whole]||'#f5e6c8','السن كاملاً', wtt?wtt.name:whole, badge('WHOLE')); }
   var keys = isAnterior(num) ? ['I','L','M','D'] : ['O','B','L','M','D'];
-  for(var i=0;i<keys.length;i++){ var k=keys[i], tk=sm[k]; if(tk){ var to=getTreatment(tk); rows+=row(T_FILL[tk]||'#888', SURFACE_LABELS[k]||k, to?to.name:tk, badge(k)); } }
+  for(var i=0;i<keys.length;i++){ var k=keys[i], tk=sm[k]; if(tk){ var to=getTreatment(tk); rows+=row(T_FILL[tk]||'#888', surfLabelFor(k, num), to?to.name:tk, badge(k)); } }
   return rows || '<div class="tip-row" style="color:#7a8a9a">سليم — اضغط أي منطقة</div>';
 }
 
@@ -5348,7 +5365,7 @@ async function openToothModal(n, surface) {
   currentSurface = surface || centerSurface(n);
   var sm = teethMap[String(n)] || {};
   var st = sm[currentSurface];
-  var surfLabel = SURFACE_LABELS[currentSurface] || currentSurface;
+  var surfLabel = surfLabelFor(currentSurface, n);
 
   // Determine which treatments to show based on the clicked region
   // currentSurface is one of: O,M,D,B,L,I (crown surfaces) or R1,R2,R3 (roots) or WHOLE
@@ -5393,7 +5410,7 @@ async function openToothModal(n, surface) {
         var _picked = _candidates[0];
         window.__toothPlannedSession = _picked;
         var _surfLbl = (_picked.surface && _picked.surface !== 'WHOLE')
-          ? ' / ' + (SURFACE_LABELS[_picked.surface] || _picked.surface)
+          ? ' / ' + surfLabelFor(_picked.surface, _picked.tooth_num)
           : '';
         _bInfo.textContent = (_picked.type || _picked.description || '—')
           + ' — السن ' + _picked.tooth_num + _surfLbl
@@ -5928,7 +5945,7 @@ function pickToothTreatment(status, label) {
   else if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
-  else areaLabel = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  else areaLabel = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
   document.getElementById('toothStep2Title').textContent = '🦷 ' + label + ' — السن ' + currentTooth + ' (' + areaLabel + ')';
   var t = getTreatment(status);
   document.getElementById('toothNotes').value = '';
@@ -6175,7 +6192,7 @@ async function saveToothTreatment() {
     if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
     else if (currentSurface === 'CROWN_FULL') areaForDesc = 'التاج كامل';
     else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
-    else areaForDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+    else areaForDesc = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
     ledgerDescription = 'السن رقم ' + currentTooth + ' — ' + areaForDesc;
   }
 
@@ -6235,7 +6252,7 @@ async function saveToothTreatment() {
   if (currentSurface === 'WHOLE') areaLabelToast = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaLabelToast = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabelToast = 'الجذر ' + currentSurface.replace('R','');
-  else areaLabelToast = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  else areaLabelToast = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
   showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + areaLabelToast + ')');
 }
 
@@ -6289,7 +6306,7 @@ async function clearToothStatus() {
   } else if (surfacesToClear[0] === 'WHOLE') areaLabel = 'السن كاملاً';
   else if (surfacesToClear[0] === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(surfacesToClear[0])) areaLabel = 'الجذر ' + surfacesToClear[0].replace('R','');
-  else areaLabel = 'السطح ' + (SURFACE_LABELS[surfacesToClear[0]] || surfacesToClear[0]);
+  else areaLabel = 'السطح ' + surfLabelFor(surfacesToClear[0], currentTooth);
 
   if (!confirm('هل تريد إزالة العلاج من ' + areaLabel + ' للسن ' + currentTooth + '؟\n(لن تُحذف الجلسة المسجلة في كشف الحساب)')) return;
 
@@ -6810,7 +6827,7 @@ async function completeSessionFromProfile(sessionId) {
   // Matches the verbose style used in completeApptWithProcedures bulk prompt.
   var toothPart = '';
   if (sess.tooth_num) {
-    var surfLbl = (sess.surface && sess.surface !== 'WHOLE') ? ' / ' + (SURFACE_LABELS[sess.surface] || sess.surface) : '';
+    var surfLbl = (sess.surface && sess.surface !== 'WHOLE') ? ' / ' + surfLabelFor(sess.surface, sess.tooth_num) : '';
     toothPart = '\nالسن: ' + sess.tooth_num + surfLbl;
   } else if (sess.quadrant && QUADRANT_LABELS[sess.quadrant]) {
     toothPart = '\nالنطاق: ' + QUADRANT_LABELS[sess.quadrant];
@@ -9014,7 +9031,7 @@ async function saveToothAndOpenLab() {
   if (currentSurface === 'WHOLE') areaForLabDesc = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaForLabDesc = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
-  else areaForLabDesc = 'السطح ' + (SURFACE_LABELS[currentSurface] || currentSurface);
+  else areaForLabDesc = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
 
   // 2. Insert ledger session — only for planned/completed.
   // existing_current/existing_other/referred are clinical notes, not billable.
