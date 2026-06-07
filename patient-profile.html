@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607o"></script>
+<script src="theme.js?v=20260607p"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607o"></script>
-<script src="sidebar.js?v=20260607o"></script>
-<script src="timepicker.js?v=20260607o"></script>
+<script src="supabase-init.js?v=20260607p"></script>
+<script src="sidebar.js?v=20260607p"></script>
+<script src="timepicker.js?v=20260607p"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607o">
+<link rel="stylesheet" href="theme.css?v=20260607p">
 </head>
 <body>
 <script>
@@ -6349,6 +6349,13 @@ async function saveToothTreatment() {
   else if (/^R[123]$/.test(currentSurface)) areaLabelToast = 'الجذر ' + currentSurface.replace('R','');
   else areaLabelToast = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
   showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + areaLabelToast + ')');
+  // P3-B: الخصم التلقائي للمواد (مسار مخطّط الأسنان) — معزول داخل try/catch.
+  // pendingToothStatus يحمل treatment.id (getTreatment يجده). يُتجاهل لو لا مادة.
+  try {
+    if (pendingToothStatus && getTreatment(pendingToothStatus)) {
+      await maybePromptMaterialDeduction(pendingToothStatus, pendingToothLabel);
+    }
+  } catch (e) { console.warn('material deduction skipped (tooth):', e); }
 }
 
 async function clearToothStatus() {
@@ -9197,6 +9204,12 @@ async function saveToothAndOpenLab() {
   });
 
   showToast('✅ تم حفظ الجلسة — أكمل بيانات المخبر');
+  // P3-B: الخصم التلقائي للمواد (مسار السن + مخبر) — معزول داخل try/catch.
+  try {
+    if (pendingToothStatus && getTreatment(pendingToothStatus)) {
+      await maybePromptMaterialDeduction(pendingToothStatus, pendingToothLabel);
+    }
+  } catch (e) { console.warn('material deduction skipped (tooth+lab):', e); }
 }
 
 /* ── Modal helpers ── */
