@@ -1482,30 +1482,68 @@
     ov.id = 'sdLockModal';
     ov.className = 'sd-lock-modal-overlay';
 
-    var doctorOptions = '';
-    doctors.forEach(function(d){
-      var sel = (d.id === curDoctorId) ? ' selected' : '';
-      doctorOptions += '<option value="'+d.id+'"'+sel+'>'+escapeHtmlLock(d.name)+'</option>';
+    // ── Phase X14: only offer roles that actually exist ──
+    // The legacy modal is reached when clinic_employees is empty — but that
+    // is NOT only the "fresh install" case. A fully-onboarded owner-only
+    // clinic (no staff added yet) also lands here. Showing phantom
+    // "طبيب"/"سكرتيرة" options the clinic doesn't have is confusing, and the
+    // owner-as-doctor record (clinic_doctors.is_owner=true) must NEVER be
+    // offered as a switchable "doctor". Resolution:
+    //   • Owner: always shown, by REAL name (getOwnerPersonName), never the
+    //     literal word "المالك".
+    //   • طبيب: only if ≥1 NON-owner active doctor exists.
+    //   • سكرتيرة: only if an active secretary employee exists (none in this
+    //     path, but checked defensively).
+    var ownerName = getOwnerPersonName() || ROLE_LABELS.owner;
+    var nonOwnerDoctors = doctors.filter(function(d){ return d.is_owner !== true; });
+    var hasSecretary = (_allEmployeesListCache || []).some(function(e){
+      return e.role === 'secretary' && e.is_active !== false;
     });
 
-    var doctorBlock = doctors.length > 0
-      ? '<select id="sdDoctorSel">' + doctorOptions + '</select>'
-      : '<div style="color:var(--red,#ef5350);font-size:12px;">لا يوجد أطباء — أضف طبيباً من صفحة الأطباء أولاً.</div>';
+    var doctorOptions = '';
+    nonOwnerDoctors.forEach(function(d){
+      var s = (d.id === curDoctorId) ? ' selected' : '';
+      doctorOptions += '<option value="'+escapeHtmlLock(d.id)+'"'+s+'>'+escapeHtmlLock(d.name)+'</option>';
+    });
+
+    // Which option starts checked? The current role's — but only if it is
+    // actually rendered. Owner is always rendered, so it is the safe default
+    // whenever the current role's option is hidden (e.g. device stuck on a
+    // deleted secretary). This prevents a "no radio checked" crash in
+    // updateActive()/confirm().
+    var initSel = 'owner';
+    if (curRole === 'doctor' && nonOwnerDoctors.length > 0) initSel = 'doctor';
+    else if (curRole === 'secretary' && hasSecretary) initSel = 'secretary';
+
+    var ownerLabelHtml =
+      '<label class="sd-opt' + (initSel==='owner'?' sd-active':'') + '" data-role="owner">' +
+        '<input type="radio" name="sdRoleSel" value="owner"' + (initSel==='owner'?' checked':'') + '> 👑 ' + escapeHtmlLock(ownerName) +
+      '</label>';
+
+    var doctorLabelHtml = (nonOwnerDoctors.length > 0)
+      ? ('<label class="sd-opt' + (initSel==='doctor'?' sd-active':'') + '" data-role="doctor">' +
+           '<input type="radio" name="sdRoleSel" value="doctor"' + (initSel==='doctor'?' checked':'') + '> 👨‍⚕️ طبيب' +
+           '<div class="sd-sub"><select id="sdDoctorSel">' + doctorOptions + '</select></div>' +
+         '</label>')
+      : '';
+
+    var secretaryLabelHtml = hasSecretary
+      ? ('<label class="sd-opt' + (initSel==='secretary'?' sd-active':'') + '" data-role="secretary">' +
+           '<input type="radio" name="sdRoleSel" value="secretary"' + (initSel==='secretary'?' checked':'') + '> 👩‍💼 السكرتيرة' +
+         '</label>')
+      : '';
+
+    var curDisplay = (curRole === 'owner')
+      ? ((ROLE_ICONS.owner||'') + ' ' + ownerName)
+      : ((ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole));
 
     ov.innerHTML =
       '<div class="sd-lock-modal" role="dialog" aria-label="تبديل الوضع" aria-labelledby="sdLegacyTitle">' +
         '<h3 id="sdLegacyTitle">🔓 تبديل الوضع</h3>' +
-        '<div class="sd-cur">الوضع الحالي: ' + (ROLE_ICONS[curRole]||'') + ' ' + (ROLE_LABELS[curRole]||curRole) + '</div>' +
-        '<label class="sd-opt' + (curRole==='owner'?' sd-active':'') + '" data-role="owner">' +
-          '<input type="radio" name="sdRoleSel" value="owner"' + (curRole==='owner'?' checked':'') + '> 👑 المالك' +
-        '</label>' +
-        '<label class="sd-opt' + (curRole==='doctor'?' sd-active':'') + '" data-role="doctor">' +
-          '<input type="radio" name="sdRoleSel" value="doctor"' + (curRole==='doctor'?' checked':'') + '> 👨‍⚕️ طبيب' +
-          '<div class="sd-sub">' + doctorBlock + '</div>' +
-        '</label>' +
-        '<label class="sd-opt' + (curRole==='secretary'?' sd-active':'') + '" data-role="secretary">' +
-          '<input type="radio" name="sdRoleSel" value="secretary"' + (curRole==='secretary'?' checked':'') + '> 👩‍💼 السكرتيرة' +
-        '</label>' +
+        '<div class="sd-cur">الوضع الحالي: ' + escapeHtmlLock(curDisplay) + '</div>' +
+        ownerLabelHtml +
+        doctorLabelHtml +
+        secretaryLabelHtml +
         '<div class="sd-pin-row" id="sdPinRow" style="display:none;">' +
           '<label>أدخل PIN للتأكيد:</label>' +
           '<input type="password" inputmode="numeric" maxlength="6" id="sdPinInput" autocomplete="off">' +
@@ -1619,7 +1657,11 @@
             return;
           }
         }
-        applyRole(targetRole, targetDocId);
+        // Phase X14: the legacy path runs only when there are NO valid
+        // clinic_employees rows, so any persisted LS_EMPLOYEE_ID is stale
+        // (e.g. a deleted secretary that left the device read-only). Pass
+        // null explicitly to clear it — otherwise applyRole() preserves it.
+        applyRole(targetRole, targetDocId, null);
         closeModal();
         window.location.reload();
       } finally {
