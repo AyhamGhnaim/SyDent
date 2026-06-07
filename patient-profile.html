@@ -173,10 +173,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
    these re-appear. */
 .jaw-wrap[data-occview="all"] .row-occ .tooth-num{display:none;}
 /* Horizontal divider between the upper (maxillary) and lower (mandibular) arches.
-   A subtle hairline that fades at both ends — no text label. Anatomically this
-   line marks where the tongue sits between the two arches. */
-.jaw-gap{position:relative;height:30px;margin:4px 0;}
-.jaw-gap::before{content:'';position:absolute;left:12px;right:12px;top:50%;height:1.5px;border-radius:2px;background:linear-gradient(to right,transparent,var(--border2) 12%,var(--border2) 88%,transparent);}
+   Drawn as a top border on the FIRST LOWER row — NOT an absolutely-positioned
+   line on the empty .jaw-gap. The old line was only as wide as the viewport and
+   stayed put while the teeth scrolled horizontally on mobile, so it showed on one
+   side only. A border on the row spans exactly the teeth width and scrolls with
+   them. No text label. Per view: all/occ -> lowerOcc, buccal -> lowerJaw. */
+.jaw-gap{height:15px;margin:0;}
+#lowerOcc{border-top:1.5px solid var(--border2);padding-top:15px;}
+.jaw-wrap[data-occview="buc"] #lowerOcc{border-top-width:0;padding-top:0;}
+.jaw-wrap[data-occview="buc"] #lowerJaw{border-top:1.5px solid var(--border2);padding-top:15px;}
 .occ-cell{display:flex;flex-direction:column;align-items:center;gap:1px;position:relative;transition:transform .15s;}
 .occ-cell:hover{transform:scale(1.12);z-index:5;}
 .occ-cell:hover .tooth-shape{filter:drop-shadow(0 0 4px var(--green));}
