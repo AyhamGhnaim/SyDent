@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SyDent">
+<meta name="theme-color" content="#0a1628">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="manifest.json">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>SyDent — المخزون</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
+<script src="theme.js?v=20260607k"></script>
+<style>
+:root {
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --border:    rgba(46,232,158,0.15);
+  --green:     #2ee89e;
+  --green-dim: rgba(46,232,158,0.12);
+  --red:       #ef5350;
+  --amber:     #f5a623;
+  --text:      #e8f0f7;
+  --text2:     #8aa3b8;
+  --text-muted:#5d7a92;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family:'Cairo',sans-serif; background:var(--bg); color:var(--text);
+  min-height:100vh; -webkit-font-smoothing:antialiased;
+}
+.main { margin-right:248px; min-height:100vh; transition:margin .25s; }
+.topbar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px 28px; border-bottom:1px solid var(--border);
+  background:var(--bg2); position:sticky; top:0; z-index:50;
+}
+.topbar h1 { font-size:20px; font-weight:800; }
+.topbar .sub { font-size:12px; color:var(--text2); margin-top:2px; }
+.content { padding:28px; max-width:1100px; }
+.card {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:14px; padding:20px; margin-bottom:20px;
+}
+.card-head {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:16px; gap:12px; flex-wrap:wrap;
+}
+.card-title { font-size:16px; font-weight:700; }
+.btn {
+  border:1px solid var(--border); background:var(--bg3); color:var(--text);
+  border-radius:9px; padding:9px 16px; font-family:'Cairo',sans-serif;
+  font-size:13px; font-weight:600; cursor:pointer; transition:all .2s;
+}
+.btn:hover { border-color:var(--green); }
+.btn-primary { background:var(--green); color:var(--bg); border-color:var(--green); }
+.btn-primary:hover { opacity:.9; }
+.data-table { width:100%; border-collapse:collapse; }
+.data-table th {
+  padding:11px 14px; font-size:12px; color:var(--text2); font-weight:600;
+  text-align:right; border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.12); white-space:nowrap;
+}
+.data-table td {
+  padding:13px 14px; font-size:13px;
+  border-bottom:1px solid rgba(46,232,158,0.05); vertical-align:middle;
+}
+.data-table tr:last-child td { border-bottom:none; }
+.data-table tr:hover td { background:rgba(46,232,158,0.025); }
+.qty-pill {
+  display:inline-block; padding:3px 12px; border-radius:20px;
+  font-weight:700; font-size:13px;
+}
+.qty-ok  { background:var(--green-dim); color:var(--green); }
+.qty-low { background:rgba(245,166,35,0.15); color:var(--amber); }
+.qty-out { background:rgba(239,83,80,0.15); color:var(--red); }
+.low-badge {
+  display:inline-block; margin-right:6px; font-size:11px; font-weight:700;
+  color:var(--amber);
+}
+.empty {
+  text-align:center; padding:40px 20px; color:var(--text2);
+}
+.empty-icon { font-size:42px; line-height:1; }
+/* Modal */
+.modal-overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  display:none; align-items:center; justify-content:center; z-index:200; padding:16px;
+}
+.modal-overlay.open { display:flex; }
+.modal-box {
+  background:var(--bg2); border:1px solid var(--border); border-radius:16px;
+  width:100%; max-width:480px; max-height:90vh; overflow-y:auto;
+}
+.modal-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 22px; border-bottom:1px solid var(--border);
+}
+.modal-head h3 { font-size:17px; font-weight:700; }
+.modal-close {
+  background:none; border:none; color:var(--text2); font-size:20px;
+  cursor:pointer; line-height:1;
+}
+.modal-body { padding:22px; }
+.modal-foot {
+  display:flex; gap:10px; justify-content:flex-start;
+  padding:16px 22px; border-top:1px solid var(--border);
+}
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+.form-group input, .form-group select, .form-group textarea {
+  width:100%; padding:10px; border:1px solid var(--border); border-radius:8px;
+  background:var(--bg3); color:var(--text); font-family:'Cairo',sans-serif; font-size:14px;
+}
+.form-row { display:flex; gap:12px; }
+.form-row .form-group { flex:1; }
+.btn-cancel-m { border:1px solid var(--border); background:transparent; color:var(--text2);
+  border-radius:9px; padding:10px 18px; font-family:'Cairo',sans-serif; font-size:14px; font-weight:600; cursor:pointer; }
+.btn-save-m { background:var(--green); color:var(--bg); border:none;
+  border-radius:9px; padding:10px 18px; font-family:'Cairo',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+.toast {
+  position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(60px);
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  padding:11px 24px; border-radius:30px; font-size:13px; font-weight:600;
+  z-index:999; opacity:0; transition:all .3s; white-space:nowrap;
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.error { border-color:var(--red); }
+.summary-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+.summary-box {
+  flex:1; min-width:150px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:12px; padding:16px 18px;
+}
+.summary-box .num { font-size:22px; font-weight:800; }
+.summary-box .lbl { font-size:12px; color:var(--text2); margin-top:4px; }
+.sb-hamburger { display:none; }
+@media (max-width:980px) {
+  .main { margin-right:0; }
+  .content { padding:18px; }
+  .sb-hamburger {
+    display:flex; flex-direction:column; gap:4px; background:none; border:none;
+    cursor:pointer; padding:6px; margin-left:10px;
+  }
+  .sb-hamburger span { width:22px; height:2px; background:var(--text); border-radius:2px; }
+  .data-table th:nth-child(4), .data-table td:nth-child(4) { display:none; }
+}
+</style>
+<link rel="stylesheet" href="theme.css?v=20260607k">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-init.js?v=20260607k"></script>
+<script src="sidebar.js?v=20260607k"></script>
+</head>
+<body>
+
+<div class="main" id="sbMainContent">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;">
+      <div>
+        <h1>📦 المخزون</h1>
+        <div class="sub">إدارة مواد ومستلزمات العيادة</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="openItemModal()">➕ صنف جديد</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ملخّص -->
+    <div class="summary-row" id="summaryRow" style="display:none;">
+      <div class="summary-box">
+        <div class="num" id="sumTotal">0</div>
+        <div class="lbl">إجمالي الأصناف</div>
+      </div>
+      <div class="summary-box">
+        <div class="num" style="color:var(--amber);" id="sumLow">0</div>
+        <div class="lbl">أصناف تحت حد التنبيه</div>
+      </div>
+    </div>
+
+    <!-- تنبيه إعادة الطلب -->
+    <div class="card" id="lowStockCard" style="display:none;border-color:rgba(245,166,35,0.4);">
+      <div class="card-head">
+        <span class="card-title" style="color:var(--amber);">⚠️ أصناف تحتاج إعادة طلب</span>
+      </div>
+      <div id="lowStockList"></div>
+    </div>
+
+    <!-- قائمة الأصناف -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📋 الأصناف</span>
+      </div>
+      <div id="itemsList"><div class="empty"><div class="empty-icon">⏳</div><div style="margin-top:8px;">جارٍ التحميل…</div></div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: صنف (إضافة/تعديل) -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="itemModalTitle">➕ صنف جديد</h3><button class="modal-close" onclick="closeModal('itemModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>اسم الصنف *</label>
+        <input type="text" id="itemName" placeholder="مثال: قفازات لاتكس مقاس M">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>الوحدة</label>
+          <input type="text" id="itemUnit" placeholder="علبة / أنبوب / قطعة">
+        </div>
+        <div class="form-group">
+          <label>الكمية الحالية</label>
+          <input type="number" id="itemQty" placeholder="0" min="0" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>حد التنبيه (إعادة الطلب)</label>
+          <input type="number" id="itemReorder" placeholder="0" min="0" inputmode="decimal">
+        </div>
+        <div class="form-group">
+          <label>سعر الشراء (ل.س)</label>
+          <input type="number" id="itemPrice" placeholder="اختياري" min="0" inputmode="numeric">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ملاحظة</label>
+        <input type="text" id="itemNote" placeholder="اختياري">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('itemModal')">إلغاء</button>
+      <button class="btn-save-m" id="itemSaveBtn" onclick="saveItem()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: حركة (شراء/استهلاك/جرد) -->
+<div class="modal-overlay" id="moveModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="moveModalTitle">حركة مخزون</h3><button class="modal-close" onclick="closeModal('moveModal')">✕</button></div>
+    <div class="modal-body">
+      <div id="moveItemInfo" style="background:var(--bg3);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;"></div>
+      <div class="form-group">
+        <label>نوع الحركة</label>
+        <select id="moveReason" onchange="onMoveReasonChange()">
+          <option value="purchase">🟢 شراء / إضافة وارد</option>
+          <option value="consume">🔴 استهلاك / صرف</option>
+          <option value="return">↩️ مرتجع</option>
+          <option value="adjust">⚖️ تعديل جرد (تصحيح الكمية)</option>
+        </select>
+      </div>
+      <div class="form-group" id="moveQtyGroup">
+        <label id="moveQtyLabel">الكمية</label>
+        <input type="number" id="moveQty" placeholder="0" min="0" inputmode="decimal">
+      </div>
+      <div class="form-group" id="moveAdjustGroup" style="display:none;">
+        <label>الكمية الصحيحة الجديدة (بعد الجرد)</label>
+        <input type="number" id="moveAdjustTo" placeholder="0" min="0" inputmode="decimal">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">سيُسجَّل الفرق تلقائياً كتعديل.</div>
+      </div>
+      <div class="form-group">
+        <label>ملاحظة</label>
+        <input type="text" id="moveNote" placeholder="اختياري (مثال: فاتورة المورّد رقم…)">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('moveModal')">إلغاء</button>
+      <button class="btn-save-m" id="moveSaveBtn" onclick="saveMovement()">تسجيل الحركة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: سجل حركات صنف -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-box" style="max-width:600px;">
+    <div class="modal-head"><h3 id="historyTitle">سجل الحركات</h3><button class="modal-close" onclick="closeModal('historyModal')">✕</button></div>
+    <div class="modal-body">
+      <div id="historyList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('historyModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var currentUser = null;
+var ITEMS = [];
+var _saveItemInFlight = false;
+var _saveMoveInFlight = false;
+var editingItemId = null;     // null = إضافة، id = تعديل
+var moveItemId = null;        // الصنف الحالي بمودال الحركة
+var toastT = null;
+
+/* ---------- helpers ---------- */
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, function(c){
+    return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
+  });
+}
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('error', !!isError);
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function fmtNum(n) {
+  var v = Number(n || 0);
+  return (Math.round(v * 100) / 100).toLocaleString('en-US');
+}
+function fmtMoney(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  return Number(n).toLocaleString('en-US') + ' ل.س';
+}
+function isTableMissing(err) {
+  var msg = (err && err.message || '') + ' ' + (err && err.code || '');
+  return /relation .* does not exist|PGRST205|42P01/i.test(msg);
+}
+
+/* ---------- تحميل ---------- */
+async function loadItems() {
+  if (!currentUser) return;
+  var el = document.getElementById('itemsList');
+  try {
+    var res = await window.sb.from('inventory_items')
+      .select('id, name, unit, quantity, reorder_level, purchase_price, note, is_active, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (res.error) {
+      if (isTableMissing(res.error)) {
+        el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>'
+          + '<div style="margin-top:8px;">ميزة المخزون غير مُفعّلة بعد — شغّل Migration 52 في Supabase.</div></div>';
+        return;
+      }
+      console.warn('loadItems:', res.error);
+      ITEMS = [];
+    } else {
+      ITEMS = res.data || [];
+    }
+  } catch (e) { console.warn('loadItems catch:', e); ITEMS = []; }
+  renderItems();
+  renderSummary();
+  renderLowStock();
+}
+
+function itemQtyClass(it) {
+  var q = Number(it.quantity || 0);
+  var r = Number(it.reorder_level || 0);
+  if (q <= 0) return 'qty-out';
+  if (r > 0 && q <= r) return 'qty-low';
+  return 'qty-ok';
+}
+
+function renderItems() {
+  var el = document.getElementById('itemsList');
+  if (!ITEMS.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>'
+      + '<div style="margin-top:8px;">لا توجد أصناف بعد — أضف أول صنف للمخزون.</div></div>';
+    return;
+  }
+  var rows = ITEMS.map(function(it){
+    var qCls = itemQtyClass(it);
+    var low = (Number(it.reorder_level||0) > 0 && Number(it.quantity||0) <= Number(it.reorder_level||0))
+      ? '<span class="low-badge">⚠️ أعد الطلب</span>' : '';
+    return '<tr>'
+      + '<td><strong>' + escapeHtml(it.name) + '</strong>' + low
+        + (it.note ? '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + escapeHtml(it.note) + '</div>' : '')
+        + '</td>'
+      + '<td><span class="qty-pill ' + qCls + '">' + fmtNum(it.quantity) + '</span>'
+        + (it.unit ? ' <span style="color:var(--text2);font-size:12px;">' + escapeHtml(it.unit) + '</span>' : '') + '</td>'
+      + '<td style="color:var(--text2);">' + (Number(it.reorder_level||0) > 0 ? fmtNum(it.reorder_level) : '—') + '</td>'
+      + '<td style="color:var(--text2);">' + fmtMoney(it.purchase_price) + '</td>'
+      + '<td style="text-align:left;white-space:nowrap;">'
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="openMoveModal(\'' + it.id + '\')">🔄 حركة</button> '
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="openHistory(\'' + it.id + '\')">📜</button> '
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="openItemModal(\'' + it.id + '\')">✏️</button> '
+        + '<button class="btn" style="padding:5px 10px;font-size:12px;color:var(--red);" onclick="deleteItem(\'' + it.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }).join('');
+  el.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+    + '<thead><tr><th>الصنف</th><th>الكمية</th><th>حد التنبيه</th><th>سعر الشراء</th><th style="text-align:left;"></th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderSummary() {
+  var row = document.getElementById('summaryRow');
+  if (!ITEMS.length) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  var low = ITEMS.filter(function(it){
+    return Number(it.reorder_level||0) > 0 && Number(it.quantity||0) <= Number(it.reorder_level||0);
+  }).length;
+  document.getElementById('sumTotal').textContent = ITEMS.length;
+  document.getElementById('sumLow').textContent = low;
+}
+
+function renderLowStock() {
+  var card = document.getElementById('lowStockCard');
+  var list = document.getElementById('lowStockList');
+  var low = ITEMS.filter(function(it){
+    return Number(it.reorder_level||0) > 0 && Number(it.quantity||0) <= Number(it.reorder_level||0);
+  });
+  if (!low.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+    + '<thead><tr><th>الصنف</th><th>المتبقي</th><th>حد التنبيه</th><th style="text-align:left;"></th></tr></thead><tbody>'
+    + low.map(function(it){
+        return '<tr>'
+          + '<td><strong>' + escapeHtml(it.name) + '</strong></td>'
+          + '<td><span class="qty-pill ' + itemQtyClass(it) + '">' + fmtNum(it.quantity) + (it.unit ? ' ' + escapeHtml(it.unit) : '') + '</span></td>'
+          + '<td style="color:var(--text2);">' + fmtNum(it.reorder_level) + '</td>'
+          + '<td style="text-align:left;"><button class="btn btn-primary" style="padding:5px 12px;font-size:12px;" onclick="openMoveModal(\'' + it.id + '\',\'purchase\')">🟢 شراء</button></td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
+}
+
+/* ---------- صنف: إضافة/تعديل ---------- */
+function openItemModal(itemId) {
+  editingItemId = itemId || null;
+  var saveBtn = document.getElementById('itemSaveBtn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ'; }
+  if (editingItemId) {
+    var it = null;
+    for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === editingItemId) { it = ITEMS[i]; break; }
+    if (!it) { editingItemId = null; }
+    document.getElementById('itemModalTitle').textContent = '✏️ تعديل صنف';
+    document.getElementById('itemName').value    = it ? (it.name || '') : '';
+    document.getElementById('itemUnit').value    = it ? (it.unit || '') : '';
+    document.getElementById('itemQty').value     = it ? (it.quantity != null ? it.quantity : '') : '';
+    document.getElementById('itemReorder').value = it ? (it.reorder_level != null ? it.reorder_level : '') : '';
+    document.getElementById('itemPrice').value   = it ? (it.purchase_price != null ? it.purchase_price : '') : '';
+    document.getElementById('itemNote').value    = it ? (it.note || '') : '';
+  } else {
+    document.getElementById('itemModalTitle').textContent = '➕ صنف جديد';
+    document.getElementById('itemName').value = '';
+    document.getElementById('itemUnit').value = '';
+    document.getElementById('itemQty').value = '';
+    document.getElementById('itemReorder').value = '';
+    document.getElementById('itemPrice').value = '';
+    document.getElementById('itemNote').value = '';
+  }
+  openModal('itemModal');
+}
+
+async function saveItem() {
+  if (_saveItemInFlight) return;
+  var name = (document.getElementById('itemName').value || '').trim();
+  if (!name) { showToast('⚠️ أدخل اسم الصنف', true); return; }
+  var qty = parseFloat(document.getElementById('itemQty').value);
+  var reorder = parseFloat(document.getElementById('itemReorder').value);
+  var price = parseInt(document.getElementById('itemPrice').value, 10);
+  var unit = (document.getElementById('itemUnit').value || '').trim() || null;
+  var note = (document.getElementById('itemNote').value || '').trim() || null;
+
+  _saveItemInFlight = true;
+  var btn = document.getElementById('itemSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    var payload = {
+      owner_id: currentUser.id,
+      name: name,
+      unit: unit,
+      reorder_level: isNaN(reorder) ? 0 : reorder,
+      purchase_price: isNaN(price) ? null : price,
+      note: note
+    };
+    if (editingItemId) {
+      // تعديل صنف: لا نلمس الكمية هنا (تتغيّر عبر الحركات فقط) إلا إذا غُيّرت يدوياً
+      var newQty = isNaN(qty) ? null : qty;
+      var curIt = null;
+      for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === editingItemId) { curIt = ITEMS[i]; break; }
+      if (newQty !== null && curIt && Number(curIt.quantity||0) !== newQty) {
+        payload.quantity = newQty;
+        // سجّل الفرق كتعديل جرد (شفافية)
+        var diff = newQty - Number(curIt.quantity||0);
+        try {
+          await window.sb.from('inventory_movements').insert({
+            owner_id: currentUser.id, item_id: editingItemId,
+            change: diff, reason: 'adjust', note: 'تعديل من شاشة الصنف'
+          });
+        } catch(e){ /* graceful */ }
+      }
+      var upd = await window.sb.from('inventory_items')
+        .update(payload).eq('id', editingItemId).eq('owner_id', currentUser.id);
+      if (upd.error) throw upd.error;
+    } else {
+      payload.quantity = isNaN(qty) ? 0 : qty;
+      var ins = await window.sb.from('inventory_items').insert(payload).select('id').single();
+      if (ins.error) throw ins.error;
+      // لو الكمية الابتدائية > 0، سجّلها كحركة وارد أولى
+      if (payload.quantity > 0) {
+        try {
+          await window.sb.from('inventory_movements').insert({
+            owner_id: currentUser.id, item_id: ins.data.id,
+            change: payload.quantity, reason: 'purchase', note: 'رصيد افتتاحي'
+          });
+        } catch(e){ /* graceful */ }
+      }
+    }
+    closeModal('itemModal');
+    showToast('تم الحفظ ✓');
+    await loadItems();
+  } catch (e) {
+    console.error('saveItem:', e);
+    if (isTableMissing(e)) showToast('⚠️ شغّل Migration 52 أولاً', true);
+    else showToast('تعذّر الحفظ', true);
+  } finally {
+    _saveItemInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'حفظ'; }
+  }
+}
+
+async function deleteItem(itemId) {
+  var it = null;
+  for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === itemId) { it = ITEMS[i]; break; }
+  var nm = it ? it.name : 'هذا الصنف';
+  if (!confirm('حذف الصنف «' + nm + '»؟\nسيختفي من القائمة (يبقى سجل حركاته محفوظاً).')) return;
+  try {
+    // soft-delete: is_active=false (نحافظ على سجل الحركات)
+    var upd = await window.sb.from('inventory_items')
+      .update({ is_active: false }).eq('id', itemId).eq('owner_id', currentUser.id);
+    if (upd.error) throw upd.error;
+    showToast('تم الحذف');
+    await loadItems();
+  } catch (e) { console.error('deleteItem:', e); showToast('تعذّر الحذف', true); }
+}
+
+/* ---------- حركة ---------- */
+function openMoveModal(itemId, presetReason) {
+  moveItemId = itemId;
+  var it = null;
+  for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === itemId) { it = ITEMS[i]; break; }
+  if (!it) return;
+  var saveBtn = document.getElementById('moveSaveBtn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'تسجيل الحركة'; }
+  document.getElementById('moveModalTitle').textContent = 'حركة: ' + it.name;
+  document.getElementById('moveItemInfo').innerHTML =
+    '<strong>' + escapeHtml(it.name) + '</strong><br>'
+    + '<span style="color:var(--text2);">الكمية الحالية: </span>'
+    + '<span class="qty-pill ' + itemQtyClass(it) + '">' + fmtNum(it.quantity) + (it.unit ? ' ' + escapeHtml(it.unit) : '') + '</span>';
+  document.getElementById('moveReason').value = presetReason || 'purchase';
+  document.getElementById('moveQty').value = '';
+  document.getElementById('moveAdjustTo').value = '';
+  document.getElementById('moveNote').value = '';
+  onMoveReasonChange();
+  openModal('moveModal');
+}
+
+function onMoveReasonChange() {
+  var reason = document.getElementById('moveReason').value;
+  var qtyGroup = document.getElementById('moveQtyGroup');
+  var adjGroup = document.getElementById('moveAdjustGroup');
+  var lbl = document.getElementById('moveQtyLabel');
+  if (reason === 'adjust') {
+    qtyGroup.style.display = 'none';
+    adjGroup.style.display = 'block';
+  } else {
+    qtyGroup.style.display = 'block';
+    adjGroup.style.display = 'none';
+    lbl.textContent = (reason === 'consume') ? 'الكمية المصروفة' : 'الكمية';
+  }
+}
+
+async function saveMovement() {
+  if (_saveMoveInFlight) return;
+  var it = null;
+  for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === moveItemId) { it = ITEMS[i]; break; }
+  if (!it) return;
+  var reason = document.getElementById('moveReason').value;
+  var note = (document.getElementById('moveNote').value || '').trim() || null;
+  var cur = Number(it.quantity || 0);
+  var change, newQty;
+
+  if (reason === 'adjust') {
+    var to = parseFloat(document.getElementById('moveAdjustTo').value);
+    if (isNaN(to) || to < 0) { showToast('⚠️ أدخل الكمية الصحيحة', true); return; }
+    newQty = to;
+    change = to - cur;
+    if (change === 0) { showToast('لا تغيير في الكمية', true); return; }
+  } else {
+    var q = parseFloat(document.getElementById('moveQty').value);
+    if (isNaN(q) || q <= 0) { showToast('⚠️ أدخل كمية صحيحة', true); return; }
+    if (reason === 'consume') {
+      change = -q;
+      newQty = cur - q;
+      if (newQty < 0) {
+        if (!confirm('الكمية المصروفة أكبر من المتوفّر. ستصبح الكمية سالبة. متابعة؟')) { return; }
+      }
+    } else {
+      // purchase أو return = وارد
+      change = q;
+      newQty = cur + q;
+    }
+  }
+
+  _saveMoveInFlight = true;
+  var btn = document.getElementById('moveSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ التسجيل…'; }
+  try {
+    // 1) سجّل الحركة
+    var insMov = await window.sb.from('inventory_movements').insert({
+      owner_id: currentUser.id, item_id: moveItemId,
+      change: change, reason: reason, note: note
+    });
+    if (insMov.error) throw insMov.error;
+    // 2) حدّث الكمية على الصنف
+    var upd = await window.sb.from('inventory_items')
+      .update({ quantity: newQty }).eq('id', moveItemId).eq('owner_id', currentUser.id);
+    if (upd.error) throw upd.error;
+    closeModal('moveModal');
+    showToast('تم تسجيل الحركة ✓');
+    await loadItems();
+  } catch (e) {
+    console.error('saveMovement:', e);
+    if (isTableMissing(e)) showToast('⚠️ شغّل Migration 52 أولاً', true);
+    else showToast('تعذّر تسجيل الحركة', true);
+  } finally {
+    _saveMoveInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'تسجيل الحركة'; }
+  }
+}
+
+/* ---------- سجل الحركات ---------- */
+var REASON_AR = { purchase: '🟢 شراء', consume: '🔴 استهلاك', return: '↩️ مرتجع', adjust: '⚖️ تعديل' };
+async function openHistory(itemId) {
+  var it = null;
+  for (var i=0;i<ITEMS.length;i++) if (ITEMS[i].id === itemId) { it = ITEMS[i]; break; }
+  document.getElementById('historyTitle').textContent = 'سجل: ' + (it ? it.name : '');
+  var list = document.getElementById('historyList');
+  list.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div></div>';
+  openModal('historyModal');
+  try {
+    var res = await window.sb.from('inventory_movements')
+      .select('change, reason, note, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('item_id', itemId)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (res.error) throw res.error;
+    var rows = res.data || [];
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty"><div class="empty-icon">📜</div><div style="margin-top:8px;">لا توجد حركات.</div></div>';
+      return;
+    }
+    list.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+      + '<thead><tr><th>التاريخ</th><th>النوع</th><th>التغيير</th><th>ملاحظة</th></tr></thead><tbody>'
+      + rows.map(function(m){
+          var d = m.created_at ? new Date(m.created_at).toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'}) : '';
+          var ch = Number(m.change||0);
+          var chTxt = (ch > 0 ? '+' : '') + fmtNum(ch);
+          var chColor = ch > 0 ? 'var(--green)' : (ch < 0 ? 'var(--red)' : 'var(--text2)');
+          return '<tr>'
+            + '<td style="white-space:nowrap;color:var(--text2);">' + escapeHtml(d) + '</td>'
+            + '<td>' + (REASON_AR[m.reason] || escapeHtml(m.reason)) + '</td>'
+            + '<td style="font-weight:700;color:' + chColor + ';">' + chTxt + '</td>'
+            + '<td style="color:var(--text2);">' + (m.note ? escapeHtml(m.note) : '—') + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</tbody></table></div>';
+  } catch (e) {
+    console.warn('openHistory:', e);
+    list.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div style="margin-top:8px;">تعذّر تحميل السجل.</div></div>';
+  }
+}
+
+/* ---------- bootstrap ---------- */
+(async function() {
+  if (typeof initSidebar === 'function') initSidebar('inventory');
+  try {
+    var { data: { user } } = await window.sb.auth.getUser();
+    if (!user) { location.href = 'auth.html'; return; }
+    currentUser = user;
+    await loadItems();
+  } catch (e) {
+    console.error('inventory bootstrap:', e);
+  }
+})();
+
+window.onPTRRefresh = function() { loadItems(); };
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.createElement('button');
+  btn.className = 'sb-hamburger';
+  btn.innerHTML = '<span></span><span></span><span></span>';
+  btn.onclick = function() { if (window.sbToggle) window.sbToggle(); };
+  var topbar = document.querySelector('.topbar');
+  if (topbar) topbar.insertBefore(btn, topbar.firstChild);
+});
+</script>
+</body>
+</html>
