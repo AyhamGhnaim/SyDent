@@ -17,10 +17,10 @@
 <title>الموظفون — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607e"></script>
+<script src="theme.js?v=20260607f"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607e"></script>
-<script src="sidebar.js?v=20260607e"></script>
+<script src="supabase-init.js?v=20260607f"></script>
+<script src="sidebar.js?v=20260607f"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -263,7 +263,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607e">
+<link rel="stylesheet" href="theme.css?v=20260607f">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -830,7 +830,30 @@ function renderList() {
     return String(a.name).localeCompare(String(b.name), 'ar');
   });
 
-  var html = '<div class="emp-grid">';
+  // Phase X14.3: security nudge — owner has no PIN but a staff member does.
+  // If the owner never set their own PIN while a staff member has one, anyone
+  // on a staff device could switch into owner mode without a PIN (the lock is
+  // only meaningful once owner mode itself is protected). Surface a clear,
+  // actionable warning so the owner sets their PIN. It disappears automatically
+  // once an owner PIN is saved (saveOwnerPin re-renders the list).
+  var _ownerEmp = employees.find(function(e){ return e.role === 'owner'; });
+  var _ownerNoPin = !!_ownerEmp && !_ownerEmp.pin_hash;
+  var _staffHasPin = employees.some(function(e){
+    return e.role !== 'owner' && e.is_active !== false && !!e.pin_hash;
+  });
+  var ownerPinNudge = (_ownerNoPin && _staffHasPin)
+    ? '<div class="info-box" style="border-color:var(--red);background:color-mix(in srgb, var(--red) 10%, transparent);align-items:center;">' +
+        '<span class="info-icon">🔓</span>' +
+        '<div style="flex:1;color:var(--text);">' +
+          '<b style="color:var(--red);">المالك بدون رقم سر.</b> ' +
+          'بما أنّ أحد الموظفين عيّن رقم سر، يستطيع أي شخص على جهاز موظف التحوّل إلى وضع المالك بدون رقم سر. ' +
+          'عيّن رقم سر المالك لحماية وضعك.' +
+        '</div>' +
+        '<button class="btn btn-sm btn-primary" style="flex-shrink:0;" onclick="openOwnerPinModal()">تعيين رقم سر المالك</button>' +
+      '</div>'
+    : '';
+
+  var html = ownerPinNudge + '<div class="emp-grid">';
   sorted.forEach(function(e){
     // Phase 6 T: pass the full employee row so avatarColor() can resolve
     // a doctor's custom color from the linked clinic_doctors record.

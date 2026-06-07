@@ -1383,8 +1383,12 @@
 
       // Determine if PIN is needed using employee-level hierarchy:
       // - Selecting the SAME employee = no-op = no PIN
-      // - Owner role → ANY other = downgrade or sibling-downgrade = no PIN (owner already supreme)
-      // - Anything else → PIN required (which means PIN of the TARGET employee)
+      // - Owner role (current) → ANY other = downgrade = no PIN (owner supreme)
+      // - Switching INTO owner = needs the OWNER's own PIN, but only if the
+      //   owner has set one. Owner mode with no PIN is unprotected; requiring a
+      //   non-existent PIN would permanently lock every device out of owner
+      //   mode (the stuck-device bug when staff have PINs but the owner doesn't).
+      // - Any other target → PIN required (the TARGET employee's PIN)
       // - If lock not configured (no PINs anywhere) → free
       var sameEmp = isCurrent(target);
       var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
@@ -1396,11 +1400,15 @@
         needPin = false; // no PINs set anywhere yet
       } else if (curRole === 'owner') {
         needPin = false; // owner can switch freely (downgrade)
+      } else if (target.role === 'owner') {
+        needPin = !!target.pin_hash; // owner switch-in: only if owner set a PIN
       } else {
         needPin = true;
       }
 
-      // Edge case: target has NO pin_hash set yet → can't verify
+      // Edge case: a NON-owner target with no pin_hash can't be verified.
+      // (Owner targets never reach here with needPin=true unless they HAVE a
+      // pin_hash, per the branch above — so the owner is never falsely blocked.)
       if (needPin && !target.pin_hash) {
         msg.textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد. اطلب من المالك إعداده.';
         msg.className = 'sd-msg';
@@ -1480,6 +1488,8 @@
           needPin = false;
         } else if (curRole === 'owner') {
           needPin = false;
+        } else if (target.role === 'owner') {
+          needPin = !!target.pin_hash; // owner switch-in: only if owner set a PIN
         } else {
           needPin = true;
         }
