@@ -18,7 +18,7 @@
 <title>SyDent — المحاسبة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607l"></script>
+<script src="theme.js?v=20260607m"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -312,15 +312,15 @@ table.providers tr:hover td { background: rgba(255,255,255,0.02); }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607l">
+<link rel="stylesheet" href="theme.css?v=20260607m">
 <!-- CRITICAL: Supabase CDN MUST load BEFORE supabase-init.js. The init
      script accesses window.supabase synchronously to expose sbGetUser and
      window.sb on the global. If the CDN loads later (e.g. at end of body),
      init() will throw "sbGetUser is not a function". This 3-line block
      matches the exact pattern used in expenses.html, payouts.html, etc. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607l"></script>
-<script src="sidebar.js?v=20260607l"></script>
+<script src="supabase-init.js?v=20260607m"></script>
+<script src="sidebar.js?v=20260607m"></script>
 </head>
 <body>
 
@@ -416,6 +416,7 @@ var expenses       = [];
 var payouts        = [];
 var labOrders      = [];
 var adjustments    = [];   // account_adjustments (Migration 45): discount / write_off / refund
+var materialCost   = 0;    // P3-C1: تكلفة المواد المستهلكة (تقديري، عرض فقط — لا يدخل معادلة الربح)
 
 // Status of EVERY ledger_session referenced by an in-range split (id → status),
 // fetched regardless of date/status. Needed to apply the canonical planned-session
@@ -740,7 +741,8 @@ async function loadAllInRange(from, to) {
     loadExpenses(from, to),
     loadPayouts(from, to),
     loadLabOrders(from, to),
-    loadAdjustments(from, to)
+    loadAdjustments(from, to),
+    loadMaterialCost(from, to)
   ]);
 
   // After payments load, fetch their splits (filtered by payment_id).
@@ -881,6 +883,44 @@ async function loadExpenses(from, to) {
     return;
   }
   expenses = res.data || [];
+}
+
+// P3-C1: تكلفة المواد المستهلكة في الفترة (تقديري — عرض فقط).
+// = Σ (كمية الاستهلاك × سعر شراء الصنف) لحركات reason='consume'.
+// معزولة تماماً: لا تدخل computeExpenseTotals ولا netProfit ولا اختبارات الهوية.
+// graceful: لو جداول المخزون مفقودة (Migration 52/53 غير مشغّل) → 0 بلا كسر.
+// ملاحظة: inventory_movements يستخدم created_at (timestamptz)، نفلتر بالنطاق
+// عبر inLocalRange مثل بقية المصادر الزمنية.
+async function loadMaterialCost(from, to) {
+  materialCost = 0;
+  try {
+    // 1) أسعار الأصناف (id → purchase_price)
+    var itemsRes = await window.sb.from('inventory_items')
+      .select('id, purchase_price')
+      .eq('owner_id', currentUser.id);
+    if (itemsRes.error || !itemsRes.data) return;  // graceful
+    var priceById = {};
+    itemsRes.data.forEach(function(it){ priceById[it.id] = Number(it.purchase_price) || 0; });
+
+    // 2) حركات الاستهلاك (نجلب نطاقاً أوسع قليلاً ثم نفلتر محلياً بالتوقيت المحلي)
+    var movRes = await window.sb.from('inventory_movements')
+      .select('item_id, change, reason, created_at')
+      .eq('owner_id', currentUser.id)
+      .eq('reason', 'consume');
+    if (movRes.error || !movRes.data) return;  // graceful
+
+    var total = 0;
+    movRes.data.forEach(function(m){
+      if (!inLocalRange(m.created_at, from, to)) return;
+      var qty = Math.abs(Number(m.change) || 0);
+      var price = priceById[m.item_id] || 0;
+      total += qty * price;
+    });
+    materialCost = total;
+  } catch (e) {
+    console.warn('loadMaterialCost (non-critical):', e);
+    materialCost = 0;  // أي خطأ → 0، لا يؤثّر على أي رقم مالي آخر
+  }
 }
 
 // account_adjustments (Migration 45): discount / write_off / refund. DATE column
@@ -1521,6 +1561,7 @@ function render(from, to) {
   var html = '';
   html += renderSummaryCards(summary, totals, netProfit, profitMargin, adj, netRevenue, netProduction, collectionRate);
   html += renderExpenseSection(breakdown, totals);
+  html += renderMaterialCostSection();
   html += renderAdjustmentsSection(adj);
   html += renderProviderSection(providerRows);
   html += renderUnearnedSection(summary);
@@ -1680,8 +1721,25 @@ function renderExpenseSection(breakdown, totals) {
     '</div>';
 }
 
-function renderProviderSection(rows) {
-  if (!rows.length) {
+// P3-C1: بطاقة تكلفة المواد المستهلكة — عرض فقط، منفصلة عن معادلة الربح.
+// لا تُضاف لإجمالي المصروفات ولا تؤثّر على صافي الربح. معلومة تقديرية فقط.
+function renderMaterialCostSection() {
+  if (!materialCost || materialCost <= 0) return '';  // لا شيء لعرضه
+  return '' +
+    '<div class="section">' +
+      '<h2>💊 تكلفة المواد المستهلكة <span class="count">تقديري</span></h2>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;background:rgba(6,182,212,0.07);border:1px solid rgba(6,182,212,0.25);border-radius:12px;">' +
+        '<div style="font-size:13px;color:var(--text2,#8aa3b8);line-height:1.6;">' +
+          'القيمة التقديرية للمواد التي استُهلكت من المخزون في هذه الفترة ' +
+          '(كمية الاستهلاك × سعر الشراء).<br>' +
+          '<strong style="color:#06b6d4;">معلومة مرجعية فقط</strong> — غير مُدرَجة في إجمالي المصروفات أو صافي الربح.' +
+        '</div>' +
+        '<div style="font-size:20px;font-weight:800;color:#06b6d4;white-space:nowrap;">' + fmtSY(materialCost) + '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function renderProviderSection(rows) {  if (!rows.length) {
     return '' +
       '<div class="section">' +
         '<h2>👨‍⚕️ الأداء حسب الطبيب</h2>' +
