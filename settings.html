@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607g"></script>
+<script src="theme.js?v=20260607h"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607g"></script>
+<script src="supabase-init.js?v=20260607h"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607g">
-<script src="sidebar.js?v=20260607g"></script>
+<link rel="stylesheet" href="theme.css?v=20260607h">
+<script src="sidebar.js?v=20260607h"></script>
 </head>
 <body>
 
@@ -432,6 +432,17 @@ textarea::placeholder { color: var(--text2); }
         </div>
         <button type="submit" class="btn btn-primary" id="btnSaveProfile">حفظ التغييرات</button>
       </form>
+    </div>
+
+    <!-- 1.5 معلومات الروشتة -->
+    <div class="section">
+      <div class="section-title">💊 معلومات الروشتة</div>
+      <div class="section-sub">تظهر على رأس الروشتة الطبية المطبوعة</div>
+      <div class="form-group">
+        <label>رقم النقابة</label>
+        <input type="text" id="fLicenseNo" placeholder="مثال: 12345" style="max-width:300px;">
+      </div>
+      <button type="button" class="btn btn-primary" id="btnSaveLicense" onclick="saveLicenseNo()">💾 حفظ</button>
     </div>
 
     <!-- 2. تغيير البريد -->
@@ -536,11 +547,6 @@ textarea::placeholder { color: var(--text2); }
           <label>رقم العيادة (يظهر في الرسالة)</label>
           <input type="text" id="fClinicPhone" placeholder="0944-123-456">
         </div>
-      </div>
-
-      <div class="form-group">
-        <label>رقم النقابة (يظهر على الروشتة)</label>
-        <input type="text" id="fLicenseNo" placeholder="مثال: 12345" style="max-width:300px;">
       </div>
 
       <div class="form-group">
@@ -958,8 +964,6 @@ async function saveClinicSettings() {
     whatsapp_reminder_template: template,
     updated_at: new Date().toISOString()
   };
-  var licInput = document.getElementById('fLicenseNo');
-  if (licInput) payload.license_no = (licInput.value.trim() || null);
 
   // Phase 7.6G: any save from settings.html counts as the owner
   // explicitly confirming/editing their clinic_name — flip the
@@ -988,6 +992,37 @@ async function saveClinicSettings() {
   // Reflect any server-side clamping back into the form
   document.getElementById('fHoursBefore').value = data.whatsapp_reminder_hours_before;
   showToast('✅ تم حفظ إعدادات WhatsApp');
+}
+
+// ─── رقم النقابة (يظهر على الروشتة) ───
+// يُحفظ على نفس صف clinic_settings (عمود license_no، Migration 51).
+// منفصل عن إعدادات الواتساب ليكون واضحاً منطقياً.
+async function saveLicenseNo() {
+  if (!currentUser) return;
+  const input = document.getElementById('fLicenseNo');
+  const val = input ? (input.value.trim() || null) : null;
+  const btn = document.getElementById('btnSaveLicense');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    const { data, error } = await window.sb.from('clinic_settings')
+      .upsert({ owner_id: currentUser.id, license_no: val, updated_at: new Date().toISOString() },
+              { onConflict: 'owner_id' })
+      .select().single();
+    if (error) throw error;
+    // حدّث الكاش حتى تظهر القيمة فوراً بأي مكان يقرأ CLINIC_SETTINGS_WA
+    if (data) CLINIC_SETTINGS_WA = data;
+    showToast('✅ تم حفظ رقم النقابة');
+  } catch (e) {
+    console.warn('saveLicenseNo:', e);
+    const msg = (e && e.message || '') + ' ' + (e && e.code || '');
+    if (/license_no|column .* does not exist|42703|PGRST204/i.test(msg)) {
+      showToast('⚠️ يلزم تشغيل Migration 51 أولاً', true);
+    } else {
+      showToast('❌ تعذّر حفظ رقم النقابة', true);
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 حفظ'; }
+  }
 }
 
 // ─── Gap 5: Appointment settings (no-show fee) ───
