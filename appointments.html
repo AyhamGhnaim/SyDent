@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607q"></script>
+<script src="theme.js?v=20260607r"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607q">
+<link rel="stylesheet" href="theme.css?v=20260607r">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607q"></script>
-<script src="sidebar.js?v=20260607q"></script>
-<script src="timepicker.js?v=20260607q"></script>
+<script src="supabase-init.js?v=20260607r"></script>
+<script src="sidebar.js?v=20260607r"></script>
+<script src="timepicker.js?v=20260607r"></script>
 </head>
 <body>
 <script>
@@ -949,6 +949,7 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="view-btn active" id="btnMonth" onclick="setView('month')">📅 شهري</button>
       <button class="view-btn" id="btnDay"   onclick="setView('day')">🕐 يومي</button>
       <button class="view-btn" id="btnList"  onclick="setView('list')">☰ قائمة</button>
+      <button class="view-btn" id="btnCalls" onclick="setView('calls')">📞 اتصالات</button>
     </div>
     <button class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block>＋ موعد جديد</button>
   </div>
@@ -1022,6 +1023,10 @@ textarea { resize: vertical; min-height: 72px; }
     <!-- List View -->
     <div id="listView" class="list-view">
       <div id="listContent"></div>
+    </div>
+
+    <div id="callsView" class="list-view" style="display:none;">
+      <div id="callsContent"></div>
     </div>
 
     </div><!-- /scheduleView -->
@@ -2078,7 +2083,8 @@ function setView(v) {
   document.getElementById('monthView').style.display = v==='month' ? 'block' : 'none';
   document.getElementById('dayView').style.display   = v==='day'   ? 'block' : 'none';
   document.getElementById('listView').style.display  = v==='list'  ? 'block' : 'none';
-  ['btnMonth','btnDay','btnList'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('callsView').style.display = v==='calls' ? 'block' : 'none';
+  ['btnMonth','btnDay','btnList','btnCalls'].forEach(id => document.getElementById(id).classList.remove('active'));
   document.getElementById('btn'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
   render();
 }
@@ -3721,6 +3727,7 @@ function render() {
     _refreshK3ToggleVisibility();
     _applyK3ViewMode(getDayViewMode());
   }
+  else if (view==='calls') renderCalls();
   else renderList();
 }
 
@@ -4332,6 +4339,105 @@ function renderList() {
     html += '</div>';
   });
   document.getElementById('listContent').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// P4 — تبويب "📞 الاتصالات": قائمة عمل مجمّعة للاستقبال.
+// إضافي بالكامل: يعيد استخدام بنية التذكير/التأكيد الموجودة دون أي تعديل عليها.
+//   • النافذة: مواعيد اليوم + الغد، غير المخطّطة وغير المنتهية.
+//   • كل صف: تذكير واتساب (openWaReminderModal الموجود) + نسخ الرسالة (جديد،
+//     للاتصال الهاتفي) + تأكيد (recordApptTime الموجود — يحدّث ويعيد الرسم تلقائياً).
+//   • لا migration، لا جدول/صفحة جديدة، صفر لمس للمالية.
+// ═══════════════════════════════════════════════════════════════
+function isApptConfirmed(a) {
+  return !!(a && (a.confirmation_status === 'confirmed' || a.confirmed_at));
+}
+
+function renderCalls() {
+  document.getElementById('calMonth').textContent = MONTHS_AR[currentDate.getMonth()]+' '+currentDate.getFullYear();
+  var todayS = dateStr(new Date());
+  var tmrwD = new Date(); tmrwD.setHours(0,0,0,0); tmrwD.setTime(tmrwD.getTime() + 86400000);
+  var tmrwS = dateStr(tmrwD);
+
+  var rows = appointments
+    .filter(function(a){
+      return a && a.date && !isPlannedAppt(a) && !isFinishedStatus(a.status)
+        && (a.date === todayS || a.date === tmrwS);
+    })
+    .sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); });
+
+  if (rows.length === 0) {
+    document.getElementById('callsContent').innerHTML =
+      '<div style="text-align:center;padding:60px 20px;color:var(--text2)">'
+      + '<div style="font-size:48px;margin-bottom:12px">📞</div>'
+      + '<div style="font-size:16px;color:var(--text)">لا مواعيد لليوم أو الغد بحاجة لاتصال</div>'
+      + '</div>';
+    return;
+  }
+
+  var needCount = rows.filter(function(a){ return !isApptConfirmed(a); }).length;
+  var html =
+    '<div style="padding:10px 14px;margin-bottom:10px;background:var(--card2,rgba(255,255,255,0.04));border-radius:10px;font-size:13px;color:var(--text2);">'
+    + '📞 قائمة الاتصالات — ' + (needCount > 0
+        ? ('<b style="color:var(--text)">' + needCount + '</b> موعد بحاجة تأكيد')
+        : 'كل المواعيد مؤكّدة ✅')
+    + '</div>';
+
+  [{ key: todayS, label: 'اليوم' }, { key: tmrwS, label: 'غداً' }].forEach(function(g){
+    var evts = rows.filter(function(a){ return a.date === g.key; });
+    if (!evts.length) return;
+    var d = new Date(g.key);
+    var dn = DAYS_AR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_AR[d.getMonth()];
+    html += '<div class="list-group"><div class="list-date-header">' + dn
+      + ' <span class="date-badge">' + g.label + '</span></div>';
+    evts.forEach(function(e){
+      var confirmed = isApptConfirmed(e);
+      var phone = (typeof resolvePatientPhoneForAppt === 'function') ? resolvePatientPhoneForAppt(e) : null;
+      var waHtml = getReminderBadgeHtml(e);
+      var confChip = confirmed ? '<span class="list-badge status-confirmed">📞 مؤكّد</span>' : '';
+      var waBtn = phone
+        ? '<button class="list-action-btn" title="تذكير واتساب" onclick="event.stopPropagation(); openWaReminderModal(\'' + e.id + '\')">📱</button>'
+        : '<button class="list-action-btn" title="لا رقم هاتف مسجّل" disabled style="opacity:0.4;cursor:not-allowed;">📱</button>';
+      var copyBtn = '<button class="list-action-btn" title="نسخ رسالة التذكير" onclick="event.stopPropagation(); copyApptMessage(\'' + e.id + '\', this)">📋</button>';
+      var confBtn = confirmed ? ''
+        : '<button class="list-action-btn" title="تم التأكيد" onclick="event.stopPropagation(); recordApptTime(\'' + e.id + '\', \'confirmed_at\', this)">✅</button>';
+      html +=
+        '<div class="list-item" style="border-right:3px solid ' + getApptColor(e).fill + ';' + (confirmed ? 'opacity:0.6;' : '') + '" onclick="editAppt(\'' + e.id + '\')">'
+        + '<div class="list-time">' + fmtTime12(e.time) + '</div>'
+        + '<div class="list-avatar" style="background:' + avatarColor(e.patient_name||'؟') + '22;color:' + avatarColor(e.patient_name||'؟') + '">' + escapeHtml(initials(e.patient_name||'؟')) + '</div>'
+        + '<div class="list-info">'
+        +   '<div class="list-name">' + (escapeHtml(e.patient_name)||'—') + ' ' + waHtml + ' ' + confChip + '</div>'
+        +   '<div class="list-type">' + (phone ? ('📞 ' + escapeHtml(phone)) : 'لا رقم هاتف') + ' — ' + (escapeHtml(e.type)||'—') + '</div>'
+        + '</div>'
+        + '<div class="list-actions" onclick="event.stopPropagation()">' + waBtn + copyBtn + confBtn + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('callsContent').innerHTML = html;
+}
+
+// نسخ رسالة التذكير للحافظة (للاتصال الهاتفي / المرضى بلا واتساب) — يعيد استخدام buildWaMessage.
+async function copyApptMessage(apptId, btnEl) {
+  var appt = appointments.find(function(a){ return a.id === apptId; });
+  if (!appt) return;
+  var msg = (typeof buildWaMessage === 'function') ? buildWaMessage(appt) : '';
+  if (!msg) { showToast('تعذّر بناء الرسالة'); return; }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(msg);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = msg; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    showToast('📋 تم نسخ الرسالة');
+  } catch (e) {
+    console.warn('copyApptMessage failed:', e);
+    showToast('تعذّر النسخ — انسخ يدوياً');
+  }
 }
 
 // ─── Modal ───────────────────────────────────────────
