@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607j"></script>
+<script src="theme.js?v=20260607k"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607j"></script>
-<script src="sidebar.js?v=20260607j"></script>
-<script src="timepicker.js?v=20260607j"></script>
+<script src="supabase-init.js?v=20260607k"></script>
+<script src="sidebar.js?v=20260607k"></script>
+<script src="timepicker.js?v=20260607k"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607j">
+<link rel="stylesheet" href="theme.css?v=20260607k">
 </head>
 <body>
 <script>
@@ -1636,7 +1636,7 @@ function buildPrintHtml(withPrices){
   html += _ppRow('الاسم', patient.name);
   html += _ppRow('رقم المريض', patient.local_id);
   html += _ppRow('الهاتف', patient.phone);
-  if (patient.dob) html += _ppRow('العمر', calcAge(patient.dob) + ' سنة');
+  if (patient.dob) html += _ppRow('العمر', calcAge(patient.dob));
   html += _ppRow('الجنس', _ppGenderAr(patient.gender));
   html += _ppRow('آخر زيارة', patient.last_visit);
   html += '</table>';
@@ -10099,7 +10099,7 @@ function buildPrescriptionHtml(rx) {
   h += '<div style="background:#f6f6f6;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:#222;">';
   h += '<strong>المريض:</strong> ' + escapeHtml(pName);
   if (pGender) h += ' &nbsp;•&nbsp; ' + escapeHtml(pGender);
-  if (pAge !== '') h += ' &nbsp;•&nbsp; ' + escapeHtml(String(pAge)) + ' سنة';
+  if (pAge !== '') h += ' &nbsp;•&nbsp; ' + escapeHtml(String(pAge));
   h += '</div>';
 
   // جدول الأدوية
