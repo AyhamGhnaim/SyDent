@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607h"></script>
+<script src="theme.js?v=20260607i"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607h"></script>
-<script src="sidebar.js?v=20260607h"></script>
-<script src="timepicker.js?v=20260607h"></script>
+<script src="supabase-init.js?v=20260607i"></script>
+<script src="sidebar.js?v=20260607i"></script>
+<script src="timepicker.js?v=20260607i"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -94,7 +94,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── Tabs ── */
 .tabs{display:flex;gap:6px;margin-bottom:22px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:5px;width:fit-content;max-width:100%;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
 .tabs::-webkit-scrollbar{display:none;width:0;height:0;}
-.tab{padding:9px 28px;border:none;border-radius:9px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.tab{padding:9px 20px;border:none;border-radius:9px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s;white-space:nowrap;flex-shrink:0;}
 .tab.active{background:var(--green);color:var(--bg);}
 .panel{display:none;}
 .panel.active{display:block;}
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607h">
+<link rel="stylesheet" href="theme.css?v=20260607i">
 </head>
 <body>
 <script>
@@ -9174,14 +9174,19 @@ function switchTab(name, btn) {
   var panel = document.getElementById('tab-'+name);
   if (panel) panel.classList.add('active');
   // If btn passed, mark it active; otherwise find by onclick attr
+  var activeTab = btn;
   if (btn && btn.classList) {
     btn.classList.add('active');
   } else {
     var tabs = document.querySelectorAll('.tab');
     for (var i=0; i<tabs.length; i++) {
       var oc = tabs[i].getAttribute('onclick') || '';
-      if (oc.indexOf("'"+name+"'") !== -1) { tabs[i].classList.add('active'); break; }
+      if (oc.indexOf("'"+name+"'") !== -1) { tabs[i].classList.add('active'); activeTab = tabs[i]; break; }
     }
+  }
+  // اجعل التبويب النشط مرئياً لو كان شريط التبويبات يتجاوز عرض الشاشة (scroll أفقي)
+  if (activeTab && activeTab.scrollIntoView) {
+    try { activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch(e){}
   }
 }
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
