@@ -13,10 +13,10 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607k"></script>
+<script src="theme.js?v=20260607l"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607k"></script>
-<script src="sidebar.js?v=20260607k"></script>
+<script src="supabase-init.js?v=20260607l"></script>
+<script src="sidebar.js?v=20260607l"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -111,6 +111,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .chip-active{background:var(--green);color:#0a1628;border-color:var(--green);}
 .dup-btn{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
 .dup-btn:hover{border-color:var(--purple,#a78bfa);color:var(--purple,#a78bfa);}
+.mat-btn{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
+.mat-btn:hover{border-color:#06b6d4;color:#06b6d4;}
 .inact-btn,.act-btn{flex:1;padding:7px;font-size:12px;font-weight:700;border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);transition:all .15s;}
 .inact-btn:hover{border-color:#f59e0b;color:#f59e0b;}
 .act-btn:hover{border-color:var(--green);color:var(--green);}
@@ -222,7 +224,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607k">
+<link rel="stylesheet" href="theme.css?v=20260607l">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -496,6 +498,30 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- Modal: ربط مواد المخزون بالعلاج (P3-B) -->
+<div class="modal-overlay" id="materialsModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head">
+      <h3 id="matModalTitle">🧰 المواد المستهلكة</h3>
+      <button class="modal-close" onclick="closeMaterialsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">
+        المواد المرتبطة هنا تُخصم تلقائياً من المخزون عند تسجيل جلسة بهذا العلاج (بعد تأكيدك).
+      </div>
+      <div id="matNoInventory" style="display:none;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.4);border-radius:10px;padding:14px;font-size:13px;color:var(--text);margin-bottom:14px;">
+        ⚠️ لا توجد أصناف في المخزون بعد. أضف أصنافاً من صفحة <strong>📦 المخزون</strong> أولاً.
+      </div>
+      <div id="matRowsWrap"></div>
+      <button class="btn btn-outline" id="matAddBtn" onclick="matAddRow()" style="margin-top:8px;font-size:13px;padding:8px 16px;">➕ إضافة مادة</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeMaterialsModal()">إلغاء</button>
+      <button class="btn-save-m" id="matSaveBtn" onclick="saveMaterials()">حفظ المواد</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -672,6 +698,7 @@ function render() {
         + '<div class="treat-actions">'
           + '<button class="ed-btn" onclick="editTreatment(\'' + t.id + '\')">✏️ تعديل</button>'
           + '<button class="dup-btn" onclick="duplicateTreatment(\'' + t.id + '\')" title="إنشاء نسخة جديدة من هذا العلاج">📋 نسخ</button>'
+          + '<button class="mat-btn" onclick="openMaterialsModal(\'' + t.id + '\')" title="ربط مواد المخزون التي تُستهلك مع هذا العلاج (تُخصم تلقائياً عند الجلسة)">🧰 المواد</button>'
           + '<button class="' + toggleBtnClass + '" onclick="toggleActive(\'' + t.id + '\')" title="' + (isInactive ? 'تفعيل العلاج' : 'تعطيل العلاج (يخفيه من قائمة العلاجات في مخطط الأسنان)') + '">' + toggleBtnText + '</button>'
           + (t.builtin
               ? ''
@@ -1307,6 +1334,150 @@ function printLegend() {
 // ============================================================
 // === Helper to close any modal by id ===
 // ============================================================
+
+// ============================================================
+// === Treatment Materials (P3-B) — ربط مواد المخزون بالعلاج ===
+// ============================================================
+var INV_ITEMS_CACHE = [];          // أصناف المخزون (للـ dropdown)
+var matEditingTreatmentId = null;
+var _saveMaterialsInFlight = false;
+
+async function loadInventoryItemsForMaterials() {
+  // graceful: لو جدول المخزون غير موجود، نرجّع قائمة فارغة بلا كسر
+  try {
+    var res = await window.sb.from('inventory_items')
+      .select('id, name, unit, quantity')
+      .eq('owner_id', currentDoctor.id)
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    if (res.error) { INV_ITEMS_CACHE = []; return; }
+    INV_ITEMS_CACHE = res.data || [];
+  } catch (e) { INV_ITEMS_CACHE = []; }
+}
+
+function matItemOptions(selectedId) {
+  var opts = '<option value="">— اختر صنفاً —</option>';
+  INV_ITEMS_CACHE.forEach(function(it){
+    var sel = (it.id === selectedId) ? ' selected' : '';
+    var unit = it.unit ? (' (' + escapeHtml(it.unit) + ')') : '';
+    opts += '<option value="' + it.id + '"' + sel + '>' + escapeHtml(it.name) + unit + '</option>';
+  });
+  return opts;
+}
+
+function matRowHtml(itemId, qty) {
+  return '<div class="mat-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
+    + '<select class="mat-item" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+      + matItemOptions(itemId) + '</select>'
+    + '<input type="number" class="mat-qty" value="' + (qty != null ? qty : 1) + '" min="0" step="0.01" inputmode="decimal" placeholder="الكمية" style="width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+    + '<button type="button" class="btn" onclick="this.closest(\'.mat-row\').remove()" style="padding:8px 12px;font-size:13px;color:var(--red);" title="حذف">✕</button>'
+  + '</div>';
+}
+
+function matAddRow(itemId, qty) {
+  var wrap = document.getElementById('matRowsWrap');
+  if (!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', matRowHtml(itemId, qty));
+}
+
+async function openMaterialsModal(treatmentId) {
+  matEditingTreatmentId = treatmentId;
+  var t = null;
+  for (var i=0; i<treatments.length; i++) if (treatments[i].id === treatmentId) { t = treatments[i]; break; }
+  document.getElementById('matModalTitle').textContent = '🧰 مواد: ' + (t ? t.name : '');
+  var saveBtn = document.getElementById('matSaveBtn');
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ المواد'; }
+  document.getElementById('matRowsWrap').innerHTML = '';
+
+  // حمّل أصناف المخزون
+  await loadInventoryItemsForMaterials();
+  var noInv = document.getElementById('matNoInventory');
+  var addBtn = document.getElementById('matAddBtn');
+  if (!INV_ITEMS_CACHE.length) {
+    noInv.style.display = 'block';
+    addBtn.style.display = 'none';
+  } else {
+    noInv.style.display = 'none';
+    addBtn.style.display = '';
+  }
+
+  // حمّل المواد المرتبطة حالياً بهذا العلاج
+  try {
+    var res = await window.sb.from('treatment_materials')
+      .select('item_id, qty_per_use')
+      .eq('owner_id', currentDoctor.id)
+      .eq('treatment_id', treatmentId);
+    if (!res.error && res.data && res.data.length) {
+      res.data.forEach(function(m){ matAddRow(m.item_id, m.qty_per_use); });
+    } else if (INV_ITEMS_CACHE.length) {
+      matAddRow(); // صف فارغ أول
+    }
+  } catch (e) {
+    if (INV_ITEMS_CACHE.length) matAddRow();
+  }
+
+  document.getElementById('materialsModal').classList.add('open');
+}
+
+function closeMaterialsModal() {
+  var el = document.getElementById('materialsModal');
+  el.classList.remove('open');
+  el.style.display = 'none';
+  setTimeout(function(){ el.style.display = ''; }, 50);
+}
+
+function matCollectRows() {
+  var rows = document.querySelectorAll('#matRowsWrap .mat-row');
+  var out = [];
+  var seen = {};
+  for (var i=0; i<rows.length; i++) {
+    var itemId = rows[i].querySelector('.mat-item').value;
+    var qty = parseFloat(rows[i].querySelector('.mat-qty').value);
+    if (!itemId) continue;                 // تجاهل الصفوف بلا صنف
+    if (isNaN(qty) || qty <= 0) continue;   // تجاهل الكميات غير الصالحة
+    if (seen[itemId]) continue;             // تجاهل التكرار (نفس الصنف مرتين)
+    seen[itemId] = true;
+    out.push({ item_id: itemId, qty_per_use: qty });
+  }
+  return out;
+}
+
+async function saveMaterials() {
+  if (_saveMaterialsInFlight) return;
+  if (!matEditingTreatmentId) return;
+  var rows = matCollectRows();
+
+  _saveMaterialsInFlight = true;
+  var btn = document.getElementById('matSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    // استبدال كامل: احذف القديم ثم أدرج الجديد (أبسط + متّسق)
+    var del = await window.sb.from('treatment_materials')
+      .delete().eq('treatment_id', matEditingTreatmentId).eq('owner_id', currentDoctor.id);
+    if (del.error) throw del.error;
+    if (rows.length) {
+      var payload = rows.map(function(r){
+        return { owner_id: currentDoctor.id, treatment_id: matEditingTreatmentId,
+                 item_id: r.item_id, qty_per_use: r.qty_per_use };
+      });
+      var ins = await window.sb.from('treatment_materials').insert(payload);
+      if (ins.error) throw ins.error;
+    }
+    closeMaterialsModal();
+    showToast('تم حفظ المواد ✓');
+  } catch (e) {
+    console.error('saveMaterials:', e);
+    var msg = (e && e.message || '') + ' ' + (e && e.code || '');
+    if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+      showToast('⚠️ شغّل Migration 53 أولاً');
+    } else {
+      showToast('تعذّر حفظ المواد');
+    }
+  } finally {
+    _saveMaterialsInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'حفظ المواد'; }
+  }
+}
 
 </script>
 
