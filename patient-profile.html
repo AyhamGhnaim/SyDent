@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607b32"></script>
+<script src="theme.js?v=20260607b33"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607b32"></script>
-<script src="sidebar.js?v=20260607b32"></script>
-<script src="timepicker.js?v=20260607b32"></script>
+<script src="supabase-init.js?v=20260607b33"></script>
+<script src="sidebar.js?v=20260607b33"></script>
+<script src="timepicker.js?v=20260607b33"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -647,7 +647,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607b32">
+<link rel="stylesheet" href="theme.css?v=20260607b33">
 </head>
 <body>
 <script>
@@ -6395,8 +6395,8 @@ function renderSessions() {
     rows += '<tr>'
       + '<td' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</td>'
       + '<td>' + typeBadge + toothBadge + regionalBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
-      + '<td style="color:var(--text2)">' + (s.description||'—') + '</td>'
-      + '<td style="color:var(--text2)">' + (s.notes||'—') + '</td>'
+      + '<td style="color:var(--text2)">' + escapeHtml(s.description||'—') + '</td>'
+      + '<td style="color:var(--text2)">' + escapeHtml(s.notes||'—') + '</td>'
       + '<td style="' + costStyle + '">' + fmt(s.cost) + ' ل.س</td>'
       + '<td style="white-space:nowrap;">'
       +   (s.status === 'planned'
@@ -6478,7 +6478,7 @@ function renderPayments() {
     rows += '<tr>'
       + '<td' + dtHoverAttrs(p.created_at) + '>' + fmtD(p.date) + '</td>'
       + '<td>' + manualBadge + '<span class="tag tag-green">' + (p.method||'—') + '</span></td>'
-      + '<td style="color:var(--text2)">' + (p.notes||'—') + '</td>'
+      + '<td style="color:var(--text2)">' + escapeHtml(p.notes||'—') + '</td>'
       + '<td class="amount-green" style="text-align:left;">' + fmt(p.amount) + ' ل.س</td>'
       + '<td style="white-space:nowrap;">' + splitBtn + '<button class="del-btn" onclick="delPayment(\'' + p.id + '\')">🗑</button></td>'
       + '</tr>';
@@ -6670,7 +6670,7 @@ function renderRecentSessions() {
         + '<span style="color:' + costColor + ';font-weight:700;font-size:13px;white-space:nowrap;"' + (costTitle ? ' title="' + costTitle + '"' : '') + '>' + fmt(s.cost) + ' ل.س</span>'
       + '</div>'
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);">'
-        + '<span>' + (s.description || '—') + '</span>'
+        + '<span>' + escapeHtml(s.description || '—') + '</span>'
         + '<span' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</span>'
       + '</div>'
     + '</div>';
