@@ -15,7 +15,7 @@
 <title>SyDent — المخزون</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607n"></script>
+<script src="theme.js?v=20260607o"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -151,10 +151,10 @@ body {
   .data-table th:nth-child(4), .data-table td:nth-child(4) { display:none; }
 }
 </style>
-<link rel="stylesheet" href="theme.css?v=20260607n">
+<link rel="stylesheet" href="theme.css?v=20260607o">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607n"></script>
-<script src="sidebar.js?v=20260607n"></script>
+<script src="supabase-init.js?v=20260607o"></script>
+<script src="sidebar.js?v=20260607o"></script>
 </head>
 <body>
 
@@ -586,27 +586,18 @@ async function saveMovement() {
   var reason = document.getElementById('moveReason').value;
   var note = (document.getElementById('moveNote').value || '').trim() || null;
   var cur = Number(it.quantity || 0);
-  var change, newQty;
+  var change, newQty, q, to;
 
+  // التحقق من المدخلات فقط (الحساب الفعلي يتم لاحقاً على الكمية الطازجة)
   if (reason === 'adjust') {
-    var to = parseFloat(document.getElementById('moveAdjustTo').value);
+    to = parseFloat(document.getElementById('moveAdjustTo').value);
     if (isNaN(to) || to < 0) { showToast('⚠️ أدخل الكمية الصحيحة', true); return; }
-    newQty = to;
-    change = to - cur;
-    if (change === 0) { showToast('لا تغيير في الكمية', true); return; }
+    newQty = to;   // قيمة مطلقة (تُعتمد كما هي)
   } else {
-    var q = parseFloat(document.getElementById('moveQty').value);
+    q = parseFloat(document.getElementById('moveQty').value);
     if (isNaN(q) || q <= 0) { showToast('⚠️ أدخل كمية صحيحة', true); return; }
-    if (reason === 'consume') {
-      change = -q;
-      newQty = cur - q;
-      if (newQty < 0) {
-        if (!confirm('الكمية المصروفة أكبر من المتوفّر. ستصبح الكمية سالبة. متابعة؟')) { return; }
-      }
-    } else {
-      // purchase أو return = وارد
-      change = q;
-      newQty = cur + q;
+    if (reason === 'consume' && (cur - q) < 0) {
+      if (!confirm('الكمية المصروفة أكبر من المتوفّر (' + fmtNum(cur) + '). ستُخصم حتى الصفر فقط. متابعة؟')) { return; }
     }
   }
 
@@ -614,6 +605,31 @@ async function saveMovement() {
   var btn = document.getElementById('moveSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'جارٍ التسجيل…'; }
   try {
+    // اقرأ الكمية الطازجة من DB لحظة التسجيل (تفادي خطأ التزامن لو تغيّرت
+    // الكمية بعد تحميل الصفحة — تبويب آخر، جهاز آخر، إلخ).
+    var fresh = await window.sb.from('inventory_items')
+      .select('quantity').eq('id', moveItemId).eq('owner_id', currentUser.id).single();
+    if (fresh.error) throw fresh.error;
+    var freshCur = Number(fresh.data.quantity) || 0;
+    // أعد حساب change/newQty على أساس الكمية الطازجة
+    if (reason === 'adjust') {
+      // الجرد = قيمة مطلقة جديدة؛ change = الفرق عن الطازج
+      change = newQty - freshCur;
+      if (change === 0) {
+        if (btn) { btn.disabled = false; btn.textContent = 'تسجيل الحركة'; }
+        _saveMoveInFlight = false;
+        showToast('لا تغيير في الكمية', true);
+        return;
+      }
+    } else if (reason === 'consume') {
+      newQty = freshCur - q;
+      if (newQty < 0) newQty = 0;       // لا تنزل تحت الصفر
+      change = newQty - freshCur;        // الكمية الفعلية المخصومة
+    } else {
+      // purchase / return = وارد
+      newQty = freshCur + q;
+      change = q;
+    }
     // 1) سجّل الحركة
     var insMov = await window.sb.from('inventory_movements').insert({
       owner_id: currentUser.id, item_id: moveItemId,
