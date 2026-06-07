@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607i"></script>
+<script src="theme.js?v=20260607j"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607i"></script>
-<script src="sidebar.js?v=20260607i"></script>
-<script src="timepicker.js?v=20260607i"></script>
+<script src="supabase-init.js?v=20260607j"></script>
+<script src="sidebar.js?v=20260607j"></script>
+<script src="timepicker.js?v=20260607j"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607i">
+<link rel="stylesheet" href="theme.css?v=20260607j">
 </head>
 <body>
 <script>
@@ -1392,9 +1392,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
         <div class="form-group">
           <label>تعبئة من قالب</label>
-          <select id="rxTemplatePick" onchange="rxApplyTemplate(this.value)" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
-            <option value="">— بلا قالب —</option>
-          </select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <select id="rxTemplatePick" onchange="rxApplyTemplate(this.value)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
+              <option value="">— بلا قالب —</option>
+            </select>
+            <button type="button" class="btn" onclick="openRxTemplatesModal()" title="إدارة القوالب" style="padding:10px 14px;font-size:14px;white-space:nowrap;">⚙️ القوالب</button>
+          </div>
         </div>
       </div>
       <div class="form-group" id="rxApptGroup" style="display:none;">
@@ -1421,6 +1424,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeModal('rxModal')">إلغاء</button>
       <button class="btn-save-m" id="rxSaveBtn" onclick="savePrescription()">حفظ الروشتة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: إدارة قوالب الروشتات -->
+<div class="modal-overlay" id="rxTemplatesModal">
+  <div class="modal-box" style="max-width:560px;">
+    <div class="modal-head"><h3>⚙️ إدارة قوالب الروشتات</h3><button class="modal-close" onclick="closeModal('rxTemplatesModal')">✕</button></div>
+    <div class="modal-body">
+      <div id="rxTemplatesList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('rxTemplatesModal')">إغلاق</button>
     </div>
   </div>
 </div>
@@ -9747,6 +9763,7 @@ async function openRxModal() {
   document.getElementById('rxTemplateNameGroup').style.display = 'none';
   document.getElementById('rxTemplateName').value = '';
   document.getElementById('rxItemsWrap').innerHTML = '';
+  _rxEditingTemplateId = null;
   rxAddItemRow(); // سطر فارغ أول
 
   // قائمة الأطباء
@@ -9826,7 +9843,79 @@ function rxApplyTemplate(tid) {
   items.forEach(function(it){ rxAddItemRow(it); });
 }
 
-/* ---------- جمع الأدوية من النموذج ---------- */
+/* ---------- إدارة القوالب (عرض/تعديل/حذف) ---------- */
+async function openRxTemplatesModal() {
+  if (!RX_TEMPLATES.length) { try { await loadRxTemplates(); } catch(e){} }
+  renderRxTemplatesList();
+  openModal('rxTemplatesModal');
+}
+
+function renderRxTemplatesList() {
+  var el = document.getElementById('rxTemplatesList');
+  if (!el) return;
+  if (!RX_TEMPLATES.length) {
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text2);">'
+      + '<div style="font-size:30px;">📋</div>'
+      + '<div style="margin-top:8px;font-size:13px;">لا توجد قوالب بعد.<br>أنشئ روشتة وفعّل «حفظ كقالب» لإضافة قالب.</div></div>';
+    return;
+  }
+  el.innerHTML = RX_TEMPLATES.map(function(t){
+    var items = Array.isArray(t.items) ? t.items : [];
+    var drugs = items.map(function(it){ return escapeHtml(it.drug_name||''); }).join('، ');
+    if (drugs.length > 80) drugs = drugs.slice(0,80) + '…';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--bg2);display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-weight:700;color:var(--text);">' + escapeHtml(t.name) + '</div>'
+        + '<div style="font-size:12px;color:var(--text2);margin-top:3px;">' + (drugs || '<span style="opacity:.6;">— بلا أدوية —</span>') + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:6px;white-space:nowrap;">'
+        + '<button class="btn" style="padding:6px 12px;font-size:12px;" onclick="rxEditTemplate(\'' + t.id + '\')">✏️ تعديل</button>'
+        + '<button class="btn" style="padding:6px 12px;font-size:12px;color:var(--danger,#e5484d);" onclick="deleteRxTemplate(\'' + t.id + '\')">🗑️ حذف</button>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+async function deleteRxTemplate(tid) {
+  var tpl = null;
+  for (var i=0;i<RX_TEMPLATES.length;i++) if (RX_TEMPLATES[i].id === tid) { tpl = RX_TEMPLATES[i]; break; }
+  var nm = tpl ? tpl.name : 'هذا القالب';
+  if (!confirm('حذف القالب «' + nm + '» نهائياً؟')) return;
+  try {
+    var del = await window.sb.from('prescription_templates')
+      .delete().eq('id', tid).eq('owner_id', currentUser.id);
+    if (del.error) throw del.error;
+    await loadRxTemplates();
+    renderRxTemplatesList();      // حدّث قائمة المودال
+    rxPopulateTemplatePicker();   // حدّث الـ dropdown بمودال الروشتة
+    showToast('تم حذف القالب');
+  } catch (e) { console.error('deleteRxTemplate:', e); showToast('⚠️ تعذّر حذف القالب'); }
+}
+
+// تعديل قالب = تحميل أدويته بمودال الروشتة + تعبئة اسمه للحفظ.
+// الحفظ ينشئ نسخة جديدة؛ لتجنّب التكرار نحذف القديم بعد نجاح الحفظ.
+function rxEditTemplate(tid) {
+  var tpl = null;
+  for (var i=0;i<RX_TEMPLATES.length;i++) if (RX_TEMPLATES[i].id === tid) { tpl = RX_TEMPLATES[i]; break; }
+  if (!tpl) return;
+  closeModal('rxTemplatesModal');
+  // افتح مودال الروشتة بدون إعادة ضبط القوالب، ثم احقن أدوية القالب
+  openRxModal().then(function(){
+    var items = Array.isArray(tpl.items) ? tpl.items : [];
+    var wrap = document.getElementById('rxItemsWrap');
+    wrap.innerHTML = '';
+    if (!items.length) { rxAddItemRow(); } else { items.forEach(function(it){ rxAddItemRow(it); }); }
+    // فعّل «حفظ كقالب» واملأ الاسم، وعلّم أننا نعدّل قالباً (للحذف بعد الحفظ)
+    var chk = document.getElementById('rxSaveAsTemplate');
+    chk.checked = true;
+    document.getElementById('rxTemplateNameGroup').style.display = 'block';
+    document.getElementById('rxTemplateName').value = tpl.name;
+    _rxEditingTemplateId = tpl.id;
+    showToast('عدّل الأدوية ثم احفظ الروشتة — سيُحدَّث القالب');
+  });
+}
+var _rxEditingTemplateId = null;
+
 function rxCollectItems() {
   var rows = document.querySelectorAll('#rxItemsWrap .rx-item-row');
   var items = [];
@@ -9908,10 +9997,18 @@ async function savePrescription() {
           await window.sb.from('prescription_templates').insert({
             owner_id: currentUser.id, name: tname, items: tplItems
           });
+          // لو كنا نعدّل قالباً موجوداً: احذف القديم بعد نجاح إنشاء الجديد (تجنّب التكرار)
+          if (_rxEditingTemplateId) {
+            try {
+              await window.sb.from('prescription_templates')
+                .delete().eq('id', _rxEditingTemplateId).eq('owner_id', currentUser.id);
+            } catch (e) { console.warn('delete old template on edit:', e); }
+          }
           await loadRxTemplates();
         } catch (e) { console.warn('save template:', e); }
       }
     }
+    _rxEditingTemplateId = null;
 
     // audit (graceful — نفس نمط الصفحة)
     try {
