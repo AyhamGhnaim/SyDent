@@ -13,10 +13,10 @@
 <title>قائمة العلاجات — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607m"></script>
+<script src="theme.js?v=20260607n"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607m"></script>
-<script src="sidebar.js?v=20260607m"></script>
+<script src="supabase-init.js?v=20260607n"></script>
+<script src="sidebar.js?v=20260607n"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -224,7 +224,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607m">
+<link rel="stylesheet" href="theme.css?v=20260607n">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -508,9 +508,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-body">
       <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">
         المواد المرتبطة هنا تُخصم تلقائياً من المخزون عند تسجيل جلسة بهذا العلاج (بعد تأكيدك).
+        <br><strong style="color:#06b6d4;">الكمية = ما يُستهلك بنفس وحدة الصنف في المخزون</strong>
+        (مثال: إن كانت وحدة الكفوف «زوج»، اكتب 1 = زوج واحد لكل جلسة).
       </div>
       <div id="matNoInventory" style="display:none;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.4);border-radius:10px;padding:14px;font-size:13px;color:var(--text);margin-bottom:14px;">
         ⚠️ لا توجد أصناف في المخزون بعد. أضف أصنافاً من صفحة <strong>📦 المخزون</strong> أولاً.
+      </div>
+      <div id="matColHeaders" style="display:none;gap:8px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--text2);font-weight:700;">
+        <span style="flex:1;">الصنف</span>
+        <span style="width:80px;text-align:center;">الكمية</span>
+        <span style="min-width:42px;">الوحدة</span>
+        <span style="width:38px;"></span>
       </div>
       <div id="matRowsWrap"></div>
       <button class="btn btn-outline" id="matAddBtn" onclick="matAddRow()" style="margin-top:8px;font-size:13px;padding:8px 16px;">➕ إضافة مادة</button>
@@ -1367,11 +1375,31 @@ function matItemOptions(selectedId) {
 
 function matRowHtml(itemId, qty) {
   return '<div class="mat-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">'
-    + '<select class="mat-item" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+    + '<select class="mat-item" onchange="matUpdateRowUnit(this)" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
       + matItemOptions(itemId) + '</select>'
-    + '<input type="number" class="mat-qty" value="' + (qty != null ? qty : 1) + '" min="0" step="0.01" inputmode="decimal" placeholder="الكمية" style="width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:13px;">'
+    + '<input type="number" class="mat-qty" value="' + (qty != null ? qty : 1) + '" min="0" step="0.01" inputmode="decimal" placeholder="الكمية" style="width:80px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg3);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;font-weight:700;text-align:center;">'
+    + '<span class="mat-unit" style="font-size:12px;color:var(--text2);min-width:42px;">' + matUnitFor(itemId) + '</span>'
     + '<button type="button" class="btn" onclick="this.closest(\'.mat-row\').remove()" style="padding:8px 12px;font-size:13px;color:var(--red);" title="حذف">✕</button>'
   + '</div>';
+}
+
+// يرجّع وحدة الصنف (للعرض بجانب الكمية)
+function matUnitFor(itemId) {
+  if (!itemId) return '';
+  for (var i=0; i<INV_ITEMS_CACHE.length; i++) {
+    if (INV_ITEMS_CACHE[i].id === itemId) {
+      return INV_ITEMS_CACHE[i].unit ? escapeHtml(INV_ITEMS_CACHE[i].unit) : '';
+    }
+  }
+  return '';
+}
+
+// تحديث عرض الوحدة عند تغيير اختيار الصنف
+function matUpdateRowUnit(selectEl) {
+  var row = selectEl.closest('.mat-row');
+  if (!row) return;
+  var unitEl = row.querySelector('.mat-unit');
+  if (unitEl) unitEl.innerHTML = matUnitFor(selectEl.value);
 }
 
 function matAddRow(itemId, qty) {
@@ -1393,12 +1421,15 @@ async function openMaterialsModal(treatmentId) {
   await loadInventoryItemsForMaterials();
   var noInv = document.getElementById('matNoInventory');
   var addBtn = document.getElementById('matAddBtn');
+  var colHeaders = document.getElementById('matColHeaders');
   if (!INV_ITEMS_CACHE.length) {
     noInv.style.display = 'block';
     addBtn.style.display = 'none';
+    if (colHeaders) colHeaders.style.display = 'none';
   } else {
     noInv.style.display = 'none';
     addBtn.style.display = '';
+    if (colHeaders) colHeaders.style.display = 'flex';
   }
 
   // حمّل المواد المرتبطة حالياً بهذا العلاج
