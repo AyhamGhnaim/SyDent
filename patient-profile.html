@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607s"></script>
+<script src="theme.js?v=20260607t"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607s"></script>
-<script src="sidebar.js?v=20260607s"></script>
-<script src="timepicker.js?v=20260607s"></script>
+<script src="supabase-init.js?v=20260607t"></script>
+<script src="sidebar.js?v=20260607t"></script>
+<script src="timepicker.js?v=20260607t"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -656,7 +656,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607s">
+<link rel="stylesheet" href="theme.css?v=20260607t">
 </head>
 <body>
 <script>
@@ -1111,6 +1111,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">⚠️ يوجد علاج مخطّط على هذا السن:</div>
           <div id="toothPlannedInfo" style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:8px;"></div>
           <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:#2ee89e;color:#0a1628;border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✅ تم إنجاز العلاج المخطّط</button>
+        </div>
+        <!-- Composite surfaces: multi-select chips (crown-surface clicks only). Lets the
+             dentist mark one restoration spanning several surfaces, e.g. MOD. -->
+        <div id="toothSurfaceChips" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">الأسطح المشمولة بالترميم <span style="opacity:0.7;">(اضغط لإضافة/إزالة سطح)</span>:</div>
+          <div id="toothSurfaceChipsRow" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
         </div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
           <span>اختر نوع العلاج:</span>
@@ -3469,6 +3475,52 @@ var SURFACE_LABELS = {
   'PONTIC': 'سن وهمي (جسر)'
 };
 
+/* ── COMPOSITE SURFACE SUPPORT (multi-surface restorations, e.g. MOD) ──
+ * A single restoration can span several crown surfaces (MO, OD, MOD, MODBL…),
+ * exactly how dentists classify restorations clinically (a MOD composite is ONE
+ * restoration, ONE fee, ONE ledger session). The composite is stored as a SINGLE
+ * surface code (e.g. 'MOD') on teeth_status / ledger_sessions — `surface` stays a
+ * pure clinical LABEL with zero financial effect (FIFO / splitIsEarned / identity
+ * tests A–E never read it). Single-surface codes remain valid and unchanged.
+ *
+ * Canonical order (matches the DB CHECK regex ^M?[OI]?D?B?L?V?$): M → O/I → D → B → L → V.
+ * O and I share the central slot (O = posterior occlusal, I = anterior incisal). */
+var SURFACE_ORDER = { M:1, O:2, I:2, D:3, B:4, L:5, V:6 };
+/* Multi-character codes that are NOT composite crown surfaces (whole-tooth / crown / roots). */
+var SPECIAL_SURFACE_CODES = ['WHOLE','PONTIC','CROWN_FULL','BRIDGE','R1','R2','R3'];
+
+/* True only for a multi-surface crown code (e.g. 'MOD'); false for single codes,
+   roots (R1-R3) and the whole-tooth/crown special codes above. */
+function isCompositeSurfaceCode(code){
+  if (!code || code.length < 2) return false;
+  if (SPECIAL_SURFACE_CODES.indexOf(code) !== -1) return false;
+  return /^[MODBLIV]+$/.test(code);
+}
+
+/* Build a canonical-ordered composite code from a set of single surface letters.
+   Dedupes + sorts by SURFACE_ORDER so MOD / DOM / OMD all normalize to 'MOD'. */
+function buildCompositeCode(letters){
+  var uniq = [];
+  for (var i=0;i<(letters||[]).length;i++){ if (uniq.indexOf(letters[i])===-1) uniq.push(letters[i]); }
+  uniq.sort(function(a,b){ return (SURFACE_ORDER[a]||99)-(SURFACE_ORDER[b]||99); });
+  return uniq.join('');
+}
+
+/* RENDER RESOLVER: which treatment_key should COLOR a single crown region on a
+   tooth, accounting for composite codes. An explicit single-surface row wins;
+   otherwise the first composite code that includes this region letter colors it.
+   (After composite-save subsumption cleanup, real overlaps don't occur — this is
+   the safety net.) Returns the treatment_key or null. */
+function effectiveSurfaceTreatment(sm, regionKey){
+  if (!sm) return null;
+  if (sm[regionKey]) return sm[regionKey];
+  for (var k in sm){
+    if (k === '__status') continue;
+    if (isCompositeSurfaceCode(k) && k.indexOf(regionKey) !== -1) return sm[k];
+  }
+  return null;
+}
+
 /* Returns the Arabic display name for a tooth surface. Special case: the inner
    surface of UPPER (maxillary) teeth is anatomically the PALATAL surface
    ("حنكي"), not lingual — the surface key stays 'L' (no data change), but the
@@ -3477,6 +3529,12 @@ var SURFACE_LABELS = {
    a number it falls back to the plain SURFACE_LABELS value. */
 function surfLabelFor(key, num){
   var L = (typeof SURFACE_LABELS !== 'undefined' && SURFACE_LABELS) || {};
+  // Composite code (e.g. 'MOD') → join each component surface's label with '·'.
+  if (typeof isCompositeSurfaceCode === 'function' && isCompositeSurfaceCode(key)) {
+    var parts = key.split(''), out = [];
+    for (var ci=0; ci<parts.length; ci++){ out.push(surfLabelFor(parts[ci], num)); }
+    return out.join('·');
+  }
   if (key === 'L' && num !== null && num !== undefined && num !== '') {
     var q = Math.floor(parseInt(num, 10) / 10);  // FDI quadrant: 1,2 = upper
     if (q === 1 || q === 2) return 'حنكي';
@@ -4577,7 +4635,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   var OVERSHOOT = 12;
   function overlayRect(rect, isCenter) {
     var fillKey = rect.key;
-    var tk = sm[fillKey];
+    var tk = effectiveSurfaceTreatment(sm, fillKey);
     var fill, opacity, useColor = false;
     // Surface treatments always paint at full solidity. whole-tooth (outline)
     // and crown_full (transparent overlay) are drawn separately AFTER these, so
@@ -4714,6 +4772,14 @@ function buildTooth(num, surfaceMap, isUpper) {
   // ALWAYS list surface + lingual + root treatments — even under a whole/crown_full —
   // so the doctor sees every treatment on the tooth, not just the full-coverage one.
   {
+    // Composite restorations (e.g. MOD) — ONE row each, listed before single surfaces.
+    for (var compK in sm) {
+      if (compK === '__status') continue;
+      if (!isCompositeSurfaceCode(compK) || !sm[compK]) continue;
+      var cTk = sm[compK];
+      var cObj = getTreatment(cTk);
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + (T_FILL[cTk] || '#888') + '"></span><b>' + surfLabelFor(compK, num) + ':</b> ' + (cObj ? cObj.name : cTk) + tipStatusBadge(sm, compK) + '</div>';
+    }
     var crownKeys = surfacesFor(num);
     for (var ki = 0; ki < crownKeys.length; ki++) {
       var sk = crownKeys[ki];
@@ -4894,7 +4960,7 @@ function buildOcclusalTooth(num, sm, isUpper){
   var occWholeColor=occHasWhole?(T_FILL[whole]||'#f5e6c8'):null;
   // Any PARTIAL surface treatment present (occlusal/buccal/lingual/mesial/distal/incisal)?
   // Used to decide whether to re-stamp the cusps on top so they stay visible.
-  var occHasSurfaceFill=!!(sm.O||sm.B||sm.L||sm.M||sm.D||sm.I);
+  var occHasSurfaceFill=!!(effectiveSurfaceTreatment(sm,'O')||effectiveSurfaceTreatment(sm,'B')||effectiveSurfaceTreatment(sm,'L')||effectiveSurfaceTreatment(sm,'M')||effectiveSurfaceTreatment(sm,'D')||effectiveSurfaceTreatment(sm,'I'));
   var defs='<defs>'
     +'<radialGradient id="en'+gid+'" cx="44%" cy="36%" r="72%"><stop offset="0%" stop-color="#fbf4e3"/><stop offset="60%" stop-color="#f0e4c8"/><stop offset="100%" stop-color="#d6c293"/></radialGradient>'
     +'<radialGradient id="cu'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,253,245,0.4)"/><stop offset="60%" stop-color="rgba(247,238,214,0.2)"/><stop offset="100%" stop-color="rgba(247,238,214,0)"/></radialGradient>'
@@ -4928,7 +4994,7 @@ function buildOcclusalTooth(num, sm, isUpper){
   var antX=b.x0, antW=(b.x1-b.x0);
   var leftKey=mesialOnRight?'D':'M', rightKey=mesialOnRight?'M':'D';
   var OS=16; // overshoot (occlusal units) — trimmed back to the crown by the clip-path
-  function reg(key,rx,ry,rw,rh){var tk=sm[key],fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
+  function reg(key,rx,ry,rw,rh){var tk=effectiveSurfaceTreatment(sm,key),fill='#000',op=0;if(tk&&T_FILL[tk]){fill=T_FILL[tk];op=SURFACE_FILL_OPACITY;}if(op===0)return '';return '<rect x="'+rx+'" y="'+ry+'" width="'+rw+'" height="'+rh+'" fill="'+fill+'" fill-opacity="'+op+'" clip-path="url(#cl'+gid+')" pointer-events="none"></rect>';}
   // Anatomy (cusps / grooves / ridges / fossae) is drawn BEFORE the surface
   // tints so a colored surface (e.g. an occlusal filling) sits ON TOP of the
   // anatomy at full SURFACE_FILL_OPACITY — otherwise the pale cusp highlights
@@ -5026,6 +5092,8 @@ function occTipRows(num, sm){
   var cfKey=cf||((wtp==='crown_full')?whole:null)||(isBr?whole:null);
   if(cfKey){ var cft=getTreatment(cfKey); rows+=row(T_FILL[cfKey]||'#fb923c', isBr?'دعامة جسر':'التاج كامل', cft?cft.name:cfKey, badge(cf?'CROWN_FULL':'WHOLE')); }
   if(whole && !isExtractionKey(whole) && !isImplantKey(whole) && !isBr && wtp!=='crown_full'){ var wtt=getTreatment(whole); rows+=row(T_FILL[whole]||'#f5e6c8','السن كاملاً', wtt?wtt.name:whole, badge('WHOLE')); }
+  // Composite restorations (e.g. MOD) — ONE row each, before single surfaces.
+  for(var compO in sm){ if(compO==='__status') continue; if(!isCompositeSurfaceCode(compO)||!sm[compO]) continue; var coTk=sm[compO], coObj=getTreatment(coTk); rows+=row(T_FILL[coTk]||'#888', surfLabelFor(compO, num), coObj?coObj.name:coTk, badge(compO)); }
   var keys = isAnterior(num) ? ['I','L','M','D'] : ['O','B','L','M','D'];
   for(var i=0;i<keys.length;i++){ var k=keys[i], tk=sm[k]; if(tk){ var to=getTreatment(tk); rows+=row(T_FILL[tk]||'#888', surfLabelFor(k, num), to?to.name:tk, badge(k)); } }
   return rows || '<div class="tip-row" style="color:#7a8a9a">سليم — اضغط أي منطقة</div>';
@@ -5273,6 +5341,10 @@ function attachSurfaceClicks() {
 /* ── Tooth Modal ── */
 var currentTooth = null;
 var currentSurface = null;
+/* Selected single crown-surface letters for a composite restoration (e.g. ['M','O','D']).
+   Used only for crown-surface clicks; currentSurface is rebuilt from this as the canonical
+   composite code. Single selection → currentSurface stays a single letter (backward-compatible). */
+var currentSurfaces = [];
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
 var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'referred' / 'condition'
@@ -5411,6 +5483,62 @@ function pickStatus(s) {
   }
 }
 
+/* ── Composite surface chips (multi-select) ──────────────────────────────────
+ * Shown only for crown-surface clicks (not roots / whole / crown_full / regional).
+ * Lets the dentist mark a single restoration spanning multiple surfaces (MOD…). */
+function crownSurfacesForChips(num){
+  // surfacesFor() gives the facial set (I|O, M, D, B, V); add L (recordable from occlusal).
+  var set = surfacesFor(num).concat(['L']);
+  // unique + canonical display order
+  var uniq = [];
+  for (var i=0;i<set.length;i++){ if (uniq.indexOf(set[i])===-1) uniq.push(set[i]); }
+  uniq.sort(function(a,b){ return (SURFACE_ORDER[a]||99)-(SURFACE_ORDER[b]||99); });
+  return uniq;
+}
+
+function renderSurfaceChips(){
+  var wrap = document.getElementById('toothSurfaceChips');
+  var rowEl = document.getElementById('toothSurfaceChipsRow');
+  if (!wrap || !rowEl) return;
+  if (!currentTooth || !currentSurfaces.length){ wrap.style.display = 'none'; rowEl.innerHTML = ''; return; }
+  var chips = crownSurfacesForChips(currentTooth);
+  var html = '';
+  for (var i=0;i<chips.length;i++){
+    var sk = chips[i];
+    var on = currentSurfaces.indexOf(sk) !== -1;
+    html += '<button type="button" onclick="toggleSurfaceChip(\'' + sk + '\')" '
+         + 'style="padding:5px 12px;border-radius:16px;font-family:Cairo,sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid '
+         + (on ? 'var(--green);background:rgba(46,232,158,0.18);color:var(--green);' : 'var(--border);background:transparent;color:var(--text2);')
+         + '">' + (on ? '✓ ' : '') + surfLabelFor(sk, currentTooth) + '</button>';
+  }
+  rowEl.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+function toggleSurfaceChip(surf){
+  var idx = currentSurfaces.indexOf(surf);
+  if (idx === -1) currentSurfaces.push(surf);
+  else {
+    if (currentSurfaces.length <= 1) return;   // keep at least one surface selected
+    currentSurfaces.splice(idx, 1);
+  }
+  currentSurface = buildCompositeCode(currentSurfaces);   // single letter if only one
+  renderSurfaceChips();
+  updateToothModalAreaTitle();
+}
+
+/* Refresh the modal title's area label from the current (possibly composite) surface. */
+function updateToothModalAreaTitle(){
+  var el = document.getElementById('toothModalTitle');
+  if (!el || !currentTooth) return;
+  var areaLbl;
+  if (currentSurface === 'WHOLE') areaLbl = 'السن كاملاً';
+  else if (currentSurface === 'CROWN_FULL') areaLbl = 'التاج كامل';
+  else if (/^R[123]$/.test(currentSurface)) areaLbl = 'الجذر ' + currentSurface.replace('R','');
+  else areaLbl = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
+  el.textContent = 'السن ' + currentTooth + ' — ' + areaLbl;
+}
+
 async function openToothModal(n, surface) {
   await loadTreatmentsFromSupabase();
   // Phase 3 Feature G: 'regional mode' — opened via "+ علاج جماعي" button. No specific tooth.
@@ -5421,6 +5549,8 @@ async function openToothModal(n, surface) {
   if (isRegionalMode) {
     currentTooth = null;
     currentSurface = null;
+    currentSurfaces = [];
+    var _crw = document.getElementById('toothSurfaceChips'); if (_crw) _crw.style.display = 'none';
     document.getElementById('toothModalTitle').textContent = 'علاج جماعي (ربع / فك / فم)';
     var containerR = document.getElementById('toothOptsContainer');
     var htmlR = '';
@@ -5475,6 +5605,31 @@ async function openToothModal(n, surface) {
 
   document.getElementById('toothModalTitle').textContent =
     'السن ' + n + ' — ' + clickedAreaLabel + (st ? ' — ' + (getTreatment(st) ? getTreatment(st).name : st) : ' (سليم)');
+
+  // Composite surface chips: show only for crown-surface clicks (single letter like
+  // O/I/B/L/M/D/V). Roots, WHOLE, CROWN_FULL keep single-surface behavior (no chips).
+  // Seed the selection with the clicked surface; the dentist can add more for a MOD-style
+  // restoration. If the clicked surface already holds a composite code, pre-select its letters.
+  if (!isRootClick && !isWholeClick && currentSurface !== 'CROWN_FULL'
+      && /^[MODBLIV]+$/.test(currentSurface)
+      && !isExtracted(n) && !isImplant(n) && !isBridgeAbut(n)) {
+    // If the clicked region is already part of a stored composite (e.g. clicked M on a
+    // tooth holding 'MOD'), seed the chips from that composite so the dentist edits it
+    // as one restoration instead of starting over on a single surface.
+    var _existComp = null, _smSeed = teethMap[String(n)] || {};
+    for (var _ek in _smSeed) {
+      if (_ek === '__status') continue;
+      if (isCompositeSurfaceCode(_ek) && _smSeed[_ek] && _ek.indexOf(currentSurface) !== -1) { _existComp = _ek; break; }
+    }
+    if (_existComp) { currentSurface = _existComp; currentSurfaces = _existComp.split(''); }
+    else { currentSurfaces = isCompositeSurfaceCode(currentSurface) ? currentSurface.split('') : [currentSurface]; }
+    renderSurfaceChips();
+    updateToothModalAreaTitle();
+  } else {
+    currentSurfaces = [];
+    var _chipWrap = document.getElementById('toothSurfaceChips');
+    if (_chipWrap){ _chipWrap.style.display = 'none'; var _r=document.getElementById('toothSurfaceChipsRow'); if(_r) _r.innerHTML=''; }
+  }
 
   // Phase 8B: detect if there's a planned ledger_session on this exact tooth+surface,
   // and if so show the "أكمل العلاج المخطّط" shortcut banner at the top of Step 1.
@@ -5914,6 +6069,8 @@ function proceedToRegionalStep2(status, label) {
   // Reset tooth-specific state — this is a regional treatment, no tooth
   currentTooth = null;
   currentSurface = null;
+  currentSurfaces = [];
+  var _prw = document.getElementById('toothSurfaceChips'); if (_prw) _prw.style.display = 'none';
 
   // Show the toothModal in Step 2 mode (skip Step 1 treatment list)
   document.getElementById('toothStep1').style.display = 'none';
@@ -6260,6 +6417,33 @@ async function saveToothTreatment() {
         .eq('tooth_num', String(currentTooth));
       if (dAll.error) console.error('clear surfaces before implant error:', dAll.error);
       teethMap[String(currentTooth)] = {};
+    }
+    // Composite restoration (e.g. MOD): it physically occupies all its component
+    // surfaces. Clear any existing crown-surface rows on this tooth whose letters are
+    // a SUBSET of the new composite (single 'M' / 'MO' subsumed by 'MOD'), so they
+    // don't linger underneath. Scoped to composite saves ONLY → single-surface save
+    // behavior is unchanged. (Renders precedence is the safety net for rare overlaps.)
+    if (isCompositeSurfaceCode(currentSurface)) {
+      var _newSet = currentSurface.split('');
+      var _smC = teethMap[String(currentTooth)] || {};
+      var _toDel = [];
+      for (var _ck in _smC) {
+        if (_ck === '__status' || _ck === currentSurface || !_smC[_ck]) continue;
+        if (!/^[MODBLIV]+$/.test(_ck)) continue;  // crown single/composite codes only
+        var _isSub = _ck.split('').every(function(l){ return _newSet.indexOf(l) !== -1; });
+        if (_isSub) _toDel.push(_ck);
+      }
+      for (var _di=0; _di<_toDel.length; _di++) {
+        var _dk = _toDel[_di];
+        var _drc = await window.sb.from('teeth_status').delete()
+          .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+          .eq('tooth_num', String(currentTooth)).eq('surface', _dk);
+        if (_drc.error) console.error('composite overlap clear error (' + _dk + '):', _drc.error);
+        if (teethMap[String(currentTooth)]) {
+          delete teethMap[String(currentTooth)][_dk];
+          if (teethMap[String(currentTooth)].__status) delete teethMap[String(currentTooth)].__status[_dk];
+        }
+      }
     }
     // Normal save — DB constraint now accepts all valid surface values
     var rN = await upsertTeethStatusWithFallback({
