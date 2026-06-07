@@ -1167,6 +1167,28 @@
       return openSwitchModalLegacy();
     }
 
+    // ── Phase X14.1: the owner must ALWAYS be switchable ──
+    // The owner's identity lives in clinic_doctors.is_owner=true, and many
+    // clinics have NO clinic_employees row for the owner. Without this guard a
+    // clinic whose only employee is e.g. a secretary would render only that
+    // secretary and hide the owner entirely — locking the owner out of their
+    // own account. If no owner row is present, synthesize one (sentinel id,
+    // never persisted as an employee_id; switch-in verifies the CLINIC-level
+    // PIN, not a per-employee PIN).
+    var OWNER_SENTINEL_ID = '__owner__';
+    if (!employees.some(function(e){ return e.role === 'owner'; })) {
+      await loadDoctors(); // ensure getOwnerPersonName() can resolve from clinic_doctors
+      employees = employees.concat([{
+        id: OWNER_SENTINEL_ID,
+        name: getOwnerPersonName() || ROLE_LABELS.owner,
+        role: 'owner',
+        doctor_id: null,
+        pin_hash: null,
+        is_active: true,
+        _ownerSynthetic: true
+      }]);
+    }
+
     var curRole = getRole();
     var curDoctorId = getDoctorId();
     var curEmployeeId = getEmployeeId();
@@ -1221,7 +1243,9 @@
       var icon = ROLE_ICONS[emp.role] || '👤';
       var roleLabel = ROLE_LABELS[emp.role] || emp.role;
       var hasPinForThisEmployee = !!emp.pin_hash;
-      var pinWarn = (!hasPinForThisEmployee)
+      // Owner switch-in verifies the CLINIC-level PIN, not a per-row pin_hash,
+      // so the "بدون PIN" warning is meaningless (and misleading) for owners.
+      var pinWarn = (!hasPinForThisEmployee && emp.role !== 'owner')
         ? '<span style="color:var(--yellow,#f5c842);font-size:11px;margin-right:6px;">⚠ بدون PIN</span>'
         : '';
       // Owner row: the 👑 crown already signals ownership — omit the
@@ -1309,7 +1333,13 @@
       // - Anything else → PIN required (which means PIN of the TARGET employee)
       // - If lock not configured (no PINs anywhere) → free
       var sameEmp = isCurrent(target);
-      var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
+      var targetIsOwner = (target.role === 'owner');
+      // Owner switch-in is gated by the CLINIC-level PIN (clinic_settings
+      // .lock_pin_hash via verifyPin) — the owner has no per-employee pin_hash.
+      // Non-owner targets use their own employee PIN.
+      var lockConfigured = targetIsOwner
+        ? hasPinSet
+        : (hasPinSet || employees.some(function(e){ return !!e.pin_hash; }));
 
       var needPin;
       if (sameEmp) {
@@ -1322,8 +1352,10 @@
         needPin = true;
       }
 
-      // Edge case: target has NO pin_hash set yet → can't verify
-      if (needPin && !target.pin_hash) {
+      // Edge case: a NON-owner target with no pin_hash can't be verified.
+      // Owner targets verify the clinic-level PIN, so a null per-row pin_hash
+      // is NOT a blocker for them.
+      if (needPin && !targetIsOwner && !target.pin_hash) {
         msg.textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد. اطلب من المالك إعداده.';
         msg.className = 'sd-msg';
         pinRow.style.display = 'none';
@@ -1395,8 +1427,11 @@
           return;
         }
 
-        // PIN logic same as updateActive
-        var lockConfigured = hasPinSet || employees.some(function(e){ return !!e.pin_hash; });
+        // PIN logic same as updateActive (owner gated by clinic-level PIN)
+        var targetIsOwner = (target.role === 'owner');
+        var lockConfigured = targetIsOwner
+          ? hasPinSet
+          : (hasPinSet || employees.some(function(e){ return !!e.pin_hash; }));
         var needPin = false;
         if (!lockConfigured) {
           needPin = false;
@@ -1407,12 +1442,13 @@
         }
 
         if (needPin) {
-          if (!target.pin_hash) {
+          if (!targetIsOwner && !target.pin_hash) {
             ov.querySelector('#sdMsg').textContent = '⚠ هذا الموظف لم يضبط رقم سر بعد.';
             return;
           }
           var pin = (ov.querySelector('#sdPinInput').value || '').trim();
-          var ver = await verifyEmployeePin(target, pin);
+          // Owner → clinic-level PIN (verifyPin); others → per-employee PIN.
+          var ver = targetIsOwner ? await verifyPin(pin) : await verifyEmployeePin(target, pin);
           if (!ver.ok) {
             var pm = ov.querySelector('#sdPinMsg');
             if (ver.reason === 'cooldown') {
@@ -1428,17 +1464,20 @@
           }
         }
 
-        // Apply: role + doctor_id derived from the employee
+        // Apply: role + doctor_id derived from the employee. The synthetic
+        // owner carries a sentinel id that must NEVER be stored as an
+        // employee_id — pass null so switching to owner clears it.
         var newDoctorId = (target.role === 'doctor') ? (target.doctor_id || null) : null;
-        applyRole(target.role, newDoctorId, target.id);
+        var newEmpId = target._ownerSynthetic ? null : target.id;
+        applyRole(target.role, newDoctorId, newEmpId);
 
         // Log to audit before reload (best effort, fire-and-forget)
         try {
           await logAudit('lock.role_switch', {
-            entityId: target.id,
+            entityId: target._ownerSynthetic ? null : target.id,
             description: 'تبديل إلى الموظف: ' + target.name + ' (' + (ROLE_LABELS[target.role] || target.role) + ')',
             oldValue: { role: curRole, doctor_id: curDoctorId, employee_id: curEmployeeId },
-            newValue: { role: target.role, doctor_id: newDoctorId, employee_id: target.id }
+            newValue: { role: target.role, doctor_id: newDoctorId, employee_id: newEmpId }
           });
         } catch (e) { /* ignore */ }
 
