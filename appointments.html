@@ -17,7 +17,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607r"></script>
+<script src="theme.js?v=20260607s"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -920,11 +920,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607r">
+<link rel="stylesheet" href="theme.css?v=20260607s">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607r"></script>
-<script src="sidebar.js?v=20260607r"></script>
-<script src="timepicker.js?v=20260607r"></script>
+<script src="supabase-init.js?v=20260607s"></script>
+<script src="sidebar.js?v=20260607s"></script>
+<script src="timepicker.js?v=20260607s"></script>
 </head>
 <body>
 <script>
@@ -4355,14 +4355,24 @@ function isApptConfirmed(a) {
 
 function renderCalls() {
   document.getElementById('calMonth').textContent = MONTHS_AR[currentDate.getMonth()]+' '+currentDate.getFullYear();
-  var todayS = dateStr(new Date());
-  var tmrwD = new Date(); tmrwD.setHours(0,0,0,0); tmrwD.setTime(tmrwD.getTime() + 86400000);
-  var tmrwS = dateStr(tmrwD);
+  // نافذة الاتصالات مرتبطة بإعداد التذكير: نطابق سقف الـbadge بالضبط
+  // (whatsapp_reminder_hours_before + 24) — فكل موعد عليه badge "أرسل تذكير"
+  // يظهر هنا أيضاً، صفر تناقض. المواعيد القادمة فقط. افتراضي 24 لو الإعداد غائب.
+  var cfgHours = (CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminder_hours_before) || 24;
+  var windowH = cfgHours + 24;
+  var nowMs = Date.now();
+  function _apptDiffH(a) {
+    var timeStr = (a.time && /^\d{2}:\d{2}/.test(a.time)) ? a.time.slice(0,5) : '12:00';
+    var d = new Date(a.date + 'T' + timeStr + ':00');
+    if (isNaN(d.getTime())) return null;
+    return (d.getTime() - nowMs) / 36e5;
+  }
 
   var rows = appointments
     .filter(function(a){
-      return a && a.date && !isPlannedAppt(a) && !isFinishedStatus(a.status)
-        && (a.date === todayS || a.date === tmrwS);
+      if (!a || !a.date || isPlannedAppt(a) || isFinishedStatus(a.status)) return false;
+      var diff = _apptDiffH(a);
+      return diff !== null && diff >= 0 && diff <= windowH;
     })
     .sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); });
 
@@ -4370,7 +4380,7 @@ function renderCalls() {
     document.getElementById('callsContent').innerHTML =
       '<div style="text-align:center;padding:60px 20px;color:var(--text2)">'
       + '<div style="font-size:48px;margin-bottom:12px">📞</div>'
-      + '<div style="font-size:16px;color:var(--text)">لا مواعيد لليوم أو الغد بحاجة لاتصال</div>'
+      + '<div style="font-size:16px;color:var(--text)">لا مواعيد ضمن نافذة التذكير بحاجة لاتصال</div>'
       + '</div>';
     return;
   }
@@ -4381,15 +4391,22 @@ function renderCalls() {
     + '📞 قائمة الاتصالات — ' + (needCount > 0
         ? ('<b style="color:var(--text)">' + needCount + '</b> موعد بحاجة تأكيد')
         : 'كل المواعيد مؤكّدة ✅')
+    + ' <span style="opacity:0.7;">· خلال ' + Math.round(windowH) + ' ساعة</span>'
     + '</div>';
 
-  [{ key: todayS, label: 'اليوم' }, { key: tmrwS, label: 'غداً' }].forEach(function(g){
-    var evts = rows.filter(function(a){ return a.date === g.key; });
-    if (!evts.length) return;
-    var d = new Date(g.key);
+  // تجميع ديناميكي حسب اليوم — اليوم/غداً/بعد غد ثم التاريخ لباقي الأيام.
+  var todayMid = new Date(); todayMid.setHours(0,0,0,0);
+  var byDate = {};
+  rows.forEach(function(a){ (byDate[a.date] = byDate[a.date] || []).push(a); });
+
+  Object.keys(byDate).sort().forEach(function(ds){
+    var evts = byDate[ds];
+    var d = new Date(ds + 'T00:00:00');
     var dn = DAYS_AR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_AR[d.getMonth()];
+    var diffDays = Math.round((d.getTime() - todayMid.getTime()) / 86400000);
+    var lbl = (diffDays === 0) ? 'اليوم' : (diffDays === 1) ? 'غداً' : (diffDays === 2) ? 'بعد غد' : '';
     html += '<div class="list-group"><div class="list-date-header">' + dn
-      + ' <span class="date-badge">' + g.label + '</span></div>';
+      + (lbl ? ' <span class="date-badge">' + lbl + '</span>' : '') + '</div>';
     evts.forEach(function(e){
       var confirmed = isApptConfirmed(e);
       var phone = (typeof resolvePatientPhoneForAppt === 'function') ? resolvePatientPhoneForAppt(e) : null;
