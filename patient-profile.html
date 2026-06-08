@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260607u"></script>
+<script src="theme.js?v=20260607v"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260607u"></script>
-<script src="sidebar.js?v=20260607u"></script>
-<script src="timepicker.js?v=20260607u"></script>
+<script src="supabase-init.js?v=20260607v"></script>
+<script src="sidebar.js?v=20260607v"></script>
+<script src="timepicker.js?v=20260607v"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -292,6 +292,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
 /* Treatment status badges on chart */
 .tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);pointer-events:none;}
+.tooth-photo-badge{position:absolute;top:-7px;left:-7px;height:19px;padding:0 5px;border-radius:10px;background:var(--green);color:#04130d;border:2px solid var(--bg);z-index:6;box-shadow:0 0 0 1px rgba(0,0,0,0.25);font-size:10px;font-weight:800;display:flex;align-items:center;gap:1px;cursor:pointer;line-height:1;white-space:nowrap;font-family:'Cairo',sans-serif;}
+.tooth-photo-badge:hover{filter:brightness(1.12);}
 .status-planned{background:#ef4444;}
 .status-completed{background:#3b82f6;}
 .status-existing_current{background:#10b981;opacity:.85;}  /* EC — done in our clinic */
@@ -671,7 +673,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260607u">
+<link rel="stylesheet" href="theme.css?v=20260607v">
 </head>
 <body>
 <script>
@@ -3200,6 +3202,22 @@ async function loadAll() {
     teethMap[n].__status[s] = t.status || 'completed';
   });
 
+  // Phase B: per-tooth photo counts for the chart badges. Seeds _toothPhotoCounts
+  // before the first renderTeeth() (the Files tab loads lazily, so we can't rely on
+  // _pfFiles here). Graceful: empty map if the tooth_num column is missing (pre-M55).
+  _toothPhotoCounts = {};
+  try {
+    var pcRes = await window.sb.from('patient_documents').select('tooth_num')
+      .eq('patient_id', patientId)
+      .not('tooth_num', 'is', null);
+    if (!pcRes.error && pcRes.data) {
+      pcRes.data.forEach(function(r){
+        var tn = (r.tooth_num != null && r.tooth_num !== '') ? String(r.tooth_num) : '';
+        if (tn) _toothPhotoCounts[tn] = (_toothPhotoCounts[tn] || 0) + 1;
+      });
+    }
+  } catch(e) { /* tooth_num column missing pre-Migration-55 → leave empty */ }
+
   // lab orders (defensive: fail silently if table missing or RLS blocks)
   try {
     const { data: lo, error: loErr } = await window.sb.from('lab_orders').select('*')
@@ -5521,6 +5539,7 @@ function renderTeeth() {
   renderOcclusal();
   attachSurfaceClicks();
   addStatusBadges();
+  addPhotoBadges();   // P2 Phase B: photo-count badges, after status badges so both coexist
   if (typeof renderOrthoOverlay === 'function') renderOrthoOverlay();
 }
 
@@ -9902,6 +9921,7 @@ var _pfFiles = [];          // current patient's document rows
 var _pfUrls  = {};          // storage_path -> short-lived signed URL
 var _pfLoadInFlight = false;
 var _pfToothFilter = '';    // P2: active tooth filter in the gallery ('' = all)
+var _toothPhotoCounts = {}; // P2 Phase B: { tooth_num: photo_count } for chart badges
 
 // ── P2: tooth linkage for files (Migration 55) ──────────────
 // Build FDI tooth <option>s: permanent (18-11/21-28/48-41/31-38) + primary
@@ -9928,6 +9948,31 @@ function pfApplyToothFilter(v){
   renderPatientFiles();
 }
 
+// P2 Phase B: small clickable photo-count badge on teeth that have linked images.
+// Positioned top-left (status badge sits top-right) so the two never collide.
+// Clicking it opens the Files tab filtered to that tooth.
+function addPhotoBadges(){
+  // Clear existing photo badges first (counts may have changed, or no re-render happened).
+  document.querySelectorAll('.tooth-photo-badge').forEach(function(b){ b.remove(); });
+  if (!_toothPhotoCounts) return;
+  Object.keys(_toothPhotoCounts).forEach(function(num){
+    var n = _toothPhotoCounts[num];
+    if (!n) return;
+    var cell = document.querySelector('.tooth-cell[data-tooth-cell="' + num + '"]');
+    if (!cell) return;
+    var badge = document.createElement('div');
+    badge.className = 'tooth-photo-badge';
+    badge.textContent = '📷' + n;
+    badge.title = '📷 ' + n + ' صورة — اضغط للعرض';
+    badge.addEventListener('click', function(ev){
+      ev.stopPropagation();   // don't open the tooth treatment modal
+      _pfToothFilter = String(num);
+      switchTabByName('files');
+    });
+    cell.appendChild(badge);
+  });
+}
+
 async function loadPatientFiles(){
   if (!window.SyDentFiles || !patientId) return;
   pfPopulateToothSelect();
@@ -9939,6 +9984,14 @@ async function loadPatientFiles(){
   _pfLoadInFlight = true;
   try {
     _pfFiles = await window.SyDentFiles.list(patientId);
+    // Phase B: keep the chart's per-tooth photo counts in sync after upload/delete
+    // (both paths call loadPatientFiles), then re-badge the chart live.
+    _toothPhotoCounts = {};
+    _pfFiles.forEach(function(f){
+      var tn = (f.tooth_num != null && f.tooth_num !== '') ? String(f.tooth_num) : '';
+      if (tn) _toothPhotoCounts[tn] = (_toothPhotoCounts[tn] || 0) + 1;
+    });
+    if (typeof addPhotoBadges === 'function') addPhotoBadges();
     var imgPaths = _pfFiles.filter(function(f){ return window.SyDentFiles.isImage(f.mime_type); })
                            .map(function(f){ return f.storage_path; });
     _pfUrls = imgPaths.length ? await window.SyDentFiles.signedUrls(imgPaths, 3600) : {};
