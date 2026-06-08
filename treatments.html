@@ -236,7 +236,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn btn-outline" onclick="printLegend()" title="طباعة دليل العلاجات والألوان">🖨️ طباعة الدليل</button>
-    <button class="btn btn-outline" onclick="addFromTemplates()">➕ قوالب جاهزة</button>
     <button class="btn btn-outline" onclick="resetToDefaults()">↺ استعادة الافتراضي</button>
     <button class="btn btn-primary" onclick="openAddModal()">＋ علاج جديد</button>
   </div>
@@ -1009,9 +1008,9 @@ async function deleteTreatment(id) {
 
 
 /* ═══════════════ Ready-made templates: ortho + periodontics + pediatric ═══════════════
-   Shared by resetToDefaults (full reset) and addFromTemplates (additive — adds only
-   what's missing, never deletes/edits existing treatments). Prices are 0 by design:
-   the clinic sets its own pricing (Syrian market, manual). */
+   Appended to DEFAULTS by resetToDefaults, which additively restores any default or
+   template treatment the clinic is missing (never deletes/edits existing rows).
+   Prices are 0 by design: the clinic sets its own pricing (Syrian market, manual). */
 const EXTRA_TEMPLATES = [
   // ── Orthodontics (⚓) — regional (per-arch); brackets render on the chart ──
   { treatment_key:'ortho-fixed',     name:'تقويم ثابت',   label:'⚓', fill:'#14b8a6', stroke:'#0d8276', price:0, builtin:false, needs_lab:false, target_part:'arch',     category:'orthodontics', sort_order:20 },
@@ -1029,22 +1028,9 @@ const EXTRA_TEMPLATES = [
   { treatment_key:'pedo-fluoride',   name:'فلوريد موضعي', label:'ف', fill:'#fae8ff', stroke:'#e879f9', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'pediatric', sort_order:30 }
 ];
 
-/* Additive: add only the template treatments the clinic doesn't already have
-   (matched by treatment_key OR name). Never deletes or edits existing rows. */
-async function addFromTemplates() {
-  if (!confirm('إضافة قوالب التقويم + اللثوي + الأطفال الجاهزة؟\nتُضاف الجديدة فقط — لن يُحذف أو يُعدّل أي علاج موجود.')) return;
-  var haveKey = {}, haveName = {};
-  for (var i = 0; i < treatments.length; i++) { haveKey[treatments[i].treatment_key] = 1; haveName[treatments[i].name] = 1; }
-  var toAdd = EXTRA_TEMPLATES.filter(function(t){ return !haveKey[t.treatment_key] && !haveName[t.name]; });
-  if (!toAdd.length) { showToast('✅ كل القوالب مضافة مسبقاً'); return; }
-  var rows = toAdd.map(function(d){ return Object.assign({ doctor_id: currentDoctor.id }, d); });
-  const { error } = await window.sb.from('treatments').insert(rows);
-  if (error) { showToast('⚠️ ' + error.message); return; }
-  await loadTreatments();
-  showToast('➕ أُضيف ' + toAdd.length + ' علاجاً من القوالب');
-}
+/* resetToDefaults (below) additively restores the default + template treatments. */
 async function resetToDefaults() {
-  if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
+  if (!confirm('استعادة كل العلاجات الافتراضية والجاهزة الناقصة؟\nتُضاف الناقصة فقط — لن يُحذف أو يُعدّل أي علاج موجود (بما فيها المخصصة).')) return;
   const DEFAULTS = [
     { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
     { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
@@ -1057,19 +1043,19 @@ async function resetToDefaults() {
     { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:8 },
     { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:9 }
   ];
-  // delete all current — abort if it fails so we don't insert defaults on top of leftovers
-  var delRes = await window.sb.from('treatments').delete().eq('doctor_id', currentDoctor.id);
-  if (delRes.error) {
-    console.warn('reset: delete old treatments failed:', delRes.error);
-    showToast('⚠️ تعذّر حذف العلاجات القديمة: ' + delRes.error.message);
-    return;
-  }
-  // insert defaults
-  const rows = DEFAULTS.concat(EXTRA_TEMPLATES).map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
+  // Additive: add only the default + template treatments the clinic is missing
+  // (matched by treatment_key OR name). NEVER deletes or edits anything — custom
+  // treatments (and any edits the dentist made to defaults) are fully preserved.
+  var _all = DEFAULTS.concat(EXTRA_TEMPLATES);
+  var _haveKey = {}, _haveName = {};
+  for (var _i = 0; _i < treatments.length; _i++) { _haveKey[treatments[_i].treatment_key] = 1; _haveName[treatments[_i].name] = 1; }
+  var _toAdd = _all.filter(function(t){ return !_haveKey[t.treatment_key] && !_haveName[t.name]; });
+  if (!_toAdd.length) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
+  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
   const { error } = await window.sb.from('treatments').insert(rows);
   if (error) { showToast('⚠️ ' + error.message); return; }
   await loadTreatments();
-  showToast('↺ تم استعادة الافتراضي');
+  showToast('↺ أُضيف ' + _toAdd.length + ' علاجاً');
 }
 
 // Phase post-X10 B1 fix: module-level in-flight flag prevents double-
