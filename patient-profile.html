@@ -280,6 +280,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;}
 .btn-save-m:hover{background:#26d48e;}
 .tooth-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.tx-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+.tx-tabs:empty{display:none;border:none;padding:0;margin:0;}
+.tx-tab{font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .12s;}
+.tx-tab:hover{border-color:var(--green);color:var(--text);}
+.tx-tab-active{background:var(--green);color:#0a1628;border-color:var(--green);}
 .status-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
 .status-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:9px;transition:all .15s;text-align:right;}
 .status-opt:hover{background:rgba(46,232,158,.08);border-color:var(--green);}
@@ -1148,6 +1153,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <span>اختر نوع العلاج:</span>
           <a href="treatments.html" data-role-block="doctor secretary" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
         </div>
+        <div class="tx-tabs" id="txTabs"></div>
         <div class="tooth-opts" id="toothOptsContainer"></div>
       </div>
       <!-- Step 2: enter cost -->
@@ -1187,6 +1193,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="form-group">
           <label>التاريخ</label>
           <input type="date" id="toothDate">
+        </div>
+        <div class="form-group" id="toothOrthoBox" style="display:none;">
+          <label>المدة المتوقعة للتقويم (أشهر)</label>
+          <input type="number" id="toothOrthoMonths" placeholder="مثال: 18" min="1" max="60" inputmode="numeric">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px;">تاريخ البدء = التاريخ أعلاه.</div>
         </div>
         <div class="form-group">
           <label>ملاحظات (اختياري)</label>
@@ -3602,13 +3613,13 @@ function orthoNameForArch(isUpper){ var t = orthoForArch(isUpper); return t ? t.
 /* Slim active-ortho banner above the chart. Called at the end of renderTeeth. */
 function renderOrthoOverlay(){
   var bar = document.getElementById('orthoBanner'); if (!bar) return;
-  var u = orthoNameForArch(true),  uc = orthoColorForArch(true);
-  var l = orthoNameForArch(false), lc = orthoColorForArch(false);
+  var u = orthoNameForArch(true),  uc = orthoColorForArch(true),  um = orthoMonthsForArch(true);
+  var l = orthoNameForArch(false), lc = orthoColorForArch(false), lm = orthoMonthsForArch(false);
   function esc(x){ return (typeof escapeHtml === 'function') ? escapeHtml(x) : x; }
-  function chip(nm,col,area){ return '<span class="ortho-chip" style="color:'+col+';background:'+col+'1a;border-color:'+col+'55;">😬 '+esc(nm)+' · '+area+'</span>'; }
+  function chip(nm,col,area,mo){ return '<span class="ortho-chip" style="color:'+col+';background:'+col+'1a;border-color:'+col+'55;">😬 '+esc(nm)+' · '+area+(mo?' · '+mo+' شهر':'')+'</span>'; }
   var items = [];
-  if (u && l && u === l) items.push(chip(u, uc, 'الفكان'));
-  else { if (u) items.push(chip(u, uc, 'الفك العلوي')); if (l) items.push(chip(l, lc, 'الفك السفلي')); }
+  if (u && l && u === l) items.push(chip(u, uc, 'الفكان', um||lm));
+  else { if (u) items.push(chip(u, uc, 'الفك العلوي', um)); if (l) items.push(chip(l, lc, 'الفك السفلي', lm)); }
   bar.innerHTML = items.join('');
   bar.style.display = items.length ? 'flex' : 'none';
 }
@@ -5776,8 +5787,62 @@ function updateToothModalAreaTitle(){
   el.textContent = 'السن ' + currentTooth + ' — ' + areaLbl;
 }
 
+
+/* ═══════════════ Tooth-modal palette: category tabs + favorites ═══════════════
+   The palette grid (#toothOptsContainer) is unchanged; a tab bar (#txTabs, above
+   it) filters by category. '⭐ شائعة' is usage-ranked (localStorage), falling back
+   to ALL allowed treatments until usage exists — so the default view matches the
+   old flat list exactly. The context action button (remove implant/bridge, undo
+   extraction, mark sound) appears in every tab. */
+var _txAllowed = [], _txSpecialHtml = '', _txTab = 'fav';
+var TX_CAT_META = { diagnostic:'🔍 تشخيصي', preventive:'🛡️ وقائي', restorative:'🦷 ترميمي', endodontics:'🌱 لب وجذر', surgical:'🔪 جراحي', prosthodontics:'🔗 تعويضي', implantology:'🔩 زراعة', cosmetic:'✨ تجميلي', prosth_cosmetic:'💎 تعويض تجميلي', orthodontics:'⚓ تقويم', periodontics:'🌿 لثوي', pediatric:'🧒 أطفال', other:'📋 أخرى' };
+var TX_CAT_ORDER = ['diagnostic','preventive','restorative','endodontics','surgical','prosthodontics','implantology','cosmetic','prosth_cosmetic','orthodontics','periodontics','pediatric','other'];
+function txUsage(){ try { return JSON.parse(localStorage.getItem('sydent_tx_usage') || '{}'); } catch(e){ return {}; } }
+function bumpTxUsage(key){ try { var u = txUsage(); u[key] = (u[key]||0) + 1; localStorage.setItem('sydent_tx_usage', JSON.stringify(u)); } catch(e){} }
+function txFavorites(){
+  var u = txUsage(), scored = _txAllowed.filter(function(t){ return (u[t.id]||0) > 0; });
+  if (!scored.length) return _txAllowed.slice();   // no usage yet → show all (familiar default)
+  scored.sort(function(a,b){ return (u[b.id]||0) - (u[a.id]||0); });
+  return scored.slice(0, 8);
+}
+function txButtonHtml(t){
+  var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
+  var laymanLine = (t.layman_name && String(t.layman_name).trim())
+    ? '<div style="font-size:11px;color:#7dd3fc;margin-top:2px;font-weight:500;">👤 ' + escapeHtml(t.layman_name.trim()) + '</div>' : '';
+  return '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
+       + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
+       + '<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:20px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
+       + '<span>' + escapeHtml(t.name) + '</span>' + laymanLine + '</button>';
+}
+function txFirstPresentCat(present){ for (var c=0;c<TX_CAT_ORDER.length;c++){ if (present[TX_CAT_ORDER[c]]) return TX_CAT_ORDER[c]; } return 'other'; }
+function txTabBtn(cat, label){ return '<button type="button" class="tx-tab' + (_txTab===cat?' tx-tab-active':'') + '" data-txtab="' + cat + '" onclick="switchTxTab(\'' + cat + '\')">' + label + '</button>'; }
+function renderTxPalette(){
+  var c = document.getElementById('toothOptsContainer'); if (!c) return;
+  var list = (_txTab === 'fav') ? txFavorites() : _txAllowed.filter(function(t){ return (t.category||'other') === _txTab; });
+  var html = ''; for (var i=0;i<list.length;i++) html += txButtonHtml(list[i]);
+  c.innerHTML = html + _txSpecialHtml;
+}
+function switchTxTab(cat){
+  _txTab = cat;
+  var tabs = document.querySelectorAll('#txTabs .tx-tab');
+  for (var i=0;i<tabs.length;i++) tabs[i].classList.toggle('tx-tab-active', tabs[i].getAttribute('data-txtab') === cat);
+  renderTxPalette();
+}
+function renderTxTabs(){
+  var tabsEl = document.getElementById('txTabs'); if (!tabsEl) return;
+  var present = {}; for (var i=0;i<_txAllowed.length;i++) present[_txAllowed[i].category||'other'] = 1;
+  var favs = txFavorites();
+  if (_txTab === 'fav') { if (!favs.length) _txTab = txFirstPresentCat(present); }
+  else if (!present[_txTab]) { _txTab = favs.length ? 'fav' : txFirstPresentCat(present); }
+  var html = '';
+  if (favs.length) html += txTabBtn('fav', '⭐ شائعة');
+  for (var c=0;c<TX_CAT_ORDER.length;c++){ var cat = TX_CAT_ORDER[c]; if (present[cat]) html += txTabBtn(cat, TX_CAT_META[cat] || TX_CAT_META.other); }
+  tabsEl.innerHTML = html;
+  renderTxPalette();
+}
 async function openToothModal(n, surface) {
   await loadTreatmentsFromSupabase();
+  var _ttClear = document.getElementById('txTabs'); if (_ttClear) _ttClear.innerHTML = '';   // reset tabs (regional path leaves it empty → collapses)
   // Phase 3 Feature G: 'regional mode' — opened via "+ علاج جماعي" button. No specific tooth.
   // In this mode we filter the treatment list to ONLY regional treatments.
   // Authoritative signal is `n === null` (the call-site contract). The window flag is
@@ -5943,47 +6008,30 @@ async function openToothModal(n, surface) {
   }
 
   var container = document.getElementById('toothOptsContainer');
-  var html = '';
-  var matched = 0;
-  for (var i=0; i<TREATMENTS.length; i++) {
-    var t = TREATMENTS[i];
-    if (!isAllowed(t)) continue;
-    matched++;
-    var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
-    // Phase 3 Feature D: show the layman (patient-facing) name as a subtle
-    // subtitle when present. The clinician sees both — technical for clinical
-    // accuracy, patient-friendly for "what would I say to the patient if they
-    // ask what this is". Matches the styling used in treatments.html legend.
-    var laymanLine = (t.layman_name && String(t.layman_name).trim())
-      ? '<div style="font-size:11px;color:#7dd3fc;margin-top:2px;font-weight:500;">👤 ' + escapeHtml(t.layman_name.trim()) + '</div>'
-      : '';
-    html += '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
-         + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
-         + '<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:20px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
-         + '<span>' + escapeHtml(t.name) + '</span>'
-         + laymanLine
-         + '</button>';
-  }
 
-  if (matched === 0) {
+  // Build the allowed treatment list (smart routing handles the surface at save time)
+  var _allowed = [];
+  for (var i=0; i<TREATMENTS.length; i++) { if (isAllowed(TREATMENTS[i])) _allowed.push(TREATMENTS[i]); }
+
+  // Context special action (shown below the palette, in every tab)
+  var _special;
+  if (isAlreadyImplant)        _special = '<button class="topt" style="border-color:#a78bfa;color:#a78bfa;font-weight:700;" onclick="removeImplant(' + n + ')">🔩 إزالة الزراعة</button>';
+  else if (isPartOfBridge)     _special = '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
+  else if (isAlreadyExtracted) _special = '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
+  else                         _special = '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+
+  if (_allowed.length === 0) {
     // Phase 4: only show "add treatment" link to Owner (others would hit blocked page)
     var addLink = '';
     if (!window.SyDentLock || window.SyDentLock.isOwner()) {
       addLink = '<br><a href="treatments.html" style="color:var(--green);text-decoration:none;font-weight:700;">⚙️ أضف علاجاً جديداً</a>';
     }
-    html = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.' + addLink + '</div>' + html;
-  }
-
-  if (isAlreadyImplant) {
-    html += '<button class="topt" style="border-color:#a78bfa;color:#a78bfa;font-weight:700;" onclick="removeImplant(' + n + ')">🔩 إزالة الزراعة</button>';
-  } else if (isPartOfBridge) {
-    html += '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
-  } else if (isAlreadyExtracted) {
-    html += '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.' + addLink + '</div>' + _special;
   } else {
-    html += '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+    // Categorized palette: tab bar (⭐شائعة + present categories) sits above the grid.
+    _txAllowed = _allowed; _txSpecialHtml = _special; _txTab = 'fav';
+    renderTxTabs();
   }
-  container.innerHTML = html;
   document.getElementById('toothStep1').style.display = 'block';
   document.getElementById('toothStep2').style.display = 'none';
   document.getElementById('toothFoot').style.display  = 'none';
@@ -6290,6 +6338,29 @@ function openRegionalAreaPicker(status, label, treatPart, autoQuadrant, autoArch
 }
 
 // User confirmed the area selection — proceed to Step 2 with the selected value.
+
+/* ═══════════════ Orthodontics session fields (start date + duration months) ═══════════════ */
+function syncOrthoField(){
+  var box = document.getElementById('toothOrthoBox'); if (!box) return;
+  var tr = (typeof getTreatment === 'function') ? getTreatment(pendingToothStatus) : null;
+  var isOrtho = !!(tr && (tr.category || '') === 'orthodontics');
+  box.style.display = isOrtho ? 'block' : 'none';
+  if (!isOrtho) { var mi = document.getElementById('toothOrthoMonths'); if (mi) mi.value = ''; }
+}
+/* Expected-duration (months) of the active ortho session for an arch — shown in the banner. */
+function orthoMonthsForArch(isUpper){
+  if (typeof sessions === 'undefined' || !sessions || !sessions.length) return null;
+  var names = orthoTreatmentNames(), side = isUpper ? 'U' : 'L';
+  for (var i=0;i<sessions.length;i++){
+    var s = sessions[i];
+    if (s.tooth_num) continue;
+    if (s.status && s.status !== 'completed' && s.status !== 'planned') continue;
+    if (!names[s.type]) continue;
+    var covers = (!s.quadrant && !s.arch) ? true : s.arch ? (s.arch===side) : s.quadrant ? (String(s.quadrant).charAt(0)===side) : false;
+    if (covers) return s.ortho_months || null;
+  }
+  return null;
+}
 function confirmRegionalAreaPick() {
   var sel = document.getElementById('regionalAreaSelect');
   if (!sel || !sel.value) return;
@@ -6313,6 +6384,7 @@ function proceedToRegionalStep2(status, label) {
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
+  syncOrthoField();   // ortho regional treatments → reveal the duration field
 
   // Title reflects the regional scope
   var areaText;
@@ -6370,6 +6442,7 @@ function openRegionalTreatmentPicker() {
 function pickToothTreatment(status, label) {
   pendingToothStatus = status;
   pendingToothLabel  = label;
+  if (typeof bumpTxUsage === 'function') bumpTxUsage(status);   // usage ranking for the ⭐شائعة tab
   // Smart routing: pick the right surface based on the treatment's target_part,
   // not where the user clicked. This way the list can stay unified.
   var tr = getTreatment(status);
@@ -6428,6 +6501,7 @@ function pickToothTreatment(status, label) {
   document.getElementById('toothStep1').style.display = 'none';
   document.getElementById('toothStep2').style.display = 'block';
   document.getElementById('toothFoot').style.display  = 'flex';
+  syncOrthoField();   // tooth treatments aren't ortho → keep the field hidden (resets stale state)
   // Build a label that reflects the area type (surface / root / whole)
   var areaLabel;
   if (tr && tr.target_part === 'bridge') areaLabel = 'جسر (يشمل السن قبل وبعد)';
@@ -6521,6 +6595,14 @@ async function saveToothTreatment() {
       if (pendingRegionalType === 'quadrant') regPayload.quadrant = pendingRegionalQuadrant;
       else if (pendingRegionalType === 'arch') regPayload.arch = pendingRegionalArch;
       // For 'mouth' both quadrant and arch stay null — the type itself signals scope.
+      // Orthodontics: persist start date (= the session date) + expected duration (months).
+      var _trOrtho = getTreatment(pendingToothStatus);
+      if (_trOrtho && (_trOrtho.category || '') === 'orthodontics') {
+        regPayload.ortho_start = date;
+        var _omEl = document.getElementById('toothOrthoMonths');
+        var _om = _omEl ? parseInt(_omEl.value, 10) : NaN;
+        if (_om > 0) regPayload.ortho_months = _om;
+      }
 
       var rReg = await window.sb.from('ledger_sessions').insert(regPayload).select().single();
       if (rReg.error) {
