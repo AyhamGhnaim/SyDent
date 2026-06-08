@@ -236,6 +236,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     <button class="btn btn-outline" onclick="printLegend()" title="طباعة دليل العلاجات والألوان">🖨️ طباعة الدليل</button>
+    <button class="btn btn-outline" onclick="addFromTemplates()">➕ قوالب جاهزة</button>
     <button class="btn btn-outline" onclick="resetToDefaults()">↺ استعادة الافتراضي</button>
     <button class="btn btn-primary" onclick="openAddModal()">＋ علاج جديد</button>
   </div>
@@ -262,6 +263,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <option value="cosmetic">✨ تجميلي</option>
         <option value="prosth_cosmetic">💎 تعويض تجميلي</option>
         <option value="orthodontics">⚓ تقويم</option>
+        <option value="periodontics">🌿 لثوي</option>
+        <option value="pediatric">🧒 أطفال</option>
         <option value="other">📋 أخرى</option>
       </select>
     </div>
@@ -347,6 +350,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <option value="cosmetic">✨ تجميلي (تبييض)</option>
           <option value="prosth_cosmetic">💎 تعويض تجميلي (فينير، زركون)</option>
           <option value="orthodontics">⚓ تقويم</option>
+          <option value="periodontics">🌿 لثوي (تقليح، معالجة لثة)</option>
+          <option value="pediatric">🧒 أطفال (لبني، حافظ مسافة)</option>
           <option value="other">📋 أخرى</option>
         </select>
       </div>
@@ -676,6 +681,8 @@ function render() {
       'cosmetic':        '✨ تجميلي',
       'prosth_cosmetic': '💎 تعويض تجميلي',
       'orthodontics':    '⚓ تقويم',
+      'periodontics':    '🌿 لثوي',
+      'pediatric':       '🧒 أطفال',
       'other':           '📋 أخرى'
     };
     var tp = targetMap[t.target_part] || targetMap.crown;
@@ -1000,6 +1007,42 @@ async function deleteTreatment(id) {
   showToast('🗑️ تم الحذف');
 }
 
+
+/* ═══════════════ Ready-made templates: ortho + periodontics + pediatric ═══════════════
+   Shared by resetToDefaults (full reset) and addFromTemplates (additive — adds only
+   what's missing, never deletes/edits existing treatments). Prices are 0 by design:
+   the clinic sets its own pricing (Syrian market, manual). */
+const EXTRA_TEMPLATES = [
+  // ── Orthodontics (⚓) — regional (per-arch); brackets render on the chart ──
+  { treatment_key:'ortho-fixed',     name:'تقويم ثابت',   label:'⚓', fill:'#14b8a6', stroke:'#0d8276', price:0, builtin:false, needs_lab:false, target_part:'arch',     category:'orthodontics', sort_order:20 },
+  { treatment_key:'ortho-removable', name:'تقويم متحرك',  label:'⚙', fill:'#22d3ee', stroke:'#0e90a8', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'orthodontics', sort_order:21 },
+  { treatment_key:'ortho-retainer',  name:'مثبّت تقويم',  label:'ث', fill:'#5eead4', stroke:'#2bb3a3', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'orthodontics', sort_order:22 },
+  // ── Periodontics (🌿) ──
+  { treatment_key:'perio-scaling',   name:'تقليح وتلميع', label:'ت', fill:'#34d399', stroke:'#1f9d6f', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'periodontics', sort_order:23 },
+  { treatment_key:'perio-srp',       name:'تسوية جذور',   label:'ج', fill:'#10b981', stroke:'#0a7d57', price:0, builtin:false, needs_lab:false, target_part:'quadrant', category:'periodontics', sort_order:24 },
+  { treatment_key:'perio-surgery',   name:'جراحة لثة',    label:'ل', fill:'#059669', stroke:'#046b4d', price:0, builtin:false, needs_lab:false, target_part:'quadrant', category:'periodontics', sort_order:25 },
+  // ── Pediatric (🧒) ──
+  { treatment_key:'pedo-filling',    name:'حشوة سن لبني', label:'ح', fill:'#f0abfc', stroke:'#c026d3', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:26 },
+  { treatment_key:'pedo-pulpotomy',  name:'بتر لب',       label:'ب', fill:'#e879f9', stroke:'#a21caf', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:27 },
+  { treatment_key:'pedo-spacer',     name:'حافظ مسافة',   label:'م', fill:'#d946ef', stroke:'#86198f', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'pediatric', sort_order:28 },
+  { treatment_key:'pedo-sealant',    name:'عازل شقوق',    label:'ع', fill:'#f5d0fe', stroke:'#d946ef', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:29 },
+  { treatment_key:'pedo-fluoride',   name:'فلوريد موضعي', label:'ف', fill:'#fae8ff', stroke:'#e879f9', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'pediatric', sort_order:30 }
+];
+
+/* Additive: add only the template treatments the clinic doesn't already have
+   (matched by treatment_key OR name). Never deletes or edits existing rows. */
+async function addFromTemplates() {
+  if (!confirm('إضافة قوالب التقويم + اللثوي + الأطفال الجاهزة؟\nتُضاف الجديدة فقط — لن يُحذف أو يُعدّل أي علاج موجود.')) return;
+  var haveKey = {}, haveName = {};
+  for (var i = 0; i < treatments.length; i++) { haveKey[treatments[i].treatment_key] = 1; haveName[treatments[i].name] = 1; }
+  var toAdd = EXTRA_TEMPLATES.filter(function(t){ return !haveKey[t.treatment_key] && !haveName[t.name]; });
+  if (!toAdd.length) { showToast('✅ كل القوالب مضافة مسبقاً'); return; }
+  var rows = toAdd.map(function(d){ return Object.assign({ doctor_id: currentDoctor.id }, d); });
+  const { error } = await window.sb.from('treatments').insert(rows);
+  if (error) { showToast('⚠️ ' + error.message); return; }
+  await loadTreatments();
+  showToast('➕ أُضيف ' + toAdd.length + ' علاجاً من القوالب');
+}
 async function resetToDefaults() {
   if (!confirm('استعادة العلاجات الافتراضية؟ سيتم حذف العلاجات المخصصة التي أضفتها.')) return;
   const DEFAULTS = [
@@ -1022,7 +1065,7 @@ async function resetToDefaults() {
     return;
   }
   // insert defaults
-  const rows = DEFAULTS.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
+  const rows = DEFAULTS.concat(EXTRA_TEMPLATES).map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
   const { error } = await window.sb.from('treatments').insert(rows);
   if (error) { showToast('⚠️ ' + error.message); return; }
   await loadTreatments();
