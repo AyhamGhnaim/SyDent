@@ -3545,6 +3545,15 @@ function loadDentitionState(){
     else { dentitionMode = 'permanent'; flipState = {}; }
   }
   var jw = document.getElementById('jawWrap'); if (jw) jw.setAttribute('data-dent', dentitionMode);
+  // Adults (≥18) in permanent dentition don't need the primary/mixed toggle — hide it.
+  // Still shown for children, unknown age, or anyone already in mixed/primary (no lockout,
+  // no data change). A retained primary tooth in an adult is a per-tooth clinical note.
+  var _dseg = document.getElementById('dentSeg');
+  if (_dseg) {
+    var _dage = (patient.dob && typeof calcAge === 'function') ? parseInt(calcAge(patient.dob), 10) : NaN;
+    var _dadult = !isNaN(_dage) && _dage >= 18;
+    _dseg.style.display = (_dadult && dentitionMode === 'permanent') ? 'none' : '';
+  }
   syncDentSeg();
 }
 function syncDentSeg(){
