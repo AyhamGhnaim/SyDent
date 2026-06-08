@@ -3588,9 +3588,21 @@ function syncDentSeg(){
 function orthoTreatmentNames(){
   var m = {};
   if (typeof TREATMENTS !== 'undefined' && TREATMENTS) {
-    for (var i=0;i<TREATMENTS.length;i++){ if ((TREATMENTS[i].category || '') === 'orthodontics') m[TREATMENTS[i].name] = TREATMENTS[i]; }
+    for (var i=0;i<TREATMENTS.length;i++){
+      var t = TREATMENTS[i];
+      // Robust: an orthodontics treatment by category OR by name/key (so a clinic
+      // that left the category as 'أخرى' on a "تقويم" treatment still renders it).
+      var isOrtho = ((t.category || '') === 'orthodontics') || /تقويم|ortho/i.test((t.id || '') + ' ' + (t.name || ''));
+      if (isOrtho) m[t.name] = t;
+    }
   }
   return m;
+}
+/* Fixed appliance (default) → brackets + archwire. Removable → labial bow only,
+   no brackets. Detected by name/key so custom names ("تقويم متحرك") also work. */
+function orthoIsRemovable(tr){
+  if (!tr) return false;
+  return /متحرك|removable|removeable/i.test((tr.id || '') + ' ' + (tr.name || ''));
 }
 function orthoForArch(isUpper){
   if (typeof sessions === 'undefined' || !sessions || !sessions.length) return null;
@@ -4953,21 +4965,25 @@ function buildTooth(num, surfaceMap, isUpper) {
     }
   }
 
-  // ── Ortho: bracket + archwire at the MIDDLE OF THE CROWN ──
+  // ── Ortho: archwire (always) + bracket (fixed appliance only) ──
   // Drawn inside the transform <g> so the upper-arch flip places it mid-crown
   // automatically. pointer-events:none → surface clicks still pass through.
-  var __orthoC = (typeof orthoColorForArch === 'function') ? orthoColorForArch(isUpper) : null;
-  if (__orthoC) {
+  var __orthoT = (typeof orthoForArch === 'function') ? orthoForArch(isUpper) : null;
+  if (__orthoT) {
+    var __orthoC   = __orthoT.fill || '#2ee89e';
+    var __orthoRem = (typeof orthoIsRemovable === 'function') && orthoIsRemovable(__orthoT);  // removable = labial bow only
     var bxM = (anat.crownL + anat.crownR) / 2;
     // ارتفاع ثابت لكل القوس (cellWidth ثابت = 60 دائم / 48 لبني) → سلك مستوٍ بلا
     // تقطّع. القيمة ضمن التاج لكل الأسنان (التاج من y=6 حتى العنق ≥62 دائم/≥46 لبني).
     var byM = isPrimaryTooth(num) ? 30 : 38;
     var bW = 21, bH = 15;                         // أكبر قليلاً + سلك ممتد ليتّصل
     svg += '<g pointer-events="none">'
-        +  '<line x1="-24" y1="' + byM + '" x2="124" y2="' + byM + '" stroke="' + __orthoC + '" stroke-width="3.2" opacity="0.92" stroke-linecap="round"/>'
-        +  '<rect x="' + (bxM - bW/2) + '" y="' + (byM - bH/2) + '" width="' + bW + '" height="' + bH + '" rx="3" fill="' + __orthoC + '" stroke="#ffffff" stroke-width="1.6"/>'
-        +  '<line x1="' + (bxM - bW/2 + 3) + '" y1="' + byM + '" x2="' + (bxM + bW/2 - 3) + '" y2="' + byM + '" stroke="rgba(255,255,255,0.92)" stroke-width="1.8"/>'
-        +  '</g>';
+        +  '<line x1="-24" y1="' + byM + '" x2="124" y2="' + byM + '" stroke="' + __orthoC + '" stroke-width="3.2" opacity="0.92" stroke-linecap="round"/>';
+    if (!__orthoRem) {                            // الثابت فقط: براكت على كل سن
+      svg += '<rect x="' + (bxM - bW/2) + '" y="' + (byM - bH/2) + '" width="' + bW + '" height="' + bH + '" rx="3" fill="' + __orthoC + '" stroke="#ffffff" stroke-width="1.6"/>'
+          +  '<line x1="' + (bxM - bW/2 + 3) + '" y1="' + byM + '" x2="' + (bxM + bW/2 - 3) + '" y2="' + byM + '" stroke="rgba(255,255,255,0.92)" stroke-width="1.8"/>';
+    }
+    svg += '</g>';
   }
 
   svg += '</g></svg>';
@@ -6643,7 +6659,7 @@ async function saveToothTreatment() {
       Object.assign(patient, regUpdates);
     }
 
-    renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
+    renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
     closeModal('toothModal');
     // Phase 3 Feature G: distinct toast for the two outcomes:
     //   - billable status (completed/planned): session created → confirm save
@@ -7399,7 +7415,7 @@ async function delSession(id) {
     }
   }
   await syncPaymentStatus();
-  renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderPayments(); renderTimeline();
   showToast('🗑️ تم حذف الجلسة');
 }
 
@@ -8146,7 +8162,7 @@ async function saveSession() {
     Object.assign(patient, updates);
   }
   await syncPaymentStatus();
-  renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderTimeline();
+  renderTeeth(); renderStats(); renderInfo(); renderSessions(); renderRecentSessions(); renderTimeline();
   closeModal('sessionModal');
   document.getElementById('sType').value=''; document.getElementById('sCost').value='';
   document.getElementById('sDesc').value=''; document.getElementById('sNotes').value='';
