@@ -389,7 +389,7 @@ async function refreshSidebarDynamic() {
       await window.SyDentPlan.load();
       const nav = document.querySelector('.sb-nav');
       if (nav) {
-        const GATEABLE = ['treatments','doctors','employees','payouts','expenses','labs','accounting','provider-reports','audit-log'];
+        const GATEABLE = ['treatments','doctors','employees','payouts','expenses','inventory','labs','accounting','provider-reports','audit-log'];
         GATEABLE.forEach(function(id){
           if (window.SyDentPlan.can(id)) return;
           let href = null;
