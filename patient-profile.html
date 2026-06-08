@@ -122,6 +122,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .jaw-wrap{overflow-x:auto;overflow-y:visible;padding:80px 0 6px;scrollbar-width:none;-ms-overflow-style:none;}
 .jaw-wrap::-webkit-scrollbar{display:none;width:0;height:0;}
+/* ── Primary / mixed dentition ── */
+.jaw-wrap[data-dent="primary"] .jaw-row{gap:11px;}
+.jaw-wrap[data-dent="mixed"] .jaw-row{gap:7px;}
+.jaw-wrap[data-dent="mixed"] .tooth-num{cursor:pointer;text-decoration:underline dotted rgba(148,163,184,.55);text-underline-offset:2px;}
+.jaw-wrap[data-dent="mixed"] [data-tooth-cell]:hover .tooth-num,.jaw-wrap[data-dent="mixed"] [data-occ-cell]:hover .tooth-num{color:var(--green);text-decoration-color:var(--green);}
+.mix-hint{display:none;max-width:560px;margin:8px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(46,232,158,.06);border:1px solid rgba(46,232,158,.22);border-radius:9px;padding:8px 12px;}
+.mix-hint b{color:var(--green);}
 .chart-hint{font-size:12px;color:var(--text2);}
 .jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;padding:0 12px;}
 .midline{width:2px;background:linear-gradient(to bottom,transparent,var(--border) 15%,var(--border) 85%,transparent);margin:0 6px;align-self:stretch;border-radius:2px;}
@@ -752,12 +759,17 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <span class="chart-card-title">🦷 مخطط الأسنان</span>
         <span class="chart-hint">اضغط على المنطقة المحددة من السن لتسجيل العلاج</span>
       </div>
+      <div class="seg" id="dentSeg" style="margin:0 auto 8px;width:max-content;">
+        <button data-dent="permanent" class="active">دائمة</button>
+        <button data-dent="mixed">مختلطة</button>
+        <button data-dent="primary">لبنية</button>
+      </div>
       <div class="seg" id="occViewSeg" style="margin:0 auto 8px;width:max-content;">
         <button data-view="all" class="active">الكل</button>
         <button data-view="buc">دهليزي</button>
         <button data-view="occ">إطباقي</button>
       </div>
-      <div class="jaw-wrap" id="jawWrap" data-occview="all">
+      <div class="jaw-wrap" id="jawWrap" data-occview="all" data-dent="permanent">
         <div class="jaw-row row-buc" id="upperJaw"></div>
         <div class="jaw-row row-occ" id="upperOcc"></div>
         <div class="jaw-gap"></div>
@@ -765,6 +777,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div class="jaw-row row-buc" id="lowerJaw"></div>
       </div>
 <div class="chart-legend" id="chartLegend"></div>
+      <div class="mix-hint" id="mixHint">💡 <b>الوضع المختلط:</b> انقر <b>رقم</b> السن لتبديله بين لبني ودائم (المواضع 1–5؛ الأرحاء 6–8 دائمة لا تتبدّل)</div>
     </div>
   </div>
 
@@ -3103,6 +3116,7 @@ async function loadAll() {
     return;
   }
   patient = pd;
+  loadDentitionState();   // primary/mixed/permanent from patient row, or derive from age
 
   // all patients for seq numbering
   const { data: allPats } = await window.sb.from('patients').select('id,created_at')
@@ -3449,6 +3463,106 @@ function renderStats() {
 var UPPER_T = [28,27,26,25,24,23,22,21,11,12,13,14,15,16,17,18];
 var LOWER_T = [38,37,36,35,34,33,32,31,41,42,43,44,45,46,47,48];
 
+/* ═══════════════ Primary / mixed dentition (additive) ═══════════════
+   FDI primary 51-85. Stored per-patient in patients.dentition_mode +
+   patients.primary_teeth (Migration 56 — both nullable → graceful). The chart
+   engine below reads activeUpper()/activeLower() instead of the raw permanent
+   arches, so primary & mixed render with no other changes. */
+var UPPER_P = [65,64,63,62,61, 51,52,53,54,55];
+var LOWER_P = [75,74,73,72,71, 81,82,83,84,85];
+function isPrimaryTooth(num){ var q = Math.floor(parseInt(num,10)/10); return q >= 5 && q <= 8; }
+function normQuad(num){ var q = Math.floor(parseInt(num,10)/10); return (q >= 5 && q <= 8) ? q - 4 : q; }
+function isFlippable(num){ var p = parseInt(num,10) % 10; return p >= 1 && p <= 5; }
+function primaryOf(permNum){ return parseInt(permNum,10) + 40; }
+function permOf(num){ num = parseInt(num,10); return num >= 51 ? num - 40 : num; }
+function defaultMixedFlips(){ var f = {}; [13,14,15,23,24,25,33,34,35,43,44,45].forEach(function(p){ f[p] = 'primary'; }); return f; }
+var flipState = {};                     // { permPosition: 'primary' } — mixed only
+var dentitionMode = 'permanent';        // 'permanent' | 'primary' | 'mixed'
+function mapMixed(permArch){ return permArch.map(function(pn){ return (isFlippable(pn) && flipState[pn] === 'primary') ? primaryOf(pn) : pn; }); }
+function activeUpper(){ return dentitionMode === 'primary' ? UPPER_P : dentitionMode === 'mixed' ? mapMixed(UPPER_T) : UPPER_T; }
+function activeLower(){ return dentitionMode === 'primary' ? LOWER_P : dentitionMode === 'mixed' ? mapMixed(LOWER_T) : LOWER_T; }
+function archOf(num){
+  num = parseInt(num,10);
+  var au = activeUpper(), al = activeLower();
+  if (au.indexOf(num) >= 0) return au;
+  if (al.indexOf(num) >= 0) return al;
+  if (UPPER_T.indexOf(num) >= 0) return UPPER_T;
+  if (LOWER_T.indexOf(num) >= 0) return LOWER_T;
+  if (UPPER_P.indexOf(num) >= 0) return UPPER_P;
+  if (LOWER_P.indexOf(num) >= 0) return LOWER_P;
+  var qn = normQuad(num); return (qn === 1 || qn === 2) ? au : al;
+}
+/* Click a tooth NUMBER in mixed mode → flip that position primary↔permanent. */
+function toggleToothDentition(num){
+  num = parseInt(num,10);
+  if (!isFlippable(num)) { if (typeof showToast === 'function') showToast('السن ' + num + ' رحى دائمة — لا يوجد لها سن لبني مقابل'); return; }
+  var pp = permOf(num);
+  if (flipState[pp] === 'primary') delete flipState[pp]; else flipState[pp] = 'primary';
+  renderTeeth(); saveDentitionState();
+}
+/* Persist dentition to the patient row (graceful if Migration 56 not applied yet). */
+async function saveDentitionState(){
+  if (!patient) return;
+  var pt = (dentitionMode === 'mixed')
+    ? JSON.stringify(Object.keys(flipState).filter(function(k){ return flipState[k] === 'primary'; }).map(function(k){ return primaryOf(k); }))
+    : null;
+  patient.dentition_mode = dentitionMode; patient.primary_teeth = pt;
+  try {
+    await window.sb.from('patients').update({ dentition_mode: dentitionMode, primary_teeth: pt })
+      .eq('id', patientId).eq('doctor_id', currentUser.id);
+  } catch (e) { /* graceful: columns added by Migration 56 */ }
+}
+/* Load saved dentition, or derive a default from the patient's age. */
+function loadDentitionState(){
+  if (!patient) return;
+  var m = patient.dentition_mode;
+  if (m === 'permanent' || m === 'primary' || m === 'mixed') {
+    dentitionMode = m; flipState = {};
+    if (m === 'mixed') {
+      var arr = []; try { arr = JSON.parse(patient.primary_teeth || '[]') || []; } catch (e) { arr = []; }
+      if (arr.length) arr.forEach(function(n){ flipState[permOf(n)] = 'primary'; });
+      else flipState = defaultMixedFlips();
+    }
+  } else {
+    var age = (patient.dob && typeof calcAge === 'function') ? parseInt(calcAge(patient.dob),10) : NaN;
+    if (!isNaN(age) && age <= 6) { dentitionMode = 'primary'; flipState = {}; }
+    else if (!isNaN(age) && age <= 12) { dentitionMode = 'mixed'; flipState = defaultMixedFlips(); }
+    else { dentitionMode = 'permanent'; flipState = {}; }
+  }
+  var jw = document.getElementById('jawWrap'); if (jw) jw.setAttribute('data-dent', dentitionMode);
+  syncDentSeg();
+}
+function syncDentSeg(){
+  var seg = document.getElementById('dentSeg');
+  if (seg) { var bs = seg.querySelectorAll('button'); for (var i=0;i<bs.length;i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-dent') === dentitionMode); }
+  var h = document.getElementById('mixHint'); if (h) h.style.display = (dentitionMode === 'mixed') ? 'block' : 'none';
+}
+/* Wire the dentition toggle + per-tooth flip (once, on DOM ready). */
+(function(){
+  function wireDent(){
+    var seg = document.getElementById('dentSeg'); if (!seg || seg.__wired) return; seg.__wired = true;
+    seg.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if (!b) return;
+      dentitionMode = b.getAttribute('data-dent');
+      if (dentitionMode === 'mixed' && Object.keys(flipState).length === 0) flipState = defaultMixedFlips();
+      var jw = document.getElementById('jawWrap'); if (jw) jw.setAttribute('data-dent', dentitionMode);
+      syncDentSeg(); renderTeeth(); saveDentitionState();
+    });
+  }
+  function wireFlip(){
+    var wrap = document.getElementById('jawWrap'); if (!wrap || wrap.__flipWired) return; wrap.__flipWired = true;
+    wrap.addEventListener('click', function(e){
+      if (dentitionMode !== 'mixed') return;
+      var numEl = e.target.closest('.tooth-num'); if (!numEl) return;
+      var cell = numEl.closest('[data-tooth-cell],[data-occ-cell]'); if (!cell) return;
+      var num = cell.getAttribute('data-tooth-cell') || cell.getAttribute('data-occ-cell');
+      if (num) toggleToothDentition(num);
+    });
+  }
+  function boot(){ wireDent(); wireFlip(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+
 function rebuildToothMaps() {
   var fills = {'': '#e8d5b0'}, strokes = {'': '#b8956a'}, labels = {};
   for (var i=0; i<TREATMENTS.length; i++) {
@@ -3464,7 +3578,9 @@ var T_FILL = _T.fill, T_STROKE = _T.stroke, T_LABEL = _T.label;
 
 /* Anterior teeth (incisors + canines) use Incisal Edge instead of Occlusal */
 var ANTERIOR_TEETH = [11,12,13,21,22,23,31,32,33,41,42,43];
-function isAnterior(num){ return ANTERIOR_TEETH.indexOf(parseInt(num,10)) !== -1; }
+// Positional: positions 1-3 (central, lateral, canine) are anterior in EVERY
+// quadrant — covers permanent (11-13…) AND primary (51-53…) with one rule.
+function isAnterior(num){ var p = parseInt(num,10) % 10; return p >= 1 && p <= 3; }
 
 /* Surface labels in Arabic */
 var SURFACE_LABELS = {
@@ -3584,10 +3700,12 @@ function surfacesFor(num){
  */
 
 function toothType(num) {
-  var pos = parseInt(num, 10) % 10;
+  var n = parseInt(num, 10), pos = n % 10, quad = Math.floor(n / 10);
+  var primary = (quad >= 5 && quad <= 8);
   if (pos === 1 || pos === 2) return 'incisor';
   if (pos === 3) return 'canine';
-  if (pos === 4 || pos === 5) return 'premolar';
+  // Primary positions 4 & 5 are PRIMARY MOLARS (not premolars — primary dentition has none).
+  if (pos === 4 || pos === 5) return primary ? 'molar' : 'premolar';
   return 'molar';
 }
 
@@ -3595,18 +3713,30 @@ function rootsCount(num) {
   var n = parseInt(num, 10);
   var pos = n % 10;
   var quad = Math.floor(n / 10);
-  var isUpper = (quad === 1 || quad === 2);
+  var primary = (quad >= 5 && quad <= 8);
+  var quadN = primary ? quad - 4 : quad;
+  var isUpper = (quadN === 1 || quadN === 2);
+  if (primary) {
+    // Primary incisors/canine single-rooted; primary molars (pos 4,5) multi-rooted:
+    // maxillary 3 roots, mandibular 2 — same divergent pattern as permanent molars.
+    if (pos <= 3) return 1;
+    return isUpper ? 3 : 2;
+  }
   if (pos <= 3) return 1;
   if (pos === 4) return isUpper ? 2 : 1;
   if (pos === 5) return 1;
   return isUpper ? 3 : 2;
 }
 
-/* Cell width in px — uniform 60px for all teeth (enlarged +20% for a more
-   comfortable, readable chart; single source of truth for facial + implant +
-   pontic + extracted placeholders). */
+/* Cell width in px — single source of truth for ALL facial builders (regular +
+   implant + pontic + extracted) via anat.cellW, and for the occlusal view.
+   Permanent = 60. Primary teeth are anatomically smaller, so they render at a
+   reduced size (PRIMARY_TOOTH_SCALE) — a child's chart reads as primary, not just
+   "permanent minus premolars". The whole tooth (crown + roots) scales uniformly
+   because the SVG viewBox stays fixed; only the rendered px size shrinks. */
+var PRIMARY_TOOTH_SCALE = 0.80;
 function cellWidth(num) {
-  return 60;
+  return isPrimaryTooth(num) ? Math.round(60 * PRIMARY_TOOTH_SCALE) : 60;
 }
 
 /* Anatomically realistic tooth drawing.
@@ -3620,7 +3750,8 @@ function toothAnatomy(num) {
   var t = toothType(num);
   var nRoots = rootsCount(num);
   var n = parseInt(num, 10);
-  var quad = Math.floor(n / 10);
+  var primary = isPrimaryTooth(num);   // deciduous tooth → distinct morphology below
+  var quad = normQuad(n);  // primary quadrants 5-8 → permanent analog 1-4 for anatomy
   // Mesial direction: quadrants 1 (UR) and 4 (LR) → mesial is on screen-right (toward midline of mouth)
   // Quadrants 2 (UL) and 3 (LL) → mesial on screen-left
   // (Patient is facing us, so their right is our left)
@@ -3628,7 +3759,7 @@ function toothAnatomy(num) {
 
   var cx = 50;
   // Lower anteriors are anatomically smaller/narrower than upper
-  var quad_n = Math.floor(parseInt(num,10) / 10);
+  var quad_n = normQuad(num);
   var pos = parseInt(num,10) % 10;
   var isLowerJaw = (quad_n === 3 || quad_n === 4);
   var isAntTooth = (t === 'incisor' || t === 'canine');
@@ -3654,13 +3785,27 @@ function toothAnatomy(num) {
   }
   else                      { crownW = 84; crownH = 56; crownTopW = 78; }
 
+  // ── Deciduous (primary) morphology ──────────────────────────────────────
+  // Primary crowns differ from permanent: noticeably SHORTER, and the anteriors
+  // are squat (mesio-distally WIDE relative to height — a primary central incisor
+  // is wider than it is tall). Primary molars are short with a slightly narrower
+  // occlusal table and a bulbous body. We adjust the dimension variables only —
+  // the outline-building math below is unchanged — and keep crownW within the
+  // 0-100 viewBox so nothing clips. Combined with the smaller cell size and the
+  // stronger cervical bulge, the chart reads unmistakably as primary.
+  if (primary) {
+    if (t === 'incisor')      { crownW = Math.round(crownW * 1.15); crownH = Math.round(crownH * 0.72); }
+    else if (t === 'canine')  { crownW = Math.round(crownW * 1.08); crownH = Math.round(crownH * 0.78); crownTopW = Math.round(crownTopW * 1.05); }
+    else                      { crownH = Math.round(crownH * 0.80); crownTopW = Math.round(crownTopW * 0.94); } // primary molar — short, taper to occlusal
+  }
+
   var crownTop = 6;
   var crownBot = crownTop + crownH;       // gum line
   var crownL = cx - crownW/2;
   var crownR = cx + crownW/2;
   var crownTL = cx - crownTopW/2;
   var crownTR = cx + crownTopW/2;
-  var bulge = 3.5;  // crown bulges slightly at the equator
+  var bulge = primary ? 4.3 : 3.5;  // primary crowns have a more pronounced cervical/equatorial bulge
 
   // ── Build crown outline path ──
   // The outline starts at top-left, follows the incisal/occlusal edge, then
@@ -3869,7 +4014,7 @@ function toothAnatomy(num) {
       trunkW = lowerCervW;
       rW = lowerCervW * 0.46;                    // each root cervical width
       rApex = rW * 0.12;                          // narrow pointed apex
-      var lowerDivMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.78 : 0.62;
+      var lowerDivMul = primary ? 1.55 : (pos === 6) ? 1.0 : (pos === 7) ? 0.78 : 0.62;  // primary molar roots flare WIDELY (straddle the developing premolar)
       // Cervical centers: each root sits in its half of the cervical width
       leftTopCx  = cx - lowerCervW * 0.24;
       rightTopCx = cx + lowerCervW * 0.24;
@@ -3940,7 +4085,7 @@ function toothAnatomy(num) {
     var rApex3 = rW3 * 0.12;                 // narrow pointed apex
 
     // Divergence multiplier by position
-    var divMul = (pos === 6) ? 1.0 : (pos === 7) ? 0.70 : 0.55;
+    var divMul = primary ? 1.55 : (pos === 6) ? 1.0 : (pos === 7) ? 0.70 : 0.55;  // primary molar roots flare WIDELY (straddle the developing premolar)
 
     // Cervical positions: MB and DB sit symmetrically around midline
     // Half-step from midline = quarter of cervical width
@@ -4228,7 +4373,7 @@ function isImplant(num) {
    along the same arch (upper or lower). Returns { mesial: num|null, distal: num|null, gap: [nums] }.
    "gap" = the contiguous missing teeth that share this bridge. */
 function findBridgeAbutments(num) {
-  var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
+  var arch = archOf(num);
   var idx = arch.indexOf(num);
   if (idx < 0) return { mesial:null, distal:null, gap:[num] };
   // Walk LEFT: skip extracted/implants (they can't be abutments); stop at first natural tooth
@@ -4748,6 +4893,23 @@ function buildTooth(num, surfaceMap, isUpper) {
     }
   }
 
+  // ── Ortho: bracket + archwire at the MIDDLE OF THE CROWN ──
+  // Drawn inside the transform <g> so the upper-arch flip places it mid-crown
+  // automatically. pointer-events:none → surface clicks still pass through.
+  var __orthoC = (typeof orthoColorForArch === 'function') ? orthoColorForArch(isUpper) : null;
+  if (__orthoC) {
+    var bxM = (anat.crownL + anat.crownR) / 2;
+    // ارتفاع ثابت لكل القوس (cellWidth ثابت = 60 دائم / 48 لبني) → سلك مستوٍ بلا
+    // تقطّع. القيمة ضمن التاج لكل الأسنان (التاج من y=6 حتى العنق ≥62 دائم/≥46 لبني).
+    var byM = isPrimaryTooth(num) ? 30 : 38;
+    var bW = 21, bH = 15;                         // أكبر قليلاً + سلك ممتد ليتّصل
+    svg += '<g pointer-events="none">'
+        +  '<line x1="-24" y1="' + byM + '" x2="124" y2="' + byM + '" stroke="' + __orthoC + '" stroke-width="3.2" opacity="0.92" stroke-linecap="round"/>'
+        +  '<rect x="' + (bxM - bW/2) + '" y="' + (byM - bH/2) + '" width="' + bW + '" height="' + bH + '" rx="3" fill="' + __orthoC + '" stroke="#ffffff" stroke-width="1.6"/>'
+        +  '<line x1="' + (bxM - bW/2 + 3) + '" y1="' + byM + '" x2="' + (bxM + bW/2 - 3) + '" y2="' + byM + '" stroke="rgba(255,255,255,0.92)" stroke-width="1.8"/>'
+        +  '</g>';
+  }
+
   svg += '</g></svg>';
   // Phase 3 Feature F follow-up: surface tooltip now shows the status badge
   // (مراقبة/مخطط/محوّل/...) inline after the treatment name. Previously the
@@ -4860,7 +5022,7 @@ function renderLegend() {
 function occSpline(pts){var n=pts.length,d='M'+pts[0][0].toFixed(1)+','+pts[0][1].toFixed(1);for(var i=0;i<n;i++){var p0=pts[(i-1+n)%n],p1=pts[i],p2=pts[(i+1)%n],p3=pts[(i+2)%n];d+=' C'+(p1[0]+(p2[0]-p0[0])/6).toFixed(1)+','+(p1[1]+(p2[1]-p0[1])/6).toFixed(1)+' '+(p2[0]-(p3[0]-p1[0])/6).toFixed(1)+','+(p2[1]-(p3[1]-p1[1])/6).toFixed(1)+' '+p2[0].toFixed(1)+','+p2[1].toFixed(1);}return d+' Z';}
 function occMirror(g){g.outline=g.outline.map(function(p){return [p[0],100-p[1]];});g.cusps=g.cusps.map(function(c){return [c[0],100-c[1],c[2]];});g.fossae=g.fossae.map(function(f){return [f[0],100-f[1],f[2]];});g.ridges=g.ridges.map(function(r){return [r[0],100-r[1],r[2],100-r[3]];});g.grooves=g.grooves.replace(/(-?[0-9]+(?:[.][0-9]+)?),(-?[0-9]+(?:[.][0-9]+)?)/g,function(m,a,b){return a+','+(100-parseFloat(b));});return g;}
 function occGeom(num){
-  var t=toothType(num),p=num%10,quad=Math.floor(num/10),upper=(quad===1||quad===2),gid='o'+num,g,bbox;
+  var t=toothType(num),p=num%10,quad=normQuad(num),upper=(quad===1||quad===2),primary=isPrimaryTooth(num),gid='o'+num,g,bbox;
   if(t==='incisor'){
     var mand=(quad>=3), central=(p===1), w=mand?(central?32:33):(central?42:35), hw=w/2;
     function X(f){return 50+f*hw;}
@@ -4903,7 +5065,19 @@ function occGeom(num){
     return {t:t,upper:upper,outline:coutline,anat:canat,bbox:cbb};
   }
   if(t==='molar'){
-    if(upper&&p===6) g={outline:[[28,26],[72,22],[78,52],[74,74],[30,70],[22,50]],cusps:[[34,34,'MB'],[68,34,'DB'],[35,64,'ML'],[70,62,'DL']],grooves:'M50,46 L36,30 M50,46 L50,24 M50,46 Q44,58 40,70 M62,60 Q70,66 76,66',ridges:[[35,64,68,34]],fossae:[[50,46,4.2],[64,58,3]]};
+    // ── Primary molar occlusal morphology (anatomically distinct from permanent) ──
+    // Defined in the same convention as the permanent presets below (lower ones are
+    // Y-mirrored by occMirror at the end). Clinical facts modelled:
+    //  • maxillary 2nd primary molar (55/65) ≈ permanent maxillary 1st molar (rhomboid,
+    //    4 cusps + oblique ridge ML→DB).
+    //  • maxillary 1st primary molar (54/64): small, triangular, dominant mesiopalatal cusp.
+    //  • mandibular 2nd primary molar (75/85) ≈ permanent mandibular 1st molar (5 cusps).
+    //  • mandibular 1st primary molar (74/84): elongated mesio-distally, primitive 4-cusp.
+    if(primary && upper && p===5)      g={outline:[[28,26],[72,22],[78,52],[74,74],[30,70],[22,50]],cusps:[[34,34,'MB'],[68,34,'DB'],[35,64,'ML'],[70,62,'DL']],grooves:'M50,46 L36,30 M50,46 L50,24 M50,46 Q44,58 40,70 M62,60 Q70,66 76,66',ridges:[[35,64,68,34]],fossae:[[50,46,4.2],[64,58,3]]};
+    else if(primary && upper && p===4) g={outline:[[31,28],[69,28],[73,55],[50,72],[27,55]],cusps:[[38,38,'MB'],[63,38,'DB'],[50,63,'ML']],grooves:'M50,50 L40,35 M50,50 L61,36 M50,50 L50,67',ridges:[],fossae:[[50,50,3.4]]};
+    else if(primary && p===5)          g={outline:[[22,34],[50,26],[78,34],[74,70],[28,72]],cusps:[[32,40,'MB'],[54,36,'DB'],[72,46,'D'],[64,66,'DL'],[34,66,'ML']],grooves:'M28,50 L72,50 M44,50 L40,32 M58,50 L62,34 M50,50 L50,72',ridges:[],fossae:[[40,50,3.4],[60,50,3.4],[50,50,2.6]]};
+    else if(primary && p===4)          g={outline:[[20,37],[80,37],[77,67],[23,67]],cusps:[[34,45,'MB'],[64,45,'DB'],[63,60,'DL'],[35,60,'ML']],grooves:'M27,52 L73,52 M44,52 L41,39 M60,52 L63,39',ridges:[],fossae:[[45,52,2.8],[62,52,2.8]],cuspRX:11};
+    else if(upper&&p===6) g={outline:[[28,26],[72,22],[78,52],[74,74],[30,70],[22,50]],cusps:[[34,34,'MB'],[68,34,'DB'],[35,64,'ML'],[70,62,'DL']],grooves:'M50,46 L36,30 M50,46 L50,24 M50,46 Q44,58 40,70 M62,60 Q70,66 76,66',ridges:[[35,64,68,34]],fossae:[[50,46,4.2],[64,58,3]]};
     else if(upper) g={outline:[[28,26],[72,26],[70,64],[30,68]],cusps:[[35,35,'MB'],[66,35,'DB'],[35,60,'ML'],[64,58,'DL']],grooves:'M50,46 L50,26 M50,46 L30,46 M50,46 L66,52 M50,46 L46,66',ridges:[],fossae:[[50,46,4]]};
     else if(p===6) g={outline:[[22,34],[50,26],[78,34],[74,70],[28,72]],cusps:[[32,40,'MB'],[54,36,'DB'],[72,46,'D'],[64,66,'DL'],[34,66,'ML']],grooves:'M28,50 L72,50 M44,50 L40,32 M58,50 L62,34 M50,50 L50,72',ridges:[],fossae:[[40,50,3.4],[60,50,3.4],[50,50,2.6]]};
     else if(p===7) g={outline:[[26,32],[74,32],[74,72],[26,72]],cusps:[[33,40,'MB'],[67,40,'DB'],[67,64,'DL'],[33,64,'ML']],grooves:'M30,52 L70,52 M50,34 L50,70',ridges:[],fossae:[[50,52,3.2]],cuspRX:12,cuspPull:0}; // lower 2nd molar (37/47) — natural anatomy: 4 equal cusps toward the corners (slightly smaller) + the cruciform "+" groove pattern (central + buccal + lingual), the defining occlusal morphology of mandibular 2nd molars
@@ -4953,7 +5127,7 @@ function occGeom(num){
 function buildOcclusalTooth(num, sm, isUpper){
   sm=sm||{};
   var G=occGeom(num), t=G.t, up=G.upper, gid='o'+num, outline=G.outline, b=G.bbox;
-  var quad=Math.floor(parseInt(num,10)/10), mesialOnRight=(quad===1||quad===4);
+  var quad=normQuad(num), mesialOnRight=(quad===1||quad===4);
   var whole=sm.WHOLE, crownFull=sm.CROWN_FULL||null;
   var isExtract=isExtractionKey(whole), isImplant=isImplantKey(whole);
   // Classify the WHOLE entry exactly like the facial view: a legacy WHOLE record
@@ -4977,7 +5151,8 @@ function buildOcclusalTooth(num, sm, isUpper){
     +'<radialGradient id="cc'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(255,255,255,0.9)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></radialGradient>'
     +'<radialGradient id="rs'+gid+'" cx="50%" cy="50%" r="50%"><stop offset="70%" stop-color="rgba(120,85,45,0)"/><stop offset="100%" stop-color="rgba(120,85,45,0.32)"/></radialGradient>'
     +'<clipPath id="cl'+gid+'"><path d="'+outline+'"/></clipPath></defs>';
-  var svg='<svg class="tooth-shape" viewBox="16.67 16.67 66.67 66.67" width="60" height="60" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
+  var occSz=cellWidth(num);
+  var svg='<svg class="tooth-shape" viewBox="16.67 16.67 66.67 66.67" width="'+occSz+'" height="'+occSz+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
   if(isExtract){ svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg; }
   svg+='<path d="'+outline+'" fill="url(#en'+gid+')" stroke="#b08d5b" stroke-width="1.4"/>';
   // surface tints — clipped to the real outline, with directional OVERSHOOT so a
@@ -5109,12 +5284,13 @@ function occTipRows(num, sm){
 }
 
 function renderOcclusal(){
-  var rows=[['upperOcc',UPPER_T,true],['lowerOcc',LOWER_T,false]];
+  var rows=[['upperOcc',activeUpper(),true],['lowerOcc',activeLower(),false]];
   rows.forEach(function(R){
     var el=document.getElementById(R[0]); if(!el) return;
     var html='';
+    var mid=R[1].length/2;
     for(var i=0;i<R[1].length;i++){
-      if(i===8) html+='<div class="midline"></div>';
+      if(i===mid) html+='<div class="midline"></div>';
       var num=R[1][i], sm=teethMap[String(num)]||{};
       var op=1, st=getDominantStatus(num);
       if(st==='planned') op=0.55; else if(st==='referred') op=0.5; else if(st==='condition') op=0.45;
@@ -5220,20 +5396,22 @@ function renderTeeth() {
       if (hasLeftBr && hasRightBr) ponticSet[arch[i]] = true;
     }
   }
-  findPontics(UPPER_T);
-  findPontics(LOWER_T);
+  var AU = activeUpper(), AL = activeLower();
+  findPontics(AU);
+  findPontics(AL);
 
-  for (var i=0; i<UPPER_T.length; i++) {
-    if (i === 8) uHtml += '<div class="midline"></div>';
-    var un = UPPER_T[i];
+  var uMid = AU.length/2, lMid = AL.length/2;
+  for (var i=0; i<AU.length; i++) {
+    if (i === uMid) uHtml += '<div class="midline"></div>';
+    var un = AU[i];
     if (isImplant(un)) uHtml += buildImplantTooth(un, true);
     else if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
     else if (isExtracted(un)) uHtml += buildExtractedPlaceholder(un, true);
     else uHtml += buildTooth(un, teethMap[String(un)], true);
   }
-  for (var j=0; j<LOWER_T.length; j++) {
-    if (j === 8) lHtml += '<div class="midline"></div>';
-    var ln = LOWER_T[j];
+  for (var j=0; j<AL.length; j++) {
+    if (j === lMid) lHtml += '<div class="midline"></div>';
+    var ln = AL[j];
     if (isImplant(ln)) lHtml += buildImplantTooth(ln, false);
     else if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
     else if (isExtracted(ln)) lHtml += buildExtractedPlaceholder(ln, false);
@@ -5246,6 +5424,7 @@ function renderTeeth() {
   renderOcclusal();
   attachSurfaceClicks();
   addStatusBadges();
+  if (typeof renderOrthoOverlay === 'function') renderOrthoOverlay();
 }
 
 /* Add a small color dot on each tooth indicating its dominant treatment status.
@@ -5266,7 +5445,7 @@ function addStatusBadges() {
     var sh = c.querySelector('.tooth-shape');
     if (sh && sh.style.opacity) sh.style.opacity = '';
   });
-  var allTeeth = UPPER_T.concat(LOWER_T);
+  var allTeeth = activeUpper().concat(activeLower());
   for (var i=0; i<allTeeth.length; i++) {
     var num = allTeeth[i];
     var sm = teethMap[String(num)] || {};
