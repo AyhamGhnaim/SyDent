@@ -772,6 +772,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button data-dent="mixed">مختلطة</button>
         <button data-dent="primary">لبنية</button>
       </div>
+      <button type="button" id="dentSegShow" onclick="showDentSeg()" title="إظهار خيارات الأسنان اللبنية/المختلطة (لحالة نادرة كسنّ لبني محتجَز عند بالغ)" style="margin:0 auto 8px;width:max-content;display:none;padding:5px 14px;background:transparent;border:1px dashed var(--border,#33415566);border-radius:8px;color:var(--text2);font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;">⚙️ خيارات الإطباق (لبنية / مختلطة)</button>
       <div class="seg" id="occViewSeg" style="margin:0 auto 8px;width:max-content;">
         <button data-view="all" class="active">الكل</button>
         <button data-view="buc">دهليزي</button>
@@ -3545,14 +3546,18 @@ function loadDentitionState(){
     else { dentitionMode = 'permanent'; flipState = {}; }
   }
   var jw = document.getElementById('jawWrap'); if (jw) jw.setAttribute('data-dent', dentitionMode);
-  // Adults (≥18) in permanent dentition don't need the primary/mixed toggle — hide it.
-  // Still shown for children, unknown age, or anyone already in mixed/primary (no lockout,
-  // no data change). A retained primary tooth in an adult is a per-tooth clinical note.
+  // Adults in permanent dentition don't need the primary/mixed toggle — hide it and offer a
+  // small "show options" link instead (escape hatch for the rare retained-primary or
+  // young-adult-ortho case, so nobody is ever locked out). Still shown outright for children,
+  // unknown age, or anyone already in mixed/primary. No data change either way.
   var _dseg = document.getElementById('dentSeg');
+  var _dshow = document.getElementById('dentSegShow');
   if (_dseg) {
+    var _ADULT_DENT_AGE = 16;   // age ≥ this hides the toggle (adjustable)
     var _dage = (patient.dob && typeof calcAge === 'function') ? parseInt(calcAge(patient.dob), 10) : NaN;
-    var _dadult = !isNaN(_dage) && _dage >= 18;
-    _dseg.style.display = (_dadult && dentitionMode === 'permanent') ? 'none' : '';
+    var _dhide = !isNaN(_dage) && _dage >= _ADULT_DENT_AGE && dentitionMode === 'permanent';
+    _dseg.style.display = _dhide ? 'none' : '';
+    if (_dshow) _dshow.style.display = _dhide ? 'block' : 'none';
   }
   syncDentSeg();
 }
@@ -3560,6 +3565,13 @@ function syncDentSeg(){
   var seg = document.getElementById('dentSeg');
   if (seg) { var bs = seg.querySelectorAll('button'); for (var i=0;i<bs.length;i++) bs[i].classList.toggle('active', bs[i].getAttribute('data-dent') === dentitionMode); }
   var h = document.getElementById('mixHint'); if (h) h.style.display = (dentitionMode === 'mixed') ? 'block' : 'none';
+}
+/* Escape hatch: reveal the dentition toggle for an adult whose segment was auto-hidden
+   (e.g. a retained primary tooth, or a young adult still in active ortho). Stays visible
+   for the rest of the session; re-collapses on next load if mode is still permanent. */
+function showDentSeg(){
+  var s = document.getElementById('dentSeg'); if (s) s.style.display = '';
+  var b = document.getElementById('dentSegShow'); if (b) b.style.display = 'none';
 }
 /* Wire the dentition toggle + per-tooth flip (once, on DOM ready). */
 (function(){
