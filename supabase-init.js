@@ -276,6 +276,7 @@
         'employees.html':'employees',
         'payouts.html':'payouts',
         'expenses.html':'expenses',
+        'inventory.html':'inventory',
         'labs.html':'labs',
         'accounting.html':'accounting',
         'provider-reports.html':'provider-reports',
