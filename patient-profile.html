@@ -2482,7 +2482,7 @@ async function loadTreatmentsFromSupabase() {
     if (error) { console.error(error); return; }
     TREATMENTS = (data || []).map(function(t){
       return { id:t.treatment_key, dbId:t.id, name:t.name, label:t.label,
-               fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin,
+               fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin, is_favorite:!!t.is_favorite,
                needs_lab: !!t.needs_lab,
                target_part: t.target_part || 'crown',
                is_active: t.is_active !== false,
@@ -5815,11 +5815,13 @@ function updateToothModalAreaTitle(){
 
 /* ═══════════════ Tooth-modal palette: category tabs + favorites ═══════════════
    The palette grid (#toothOptsContainer) is unchanged; a tab bar (#txTabs, above
-   it) filters by category. '⭐ شائعة' is usage-ranked (localStorage), falling back
-   to ALL allowed treatments until usage exists — so the default view matches the
-   old flat list exactly. The context action button (remove implant/bridge, undo
-   extraction, mark sound) appears in every tab. */
-var _txAllowed = [], _txSpecialHtml = '', _txTab = 'fav';
+   it) filters by category. Two pinned tabs lead: '⭐ المفضلة' (explicit, persisted
+   in DB via treatments.is_favorite, starred from the treatments manager) and
+   '🔥 شائعة' (usage-ranked via localStorage, falling back to ALL allowed treatments
+   until usage exists). Default view is المفضلة when any favorite exists, else شائعة.
+   The context action button (remove implant/bridge, undo extraction, mark sound)
+   appears in every tab. */
+var _txAllowed = [], _txSpecialHtml = '', _txTab = 'starred';
 var TX_CAT_META = { diagnostic:'🔍 تشخيصي', preventive:'🛡️ وقائي', restorative:'🦷 ترميمي', endodontics:'🌱 لب وجذر', surgical:'🔪 جراحي', prosthodontics:'🔗 تعويضي', implantology:'🔩 زراعة', cosmetic:'✨ تجميلي', prosth_cosmetic:'💎 تعويض تجميلي', orthodontics:'⚓ تقويم', periodontics:'🌿 لثوي', pediatric:'🧒 أطفال', other:'📋 أخرى' };
 var TX_CAT_ORDER = ['diagnostic','preventive','restorative','endodontics','surgical','prosthodontics','implantology','cosmetic','prosth_cosmetic','orthodontics','periodontics','pediatric','other'];
 function txUsage(){ try { return JSON.parse(localStorage.getItem('sydent_tx_usage') || '{}'); } catch(e){ return {}; } }
@@ -5830,6 +5832,9 @@ function txFavorites(){
   scored.sort(function(a,b){ return (u[b.id]||0) - (u[a.id]||0); });
   return scored.slice(0, 8);
 }
+// Explicit favorites (starred in the treatments manager, persisted in DB via is_favorite).
+// Distinct from txFavorites() which is ephemeral usage-based ranking.
+function txStarred(){ return _txAllowed.filter(function(t){ return t.is_favorite; }); }
 function txButtonHtml(t){
   var textColor = isLightColor(t.fill) ? '#0a1628' : '#fff';
   var laymanLine = (t.layman_name && String(t.layman_name).trim())
@@ -5843,7 +5848,9 @@ function txFirstPresentCat(present){ for (var c=0;c<TX_CAT_ORDER.length;c++){ if
 function txTabBtn(cat, label){ return '<button type="button" class="tx-tab' + (_txTab===cat?' tx-tab-active':'') + '" data-txtab="' + cat + '" onclick="switchTxTab(\'' + cat + '\')">' + label + '</button>'; }
 function renderTxPalette(){
   var c = document.getElementById('toothOptsContainer'); if (!c) return;
-  var list = (_txTab === 'fav') ? txFavorites() : _txAllowed.filter(function(t){ return (t.category||'other') === _txTab; });
+  var list = (_txTab === 'starred') ? txStarred()
+           : (_txTab === 'fav')     ? txFavorites()
+           : _txAllowed.filter(function(t){ return (t.category||'other') === _txTab; });
   var html = ''; for (var i=0;i<list.length;i++) html += txButtonHtml(list[i]);
   c.innerHTML = html + _txSpecialHtml;
 }
@@ -5856,11 +5863,17 @@ function switchTxTab(cat){
 function renderTxTabs(){
   var tabsEl = document.getElementById('txTabs'); if (!tabsEl) return;
   var present = {}; for (var i=0;i<_txAllowed.length;i++) present[_txAllowed[i].category||'other'] = 1;
-  var favs = txFavorites();
-  if (_txTab === 'fav') { if (!favs.length) _txTab = txFirstPresentCat(present); }
-  else if (!present[_txTab]) { _txTab = favs.length ? 'fav' : txFirstPresentCat(present); }
+  var starred = txStarred();   // explicit favorites (DB is_favorite)
+  var common  = txFavorites(); // ephemeral usage-based
+  // Validate active tab; prefer المفضلة → شائعة → first present category
+  var valid = {};
+  if (starred.length) valid.starred = 1;
+  if (common.length)  valid.fav = 1;
+  for (var k in present) valid[k] = 1;
+  if (!valid[_txTab]) _txTab = starred.length ? 'starred' : (common.length ? 'fav' : txFirstPresentCat(present));
   var html = '';
-  if (favs.length) html += txTabBtn('fav', '⭐ شائعة');
+  if (starred.length) html += txTabBtn('starred', '⭐ المفضلة');
+  if (common.length)  html += txTabBtn('fav', '🔥 شائعة');
   for (var c=0;c<TX_CAT_ORDER.length;c++){ var cat = TX_CAT_ORDER[c]; if (present[cat]) html += txTabBtn(cat, TX_CAT_META[cat] || TX_CAT_META.other); }
   tabsEl.innerHTML = html;
   renderTxPalette();
@@ -6054,7 +6067,7 @@ async function openToothModal(n, surface) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px;">لا توجد علاجات متاحة لهذه المنطقة.' + addLink + '</div>' + _special;
   } else {
     // Categorized palette: tab bar (⭐شائعة + present categories) sits above the grid.
-    _txAllowed = _allowed; _txSpecialHtml = _special; _txTab = 'fav';
+    _txAllowed = _allowed; _txSpecialHtml = _special; _txTab = 'starred';
     renderTxTabs();
   }
   document.getElementById('toothStep1').style.display = 'block';

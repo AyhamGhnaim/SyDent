@@ -126,6 +126,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .treat-actions button:hover{transform:translateY(-1px);}
 .treat-actions .ed-btn{background:rgba(46,232,158,0.12);border-color:rgba(46,232,158,0.38);color:var(--green);}
 .treat-actions .ed-btn:hover{background:rgba(46,232,158,0.2);border-color:var(--green);color:var(--green);}
+.treat-actions .fav-btn:hover{border-color:#f0b429;color:#f0b429;}
+.treat-actions .fav-on{background:rgba(240,180,41,0.16);border-color:rgba(240,180,41,0.55);color:#f0b429;}
+.treat-actions .fav-on:hover{background:rgba(240,180,41,0.26);border-color:#f0b429;color:#f0b429;}
 .treat-actions .dup-btn:hover{background:rgba(99,179,237,.14);border-color:var(--blue);color:var(--blue);}
 .treat-actions .inact-btn:hover{background:rgba(245,158,11,.14);border-color:#f59e0b;color:#f59e0b;}
 .treat-actions .act-btn:hover{background:rgba(46,232,158,.14);border-color:var(--green);color:var(--green);}
@@ -571,6 +574,7 @@ async function loadTreatments() {
       stroke: t.stroke,
       price: t.price,
       builtin: t.builtin,
+      is_favorite: !!t.is_favorite,
       needs_lab: !!t.needs_lab,
       target_part: t.target_part || 'crown',
       sort_order: t.sort_order,
@@ -630,6 +634,15 @@ function filteredTreatments() {
 }
 
 // ── Render grid ──
+// Treatments that drive special chart geometry (extraction placeholder, implant, pontic/bridge, ortho overlay)
+// must NOT be deletable — deleting them would break existing patient charts that reference them.
+// (Deactivate instead via the toggle button.) Non-special treatments (fillings, crowns, RCT, cleaning,
+// whitening, x-ray, consult, perio, pedo) and ALL custom treatments remain freely deletable.
+function isProtectedTreatment(t) {
+  var tp = t.target_part || '';
+  return tp === 'extraction' || tp === 'implant' || tp === 'bridge' || (t.category || '') === 'orthodontics';
+}
+
 function render() {
   var grid = document.getElementById('treatGrid');
   var emptyEl = document.getElementById('treatEmpty');
@@ -710,11 +723,12 @@ function render() {
         + '</div>'
         + '<div class="treat-price">' + fmt(t.price) + ' <span class="currency">ل.س</span></div>'
         + '<div class="treat-actions">'
+          + '<button class="fav-btn' + (t.is_favorite ? ' fav-on' : '') + '" onclick="toggleFavorite(\'' + t.id + '\')" title="' + (t.is_favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة — تظهر أولاً في مخطط الأسنان') + '">' + (t.is_favorite ? '⭐ مفضّل' : '☆ مفضّل') + '</button>'
           + '<button class="ed-btn" onclick="editTreatment(\'' + t.id + '\')">✏️ تعديل</button>'
           + '<button class="dup-btn" onclick="duplicateTreatment(\'' + t.id + '\')" title="إنشاء نسخة جديدة من هذا العلاج">📋 نسخ</button>'
           + '<button class="mat-btn" onclick="openMaterialsModal(\'' + t.id + '\')" title="ربط مواد المخزون التي تُستهلك مع هذا العلاج (تُخصم تلقائياً عند الجلسة)">🧰 المواد</button>'
           + '<button class="' + toggleBtnClass + '" onclick="toggleActive(\'' + t.id + '\')" title="' + (isInactive ? 'تفعيل العلاج' : 'تعطيل العلاج (يخفيه من قائمة العلاجات في مخطط الأسنان)') + '">' + toggleBtnText + '</button>'
-          + (t.builtin
+          + (isProtectedTreatment(t)
               ? ''
               : '<button class="del-btn" onclick="deleteTreatment(\'' + t.id + '\')">🗑 حذف</button>')
         + '</div>'
@@ -996,6 +1010,23 @@ async function reorderTreatments(draggedId, targetId) {
     }
   }
   showToast('✅ تم تحديث الترتيب');
+}
+
+async function toggleFavorite(id) {
+  var t = treatments.find(function (x) { return String(x.id) === String(id); });
+  if (!t) return;
+  var next = !t.is_favorite;
+  t.is_favorite = next;          // optimistic — instant UI feedback
+  render();
+  const { error } = await window.sb.from('treatments')
+    .update({ is_favorite: next })
+    .eq('id', id)
+    .eq('doctor_id', currentDoctor.id);
+  if (error) {                   // revert on failure
+    t.is_favorite = !next;
+    render();
+    showToast('⚠️ ' + error.message);
+  }
 }
 
 async function deleteTreatment(id) {
