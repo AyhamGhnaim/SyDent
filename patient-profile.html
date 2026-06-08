@@ -136,9 +136,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tooth-cell:hover{transform:scale(1.12);z-index:5;}
 .tooth-shape{
   display:block;
+  overflow:visible;   /* allow the ortho archwire to overshoot into the gaps and connect */
   filter:drop-shadow(0 1px 2px rgba(0,0,0,.15));
   transition:filter .15s;
 }
+.ortho-banner{display:none;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 auto 8px;width:max-content;max-width:100%;}
+.ortho-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;border:1px solid;border-radius:8px;padding:3px 10px;white-space:nowrap;}
 .tooth-cell:hover .tooth-shape{filter:drop-shadow(0 0 4px var(--green));}
 .tooth-shape .crown-surface,
 .tooth-shape .root-part{
@@ -769,6 +772,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button data-view="buc">دهليزي</button>
         <button data-view="occ">إطباقي</button>
       </div>
+      <div class="ortho-banner" id="orthoBanner" style="display:none;"></div>
       <div class="jaw-wrap" id="jawWrap" data-occview="all" data-dent="permanent">
         <div class="jaw-row row-buc" id="upperJaw"></div>
         <div class="jaw-row row-occ" id="upperOcc"></div>
@@ -1211,7 +1215,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-row">
         <div class="form-group">
           <label>رقم السن</label>
-          <input type="number" id="labOrderTooth" placeholder="مثال: 36" min="11" max="48">
+          <input type="number" id="labOrderTooth" placeholder="مثال: 36" min="11" max="85">
         </div>
         <div class="form-group">
           <label>نوع العمل</label>
@@ -3563,6 +3567,51 @@ function syncDentSeg(){
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 
+
+/* ═══════════════ Orthodontics overlay (reads the live `sessions`) ═══════════════
+   A regional ortho session = a ledger_sessions row with tooth_num null whose
+   `type` (treatment name) matches a TREATMENTS entry of category 'orthodontics'.
+   Scope: arch 'U'/'L', quadrant 'UR/UL/LR/LL', or mouth (both null = both arches).
+   Brackets + archwire are drawn inside buildTooth (gated on orthoColorForArch) —
+   defining these functions activates that previously-dormant code. */
+function orthoTreatmentNames(){
+  var m = {};
+  if (typeof TREATMENTS !== 'undefined' && TREATMENTS) {
+    for (var i=0;i<TREATMENTS.length;i++){ if ((TREATMENTS[i].category || '') === 'orthodontics') m[TREATMENTS[i].name] = TREATMENTS[i]; }
+  }
+  return m;
+}
+function orthoForArch(isUpper){
+  if (typeof sessions === 'undefined' || !sessions || !sessions.length) return null;
+  var names = orthoTreatmentNames(), side = isUpper ? 'U' : 'L';
+  for (var i=0;i<sessions.length;i++){
+    var s = sessions[i];
+    if (s.tooth_num) continue;                                       // regional rows only
+    if (s.status && s.status !== 'completed' && s.status !== 'planned') continue;
+    var tr = names[s.type]; if (!tr) continue;                       // an orthodontics treatment
+    var covers = (!s.quadrant && !s.arch) ? true                     // mouth → both arches
+               : s.arch ? (s.arch === side)                          // arch 'U' / 'L'
+               : s.quadrant ? (String(s.quadrant).charAt(0) === side) // quadrant 'U*' / 'L*'
+               : false;
+    if (covers) return tr;
+  }
+  return null;
+}
+function orthoColorForArch(isUpper){ var t = orthoForArch(isUpper); return t ? (t.fill || '#2ee89e') : null; }
+function orthoNameForArch(isUpper){ var t = orthoForArch(isUpper); return t ? t.name : null; }
+/* Slim active-ortho banner above the chart. Called at the end of renderTeeth. */
+function renderOrthoOverlay(){
+  var bar = document.getElementById('orthoBanner'); if (!bar) return;
+  var u = orthoNameForArch(true),  uc = orthoColorForArch(true);
+  var l = orthoNameForArch(false), lc = orthoColorForArch(false);
+  function esc(x){ return (typeof escapeHtml === 'function') ? escapeHtml(x) : x; }
+  function chip(nm,col,area){ return '<span class="ortho-chip" style="color:'+col+';background:'+col+'1a;border-color:'+col+'55;">😬 '+esc(nm)+' · '+area+'</span>'; }
+  var items = [];
+  if (u && l && u === l) items.push(chip(u, uc, 'الفكان'));
+  else { if (u) items.push(chip(u, uc, 'الفك العلوي')); if (l) items.push(chip(l, lc, 'الفك السفلي')); }
+  bar.innerHTML = items.join('');
+  bar.style.display = items.length ? 'flex' : 'none';
+}
 function rebuildToothMaps() {
   var fills = {'': '#e8d5b0'}, strokes = {'': '#b8956a'}, labels = {};
   for (var i=0; i<TREATMENTS.length; i++) {
