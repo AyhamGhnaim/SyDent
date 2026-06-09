@@ -13,9 +13,9 @@
 <title>SyDent — الإعدادات</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260608b"></script>
+<script src="theme.js?v=20260608c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260608b"></script>
+<script src="supabase-init.js?v=20260608c"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -402,8 +402,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260608b">
-<script src="sidebar.js?v=20260608b"></script>
+<link rel="stylesheet" href="theme.css?v=20260608c">
+<script src="sidebar.js?v=20260608c"></script>
 </head>
 <body>
 
@@ -552,6 +552,12 @@ textarea::placeholder { color: var(--text2); }
       <div class="form-group">
         <label>عدد الساعات قبل الموعد لتذكير المريض</label>
         <input type="number" id="fHoursBefore" min="1" max="168" value="24" style="max-width:200px;">
+      </div>
+
+      <div class="form-group">
+        <label>فترة الاستدعاء الدوري للمراجعة (أشهر)</label>
+        <input type="number" id="fRecallMonths" min="1" max="60" value="6" style="max-width:200px;">
+        <div style="font-size:12px;color:var(--text2,#8da0bd);margin-top:4px;">يظهر المريض في قائمة «🔔 متابعة» بصفحة المرضى إذا لم يزر منذ هذه المدة (آخر جلسة مكتملة).</div>
       </div>
 
       <div class="form-group">
@@ -869,6 +875,8 @@ function applyWaSettingsToForm(s) {
   var licEl = document.getElementById('fLicenseNo');
   if (licEl) licEl.value = safe.license_no || '';
   document.getElementById('fHoursBefore').value = safe.whatsapp_reminder_hours_before || 24;
+  var recallEl = document.getElementById('fRecallMonths');
+  if (recallEl) recallEl.value = safe.recall_interval_months || 6;
   document.getElementById('fTemplate').value    = safe.whatsapp_reminder_template || DEFAULT_WA_TEMPLATE;
   const sw = document.getElementById('waSwitch');
   if (safe.whatsapp_reminders_enabled) sw.classList.add('on');
@@ -950,6 +958,8 @@ async function saveClinicSettings() {
   const clinicPhone = document.getElementById('fClinicPhone').value.trim() || null;
   const hoursRaw    = parseInt(document.getElementById('fHoursBefore').value, 10);
   const hours       = (isNaN(hoursRaw) || hoursRaw < 1) ? 24 : Math.min(hoursRaw, 168);
+  const recallRaw   = parseInt((document.getElementById('fRecallMonths') || {}).value, 10);
+  const recallMonths= (isNaN(recallRaw) || recallRaw < 1) ? 6 : Math.min(recallRaw, 60);
   const template    = document.getElementById('fTemplate').value.trim() || DEFAULT_WA_TEMPLATE;
 
   const btn = document.getElementById('btnSaveWa');
@@ -962,6 +972,7 @@ async function saveClinicSettings() {
     clinic_phone: clinicPhone,
     whatsapp_reminder_hours_before: hours,
     whatsapp_reminder_template: template,
+    recall_interval_months: recallMonths,
     updated_at: new Date().toISOString()
   };
 
@@ -977,20 +988,33 @@ async function saveClinicSettings() {
     .upsert(payload, { onConflict: 'owner_id' })
     .select().single();
 
+  // Graceful: if recall_interval_months doesn't exist yet (Migration 56 not
+  // applied), drop it and retry so WhatsApp settings still save without error.
+  let _data = data, _error = error;
+  if (_error) {
+    const em = (_error.message || '') + ' ' + (_error.code || '');
+    if (/recall_interval_months/i.test(em) || /\b42703\b|PGRST204/i.test(em)) {
+      delete payload.recall_interval_months;
+      const retry = await window.sb.from('clinic_settings')
+        .upsert(payload, { onConflict: 'owner_id' }).select().single();
+      _data = retry.data; _error = retry.error;
+    }
+  }
+
   btn.disabled = false; btn.textContent = '💾 حفظ الإعدادات';
 
-  if (error) {
-    const msg = (error.message || '') + ' ' + (error.code || '');
+  if (_error) {
+    const msg = (_error.message || '') + ' ' + (_error.code || '');
     if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
       showToast('⚠️ يلزم ترقية قاعدة البيانات (Migration 5)', true);
     } else {
-      showToast('❌ ' + (error.message || 'فشل الحفظ'), true);
+      showToast('❌ ' + (_error.message || 'فشل الحفظ'), true);
     }
     return;
   }
-  CLINIC_SETTINGS_WA = data;
+  CLINIC_SETTINGS_WA = _data;
   // Reflect any server-side clamping back into the form
-  document.getElementById('fHoursBefore').value = data.whatsapp_reminder_hours_before;
+  if (_data) document.getElementById('fHoursBefore').value = _data.whatsapp_reminder_hours_before;
   showToast('✅ تم حفظ إعدادات WhatsApp');
 }
 

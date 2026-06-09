@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260608b"></script>
+<script src="theme.js?v=20260608c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260608b"></script>
-<script src="sidebar.js?v=20260608b"></script>
-<script src="timepicker.js?v=20260608b"></script>
+<script src="supabase-init.js?v=20260608c"></script>
+<script src="sidebar.js?v=20260608c"></script>
+<script src="timepicker.js?v=20260608c"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -673,7 +673,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260608b">
+<link rel="stylesheet" href="theme.css?v=20260608c">
 </head>
 <body>
 <script>
@@ -724,6 +724,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <button class="tab" onclick="switchTab('labs',this)">🥽 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
     <button class="tab" onclick="switchTab('files',this); loadPatientFiles();">📎 الملفات <span id="filesBadge" class="lab-badge" style="display:none">0</span></button>
     <button class="tab" onclick="switchTab('rx',this); loadPrescriptions();">💊 الروشتات <span id="rxBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('postop',this); loadPostOpTemplates();">📋 تعليمات</button>
     <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">📋 سجل النشاطات</button>
   </div>
 
@@ -916,6 +917,18 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button class="btn btn-primary" onclick="openRxModal()" style="font-size:13px;padding:8px 16px;">➕ روشتة جديدة</button>
       </div>
       <div id="rxList"></div>
+    </div>
+  </div>
+
+  <!-- Tab: تعليمات بعد الجلسة (P6) -->
+  <div class="panel" id="tab-postop">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📋 تعليمات بعد الجلسة</span>
+        <button class="btn btn-primary" onclick="openPostOpEdit()" style="font-size:13px;padding:8px 16px;">➕ قالب جديد</button>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">قوالب قابلة لإعادة الاستخدام (بعد القلع، بعد العصب…). اطبع أو انسخ ورقة تعليمات للمريض الحالي بنقرة.</div>
+      <div id="postopList"></div>
     </div>
   </div>
 
@@ -1483,6 +1496,34 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeModal('rxTemplatesModal')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: إنشاء/تعديل قالب تعليمات (P6) -->
+<div class="modal-overlay" id="postOpModal">
+  <div class="modal-box" style="max-width:600px;">
+    <div class="modal-head"><h3 id="postOpModalTitle">📋 قالب تعليمات جديد</h3><button class="modal-close" onclick="closeModal('postOpModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>اسم القالب *</label>
+        <input type="text" id="postOpName" placeholder="مثال: تعليمات بعد قلع السن">
+      </div>
+      <div class="form-group"><label>مرتبط بنوع علاج (اختياري)</label>
+        <select id="postOpTreatment" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
+          <option value="">— عام (بلا ربط) —</option>
+        </select>
+      </div>
+      <div class="form-group"><label>نص التعليمات *</label>
+        <textarea id="postOpBody" rows="8" placeholder="مثال:
+• اعضض على الشاش نصف ساعة.
+• تجنّب المضمضة القوية اليوم.
+• مسكّن عند اللزوم.
+• راجع العيادة عند نزف مستمر." style="width:100%;resize:vertical;font-family:Cairo,sans-serif;"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('postOpModal')">إلغاء</button>
+      <button class="btn-save-m" id="postOpSaveBtn" onclick="savePostOpTemplate()">حفظ القالب</button>
     </div>
   </div>
 </div>
@@ -10904,6 +10945,248 @@ async function copyPrescription(rxId) {
       showToast('تم نسخ الروشتة ✓');
     }
   } catch (e) { console.warn('copy:', e); showToast('⚠️ تعذّر النسخ'); }
+}
+
+/* ===== تعليمات بعد الجلسة (P6) ===== */
+/* ============================================================
+   Post-op instruction templates — P6 PRM.
+   نمط قوالب الروشتات: قوالب قابلة لإعادة الاستخدام (body نصّي + ربط اختياري
+   بنوع علاج). «الإصدار» = طباعة/نسخ ورقة تعليمات للمريض الحالي (بلا جدول إصدار
+   منفصل — KISS). يعتمد helpers موجودة: currentUser, patient, escapeHtml,
+   rxClinicInfo, TREATMENTS, getTreatment, openModal/closeModal, showToast,
+   calcAge، آلية الطباعة #printRoot + body.printing. معزول تماماً عن المالية.
+   ============================================================ */
+var POST_OP_TEMPLATES = [];
+var _postOpEditingId  = null;
+var _savePostOpInFlight = false;
+
+async function loadPostOpTemplates() {
+  if (!currentUser) return;
+  var el = document.getElementById('postopList');
+  try {
+    var res = await window.sb.from('post_op_templates')
+      .select('id, name, body, treatment_key, created_at')
+      .eq('owner_id', currentUser.id)
+      .order('created_at', { ascending: false });
+    if (res.error) {
+      var msg = (res.error.message || '') + ' ' + (res.error.code || '');
+      if (/relation .* does not exist|42P01|PGRST205/i.test(msg)) {
+        if (el) el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text2);font-size:13px;">ميزة التعليمات غير مُفعّلة بعد.</div>';
+        return;
+      }
+      console.warn('loadPostOpTemplates:', res.error);
+      POST_OP_TEMPLATES = [];
+    } else {
+      POST_OP_TEMPLATES = res.data || [];
+    }
+  } catch (e) { console.warn('loadPostOpTemplates catch:', e); POST_OP_TEMPLATES = []; }
+  renderPostOpList();
+}
+
+function postOpTreatmentLabel(key) {
+  if (!key) return '';
+  var t = (typeof getTreatment === 'function') ? getTreatment(key) : null;
+  if (t) return t.name || t.label || '';
+  // fallback: linear scan
+  for (var i=0;i<(TREATMENTS||[]).length;i++) if (TREATMENTS[i].id === key) return TREATMENTS[i].name || TREATMENTS[i].label || '';
+  return '';
+}
+
+function renderPostOpList() {
+  var el = document.getElementById('postopList');
+  if (!el) return;
+  if (!POST_OP_TEMPLATES.length) {
+    el.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text2);">'
+      + '<div style="font-size:34px;">📋</div>'
+      + '<div style="margin-top:8px;font-size:13px;">لا قوالب تعليمات بعد — أنشئ أول قالب لإعادة استخدامه.</div></div>';
+    return;
+  }
+  el.innerHTML = POST_OP_TEMPLATES.map(function(t){
+    var tl = postOpTreatmentLabel(t.treatment_key);
+    var preview = (t.body || '').replace(/\s+/g,' ').trim();
+    if (preview.length > 100) preview = preview.slice(0,100) + '…';
+    return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--bg2);">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+        + '<div style="flex:1;min-width:0;">'
+          + '<div style="font-weight:700;color:var(--text);">' + escapeHtml(t.name)
+            + (tl ? ' <span style="font-size:11px;font-weight:600;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:8px;margin-right:4px;">🦷 ' + escapeHtml(tl) + '</span>' : '')
+          + '</div>'
+          + '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + (preview ? escapeHtml(preview) : '<span style="opacity:.6;">— بلا نص —</span>') + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:6px;white-space:nowrap;flex-wrap:wrap;justify-content:flex-end;">'
+          + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="printPostOp(\'' + t.id + '\')">🖨️ طباعة</button>'
+          + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="copyPostOp(\'' + t.id + '\')">📋 نسخ</button>'
+          + '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="openPostOpEdit(\'' + t.id + '\')">✏️</button>'
+          + '<button class="btn" style="padding:5px 10px;font-size:12px;color:var(--danger,#e5484d);" onclick="deletePostOpTemplate(\'' + t.id + '\')">🗑️</button>'
+        + '</div>'
+      + '</div>'
+    + '</div>';
+  }).join('');
+}
+
+function postOpPopulateTreatmentSelect(selected) {
+  var sel = document.getElementById('postOpTreatment');
+  if (!sel) return;
+  var opts = '<option value="">— عام (بلا ربط) —</option>';
+  var seen = {};
+  (TREATMENTS || []).forEach(function(t){
+    if (!t || !t.id || seen[t.id]) return;
+    seen[t.id] = 1;
+    opts += '<option value="' + escapeHtml(String(t.id)) + '">' + escapeHtml(t.name || t.label || String(t.id)) + '</option>';
+  });
+  sel.innerHTML = opts;
+  sel.value = selected || '';
+}
+
+function openPostOpEdit(id) {
+  _postOpEditingId = id || null;
+  var tpl = null;
+  if (id) { for (var i=0;i<POST_OP_TEMPLATES.length;i++) if (POST_OP_TEMPLATES[i].id === id) { tpl = POST_OP_TEMPLATES[i]; break; } }
+  document.getElementById('postOpModalTitle').textContent = tpl ? '✏️ تعديل قالب تعليمات' : '📋 قالب تعليمات جديد';
+  document.getElementById('postOpName').value = tpl ? (tpl.name || '') : '';
+  document.getElementById('postOpBody').value = tpl ? (tpl.body || '') : '';
+  postOpPopulateTreatmentSelect(tpl ? tpl.treatment_key : '');
+  var btn = document.getElementById('postOpSaveBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'حفظ القالب'; }
+  openModal('postOpModal');
+}
+
+async function savePostOpTemplate() {
+  if (_savePostOpInFlight) return;
+  var name = (document.getElementById('postOpName').value || '').trim();
+  var body = (document.getElementById('postOpBody').value || '').trim();
+  if (!name) { showToast('⚠️ اكتب اسم القالب'); return; }
+  if (!body) { showToast('⚠️ اكتب نص التعليمات'); return; }
+  var tkey = document.getElementById('postOpTreatment').value || null;
+
+  _savePostOpInFlight = true;
+  var btn = document.getElementById('postOpSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الحفظ…'; }
+  try {
+    if (_postOpEditingId) {
+      var upd = await window.sb.from('post_op_templates')
+        .update({ name: name, body: body, treatment_key: tkey })
+        .eq('id', _postOpEditingId).eq('owner_id', currentUser.id);
+      if (upd.error) throw upd.error;
+    } else {
+      var ins = await window.sb.from('post_op_templates')
+        .insert({ owner_id: currentUser.id, name: name, body: body, treatment_key: tkey });
+      if (ins.error) throw ins.error;
+    }
+    try { if (typeof logAudit === 'function') await logAudit(_postOpEditingId ? 'postop_template_updated' : 'postop_template_created', 'post_op_template', _postOpEditingId || '', { name: name }); } catch(e){}
+    _postOpEditingId = null;
+    closeModal('postOpModal');
+    showToast('تم حفظ القالب ✓');
+    await loadPostOpTemplates();
+  } catch (e) {
+    console.error('savePostOpTemplate:', e);
+    showToast('⚠️ تعذّر حفظ القالب');
+  } finally {
+    _savePostOpInFlight = false;
+    if (btn) { btn.disabled = false; btn.textContent = 'حفظ القالب'; }
+  }
+}
+
+async function deletePostOpTemplate(id) {
+  var tpl = null;
+  for (var i=0;i<POST_OP_TEMPLATES.length;i++) if (POST_OP_TEMPLATES[i].id === id) { tpl = POST_OP_TEMPLATES[i]; break; }
+  var nm = tpl ? tpl.name : 'هذا القالب';
+  if (!confirm('حذف القالب «' + nm + '» نهائياً؟')) return;
+  try {
+    var del = await window.sb.from('post_op_templates').delete().eq('id', id).eq('owner_id', currentUser.id);
+    if (del.error) throw del.error;
+    try { if (typeof logAudit === 'function') await logAudit('postop_template_deleted', 'post_op_template', id, {}); } catch(e){}
+    showToast('تم الحذف');
+    await loadPostOpTemplates();
+  } catch (e) { console.error('deletePostOpTemplate:', e); showToast('⚠️ تعذّر الحذف'); }
+}
+
+function postOpGet(id) {
+  for (var i=0;i<POST_OP_TEMPLATES.length;i++) if (POST_OP_TEMPLATES[i].id === id) return POST_OP_TEMPLATES[i];
+  return null;
+}
+
+/* ---------- بناء HTML الطباعة (يطابق رأس الروشتة) ---------- */
+function buildPostOpHtml(tpl) {
+  var c = (typeof rxClinicInfo === 'function') ? rxClinicInfo() : { clinic_name:'العيادة', clinic_phone:'', license_no:'' };
+  var dateStr = new Date().toLocaleDateString('ar-SY',{year:'numeric',month:'long',day:'numeric'});
+  var pName = (patient && patient.name) ? patient.name : '';
+  var pAge = (patient && patient.dob) ? calcAge(patient.dob) : '';
+  var pGender = (patient && patient.gender) ? patient.gender : '';
+  var tl = postOpTreatmentLabel(tpl.treatment_key);
+  var bodyHtml = escapeHtml(tpl.body || '').replace(/\n/g, '<br>');
+
+  var h = '<div style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;max-width:780px;margin:0 auto;padding:24px;">';
+  // الرأس
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:14px;margin-bottom:6px;">';
+  h += '<div>';
+  h += '<div style="font-size:24px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
+  if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';
+  h += '</div>';
+  h += '<div style="text-align:left;font-size:13px;color:#444;">';
+  if (c.clinic_phone) h += '<div>📞 ' + escapeHtml(c.clinic_phone) + '</div>';
+  h += '<div style="margin-top:4px;">' + escapeHtml(dateStr) + '</div>';
+  h += '</div>';
+  h += '</div>';
+  // العنوان
+  h += '<div style="font-size:20px;font-weight:800;color:#06371f;margin:12px 0 4px;">📋 تعليمات بعد الجلسة' + (tl ? (' — ' + escapeHtml(tl)) : '') + '</div>';
+  // بيانات المريض
+  h += '<div style="background:#f6f6f6;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:#222;">';
+  h += '<strong>المريض:</strong> ' + escapeHtml(pName);
+  if (pGender) h += ' &nbsp;•&nbsp; ' + escapeHtml(pGender);
+  if (pAge !== '') h += ' &nbsp;•&nbsp; ' + escapeHtml(String(pAge));
+  h += '</div>';
+  // النص
+  h += '<div style="font-size:15px;line-height:2;color:#222;white-space:normal;">' + bodyHtml + '</div>';
+  // التذييل
+  h += '<div style="margin-top:46px;display:flex;justify-content:space-between;font-size:13px;color:#444;">';
+  h += '<div>التوقيع: ____________________</div>';
+  h += '<div>' + escapeHtml(c.clinic_name) + '</div>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function printPostOp(id) {
+  var tpl = postOpGet(id);
+  if (!tpl) return;
+  var root = document.getElementById('printRoot');
+  if (!root) return;
+  root.innerHTML = buildPostOpHtml(tpl);
+  document.body.classList.add('printing');
+  var cleanup = function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(function(){ window.print(); }, 80);
+  setTimeout(cleanup, 60000);
+}
+
+async function copyPostOp(id) {
+  var tpl = postOpGet(id);
+  if (!tpl) return;
+  var c = (typeof rxClinicInfo === 'function') ? rxClinicInfo() : { clinic_name:'العيادة' };
+  var pName = (patient && patient.name) ? patient.name : '';
+  var tl = postOpTreatmentLabel(tpl.treatment_key);
+  var lines = [];
+  lines.push('📋 تعليمات بعد الجلسة — ' + c.clinic_name + (tl ? (' (' + tl + ')') : ''));
+  if (pName) lines.push('المريض: ' + pName);
+  lines.push('────────────');
+  lines.push(tpl.body || '');
+  var text = lines.join('\n');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('تم نسخ التعليمات ✓');
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('تم نسخ التعليمات ✓');
+    }
+  } catch (e) { console.warn('copy postop:', e); showToast('⚠️ تعذّر النسخ'); }
 }
 
 /* ===== خصم المواد المستهلكة (P3-B) ===== */

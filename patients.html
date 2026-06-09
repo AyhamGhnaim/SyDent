@@ -13,7 +13,7 @@
 <title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260608b"></script>
+<script src="theme.js?v=20260608c"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -480,10 +480,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260608b">
+<link rel="stylesheet" href="theme.css?v=20260608c">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260608b"></script>
-<script src="sidebar.js?v=20260608b"></script>
+<script src="supabase-init.js?v=20260608c"></script>
+<script src="sidebar.js?v=20260608c"></script>
 </head>
 <body>
 <script>
@@ -515,6 +515,10 @@ textarea { resize: vertical; min-height: 80px; }
     <button class="btn-add" onclick="exportPatientsCsv()" title="تصدير قائمة المرضى إلى ملف CSV (Excel)"
             style="background:transparent;border:1px solid var(--border, #1e3556);color:var(--text2, #8da0bd);">
       ⬇️ تصدير CSV
+    </button>
+    <button class="btn-add" onclick="openPrmModal()" title="متابعة المرضى: الاستدعاء الدوري وأعياد الميلاد"
+            style="background:transparent;border:1px solid var(--border, #1e3556);color:var(--text2, #8da0bd);">
+      🔔 متابعة <span id="prmBadge" style="display:none;background:#e5484d;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:4px;">0</span>
     </button>
   </div>
 
@@ -663,6 +667,22 @@ textarea { resize: vertical; min-height: 80px; }
   </div>
 </div>
 
+<!-- Modal: متابعة المرضى — الاستدعاء الدوري + أعياد الميلاد (P6) -->
+<div class="modal-overlay" id="prmModal" onclick="if(event.target===this)prmClose()">
+  <div class="modal" id="prmBox" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">🔔 متابعة المرضى</div>
+      <button class="modal-close" onclick="prmClose()">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;padding:4px 0 12px;border-bottom:1px solid var(--border,#1e3556);margin-bottom:6px;">
+      <button id="prmTabRecall" onclick="prmSwitchTab('recall')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--green,#2ee89e);color:#06371f;font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🔁 الاستدعاء الدوري <span id="prmRecallCount" style="opacity:.8;">0</span></button>
+      <button id="prmTabBday" onclick="prmSwitchTab('bday')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🎂 أعياد الميلاد <span id="prmBdayCount" style="opacity:.8;">0</span></button>
+    </div>
+    <div id="prmRecallView" style="max-height:58vh;overflow:auto;"></div>
+    <div id="prmBdayView" style="display:none;max-height:58vh;overflow:auto;"></div>
+  </div>
+</div>
+
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -681,6 +701,7 @@ let currentUser = null;
 // the real status here from ledger_sessions + ledger_payments + payment_splits,
 // using the exact same math as patient-profile.html → computeFinancials().
 let finMap = {};
+let lastVisitMap = {};   // P6 Recall: patient_id → newest completed-session date (YYYY-MM-DD)
 
 // ─── Utils ───
 function fmt(n){ return Number(n||0).toLocaleString('ar-SY'); }
@@ -714,6 +735,7 @@ async function loadPatients() {
 // current doctor; the .in() filter limits to the currently-loaded patients.
 async function loadFinancials() {
   finMap = {};
+  lastVisitMap = {};
   if (!patients.length) return;
   const ids = patients.map(p => p.id);
   ids.forEach(id => { finMap[id] = { completedTotal:0, plannedTotal:0, paid:0, allocated:0, unearned:0, hasSplits:false, chargeReductions:0, refunds:0 }; });
@@ -721,7 +743,7 @@ async function loadFinancials() {
   let sRes, pRes, spRes, aRes;
   try {
     [sRes, pRes, spRes, aRes] = await Promise.all([
-      window.sb.from('ledger_sessions').select('id,patient_id,cost,status').in('patient_id', ids),
+      window.sb.from('ledger_sessions').select('id,patient_id,cost,status,date').in('patient_id', ids),
       window.sb.from('ledger_payments').select('patient_id,amount').in('patient_id', ids),
       window.sb.from('payment_splits').select('patient_id,session_id,amount,is_unearned').in('patient_id', ids),
       window.sb.from('account_adjustments').select('patient_id,kind,amount').in('patient_id', ids)
@@ -739,6 +761,11 @@ async function loadFinancials() {
     const b = finMap[s.patient_id]; if (!b) return;
     if (st === 'planned') b.plannedTotal   += Number(s.cost || 0);
     else                  b.completedTotal += Number(s.cost || 0);
+    // P6 Recall: real last visit = newest COMPLETED session date per patient.
+    if (st === 'completed' && s.date) {
+      const cur = lastVisitMap[s.patient_id];
+      if (!cur || String(s.date) > String(cur)) lastVisitMap[s.patient_id] = String(s.date);
+    }
   });
   if (!pRes.error) (pRes.data || []).forEach(p => {
     const b = finMap[p.patient_id]; if (b) b.paid += Number(p.amount || 0);
@@ -1139,6 +1166,7 @@ function exportPatientsCsv(){
   if (!data || !data.user) { window.location.href = 'auth.html'; return; }
   currentUser = data.user;
   await loadPatients();
+  try { await loadPrmMeta(); } catch(e) { /* PRM is non-critical */ }
   // Apply URL filter param (deep-link from dashboard, e.g. ?filter=pending)
   applyUrlFilter();
 })();
@@ -1173,6 +1201,254 @@ document.addEventListener('DOMContentLoaded', function() {
   var topbar = document.querySelector('.topbar');
   if (topbar) topbar.insertBefore(btn, topbar.firstChild);
 });
+
+/* ============================================================
+   PRM — الاستدعاء الدوري + أعياد الميلاد (P6)
+   patients.html. يعتمد: patients, lastVisitMap (من loadFinancials),
+   currentUser, showToast, formatDate. واتساب عبر wa.me click-to-chat
+   (يعمل بسوريا — deep link لا الـCloud API المحجوب). معزول عن المالية.
+   ============================================================ */
+var PRM_RECALL_MONTHS = 6;     // يُحمّل من clinic_settings.recall_interval_months
+var PRM_COOLDOWN_DAYS = 30;    // لا تُعِد استدعاء من استُدعي خلال هذه المدة
+var PRM_CLINIC_NAME   = '';
+var prmRecentRecalls  = {};    // patient_id → آخر recalled_at (ms)
+var prmActiveTab      = 'recall';
+
+function prmEsc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// تطبيع رقم سوري لصيغة wa.me (أرقام فقط مع 963). نفس منطق appointments.html.
+function prmNormalizePhone(raw){
+  if (!raw) return null;
+  var p = String(raw).replace(/\D/g, '');
+  if (!p) return null;
+  if (p.indexOf('00') === 0) p = p.substring(2);
+  if (p.indexOf('0') === 0 && p.length >= 9) p = '963' + p.substring(1);
+  else if (p.indexOf('963') !== 0 && p.length === 9) p = '963' + p;
+  if (p.length < 10 || p.length > 15) return null;
+  return p;
+}
+
+async function loadPrmMeta(){
+  if (!currentUser) return;
+  // 1) إعداد فترة الاستدعاء + اسم العيادة (graceful لو العمود/الجدول مفقود)
+  try {
+    var cs = await window.sb.from('clinic_settings')
+      .select('recall_interval_months, clinic_name').eq('owner_id', currentUser.id).maybeSingle();
+    if (cs && cs.data) {
+      var m = parseInt(cs.data.recall_interval_months, 10);
+      if (!isNaN(m) && m > 0) PRM_RECALL_MONTHS = m;
+      PRM_CLINIC_NAME = cs.data.clinic_name || '';
+    }
+  } catch (e) { /* graceful */ }
+  // 2) سجل الاستدعاءات الأخيرة (للتهدئة) — آخر ~120 يوم
+  try {
+    var since = new Date(Date.now() - 120*86400000).toISOString();
+    var rr = await window.sb.from('patient_recalls')
+      .select('patient_id, recalled_at').eq('owner_id', currentUser.id)
+      .gte('recalled_at', since);
+    prmRecentRecalls = {};
+    if (rr && !rr.error && rr.data) rr.data.forEach(function(r){
+      var t = new Date(r.recalled_at).getTime();
+      if (!prmRecentRecalls[r.patient_id] || t > prmRecentRecalls[r.patient_id]) prmRecentRecalls[r.patient_id] = t;
+    });
+  } catch (e) { /* graceful (جدول مفقود قبل Migration 56) */ }
+  updatePrmBadge();
+}
+
+function prmThresholdDate(){
+  var d = new Date(); d.setHours(0,0,0,0);
+  d.setMonth(d.getMonth() - (PRM_RECALL_MONTHS || 6));
+  return d.toISOString().slice(0,10);
+}
+
+function prmRecallList(){
+  var th = prmThresholdDate();
+  var cooldownMs = (PRM_COOLDOWN_DAYS || 30) * 86400000;
+  var now = Date.now();
+  var out = [];
+  (patients || []).forEach(function(p){
+    var lv = lastVisitMap[p.id];
+    if (!lv) return;                 // لا جلسة مكتملة سابقة → ليس هدف استدعاء (مريض جديد)
+    if (String(lv) > th) return;     // زار خلال الفترة
+    var rr = prmRecentRecalls[p.id];
+    if (rr && (now - rr) < cooldownMs) return;  // استُدعي حديثاً
+    out.push({ p: p, lastVisit: lv });
+  });
+  out.sort(function(a,b){ return String(a.lastVisit).localeCompare(String(b.lastVisit)); }); // الأقدم أولاً
+  return out;
+}
+
+function prmDaysUntilBirthday(dob){
+  if (!dob) return null;
+  var d = new Date(dob); if (isNaN(d.getTime())) return null;
+  var now = new Date(); now.setHours(0,0,0,0);
+  var bd = new Date(now.getFullYear(), d.getMonth(), d.getDate()); bd.setHours(0,0,0,0);
+  if (bd.getTime() < now.getTime()) bd = new Date(now.getFullYear()+1, d.getMonth(), d.getDate());
+  return Math.round((bd.getTime() - now.getTime()) / 86400000);
+}
+
+function prmBirthdayList(){
+  var out = [];
+  (patients || []).forEach(function(p){
+    var dleft = prmDaysUntilBirthday(p.dob);
+    if (dleft === null || dleft < 0 || dleft > 7) return;
+    out.push({ p: p, daysLeft: dleft });
+  });
+  out.sort(function(a,b){ return a.daysLeft - b.daysLeft; });
+  return out;
+}
+
+function updatePrmBadge(){
+  var badge = document.getElementById('prmBadge');
+  if (!badge) return;
+  var recalls = prmRecallList().length;
+  var bdayToday = prmBirthdayList().filter(function(x){ return x.daysLeft === 0; }).length;
+  var total = recalls + bdayToday;   // الـbadge = إجراءات اليوم (استدعاءات متأخرة + أعياد اليوم)
+  if (total > 0) { badge.textContent = total; badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+
+function prmRecallMsg(p){
+  var first = ((p.name || '').trim().split(' ')[0]) || 'حضرتك';
+  var clinic = PRM_CLINIC_NAME || 'عيادتنا';
+  return 'مرحباً ' + first + '،\nنذكّرك بموعد المراجعة الدورية في ' + clinic + ' للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+}
+function prmBdayMsg(p){
+  var first = ((p.name || '').trim().split(' ')[0]) || '';
+  var clinic = PRM_CLINIC_NAME || 'عيادتنا';
+  return 'كل عام وأنت بخير ' + first + '! 🎉\nعائلة ' + clinic + ' تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
+}
+
+function prmWa(phone, msg){
+  var n = prmNormalizePhone(phone);
+  if (!n) { showToast('⚠️ رقم الهاتف غير صالح'); return; }
+  var url = 'https://wa.me/' + n + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+async function prmCopyText(text){
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    showToast('تم نسخ الرسالة ✓');
+  } catch (e) { showToast('⚠️ تعذّر النسخ'); }
+}
+
+function prmRowHtml(name, phone, sub, actionsHtml){
+  var phoneTxt = phone ? prmEsc(phone) : '<span style="color:var(--text2,#8da0bd);">بلا رقم</span>';
+  return '<div style="border:1px solid var(--border,#1e3556);border-radius:10px;padding:11px 13px;margin-bottom:9px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">'
+    + '<div style="flex:1;min-width:150px;">'
+      + '<div style="font-weight:700;color:var(--text,#e8eefc);">' + prmEsc(name) + '</div>'
+      + '<div style="font-size:12px;color:var(--text2,#8da0bd);margin-top:3px;">' + phoneTxt + (sub ? (' · ' + sub) : '') + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">' + actionsHtml + '</div>'
+  + '</div>';
+}
+
+function renderPrmRecall(){
+  var el = document.getElementById('prmRecallView');
+  if (!el) return;
+  var list = prmRecallList();
+  document.getElementById('prmRecallCount').textContent = list.length;
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:36px 16px;color:var(--text2,#8da0bd);">'
+      + '<div style="font-size:38px;">🔁</div>'
+      + '<div style="margin-top:8px;font-size:14px;">لا مرضى متأخّرين عن المراجعة (أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر).</div></div>';
+    return;
+  }
+  el.innerHTML = '<div style="font-size:12px;color:var(--text2,#8da0bd);padding:0 2px 10px;">مرضى لم يزوروا منذ أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر — <b style="color:var(--text,#e8eefc);">' + list.length + '</b> للاستدعاء.</div>'
+    + list.map(function(r){
+      var p = r.p;
+      var sub = 'آخر زيارة: ' + prmEsc(formatDate(r.lastVisit));
+      var phone = p.phone || '';
+      var waBtn = phone
+        ? '<button class="btn-sm" onclick="prmDoWaRecall(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
+        : '';
+      var actions = waBtn
+        + '<button class="btn-sm" onclick="prmDoCopyRecall(\'' + p.id + '\')" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>'
+        + '<button class="btn-sm" onclick="prmMarkRecalled(\'' + p.id + '\')" title="إخفاؤه من القائمة لمدة ' + (PRM_COOLDOWN_DAYS||30) + ' يوم" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--green,#2ee89e);">✓ تم</button>';
+      return prmRowHtml(p.name || '—', phone, sub, actions);
+    }).join('');
+}
+
+function renderPrmBday(){
+  var el = document.getElementById('prmBdayView');
+  if (!el) return;
+  var list = prmBirthdayList();
+  document.getElementById('prmBdayCount').textContent = list.length;
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:36px 16px;color:var(--text2,#8da0bd);">'
+      + '<div style="font-size:38px;">🎂</div>'
+      + '<div style="margin-top:8px;font-size:14px;">لا أعياد ميلاد خلال الأيام السبعة القادمة.</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(function(r){
+    var p = r.p;
+    var when = r.daysLeft === 0 ? '🎉 اليوم' : (r.daysLeft === 1 ? 'غداً' : ('بعد ' + r.daysLeft + ' أيام'));
+    var sub = 'عيد الميلاد: ' + when;
+    var phone = p.phone || '';
+    var waBtn = phone
+      ? '<button class="btn-sm" onclick="prmDoWaBday(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
+      : '';
+    var actions = waBtn
+      + '<button class="btn-sm" onclick="prmDoCopyBday(\'' + p.id + '\')" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>';
+    return prmRowHtml(p.name || '—', phone, sub, actions);
+  }).join('');
+}
+
+function _prmFind(id){ for (var i=0;i<(patients||[]).length;i++) if (patients[i].id === id) return patients[i]; return null; }
+
+function prmDoWaRecall(id){ var p=_prmFind(id); if(p) prmWa(p.phone, prmRecallMsg(p)); }
+function prmDoCopyRecall(id){ var p=_prmFind(id); if(p) prmCopyText(prmRecallMsg(p)); }
+function prmDoWaBday(id){ var p=_prmFind(id); if(p) prmWa(p.phone, prmBdayMsg(p)); }
+function prmDoCopyBday(id){ var p=_prmFind(id); if(p) prmCopyText(prmBdayMsg(p)); }
+
+async function prmMarkRecalled(id){
+  var p = _prmFind(id); if (!p) return;
+  prmRecentRecalls[id] = Date.now();   // إخفاء فوري متفائل
+  renderPrmRecall(); updatePrmBadge();
+  try {
+    var ins = await window.sb.from('patient_recalls')
+      .insert({ owner_id: currentUser.id, patient_id: id, channel: 'whatsapp' });
+    if (ins.error) throw ins.error;
+    showToast('تم تسجيل الاستدعاء ✓');
+  } catch (e) {
+    console.warn('prmMarkRecalled:', e);
+    showToast('⚠️ تعذّر تسجيل الاستدعاء (سيظهر مجدداً لاحقاً)');
+  }
+}
+
+function prmSwitchTab(which){
+  prmActiveTab = which;
+  var onR = which === 'recall';
+  document.getElementById('prmRecallView').style.display = onR ? '' : 'none';
+  document.getElementById('prmBdayView').style.display   = onR ? 'none' : '';
+  var tR = document.getElementById('prmTabRecall'), tB = document.getElementById('prmTabBday');
+  if (tR && tB) {
+    tR.style.background = onR ? 'var(--green,#2ee89e)' : 'transparent';
+    tR.style.color      = onR ? '#06371f' : 'var(--text2,#8da0bd)';
+    tB.style.background = onR ? 'transparent' : 'var(--green,#2ee89e)';
+    tB.style.color      = onR ? 'var(--text2,#8da0bd)' : '#06371f';
+  }
+}
+
+function openPrmModal(){
+  renderPrmRecall();
+  renderPrmBday();
+  prmSwitchTab('recall');
+  document.getElementById('prmModal').classList.add('open');
+}
+function prmClose(){
+  document.getElementById('prmModal').classList.remove('open');
+}
 </script>
 </body>
 </html>
