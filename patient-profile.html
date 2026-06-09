@@ -92,7 +92,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat-lbl{font-size:11px;color:var(--text2);}
 
 /* ── Tabs ── */
-.tabs{display:flex;gap:6px;margin-bottom:22px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:5px;width:fit-content;max-width:100%;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:5px;max-width:100%;}
 .tabs::-webkit-scrollbar{display:none;width:0;height:0;}
 .tab{padding:9px 20px;border:none;border-radius:9px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s;white-space:nowrap;flex-shrink:0;}
 .tab.active{background:var(--green);color:var(--bg);}
