@@ -1206,6 +1206,25 @@ textarea { resize: vertical; min-height: 72px; }
 </div>
 
 <!-- Toast -->
+<!-- P3-B (متمّم): Material Deduction Modal — يظهر بعد الإكمال الجماعي للعلاجات
+     المخطّطة. مرآة لـ matDeductModal في patient-profile.html (نفس الفلسفة:
+     قائمة مواد بكميات قابلة للتعديل + تأكيد/تخطّي)، بكلاسات مودالات هذه الصفحة. -->
+<div class="modal-overlay" id="apptMatDeductModal" onclick="if(event.target===this) closeApptMatDeductModal()">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <h2 class="modal-title">🧰 خصم مواد من المخزون</h2>
+      <button class="modal-close" type="button" onclick="closeApptMatDeductModal()">✕</button>
+    </div>
+    <div style="font-size:13px;color:var(--text2,#8da0bd);margin-bottom:14px;">
+      العلاجات المكتملة تستهلك المواد التالية (مجموع كل الجلسات). راجع الكميات (يمكن تعديلها) ثم أكّد الخصم، أو تخطَّ.
+    </div>
+    <div id="apptMatDeductRows" style="max-height:48vh;overflow:auto;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button type="button" onclick="closeApptMatDeductModal()" style="padding:10px 18px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;">تخطّي</button>
+      <button type="button" id="apptMatDeductBtn" onclick="apptConfirmMaterialDeduction()" style="padding:10px 18px;border:none;border-radius:8px;background:var(--green,#2ee89e);color:#06371f;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">تأكيد الخصم</button>
+    </div>
+  </div>
+</div>
 <!-- WhatsApp Reminder Modal -->
 <div class="modal-overlay" id="waReminderModal" onclick="if(event.target===this) closeWaReminderModal()">
   <div class="modal" style="max-width:540px;">
@@ -2696,6 +2715,146 @@ async function reallocateAfterNoShowFee(patientId) {
   } finally {
     _apptReallocateInFlight = false;
   }
+}
+
+// ─── P3-B (متمّم): خصم المواد بعد الإكمال الجماعي ─────────────────────────────
+// MIRROR لمنطق patient-profile.html (maybePromptMaterialDeduction +
+// confirmMaterialDeduction) مع فارق واحد: التجميع عبر عدّة جلسات مكتملة دفعةً
+// واحدة (كمية المادة = Σ qty_per_use × عدد الجلسات المستخدِمة للعلاج).
+// نفس ضمانات Rule #135: قراءة طازجة لحظة الخصم + clamp صفر + عزل تام (أي فشل
+// لا يمسّ الإكمال المنجز). ledger_sessions يخزّن type (اسم/label) لا
+// treatment_key، فنحلّ الاسم→UUID عبر جدول treatments (doctor_id — Rule #134:
+// treatment_materials.treatment_id هو الـUUID لا المفتاح النصي).
+var _apptMatDeductList = [];   // [{item_id, name, unit, qty, current}]
+
+async function apptPromptMaterialDeductionBulk(completedSessions) {
+  if (!completedSessions || !completedSessions.length || !currentUser) return;
+  // 1) أسماء العلاجات المميّزة + عدد الجلسات لكل اسم ('_other'/الحرّ لن يطابق)
+  var countByType = {};
+  completedSessions.forEach(function(s){
+    var t = (s && s.type) ? String(s.type) : '';
+    if (!t) return;
+    countByType[t] = (countByType[t] || 0) + 1;
+  });
+  var typeNames = Object.keys(countByType);
+  if (!typeNames.length) return;
+  // 2) حلّ الاسم/الـlabel → treatment UUID
+  var countByTreatmentId = {};
+  try {
+    var tr = await window.sb.from('treatments')
+      .select('id, name, label')
+      .eq('doctor_id', currentUser.id);
+    if (tr.error || !tr.data) return;
+    tr.data.forEach(function(t){
+      var n = (countByType[t.name] || 0) + (t.label && t.label !== t.name ? (countByType[t.label] || 0) : 0);
+      if (n > 0) countByTreatmentId[t.id] = (countByTreatmentId[t.id] || 0) + n;
+    });
+  } catch (e) { return; }
+  var treatmentIds = Object.keys(countByTreatmentId);
+  if (!treatmentIds.length) return;
+  // 3) مواد هذه العلاجات (BoM) — مجمّعة لكل صنف
+  var qtyByItem = {};
+  try {
+    var mats = await window.sb.from('treatment_materials')
+      .select('item_id, qty_per_use, treatment_id')
+      .eq('owner_id', currentUser.id)
+      .in('treatment_id', treatmentIds);
+    if (mats.error || !mats.data || !mats.data.length) return;  // لا مواد → لا مودال
+    mats.data.forEach(function(m){
+      var per = Number(m.qty_per_use) || 1;
+      var times = countByTreatmentId[m.treatment_id] || 0;
+      if (times <= 0) return;
+      qtyByItem[m.item_id] = (qtyByItem[m.item_id] || 0) + per * times;
+    });
+  } catch (e) { return; }  // graceful (جدول مفقود قبل Migration 53)
+  var itemIds = Object.keys(qtyByItem);
+  if (!itemIds.length) return;
+  // 4) تفاصيل الأصناف (تجاهل المحذوف/غير النشط)
+  var itemsById = {};
+  try {
+    var ir = await window.sb.from('inventory_items')
+      .select('id, name, unit, quantity, is_active')
+      .in('id', itemIds)
+      .eq('owner_id', currentUser.id);
+    if (!ir.error && ir.data) ir.data.forEach(function(it){ itemsById[it.id] = it; });
+  } catch (e) { return; }
+  _apptMatDeductList = [];
+  itemIds.forEach(function(id){
+    var it = itemsById[id];
+    if (!it || it.is_active === false) return;
+    _apptMatDeductList.push({
+      item_id: id, name: it.name, unit: it.unit || '',
+      qty: Math.round(qtyByItem[id] * 100) / 100,
+      current: Number(it.quantity) || 0
+    });
+  });
+  if (!_apptMatDeductList.length) return;
+  // 5) ابنِ الصفوف واعرض المودال (نفس صفوف patient-profile)
+  var rowsEl = document.getElementById('apptMatDeductRows');
+  if (!rowsEl) return;
+  rowsEl.innerHTML = _apptMatDeductList.map(function(m, idx){
+    return '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;padding:10px;background:var(--bg2,#0f2138);border:1px solid var(--border,#1e3556);border-radius:10px;">'
+      + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-weight:700;">' + escapeHtml(m.name) + '</div>'
+        + '<div style="font-size:11px;color:var(--text2,#8da0bd);margin-top:2px;">المتوفّر: ' + (Math.round(m.current*100)/100).toLocaleString('en-US') + (m.unit ? ' ' + escapeHtml(m.unit) : '') + '</div>'
+      + '</div>'
+      + '<input type="number" class="appt-mat-deduct-qty" data-idx="' + idx + '" value="' + m.qty + '" min="0" step="0.01" inputmode="decimal" style="width:80px;padding:8px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--bg3,#13284a);color:var(--text,#e8eefc);font-family:Cairo,sans-serif;font-size:13px;">'
+      + (m.unit ? '<span style="font-size:12px;color:var(--text2,#8da0bd);min-width:38px;">' + escapeHtml(m.unit) + '</span>' : '')
+    + '</div>';
+  }).join('');
+  var btn = document.getElementById('apptMatDeductBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'تأكيد الخصم'; }
+  var mod = document.getElementById('apptMatDeductModal');
+  if (mod) mod.classList.add('open');
+}
+
+function closeApptMatDeductModal() {
+  var mod = document.getElementById('apptMatDeductModal');
+  if (mod) mod.classList.remove('open');
+}
+
+async function apptConfirmMaterialDeduction() {
+  var btn = document.getElementById('apptMatDeductBtn');
+  if (btn && btn.disabled) return;
+  var inputs = document.querySelectorAll('#apptMatDeductRows .appt-mat-deduct-qty');
+  var toDeduct = [];
+  inputs.forEach(function(inp){
+    var idx = parseInt(inp.getAttribute('data-idx'), 10);
+    var q = parseFloat(inp.value);
+    if (isNaN(q) || q <= 0) return;          // تجاهل الصفر/الفارغ
+    var m = _apptMatDeductList[idx];
+    if (!m) return;
+    toDeduct.push({ item_id: m.item_id, qty: q });
+  });
+  if (!toDeduct.length) { closeApptMatDeductModal(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الخصم…'; }
+  var ok = 0, fail = 0;
+  for (var i=0; i<toDeduct.length; i++) {
+    var d = toDeduct[i];
+    try {
+      // قراءة طازجة لحظة الخصم (Rule #135 — تفادي race بين فتح المودال والتأكيد)
+      var fresh = await window.sb.from('inventory_items')
+        .select('quantity').eq('id', d.item_id).eq('owner_id', currentUser.id).single();
+      if (fresh.error) throw fresh.error;
+      var curQty = Number(fresh.data.quantity) || 0;
+      var newQty = curQty - d.qty;
+      if (newQty < 0) newQty = 0;   // clamp — لا تنزل تحت الصفر
+      var actualChange = newQty - curQty;
+      var insMov = await window.sb.from('inventory_movements').insert({
+        owner_id: currentUser.id, item_id: d.item_id,
+        change: actualChange, reason: 'consume', note: 'استهلاك تلقائي (إكمال موعد)'
+      });
+      if (insMov.error) throw insMov.error;
+      var upd = await window.sb.from('inventory_items')
+        .update({ quantity: newQty }).eq('id', d.item_id).eq('owner_id', currentUser.id);
+      if (upd.error) throw upd.error;
+      ok++;
+    } catch (e) { console.warn('appt deduct item failed:', e); fail++; }
+  }
+  closeApptMatDeductModal();
+  if (ok && !fail) showToast('تم خصم ' + ok + ' مادة من المخزون ✓');
+  else if (ok && fail) showToast('خُصمت ' + ok + ' مادة، وتعذّر ' + fail);
+  else showToast('⚠️ تعذّر خصم المواد');
 }
 
 // Apply the no-show fee: INSERT a ledger_sessions row for the patient at the
@@ -5370,6 +5529,7 @@ async function completeApptWithProcedures(apptIdParam, sessionIdsFilter) {
   if (btn) { btn.disabled = true; btn.textContent = 'جارٍ الإكمال…'; }
 
   var failed = 0;
+  var completedForDeduct = [];   // P3-B: الجلسات التي اكتملت فعلاً (لخصم المواد)
   for (var i=0; i<plannedOnes.length; i++) {
     var s = plannedOnes[i];
     // 1) update session — also rewrite provider_id when unifying.
@@ -5379,6 +5539,7 @@ async function completeApptWithProcedures(apptIdParam, sessionIdsFilter) {
       .update(sessPatch)
       .eq('id', s.id).eq('doctor_id', currentUser.id);
     if (u1.error) { failed++; console.error('session complete err:', u1.error); continue; }
+    completedForDeduct.push(s);
     // 2) update matching teeth_status row(s) — only if session has tooth_num
     if (s.tooth_num) {
       var teethPatch = { status: 'completed' };
@@ -5497,6 +5658,12 @@ async function completeApptWithProcedures(apptIdParam, sessionIdsFilter) {
     }
   }
   if (btn) { btn.disabled = false; btn.textContent = '✅ إكمال الموعد + كل العلاجات المخطّطة'; }
+  // P3-B (متمّم): المواد تُستهلك عند الإنجاز — اعرض مودال الخصم المجمّع للجلسات
+  // التي اكتملت فعلاً. معزول تماماً (try/catch): فشله لا يمسّ الإكمال المنجز.
+  // نقطة الربط الوحيدة هنا تغطي كل المستدعين (الزر الكامل + subset + dismissed).
+  try {
+    if (completedForDeduct.length) await apptPromptMaterialDeductionBulk(completedForDeduct);
+  } catch (e) { console.warn('material deduction skipped (bulk complete):', e); }
   // Phase 8C: callers (dismissedConfirmComplete) need to know whether the user
   // cancelled mid-flow (provider mismatch second prompt → cancel) vs. completed.
   return true;

@@ -7017,8 +7017,11 @@ async function saveToothTreatment() {
   showToast('✅ تمت إضافة ' + pendingToothLabel + ' للسن ' + currentTooth + ' (' + areaLabelToast + ')');
   // P3-B: الخصم التلقائي للمواد (مسار مخطّط الأسنان) — معزول داخل try/catch.
   // pendingToothStatus يحمل treatment.id (getTreatment يجده). يُتجاهل لو لا مادة.
+  // بوّابة الحالة: المواد تُستهلك عند الإنجاز لا عند التخطيط — الجلسة المخطّطة
+  // تطلب الخصم لاحقاً لحظة قلبها completed (completeSessionFromProfile /
+  // الإكمال الجماعي بالمواعيد)، لا هنا. completed فقط يمرّ.
   try {
-    if (pendingToothStatus && getTreatment(pendingToothStatus)) {
+    if (pendingTreatStatus === 'completed' && pendingToothStatus && getTreatment(pendingToothStatus)) {
       await maybePromptMaterialDeduction(pendingToothStatus, pendingToothLabel);
     }
   } catch (e) { console.warn('material deduction skipped (tooth):', e); }
@@ -7697,6 +7700,18 @@ async function completeSessionFromProfile(sessionId) {
   var toastMsg = '✅ تم إكمال العلاج';
   if (apptCompleted) toastMsg += ' • وأُكمل الموعد المرتبط تلقائياً';
   showToast(toastMsg);
+
+  // P3-B (متمّم): المواد تُستهلك عند الإنجاز — حفظ الجلسة المخطّطة لم يعد يطلب
+  // الخصم (بوّابة completed في saveToothTreatment/saveToothAndOpenLab)، فيُطلب
+  // هنا لحظة planned→completed. معزول تماماً (try/catch): فشله لا يمسّ الإكمال
+  // المنجز أعلاه. الربط بالاسم لأن ledger_sessions يخزّن type (اسم/label) لا
+  // treatment_key؛ الجلسات الحرّة (_other) لا تطابق → تُتجاهل بصمت.
+  try {
+    var _mdTr = (Array.isArray(TREATMENTS) ? TREATMENTS : []).find(function(t){
+      return t && (t.name === sess.type || t.label === sess.type);
+    });
+    if (_mdTr) await maybePromptMaterialDeduction(_mdTr.id, sess.type);
+  } catch (e) { console.warn('material deduction skipped (complete):', e); }
 }
 
 /* Phase 8B: Tooth-chart shortcut. When openToothModal detects a planned session on
@@ -9871,8 +9886,10 @@ async function saveToothAndOpenLab() {
 
   showToast('✅ تم حفظ الجلسة — أكمل بيانات المخبر');
   // P3-B: الخصم التلقائي للمواد (مسار السن + مخبر) — معزول داخل try/catch.
+  // بوّابة الحالة (مطابقة لـ saveToothTreatment): completed فقط؛ المخطّط يُخصم
+  // لاحقاً لحظة الإكمال.
   try {
-    if (pendingToothStatus && getTreatment(pendingToothStatus)) {
+    if (pendingTreatStatus === 'completed' && pendingToothStatus && getTreatment(pendingToothStatus)) {
       await maybePromptMaterialDeduction(pendingToothStatus, pendingToothLabel);
     }
   } catch (e) { console.warn('material deduction skipped (tooth+lab):', e); }
