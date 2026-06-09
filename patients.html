@@ -1212,6 +1212,11 @@ document.addEventListener('DOMContentLoaded', function() {
 var PRM_RECALL_MONTHS = 6;     // يُحمّل من clinic_settings.recall_interval_months
 var PRM_COOLDOWN_DAYS = 30;    // لا تُعِد استدعاء من استُدعي خلال هذه المدة
 var PRM_CLINIC_NAME   = '';
+var PRM_CLINIC_PHONE  = '';
+var PRM_RECALL_TPL    = '';    // من clinic_settings.whatsapp_recall_template
+var PRM_BDAY_TPL      = '';    // من clinic_settings.whatsapp_birthday_template
+var DEFAULT_RECALL_TPL = 'مرحباً {patient_first_name}،\nنذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+var DEFAULT_BDAY_TPL   = 'كل عام وأنت بخير {patient_first_name}! 🎉\nعائلة {clinic_name} تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
 var prmRecentRecalls  = {};    // patient_id → آخر recalled_at (ms)
 var prmActiveTab      = 'recall';
 
@@ -1238,11 +1243,14 @@ async function loadPrmMeta(){
   // 1) إعداد فترة الاستدعاء + اسم العيادة (graceful لو العمود/الجدول مفقود)
   try {
     var cs = await window.sb.from('clinic_settings')
-      .select('recall_interval_months, clinic_name').eq('owner_id', currentUser.id).maybeSingle();
+      .select('*').eq('owner_id', currentUser.id).maybeSingle();
     if (cs && cs.data) {
       var m = parseInt(cs.data.recall_interval_months, 10);
       if (!isNaN(m) && m > 0) PRM_RECALL_MONTHS = m;
-      PRM_CLINIC_NAME = cs.data.clinic_name || '';
+      PRM_CLINIC_NAME  = cs.data.clinic_name  || '';
+      PRM_CLINIC_PHONE = cs.data.clinic_phone || '';
+      PRM_RECALL_TPL   = cs.data.whatsapp_recall_template   || '';
+      PRM_BDAY_TPL     = cs.data.whatsapp_birthday_template || '';
     }
   } catch (e) { /* graceful */ }
   // 2) سجل الاستدعاءات الأخيرة (للتهدئة) — آخر ~120 يوم
@@ -1313,15 +1321,29 @@ function updatePrmBadge(){
   else badge.style.display = 'none';
 }
 
+function prmApplyPlaceholders(tpl, data){
+  var out = tpl || '';
+  Object.keys(data).forEach(function(k){
+    out = out.split('{' + k + '}').join(data[k] == null ? '' : String(data[k]));
+  });
+  return out;
+}
+function prmMsgData(p){
+  var full = (p.name || '').trim();
+  return {
+    patient_name: full || 'المريض',
+    patient_first_name: (full.split(' ')[0]) || full || 'حضرتك',
+    clinic_name: PRM_CLINIC_NAME || 'عيادتنا',
+    clinic_phone: PRM_CLINIC_PHONE || ''
+  };
+}
 function prmRecallMsg(p){
-  var first = ((p.name || '').trim().split(' ')[0]) || 'حضرتك';
-  var clinic = PRM_CLINIC_NAME || 'عيادتنا';
-  return 'مرحباً ' + first + '،\nنذكّرك بموعد المراجعة الدورية في ' + clinic + ' للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+  var tpl = (PRM_RECALL_TPL && PRM_RECALL_TPL.trim()) ? PRM_RECALL_TPL : DEFAULT_RECALL_TPL;
+  return prmApplyPlaceholders(tpl, prmMsgData(p));
 }
 function prmBdayMsg(p){
-  var first = ((p.name || '').trim().split(' ')[0]) || '';
-  var clinic = PRM_CLINIC_NAME || 'عيادتنا';
-  return 'كل عام وأنت بخير ' + first + '! 🎉\nعائلة ' + clinic + ' تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
+  var tpl = (PRM_BDAY_TPL && PRM_BDAY_TPL.trim()) ? PRM_BDAY_TPL : DEFAULT_BDAY_TPL;
+  return prmApplyPlaceholders(tpl, prmMsgData(p));
 }
 
 function prmWa(phone, msg){

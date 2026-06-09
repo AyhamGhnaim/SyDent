@@ -575,6 +575,27 @@ textarea::placeholder { color: var(--text2); }
         <textarea id="fTemplate" placeholder="اكتب قالب الرسالة هنا..."></textarea>
       </div>
 
+      <div class="form-group">
+        <label>قالب رسالة الاستدعاء الدوري (متابعة)</label>
+        <div class="wa-placeholders">
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{patient_first_name}')">{patient_first_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{patient_name}')">{patient_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{clinic_name}')">{clinic_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{clinic_phone}')">{clinic_phone}</span>
+        </div>
+        <textarea id="fRecallTemplate" placeholder="رسالة استدعاء المريض للمراجعة الدورية..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>قالب رسالة عيد الميلاد</label>
+        <div class="wa-placeholders">
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fBdayTemplate','{patient_first_name}')">{patient_first_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fBdayTemplate','{patient_name}')">{patient_name}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fBdayTemplate','{clinic_name}')">{clinic_name}</span>
+        </div>
+        <textarea id="fBdayTemplate" placeholder="رسالة تهنئة بعيد الميلاد..."></textarea>
+      </div>
+
       <div class="wa-actions-row">
         <button type="button" class="btn btn-primary" id="btnSaveWa" onclick="saveClinicSettings()">💾 حفظ الإعدادات</button>
         <button type="button" class="btn-secondary" onclick="previewTemplate()">👁️ معاينة الرسالة</button>
@@ -811,6 +832,15 @@ const DEFAULT_WA_TEMPLATE =
 '👨‍⚕️ الطبيب: {doctor_name}\n\n' +
 'الرجاء تأكيد الحضور 🙏';
 
+// P6 — recall + birthday default templates (used if the clinic hasn't customized).
+const DEFAULT_RECALL_TEMPLATE =
+'مرحباً {patient_first_name}،\n' +
+'نذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+
+const DEFAULT_BIRTHDAY_TEMPLATE =
+'كل عام وأنت بخير {patient_first_name}! 🎉\n' +
+'عائلة {clinic_name} تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
+
 let CLINIC_SETTINGS_WA = null;
 
 // Load (or auto-create) the clinic_settings row for this owner. Auto-creation
@@ -878,6 +908,10 @@ function applyWaSettingsToForm(s) {
   var recallEl = document.getElementById('fRecallMonths');
   if (recallEl) recallEl.value = safe.recall_interval_months || 6;
   document.getElementById('fTemplate').value    = safe.whatsapp_reminder_template || DEFAULT_WA_TEMPLATE;
+  var recallTplEl = document.getElementById('fRecallTemplate');
+  if (recallTplEl) recallTplEl.value = safe.whatsapp_recall_template || DEFAULT_RECALL_TEMPLATE;
+  var bdayTplEl = document.getElementById('fBdayTemplate');
+  if (bdayTplEl) bdayTplEl.value = safe.whatsapp_birthday_template || DEFAULT_BIRTHDAY_TEMPLATE;
   const sw = document.getElementById('waSwitch');
   if (safe.whatsapp_reminders_enabled) sw.classList.add('on');
   else sw.classList.remove('on');
@@ -894,6 +928,17 @@ function insertPlaceholder(ph) {
   const before = ta.value.substring(0, start);
   const after  = ta.value.substring(end);
   ta.value = before + ph + after;
+  const pos = start + ph.length;
+  ta.focus();
+  ta.setSelectionRange(pos, pos);
+}
+
+// Generic placeholder insert for any template textarea (recall/birthday).
+function insertPlaceholderInto(elId, ph) {
+  const ta = document.getElementById(elId);
+  if (!ta) return;
+  const start = ta.selectionStart || 0, end = ta.selectionEnd || 0;
+  ta.value = ta.value.substring(0, start) + ph + ta.value.substring(end);
   const pos = start + ph.length;
   ta.focus();
   ta.setSelectionRange(pos, pos);
@@ -961,6 +1006,10 @@ async function saveClinicSettings() {
   const recallRaw   = parseInt((document.getElementById('fRecallMonths') || {}).value, 10);
   const recallMonths= (isNaN(recallRaw) || recallRaw < 1) ? 6 : Math.min(recallRaw, 60);
   const template    = document.getElementById('fTemplate').value.trim() || DEFAULT_WA_TEMPLATE;
+  const recallTplRaw   = (document.getElementById('fRecallTemplate') || {}).value;
+  const recallTemplate   = (recallTplRaw && recallTplRaw.trim()) ? recallTplRaw.trim() : DEFAULT_RECALL_TEMPLATE;
+  const bdayTplRaw     = (document.getElementById('fBdayTemplate') || {}).value;
+  const birthdayTemplate = (bdayTplRaw && bdayTplRaw.trim()) ? bdayTplRaw.trim() : DEFAULT_BIRTHDAY_TEMPLATE;
 
   const btn = document.getElementById('btnSaveWa');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
@@ -973,6 +1022,8 @@ async function saveClinicSettings() {
     whatsapp_reminder_hours_before: hours,
     whatsapp_reminder_template: template,
     recall_interval_months: recallMonths,
+    whatsapp_recall_template: recallTemplate,
+    whatsapp_birthday_template: birthdayTemplate,
     updated_at: new Date().toISOString()
   };
 
@@ -988,17 +1039,25 @@ async function saveClinicSettings() {
     .upsert(payload, { onConflict: 'owner_id' })
     .select().single();
 
-  // Graceful: if recall_interval_months doesn't exist yet (Migration 56 not
-  // applied), drop it and retry so WhatsApp settings still save without error.
+  // Graceful: if any of the newer optional columns don't exist yet (migration
+  // not applied), drop the offending column and retry so the core WhatsApp
+  // settings still save without error. Loops in case more than one is missing.
   let _data = data, _error = error;
-  if (_error) {
+  const _optionalCols = ['recall_interval_months', 'whatsapp_recall_template', 'whatsapp_birthday_template'];
+  let _guard = 0;
+  while (_error && _guard < 5) {
     const em = (_error.message || '') + ' ' + (_error.code || '');
-    if (/recall_interval_months/i.test(em) || /\b42703\b|PGRST204/i.test(em)) {
-      delete payload.recall_interval_months;
-      const retry = await window.sb.from('clinic_settings')
-        .upsert(payload, { onConflict: 'owner_id' }).select().single();
-      _data = retry.data; _error = retry.error;
+    if (!/\b42703\b|PGRST204/i.test(em)) break;      // not a missing-column error
+    let _dropped = null;
+    for (let i = 0; i < _optionalCols.length; i++) {
+      const c = _optionalCols[i];
+      if (em.indexOf(c) !== -1 && (c in payload)) { delete payload[c]; _dropped = c; break; }
     }
+    if (!_dropped) break;                              // missing column isn't droppable
+    const retry = await window.sb.from('clinic_settings')
+      .upsert(payload, { onConflict: 'owner_id' }).select().single();
+    _data = retry.data; _error = retry.error;
+    _guard++;
   }
 
   btn.disabled = false; btn.textContent = '💾 حفظ الإعدادات';
