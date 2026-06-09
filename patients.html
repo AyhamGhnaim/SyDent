@@ -13,7 +13,7 @@
 <title>SyDent — المرضى</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260608c"></script>
+<script src="theme.js?v=20260608d"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -480,10 +480,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260608c">
+<link rel="stylesheet" href="theme.css?v=20260608d">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260608c"></script>
-<script src="sidebar.js?v=20260608c"></script>
+<script src="supabase-init.js?v=20260608d"></script>
+<script src="sidebar.js?v=20260608d"></script>
 </head>
 <body>
 <script>
@@ -743,7 +743,7 @@ async function loadFinancials() {
   let sRes, pRes, spRes, aRes;
   try {
     [sRes, pRes, spRes, aRes] = await Promise.all([
-      window.sb.from('ledger_sessions').select('id,patient_id,cost,status,date').in('patient_id', ids),
+      window.sb.from('ledger_sessions').select('id,patient_id,cost,status,date,description').in('patient_id', ids),
       window.sb.from('ledger_payments').select('patient_id,amount').in('patient_id', ids),
       window.sb.from('payment_splits').select('patient_id,session_id,amount,is_unearned').in('patient_id', ids),
       window.sb.from('account_adjustments').select('patient_id,kind,amount').in('patient_id', ids)
@@ -761,8 +761,9 @@ async function loadFinancials() {
     const b = finMap[s.patient_id]; if (!b) return;
     if (st === 'planned') b.plannedTotal   += Number(s.cost || 0);
     else                  b.completedTotal += Number(s.cost || 0);
-    // P6 Recall: real last visit = newest COMPLETED session date per patient.
-    if (st === 'completed' && s.date) {
+    // P6 Recall: real last visit = newest COMPLETED treatment session per patient.
+    // Exclude no-show fee rows (status 'completed' but the patient did NOT attend).
+    if (st === 'completed' && s.date && s.description !== 'رسم عدم الحضور') {
       const cur = lastVisitMap[s.patient_id];
       if (!cur || String(s.date) > String(cur)) lastVisitMap[s.patient_id] = String(s.date);
     }
