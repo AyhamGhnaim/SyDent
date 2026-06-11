@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260611c"></script>
+<script src="theme.js?v=20260611d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260611c"></script>
-<script src="sidebar.js?v=20260611c"></script>
-<script src="timepicker.js?v=20260611c"></script>
+<script src="supabase-init.js?v=20260611d"></script>
+<script src="sidebar.js?v=20260611d"></script>
+<script src="timepicker.js?v=20260611d"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -687,7 +687,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260611c">
+<link rel="stylesheet" href="theme.css?v=20260611d">
 </head>
 <body>
 <script>
@@ -5290,14 +5290,50 @@ function printChart(){
   h += ' &nbsp;•&nbsp; الإطباق: ' + dentLbl;
   if (filtLbl) h += ' &nbsp;•&nbsp; <strong>عرض مفلتر:</strong> ' + filtLbl;
   h += '</div>';
-  // Self-contained clone — ROOT CAUSE of the black-roots print bug: while printing,
-  // the live chart sits under body.printing's display:none, and SVG paint servers
-  // (gradients / clipPaths) referenced ACROSS into a hidden subtree don't resolve
-  // (the clone's url(#id) hit the ORIGINAL hidden defs first — duplicate ids).
-  // Prefixing every id + url(#)/href(#) makes the clone resolve against ITS OWN
-  // visible defs, and kills the duplicate-id ambiguity as a bonus. Both quote
-  // styles are covered (facial builders use ", pontic/implant builders use ').
-  var jwHtml = jw.outerHTML
+  // Self-contained FLAT clone — two distinct print bugs are handled here:
+  // (1) WebKit (iOS Safari) rasterizes SVG gradient fills as BLACK in print
+  //     output even when the url(#) refs resolve correctly on screen. Fix:
+  //     flatten EVERY gradient to a solid color taken from that gradient's
+  //     OWN stops (middle non-transparent stop) — works for dynamic gradients
+  //     too (pontic 'pg' / implant shading derive from the live treatment
+  //     palette, so no hardcoded map could cover them). Transparent-core rim/
+  //     shadow rings ('rs'/'sh') become none — flattening those would paint a
+  //     brown wash over the whole tooth. Gradient defs are then REMOVED so no
+  //     renderer can ever paint an unresolved server black.
+  // (2) Duplicate ids vs the display:none original (clipPaths remain id-based):
+  //     prefix every id + url(#)/href(#) so the clone resolves only against
+  //     its own visible defs. Both quote styles covered (' and ").
+  var tmp = jw.cloneNode(true);
+  var gradMap = {};
+  tmp.querySelectorAll('linearGradient,radialGradient').forEach(function(g){
+    var gidv = g.getAttribute('id') || '';
+    var pick = null;
+    if (!/^(rs|sh)/.test(gidv)) {
+      var stops = g.querySelectorAll('stop');
+      for (var si = 0; si < stops.length; si++) {
+        var sc = stops[si].getAttribute('stop-color') || '';
+        var so = stops[si].getAttribute('stop-opacity');
+        if (/^rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/.test(sc.replace(/\s+/g,''))) continue;  // alpha-0 stop
+        if (so !== null && parseFloat(so) === 0) continue;
+        pick = sc;
+        if (si >= Math.floor(stops.length / 2)) break;   // settle on a middle-ish tone
+      }
+    }
+    gradMap[gidv] = pick;                                // null → decorative ring/shadow → 'none'
+    if (g.parentNode) g.parentNode.removeChild(g);
+  });
+  var allEls = tmp.querySelectorAll('*');
+  for (var ei = 0; ei < allEls.length; ei++) {
+    var pel = allEls[ei];
+    for (var ai = 0; ai < 2; ai++) {
+      var att = ai ? 'stroke' : 'fill';
+      var v = pel.getAttribute && pel.getAttribute(att);
+      if (!v || v.indexOf('url(#') !== 0) continue;
+      var rid = v.slice(5, -1);
+      if (rid in gradMap) pel.setAttribute(att, gradMap[rid] || 'none');  // clipPath refs aren't in the map → untouched
+    }
+  }
+  var jwHtml = tmp.outerHTML
     .replace(/id="/g,  'id="prn-')
     .replace(/id='/g,  "id='prn-")
     .replace(/url\(#/g, 'url(#prn-')
