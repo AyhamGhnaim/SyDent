@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260611d"></script>
+<script src="theme.js?v=20260611e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260611d"></script>
-<script src="sidebar.js?v=20260611d"></script>
-<script src="timepicker.js?v=20260611d"></script>
+<script src="supabase-init.js?v=20260611e"></script>
+<script src="sidebar.js?v=20260611e"></script>
+<script src="timepicker.js?v=20260611e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -687,7 +687,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260611d">
+<link rel="stylesheet" href="theme.css?v=20260611e">
 </head>
 <body>
 <script>
@@ -5296,9 +5296,12 @@ function printChart(){
   //     flatten EVERY gradient to a solid color taken from that gradient's
   //     OWN stops (middle non-transparent stop) — works for dynamic gradients
   //     too (pontic 'pg' / implant shading derive from the live treatment
-  //     palette, so no hardcoded map could cover them). Transparent-core rim/
-  //     shadow rings ('rs'/'sh') become none — flattening those would paint a
-  //     brown wash over the whole tooth. Gradient defs are then REMOVED so no
+  //     palette, so no hardcoded map could cover them). Transparent-FADING
+  //     decorative overlays — rim/shadow rings (rs/sh), fossa pits (fo), cusp
+  //     eminences/cores (cu/cc), sheens/highlights (oh/hi/pk) — become none:
+  //     flattened to solid they read as dark caries-like dots / white blobs /
+  //     a flat wash on paper. The stroked grooves carry the printed anatomy.
+  //     Gradient defs are then REMOVED so no
   //     renderer can ever paint an unresolved server black.
   // (2) Duplicate ids vs the display:none original (clipPaths remain id-based):
   //     prefix every id + url(#)/href(#) so the clone resolves only against
@@ -5308,7 +5311,7 @@ function printChart(){
   tmp.querySelectorAll('linearGradient,radialGradient').forEach(function(g){
     var gidv = g.getAttribute('id') || '';
     var pick = null;
-    if (!/^(rs|sh)/.test(gidv)) {
+    if (!/^(rs|sh|fo|cc|cu|oh|hi|pk)/.test(gidv)) {
       var stops = g.querySelectorAll('stop');
       for (var si = 0; si < stops.length; si++) {
         var sc = stops[si].getAttribute('stop-color') || '';
