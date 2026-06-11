@@ -603,6 +603,72 @@ textarea::placeholder { color: var(--text2); }
       </div>
     </div>
 
+    <!-- ═══ P5: Online Booking Portal (بوابة الحجز الإلكتروني) ═══ -->
+    <div class="section" style="border-color: rgba(46,232,158,0.25);" id="bookingSection">
+      <div class="section-title">🌐 الحجز الإلكتروني</div>
+      <div class="section-sub">بوابة عامة يحجز منها مرضاك بأنفسهم — يصلك الطلب في تبويب «طلبات الحجز» بصفحة المواعيد وتؤكّده بنقرة. <strong style="color:var(--green)">بلا تسجيل وبلا تطبيقات للمريض.</strong></div>
+      <div id="bookingMigNotice" style="display:none;padding:10px 12px;border-radius:10px;background:rgba(232,93,93,0.1);border:1px solid rgba(232,93,93,0.35);font-size:13px;margin-bottom:12px;">⚠️ يلزم تطبيق <b>Migration 59</b> على قاعدة البيانات لتفعيل هذا القسم.</div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="bkEnabled" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;">
+        <label for="bkEnabled" style="margin:0;cursor:pointer;font-weight:700;">تفعيل بوابة الحجز الإلكتروني</label>
+      </div>
+
+      <div class="form-group">
+        <label>أيام الدوام</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay6" style="accent-color:var(--green);"> السبت</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay0" style="accent-color:var(--green);"> الأحد</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay1" style="accent-color:var(--green);"> الاثنين</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay2" style="accent-color:var(--green);"> الثلاثاء</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay3" style="accent-color:var(--green);"> الأربعاء</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay4" style="accent-color:var(--green);"> الخميس</label>
+          <label style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.05);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:13px;"><input type="checkbox" id="bkDay5" style="accent-color:var(--green);"> الجمعة</label>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">
+        <div class="form-group" style="flex:1;min-width:130px;">
+          <label>بداية الدوام</label>
+          <input type="time" id="bkStart" value="10:00">
+        </div>
+        <div class="form-group" style="flex:1;min-width:130px;">
+          <label>نهاية الدوام</label>
+          <input type="time" id="bkEnd" value="18:00">
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px;">
+        <div class="form-group" style="flex:1;min-width:130px;">
+          <label>مدة الموعد على البوابة</label>
+          <select id="bkSlot">
+            <option value="30">30 دقيقة</option>
+            <option value="45">45 دقيقة</option>
+            <option value="60">ساعة</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1;min-width:130px;">
+          <label>أقصى مدى للحجز (أيام)</label>
+          <input type="number" id="bkMaxDays" min="1" max="35" value="30">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>ملاحظة تظهر للمريض على البوابة (اختياري)</label>
+        <textarea id="bkNote" maxlength="300" placeholder="مثال: العنوان — شارع الجلاء، بناء رقم 12. الحجز للكشف فقط."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>رابط بوابة الحجز — شاركه على واتساب وفيسبوك العيادة</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="bkLink" readonly style="flex:1;direction:ltr;text-align:left;font-size:12.5px;">
+          <button type="button" class="btn btn-primary" style="flex:0 0 auto;" onclick="copyBookingLink()">📋 نسخ</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="btnSaveBooking" onclick="saveBookingSettings()">💾 حفظ إعدادات الحجز</button>
+    </div>
+
     <h2 class="settings-group-title">🛠️ متقدّم</h2>
     <!-- Bug #2: Backfill orphaned payment splits -->
     <div class="section">
@@ -790,6 +856,103 @@ function showToast(msg, isError = false) {
 }
 
 // ─── Init ───
+// ═══ P5: Online booking settings (إعدادات بوابة الحجز الإلكتروني) ═══
+// Reads from CLINIC_SETTINGS_WA (the full clinic_settings row, select('*'),
+// loaded by loadClinicSettingsWa right before us in init). Post-Migration-59
+// that row contains the booking_* columns; their ABSENCE from the object is
+// the definitive "migration missing" signal (Δ4) — zero extra queries.
+async function loadBookingSettings() {
+  var row = (typeof CLINIC_SETTINGS_WA !== 'undefined') ? CLINIC_SETTINGS_WA : null;
+  if (!row && currentUser) {
+    try {
+      const res = await window.sb.from('clinic_settings')
+        .select('*').eq('owner_id', currentUser.id).maybeSingle();
+      row = res.data || null;
+    } catch (e) { row = null; }
+  }
+  if (!row || !('booking_enabled' in row)) {
+    var n = document.getElementById('bookingMigNotice');
+    if (n) n.style.display = 'block';
+    var b = document.getElementById('btnSaveBooking');
+    if (b) b.disabled = true;
+    return;
+  }
+  document.getElementById('bkEnabled').checked = !!row.booking_enabled;
+  var days = String(row.booking_work_days || '0,1,2,3,4,6').split(',').map(function(s){ return s.trim(); });
+  ['0','1','2','3','4','5','6'].forEach(function(d){
+    var cb = document.getElementById('bkDay' + d);
+    if (cb) cb.checked = days.indexOf(d) !== -1;
+  });
+  document.getElementById('bkStart').value = String(row.booking_work_start || '10:00').slice(0,5);
+  document.getElementById('bkEnd').value   = String(row.booking_work_end   || '18:00').slice(0,5);
+  var slotSel = document.getElementById('bkSlot');
+  slotSel.value = String(row.booking_slot_minutes || 30);
+  if (slotSel.value !== String(row.booking_slot_minutes || 30)) slotSel.value = '30';
+  document.getElementById('bkMaxDays').value = row.booking_max_days_ahead || 30;
+  document.getElementById('bkNote').value = row.booking_note || '';
+  var base = (location.origin && /^https?:/.test(location.origin)) ? location.origin : 'https://sydent.app';
+  document.getElementById('bkLink').value = base + '/book.html?c=' + currentUser.id;
+}
+
+async function saveBookingSettings() {
+  if (!currentUser) return;
+  var days = [];
+  ['0','1','2','3','4','5','6'].forEach(function(d){
+    var cb = document.getElementById('bkDay' + d);
+    if (cb && cb.checked) days.push(d);
+  });
+  if (days.length === 0) { showToast('⚠️ اختر يوم دوام واحداً على الأقل', true); return; }   // Δ6
+  var start = document.getElementById('bkStart').value;
+  var end   = document.getElementById('bkEnd').value;
+  if (!start || !end || end <= start) { showToast('⚠️ تحقق من ساعات الدوام — النهاية يجب أن تكون بعد البداية', true); return; }
+  var btn = document.getElementById('btnSaveBooking');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
+  // Δ3: the proven house pattern (same as saveClinicSettings) — named columns
+  // only, so the WhatsApp/recall columns are never touched by this save.
+  var payload = {
+    owner_id: currentUser.id,
+    booking_enabled: document.getElementById('bkEnabled').checked,
+    booking_slot_minutes: parseInt(document.getElementById('bkSlot').value, 10) || 30,
+    booking_work_days: days.join(','),
+    booking_work_start: start,
+    booking_work_end: end,
+    booking_max_days_ahead: Math.min(35, Math.max(1, parseInt(document.getElementById('bkMaxDays').value, 10) || 30)),
+    booking_note: (document.getElementById('bkNote').value || '').trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await window.sb.from('clinic_settings')
+    .upsert(payload, { onConflict: 'owner_id' });
+  btn.disabled = false; btn.textContent = '💾 حفظ إعدادات الحجز';
+  if (error) {
+    var em = (error.message || '') + ' ' + (error.code || '');
+    if (/\b42703\b|PGRST204/i.test(em)) {
+      var n = document.getElementById('bookingMigNotice');
+      if (n) n.style.display = 'block';
+      showToast('⚠️ يلزم تطبيق Migration 59 أولاً', true);
+    } else {
+      showToast('❌ ' + (error.message || 'فشل الحفظ'), true);
+    }
+    return;
+  }
+  showToast('✅ حُفظت إعدادات الحجز');
+}
+
+async function copyBookingLink() {
+  var link = document.getElementById('bkLink').value;
+  if (!link) return;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(link);
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = link; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+    }
+    showToast('📋 تم نسخ رابط البوابة');
+  } catch (e) { showToast('تعذّر النسخ — انسخ يدوياً', true); }
+}
+
 (async function init() {
   await new Promise(r => setTimeout(r, 80));
   const { data } = await window.sb.auth.getUser();
@@ -814,6 +977,7 @@ function showToast(msg, isError = false) {
   await loadAppointmentTypes();
   // Phase 2A: load WhatsApp Reminders settings (fault-tolerant)
   await loadClinicSettingsWa();
+  await loadBookingSettings();
   // Bug #2: auto-scan for orphaned payment splits (fault-tolerant)
   await scanOrphanedPayments();
 })();

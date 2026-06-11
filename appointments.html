@@ -950,6 +950,7 @@ textarea { resize: vertical; min-height: 72px; }
       <button class="view-btn" id="btnDay"   onclick="setView('day')">🕐 يومي</button>
       <button class="view-btn" id="btnList"  onclick="setView('list')">☰ قائمة</button>
       <button class="view-btn" id="btnCalls" onclick="setView('calls')">📞 اتصالات</button>
+      <button class="view-btn" id="btnBooking" onclick="setView('booking')">🌐 طلبات الحجز<span id="bookingBadge" style="display:none;background:var(--red,#e85d5d);color:#fff;border-radius:10px;padding:0 7px;margin-inline-start:6px;font-size:0.72rem;font-weight:800;"></span></button>
     </div>
     <button class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block>＋ موعد جديد</button>
   </div>
@@ -1027,6 +1028,13 @@ textarea { resize: vertical; min-height: 72px; }
 
     <div id="callsView" class="list-view" style="display:none;">
       <div id="callsContent"></div>
+    </div>
+
+    <!-- P5: online booking requests — NO <form> here on purpose:
+         openModal() resets document.querySelector('form') (the appointment
+         modal); an earlier form in the DOM would hijack that reset. -->
+    <div id="bookingView" class="list-view" style="display:none;">
+      <div id="bookingContent"></div>
     </div>
 
     </div><!-- /scheduleView -->
@@ -2103,7 +2111,8 @@ function setView(v) {
   document.getElementById('dayView').style.display   = v==='day'   ? 'block' : 'none';
   document.getElementById('listView').style.display  = v==='list'  ? 'block' : 'none';
   document.getElementById('callsView').style.display = v==='calls' ? 'block' : 'none';
-  ['btnMonth','btnDay','btnList','btnCalls'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById('bookingView').style.display = v==='booking' ? 'block' : 'none';
+  ['btnMonth','btnDay','btnList','btnCalls','btnBooking'].forEach(id => document.getElementById(id).classList.remove('active'));
   document.getElementById('btn'+v.charAt(0).toUpperCase()+v.slice(1)).classList.add('active');
   render();
 }
@@ -3887,6 +3896,7 @@ function render() {
     _applyK3ViewMode(getDayViewMode());
   }
   else if (view==='calls') renderCalls();
+  else if (view==='booking') renderBookingRequests();
   else renderList();
 }
 
@@ -5811,7 +5821,7 @@ async function deleteApptFromModal() {
   await loadAppointments();
 }
 
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); window._bookingConfirmCtx = null; }
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target===this) closeModal();
 });
@@ -6345,6 +6355,7 @@ async function submitAppt(e) {
       // attach in edit mode" flow confusing. Now attachment happens
       // atomically as part of the save action.
       var _newApptId = (ins.data && ins.data.id) ? ins.data.id : null;
+      if (_newApptId && window._bookingConfirmCtx) bookingMarkConfirmed(_newApptId);  // P5: link confirmed booking request (must run BEFORE closeModal clears ctx)
       closeModal();
       // Gap 7: after adding a planned appt, jump straight to planned tab
       if (isPlannedNow) setMainTab('planned');
@@ -6538,6 +6549,218 @@ async function apptDeleteFile(id){
 })();
 
 // ─── Init ────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// P5 — Online Booking Requests (بوابة الحجز الإلكتروني) — reception side.
+// Patients submit via the public book.html portal (anon RPCs, Migration 59).
+// Pending requests land here; ✅ opens the normal appointment modal
+// prefilled, the save goes through submitAppt (the one battle-tested path),
+// and the post-insert hook links the request via bookingMarkConfirmed.
+// Table may not exist yet (Migration 59 not applied) → graceful notice.
+// ═══════════════════════════════════════════════════════════════
+var bookingRequests = [];
+var _bookingTableMissing = false;
+window._bookingConfirmCtx = null;
+
+async function loadBookingRequests() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await window.sb
+      .from('booking_requests')
+      .select('*')
+      .eq('clinic_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) {
+      const em = (error.message || '') + ' ' + (error.code || '');
+      _bookingTableMissing = /relation .* does not exist|42P01|PGRST205/i.test(em);
+      if (!_bookingTableMissing) console.warn('P5 booking load:', error);
+      bookingRequests = [];
+    } else {
+      _bookingTableMissing = false;
+      bookingRequests = data || [];
+    }
+  } catch (e) {
+    console.warn('P5 booking load:', e);
+    bookingRequests = [];
+  }
+  updateBookingBadge();
+  if (view === 'booking') renderBookingRequests();
+}
+
+function updateBookingBadge() {
+  var b = document.getElementById('bookingBadge');
+  if (!b) return;
+  var n = 0;
+  for (var i = 0; i < bookingRequests.length; i++) {
+    if (bookingRequests[i].status === 'pending') n++;
+  }
+  b.textContent = n;
+  b.style.display = n > 0 ? 'inline-block' : 'none';
+}
+
+function bookingFmtDate(ds) {
+  if (!ds) return '—';
+  var d = new Date(ds + 'T00:00:00');
+  if (isNaN(d.getTime())) return ds;
+  return DAYS_AR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_AR[d.getMonth()];
+}
+
+function bookingIsPast(req) {
+  var t = (req.requested_time && /^\d{2}:\d{2}/.test(req.requested_time)) ? req.requested_time.slice(0,5) : '23:59';
+  var d = new Date(req.requested_date + 'T' + t + ':00');
+  return !isNaN(d.getTime()) && d.getTime() < Date.now();
+}
+
+function bookingAgo(iso) {
+  if (!iso) return '';
+  var diff = Date.now() - new Date(iso).getTime();
+  if (isNaN(diff) || diff < 0) return '';
+  var m = Math.floor(diff / 60000);
+  if (m < 60) return 'قبل ' + (m <= 1 ? 'دقيقة' : m + ' دقيقة');
+  var h = Math.floor(m / 60);
+  if (h < 24) return 'قبل ' + (h === 1 ? 'ساعة' : h + ' ساعات');
+  var dd = Math.floor(h / 24);
+  return 'قبل ' + (dd === 1 ? 'يوم' : dd + ' أيام');
+}
+
+function bookingCard(req, isPending) {
+  var phoneIntl = (typeof normalizePhone === 'function') ? normalizePhone(req.phone) : null;
+  var waMsg = 'مرحباً ' + (req.patient_name || '') + ' 🌟 بخصوص طلب حجزكم يوم '
+    + bookingFmtDate(req.requested_date) + ' الساعة ' + fmtTime12(req.requested_time) + ' — ';
+  var waBtn = phoneIntl
+    ? '<a class="list-action-btn" title="مراسلة واتساب" style="text-decoration:none;" href="https://wa.me/' + phoneIntl
+      + '?text=' + encodeURIComponent(waMsg) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">📱</a>'
+    : '';
+  var pastChip = (isPending && bookingIsPast(req))
+    ? ' <span class="list-badge" style="background:rgba(232,93,93,0.15);color:#ff9b9b;">⏰ فات وقته</span>' : '';
+  var statusChip = '';
+  if (req.status === 'confirmed') statusChip = ' <span class="list-badge status-confirmed">✅ مؤكّد</span>';
+  if (req.status === 'rejected')  statusChip = ' <span class="list-badge" style="opacity:0.7;">✖ مرفوض</span>';
+  var actions = isPending
+    ? '<button class="list-action-btn" title="تأكيد كموعد" onclick="event.stopPropagation(); confirmBookingRequest(\'' + req.id + '\')">✅</button>'
+      + '<button class="list-action-btn" title="رفض الطلب" onclick="event.stopPropagation(); rejectBookingRequest(\'' + req.id + '\')">❌</button>'
+      + waBtn
+    : waBtn;
+  return '<div class="list-item" style="border-right:3px solid var(--green);' + (isPending ? '' : 'opacity:0.62;') + '">'
+    + '<div class="list-time">' + fmtTime12(req.requested_time) + '</div>'
+    + '<div class="list-avatar" style="background:' + avatarColor(req.patient_name || '؟') + '22;color:' + avatarColor(req.patient_name || '؟') + '">' + escapeHtml(initials(req.patient_name || '؟')) + '</div>'
+    + '<div class="list-info">'
+    +   '<div class="list-name">' + (escapeHtml(req.patient_name) || '—') + pastChip + statusChip + '</div>'
+    +   '<div class="list-type">📅 ' + bookingFmtDate(req.requested_date)
+    +     ' · 📞 ' + (escapeHtml(req.phone) || '—')
+    +     (req.note ? ' · 📝 ' + escapeHtml(req.note) : '')
+    +     ' <span style="opacity:0.6;">· ' + bookingAgo(req.created_at) + '</span></div>'
+    + '</div>'
+    + '<div class="list-actions" onclick="event.stopPropagation()">' + actions + '</div>'
+    + '</div>';
+}
+
+function renderBookingRequests() {
+  var el = document.getElementById('bookingContent');
+  if (!el) return;
+  if (_bookingTableMissing) {
+    el.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text2)">'
+      + '<div style="font-size:48px;margin-bottom:12px">🌐</div>'
+      + '<div style="font-size:16px;color:var(--text)">ميزة الحجز الإلكتروني تتطلب تطبيق Migration 59 على قاعدة البيانات</div>'
+      + '</div>';
+    return;
+  }
+  var pending = [], archive = [];
+  bookingRequests.forEach(function(r){
+    if (r.status === 'pending') pending.push(r); else archive.push(r);
+  });
+  // soonest requested slot first for pending; newest first for archive (load order)
+  pending.sort(function(a,b){
+    return (a.requested_date + (a.requested_time||'')).localeCompare(b.requested_date + (b.requested_time||''));
+  });
+
+  var html =
+    '<div style="padding:10px 14px;margin-bottom:10px;background:var(--card2,rgba(255,255,255,0.04));border-radius:10px;font-size:13px;color:var(--text2);">'
+    + '🌐 طلبات الحجز الإلكتروني — ' + (pending.length > 0
+        ? ('<b style="color:var(--text)">' + pending.length + '</b> طلب بانتظار التأكيد')
+        : 'لا طلبات بانتظار التأكيد ✅')
+    + '</div>';
+
+  if (pending.length === 0 && archive.length === 0) {
+    html += '<div style="text-align:center;padding:50px 20px;color:var(--text2)">'
+      + '<div style="font-size:48px;margin-bottom:12px">🌐</div>'
+      + '<div style="font-size:16px;color:var(--text)">لا طلبات حجز بعد — شارك رابط البوابة من الإعدادات</div>'
+      + '</div>';
+  } else {
+    if (pending.length > 0) {
+      html += '<div class="list-group"><div class="list-date-header">قيد الانتظار <span class="date-badge">' + pending.length + '</span></div>';
+      pending.forEach(function(r){ html += bookingCard(r, true); });
+      html += '</div>';
+    }
+    if (archive.length > 0) {
+      html += '<div class="list-group"><div class="list-date-header" style="opacity:0.75;">السجلّ الأخير</div>';
+      archive.slice(0, 20).forEach(function(r){ html += bookingCard(r, false); });
+      html += '</div>';
+    }
+  }
+  el.innerHTML = html;
+}
+
+async function confirmBookingRequest(id) {
+  var req = null;
+  for (var i = 0; i < bookingRequests.length; i++) {
+    if (bookingRequests[i].id === id) { req = bookingRequests[i]; break; }
+  }
+  if (!req) return;
+  window._bookingConfirmCtx = { id: req.id };
+  await openModal(req.requested_date);
+  document.getElementById('fPatient').value = req.patient_name || '';
+  document.getElementById('fTime').value = req.requested_time || '';
+  // fDuration is a <select>: if the request's duration has no matching
+  // <option>, assignment silently fails → inject one (Δ2 defensive).
+  var durSel = document.getElementById('fDuration');
+  var durVal = String(req.duration || 30);
+  durSel.value = durVal;
+  if (durSel.value !== durVal) {
+    var opt = document.createElement('option');
+    opt.value = durVal; opt.textContent = durVal + ' دقيقة';
+    durSel.appendChild(opt);
+    durSel.value = durVal;
+  }
+  var noteParts = ['📞 ' + (req.phone || '') + ' — حجز إلكتروني'];
+  if (req.note) noteParts.push(req.note);
+  document.getElementById('fNotes').value = noteParts.join('\n');
+  showToast('أكمل تفاصيل الموعد ثم احفظ لتأكيد الطلب');
+}
+
+// Called synchronously from submitAppt's success path (before closeModal
+// clears the ctx). Reads + clears the ctx, then links asynchronously so the
+// save flow is never delayed; the appointment is already saved regardless.
+function bookingMarkConfirmed(apptId) {
+  var ctx = window._bookingConfirmCtx;
+  window._bookingConfirmCtx = null;
+  if (!ctx || !ctx.id || !apptId) return;
+  (async function(){
+    try {
+      const { error } = await window.sb.from('booking_requests')
+        .update({ status: 'confirmed', appointment_id: apptId, reviewed_at: new Date().toISOString() })
+        .eq('id', ctx.id)
+        .eq('clinic_id', currentUser.id);
+      if (error) { console.warn('P5 confirm link:', error); showToast('⚠️ الموعد حُفظ لكن تعذّر ربط طلب الحجز'); return; }
+      showToast('🌐 تم تأكيد طلب الحجز وربطه بالموعد');
+      await loadBookingRequests();
+    } catch (e) { console.warn('P5 confirm link:', e); }
+  })();
+}
+
+async function rejectBookingRequest(id) {
+  if (!confirm('رفض طلب الحجز هذا؟ سيعود الوقت متاحاً على بوابة الحجز.')) return;
+  try {
+    const { error } = await window.sb.from('booking_requests')
+      .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('clinic_id', currentUser.id);
+    if (error) { showToast('❌ تعذّر رفض الطلب'); return; }
+    showToast('تم رفض الطلب');
+    await loadBookingRequests();
+  } catch (e) { showToast('❌ تعذّر رفض الطلب'); }
+}
+
 (async function init() {
   await new Promise(r => setTimeout(r, 80));
   const { data } = await window.sb.auth.getUser();
@@ -6551,6 +6774,7 @@ async function apptDeleteFile(id){
   await loadPatientPhones();
   await loadReminderLogs();
   await loadAppointments();
+  loadBookingRequests().catch(function(e){ console.warn('P5 booking requests:', e); });
 
   // Phase 2A — Deep-link handler: dashboard's ⚠️ "أرسل تذكير" badge sends the
   // user here with ?wa=<appointment_id>. Open the modal automatically so the

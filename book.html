@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a1628">
+<meta name="robots" content="noindex">
+<title>حجز موعد</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!--
+  P5 — Public Booking Portal (بوابة الحجز الإلكتروني)
+  STANDALONE by design: loads NO shared SyDent files (supabase-init.js /
+  sidebar.js / theme.js / theme.css). Rationale: isPublicPage() and the
+  autoGate skip-list don't include this page, SyDentLock.autoInit would fire
+  dead anon queries, and touching supabase-init.js = fleet-wide cache bust.
+  The two constants below are duplicated intentionally (they are public and
+  already present in every page's source).
+  Anonymous surface = 3 SECURITY DEFINER RPCs only (Migration 59):
+    booking_clinic_info / booking_busy_slots / booking_create_request.
+-->
+<style>
+:root{
+  --bg:#0a1628; --card:#101f33; --card2:#16273e; --line:rgba(255,255,255,0.08);
+  --text:#eef3f8; --text2:#8fa3b8; --green:#2ee89e; --green2:#1fba7e;
+  --red:#e85d5d; --radius:14px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Cairo',sans-serif; font-size:15px;
+  min-height:100vh; padding:16px 14px 40px;
+}
+.wrap{max-width:560px;margin:0 auto;}
+.brand{
+  text-align:center; color:var(--text2); font-size:12px; font-weight:600;
+  letter-spacing:.5px; margin-bottom:14px;
+}
+.brand b{color:var(--green);}
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:var(--radius); padding:18px 16px; margin-bottom:14px;
+}
+h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
+.sub{color:var(--text2); font-size:13px; text-align:center; margin:0 0 4px;}
+.note{
+  background:rgba(46,232,158,0.08); border:1px solid rgba(46,232,158,0.25);
+  border-radius:10px; padding:10px 12px; font-size:13px; color:var(--text);
+  margin-top:12px; white-space:pre-wrap;
+}
+.step-title{font-size:14px; font-weight:700; margin:0 0 10px; color:var(--text);}
+.step-title .n{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:50%; background:var(--green);
+  color:#06281a; font-size:12px; font-weight:800; margin-inline-end:7px;
+}
+.days{
+  display:flex; gap:8px; overflow-x:auto; padding-bottom:6px;
+  scrollbar-width:thin;
+}
+.day-chip{
+  flex:0 0 auto; min-width:74px; padding:9px 10px; border-radius:12px;
+  background:var(--card2); border:1.5px solid var(--line); color:var(--text);
+  text-align:center; cursor:pointer; user-select:none;
+}
+.day-chip .dn{font-size:12px; color:var(--text2); font-weight:600;}
+.day-chip .dd{font-size:15px; font-weight:800; margin-top:2px;}
+.day-chip .dl{font-size:10.5px; color:var(--green); font-weight:700; margin-top:1px; min-height:14px;}
+.day-chip.sel{border-color:var(--green); background:rgba(46,232,158,0.12);}
+.slots{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr));
+  gap:8px; margin-top:4px;
+}
+.slot{
+  padding:10px 4px; border-radius:10px; text-align:center; font-weight:700;
+  font-size:14px; background:var(--card2); border:1.5px solid var(--line);
+  color:var(--text); cursor:pointer; user-select:none;
+}
+.slot.busy{opacity:.32; cursor:not-allowed; text-decoration:line-through;}
+.slot.sel{border-color:var(--green); background:rgba(46,232,158,0.14); color:var(--green);}
+.empty-slots{color:var(--text2); font-size:13px; text-align:center; padding:18px 6px;}
+label{display:block; font-size:13px; color:var(--text2); font-weight:600; margin:12px 0 5px;}
+input[type=text],input[type=tel],textarea{
+  width:100%; background:var(--card2); border:1.5px solid var(--line);
+  border-radius:10px; color:var(--text); font-family:'Cairo',sans-serif;
+  font-size:15px; padding:11px 12px; outline:none;
+}
+input:focus,textarea:focus{border-color:var(--green);}
+textarea{resize:vertical; min-height:64px;}
+.chosen{
+  display:flex; align-items:center; gap:8px; background:rgba(46,232,158,0.1);
+  border:1px solid rgba(46,232,158,0.3); border-radius:10px;
+  padding:9px 12px; font-size:13.5px; font-weight:700; margin-bottom:4px;
+}
+.btn{
+  display:block; width:100%; border:none; border-radius:12px; padding:13px;
+  font-family:'Cairo',sans-serif; font-size:16px; font-weight:800;
+  cursor:pointer; margin-top:16px;
+}
+.btn-go{background:var(--green); color:#06281a;}
+.btn-go:disabled{opacity:.5; cursor:not-allowed;}
+.btn-ghost{background:transparent; border:1.5px solid var(--line); color:var(--text); font-weight:700;}
+.btn-wa{background:#25D366; color:#fff; text-decoration:none; text-align:center; display:block;}
+.center{text-align:center;}
+.big-icon{font-size:52px; text-align:center; margin:6px 0 10px;}
+.err{
+  background:rgba(232,93,93,0.1); border:1px solid rgba(232,93,93,0.4);
+  color:#ffb3b3; border-radius:10px; padding:10px 12px; font-size:13.5px;
+  margin-top:12px; display:none;
+}
+.spin{
+  width:34px; height:34px; border:3px solid var(--line);
+  border-top-color:var(--green); border-radius:50%;
+  animation:sp 0.8s linear infinite; margin:34px auto;
+}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* honeypot: visually gone, still fillable by naive bots */
+.hp-field{position:absolute; left:-9999px; top:-9999px; height:1px; width:1px; opacity:0;}
+.foot{color:var(--text2); font-size:11px; text-align:center; margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">حجز المواعيد · بواسطة <b>SyDent</b></div>
+  <div id="app"><div class="spin"></div></div>
+  <div class="foot">طلبك يصل للعيادة مباشرة — سيتواصل معك الاستقبال للتأكيد.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+'use strict';
+// ── Standalone client: must NOT touch the tenant app's auth storage ──
+var SUPABASE_URL = 'https://rycqzpdhxabpqrdgtdzg.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_7LjceYIlrRrHt86sLpCwPg_TlMO8VJu';
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+var DAYS_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+var MONTHS_AR = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
+
+var ERR_MAP = {
+  booking_disabled:  'الحجز الإلكتروني غير متاح حالياً لدى هذه العيادة.',
+  bad_name:          'يرجى إدخال الاسم الكامل (حرفان على الأقل).',
+  bad_phone:         'يرجى إدخال رقم هاتف صحيح.',
+  bad_note:          'الملاحظة طويلة جداً (الحد 300 حرف).',
+  bad_slot:          'يرجى اختيار اليوم والوقت.',
+  date_out_of_range: 'التاريخ خارج المدى المتاح للحجز.',
+  past_time:         'هذا الوقت أصبح في الماضي — اختر وقتاً آخر.',
+  closed_day:        'العيادة مغلقة في هذا اليوم.',
+  outside_hours:     'الوقت خارج ساعات الدوام.',
+  off_grid:          'الوقت غير متوافق مع جدول المواعيد — حدّث الصفحة.',
+  rate_phone:        'وصلت للحد الأقصى من الطلبات اليوم بهذا الرقم.',
+  rate_clinic:       'اكتمل عدد طلبات اليوم لدى العيادة — جرّب غداً.',
+  slot_taken:        'عذراً، حُجز هذا الوقت للتو — اختر وقتاً آخر.'
+};
+
+var clinicId = null, CLINIC = null, BUSY = {}, selDate = null, selTime = null;
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function pad2(n){ return (n < 10 ? '0' : '') + n; }
+function dateKey(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+function timeToMin(t){
+  if (!t) return null;
+  var p = String(t).split(':');
+  return parseInt(p[0],10)*60 + parseInt(p[1],10);
+}
+function minToHHMM(m){ return pad2(Math.floor(m/60)) + ':' + pad2(m%60); }
+function fmtTime12(m){
+  var h = Math.floor(m/60), mi = m%60, ap = h >= 12 ? 'م' : 'ص';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + pad2(mi) + ' ' + ap;
+}
+// Same normalization the platform uses for wa.me (Syrian numbers).
+function normalizePhone(raw){
+  if (!raw) return null;
+  var p = String(raw).replace(/\D/g, '');
+  if (!p) return null;
+  if (p.indexOf('00') === 0) p = p.substring(2);
+  if (p.indexOf('0') === 0 && p.length >= 9) p = '963' + p.substring(1);
+  else if (p.indexOf('963') !== 0 && p.length === 9) p = '963' + p;
+  if (p.length < 10 || p.length > 15) return null;
+  return p;
+}
+function app(){ return document.getElementById('app'); }
+
+function showUnavailable(msg){
+  app().innerHTML =
+    '<div class="card center">'
+    + '<div class="big-icon">🦷</div>'
+    + '<h1>الحجز غير متاح</h1>'
+    + '<p class="sub">' + esc(msg || 'الحجز الإلكتروني غير متاح حالياً لدى هذه العيادة.') + '</p>'
+    + '</div>';
+}
+
+// ── Day list: next max_days_ahead days, working days only ──
+function buildDays(){
+  var workDays = String(CLINIC.work_days || '').split(',')
+    .map(function(x){ return parseInt(String(x).trim(),10); })
+    .filter(function(x){ return !isNaN(x); });
+  var out = [], today = new Date(); today.setHours(0,0,0,0);
+  var maxD = Math.min(CLINIC.max_days_ahead || 30, 35);
+  for (var i = 0; i <= maxD; i++){
+    var d = new Date(today.getTime() + i*86400000);
+    if (workDays.indexOf(d.getDay()) === -1) continue;
+    // skip today entirely if the working day is already over
+    if (i === 0){
+      var nowMin = new Date().getHours()*60 + new Date().getMinutes();
+      var endMin = timeToMin(CLINIC.work_end);
+      if (endMin === null || nowMin >= endMin) continue;
+    }
+    out.push({ key: dateKey(d), date: d, offset: i });
+  }
+  return out;
+}
+
+function buildSlots(dayKey, offset){
+  var startMin = timeToMin(CLINIC.work_start), endMin = timeToMin(CLINIC.work_end);
+  var slot = CLINIC.slot_minutes || 30;
+  if (startMin === null || endMin === null || slot <= 0) return [];
+  var busy = BUSY[dayKey] || [];
+  var nowMin = -1;
+  if (offset === 0) nowMin = new Date().getHours()*60 + new Date().getMinutes();
+  var out = [];
+  for (var t = startMin; (endMin - t) >= slot; t += slot){
+    if (t <= nowMin) continue;                       // past (device time)
+    var taken = false;
+    for (var b = 0; b < busy.length; b++){
+      if (busy[b].s < t + slot && t < busy[b].e){ taken = true; break; }
+    }
+    out.push({ min: t, busy: taken });
+  }
+  return out;
+}
+
+function renderMain(){
+  var days = buildDays();
+  var html =
+    '<div class="card">'
+    + '<h1>' + esc(CLINIC.clinic_name || 'عيادة الأسنان') + '</h1>'
+    + '<p class="sub">احجز موعدك خلال دقيقة — بلا تسجيل</p>'
+    + (CLINIC.booking_note ? '<div class="note">' + esc(CLINIC.booking_note) + '</div>' : '')
+    + '</div>';
+
+  html += '<div class="card"><div class="step-title"><span class="n">1</span>اختر اليوم</div><div class="days" id="dayStrip">';
+  if (days.length === 0){
+    html += '<div class="empty-slots" style="width:100%">لا أيام متاحة للحجز حالياً.</div>';
+  } else {
+    days.forEach(function(d){
+      var lbl = d.offset === 0 ? 'اليوم' : (d.offset === 1 ? 'غداً' : '');
+      html +=
+        '<div class="day-chip' + (selDate === d.key ? ' sel' : '') + '" data-off="' + d.offset + '" onclick="pickDay(\'' + d.key + '\',' + d.offset + ')">'
+        + '<div class="dn">' + DAYS_AR[d.date.getDay()] + '</div>'
+        + '<div class="dd">' + d.date.getDate() + ' ' + MONTHS_AR[d.date.getMonth()].split(' ')[0] + '</div>'
+        + '<div class="dl">' + lbl + '</div>'
+        + '</div>';
+    });
+  }
+  html += '</div></div>';
+
+  html += '<div class="card" id="slotsCard" style="display:' + (selDate ? 'block' : 'none') + ';">'
+    + '<div class="step-title"><span class="n">2</span>اختر الوقت</div>'
+    + '<div class="slots" id="slotsGrid"></div></div>';
+
+  html += '<div class="card" id="formCard" style="display:none;">'
+    + '<div class="step-title"><span class="n">3</span>معلوماتك</div>'
+    + '<div class="chosen" id="chosenLine"></div>'
+    + '<form onsubmit="submitBooking(event)">'
+    +   '<label>الاسم الكامل *</label>'
+    +   '<input type="text" id="bName" maxlength="80" autocomplete="name" required>'
+    +   '<label>رقم الهاتف *</label>'
+    +   '<input type="tel" id="bPhone" maxlength="16" inputmode="tel" autocomplete="tel" placeholder="09XXXXXXXX" required>'
+    +   '<label>ملاحظة (اختياري)</label>'
+    +   '<textarea id="bNote" maxlength="300" placeholder="مثال: ألم بضرس علوي يمين"></textarea>'
+    +   '<div class="hp-field" aria-hidden="true"><label>website</label>'
+    +   '<input type="text" id="bWebsite" tabindex="-1" autocomplete="off"></div>'
+    +   '<div class="err" id="bErr"></div>'
+    +   '<button type="submit" class="btn btn-go" id="bGo">إرسال طلب الحجز</button>'
+    + '</form></div>';
+
+  app().innerHTML = html;
+  if (selDate){
+    var off = 0, ds = buildDays();
+    for (var i = 0; i < ds.length; i++) if (ds[i].key === selDate){ off = ds[i].offset; break; }
+    renderSlots(off);
+  }
+}
+
+window.pickDay = function(key, offset){
+  selDate = key; selTime = null;
+  document.querySelectorAll('.day-chip').forEach(function(c){ c.classList.remove('sel'); });
+  var chip = document.querySelector('.day-chip[data-off="' + offset + '"]');
+  if (chip) chip.classList.add('sel');
+  document.getElementById('slotsCard').style.display = 'block';
+  document.getElementById('formCard').style.display = 'none';
+  renderSlots(offset);
+  document.getElementById('slotsCard').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+function renderSlots(offset){
+  var grid = document.getElementById('slotsGrid');
+  var slots = buildSlots(selDate, offset);
+  if (slots.length === 0){
+    grid.innerHTML = '<div class="empty-slots" style="grid-column:1/-1;">لا أوقات متاحة بهذا اليوم — جرّب يوماً آخر.</div>';
+    return;
+  }
+  var free = 0;
+  grid.innerHTML = slots.map(function(s){
+    if (!s.busy) free++;
+    return '<div class="slot' + (s.busy ? ' busy' : '') + (selTime === s.min ? ' sel' : '')
+      + '"' + (s.busy ? '' : ' onclick="pickSlot(' + s.min + ')"') + '>' + fmtTime12(s.min) + '</div>';
+  }).join('');
+  if (free === 0){
+    grid.innerHTML += '<div class="empty-slots" style="grid-column:1/-1;">كل أوقات هذا اليوم محجوزة 🙏</div>';
+  }
+}
+
+window.pickSlot = function(min){
+  selTime = min;
+  document.querySelectorAll('.slot').forEach(function(s){ s.classList.remove('sel'); });
+  var nodes = document.querySelectorAll('.slot');
+  for (var i = 0; i < nodes.length; i++){
+    if (nodes[i].textContent === fmtTime12(min)) { nodes[i].classList.add('sel'); break; }
+  }
+  var d = new Date(selDate + 'T00:00:00');
+  document.getElementById('chosenLine').innerHTML =
+    '📅 ' + DAYS_AR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_AR[d.getMonth()]
+    + ' · 🕐 ' + fmtTime12(min);
+  document.getElementById('formCard').style.display = 'block';
+  document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+function showErr(msg){
+  var e = document.getElementById('bErr');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+window.submitBooking = async function(ev){
+  ev.preventDefault();
+  var errEl = document.getElementById('bErr'); errEl.style.display = 'none';
+  if (!selDate || selTime === null){ showErr(ERR_MAP.bad_slot); return; }
+
+  // honeypot: bots that fill it get a silent "success" with zero RPC traffic
+  if ((document.getElementById('bWebsite').value || '').trim() !== ''){
+    renderSuccess(); return;
+  }
+
+  var name  = (document.getElementById('bName').value || '').trim();
+  var phone = (document.getElementById('bPhone').value || '').trim();
+  var note  = (document.getElementById('bNote').value || '').trim();
+  if (name.length < 2){ showErr(ERR_MAP.bad_name); return; }
+  if (phone.replace(/\D/g,'').length < 8){ showErr(ERR_MAP.bad_phone); return; }
+
+  var btn = document.getElementById('bGo');
+  btn.disabled = true; btn.textContent = 'جارٍ الإرسال…';
+  try {
+    var res = await sb.rpc('booking_create_request', {
+      p_clinic: clinicId,
+      p_name:   name,
+      p_phone:  phone,
+      p_date:   selDate,
+      p_time:   minToHHMM(selTime),
+      p_note:   note || null
+    });
+    if (res.error){
+      var em = res.error.message || '';
+      var key = Object.keys(ERR_MAP).find(function(k){ return em.indexOf(k) !== -1; });
+      showErr(key ? ERR_MAP[key] : 'تعذّر إرسال الطلب — حاول مجدداً.');
+      if (key === 'slot_taken' || key === 'past_time'){
+        await loadBusy();
+        var ds = buildDays(), off = 0;
+        for (var i = 0; i < ds.length; i++) if (ds[i].key === selDate){ off = ds[i].offset; break; }
+        selTime = null; renderSlots(off);
+      }
+      btn.disabled = false; btn.textContent = 'إرسال طلب الحجز';
+      return;
+    }
+    renderSuccess();
+  } catch (e){
+    console.warn('booking submit:', e);
+    showErr('تعذّر الاتصال — تأكد من الإنترنت وحاول مجدداً.');
+    btn.disabled = false; btn.textContent = 'إرسال طلب الحجز';
+  }
+};
+
+function renderSuccess(){
+  var d = new Date(selDate + 'T00:00:00');
+  var waDigits = normalizePhone(CLINIC.clinic_phone);
+  var waBtn = waDigits
+    ? '<a class="btn btn-wa" href="https://wa.me/' + waDigits
+      + '?text=' + encodeURIComponent('مرحباً، أرسلت طلب حجز عبر بوابة العيادة وأود الاستفسار 🙏')
+      + '" target="_blank" rel="noopener">💬 تواصل مع العيادة واتساب</a>'
+    : '';
+  app().innerHTML =
+    '<div class="card center">'
+    + '<div class="big-icon">✅</div>'
+    + '<h1>تم استلام طلبك</h1>'
+    + '<p class="sub">سيتواصل معك الاستقبال قريباً لتأكيد الموعد.</p>'
+    + '<div class="chosen" style="justify-content:center;margin-top:12px;">📅 '
+    + DAYS_AR[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS_AR[d.getMonth()]
+    + ' · 🕐 ' + fmtTime12(selTime) + '</div>'
+    + waBtn
+    + '<button class="btn btn-ghost" onclick="restart()">حجز موعد آخر</button>'
+    + '</div>';
+}
+
+window.restart = async function(){
+  selDate = null; selTime = null;
+  app().innerHTML = '<div class="spin"></div>';
+  await loadBusy();
+  renderMain();
+};
+
+async function loadBusy(){
+  BUSY = {};
+  try {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var maxD = Math.min(CLINIC.max_days_ahead || 30, 35);
+    var to = new Date(today.getTime() + maxD*86400000);
+    var res = await sb.rpc('booking_busy_slots', {
+      p_clinic: clinicId, p_from: dateKey(today), p_to: dateKey(to)
+    });
+    (res.data || []).forEach(function(r){
+      var s = timeToMin(r.t);
+      if (s === null) return;
+      (BUSY[r.d] = BUSY[r.d] || []).push({ s: s, e: s + (r.dur || 30) });
+    });
+  } catch (e){ console.warn('busy load:', e); }
+}
+
+(async function init(){
+  var m = (location.search || '').match(/[?&]c=([0-9a-fA-F-]{36})/);
+  clinicId = m ? m[1] : null;
+  if (!clinicId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clinicId)){
+    showUnavailable('رابط الحجز غير صحيح — اطلب الرابط من العيادة.');
+    return;
+  }
+  try {
+    var res = await sb.rpc('booking_clinic_info', { p_clinic: clinicId });
+    if (res.error || !res.data || res.data.length === 0){
+      if (res.error) console.warn('clinic info:', res.error);
+      showUnavailable();
+      return;
+    }
+    CLINIC = res.data[0];
+    document.title = 'حجز موعد — ' + (CLINIC.clinic_name || 'عيادة الأسنان');
+    await loadBusy();
+    renderMain();
+  } catch (e){
+    console.warn('init:', e);
+    showUnavailable('تعذّر الاتصال — تأكد من الإنترنت وحدّث الصفحة.');
+  }
+})();
+</script>
+</body>
+</html>
