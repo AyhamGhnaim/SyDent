@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0a1628">
+<meta name="theme-color" content="#ffffff">
 <meta name="robots" content="noindex">
 <title>حجز موعد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -20,9 +20,10 @@
 -->
 <style>
 :root{
-  --bg:#0a1628; --card:#101f33; --card2:#16273e; --line:rgba(255,255,255,0.08);
-  --text:#eef3f8; --text2:#8fa3b8; --green:#2ee89e; --green2:#1fba7e;
-  --red:#e85d5d; --radius:14px;
+  /* SyDent LIGHT palette — mirrors theme.css :root[data-theme="light"] */
+  --bg:#ffffff; --card:#f8f7f2; --card2:#efeee9; --line:rgba(28,25,23,0.10);
+  --text:#1c1917; --text2:#57534e; --green:#16a085; --green2:#138a72;
+  --red:#dc2626; --radius:14px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;padding:0;}
@@ -40,11 +41,12 @@ body{
 .card{
   background:var(--card); border:1px solid var(--line);
   border-radius:var(--radius); padding:18px 16px; margin-bottom:14px;
+  box-shadow:0 1px 3px rgba(28,25,23,0.06);
 }
 h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
 .sub{color:var(--text2); font-size:13px; text-align:center; margin:0 0 4px;}
 .note{
-  background:rgba(46,232,158,0.08); border:1px solid rgba(46,232,158,0.25);
+  background:rgba(22,160,133,0.08); border:1px solid rgba(22,160,133,0.30);
   border-radius:10px; padding:10px 12px; font-size:13px; color:var(--text);
   margin-top:12px; white-space:pre-wrap;
 }
@@ -66,7 +68,7 @@ h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
 .day-chip .dn{font-size:12px; color:var(--text2); font-weight:600;}
 .day-chip .dd{font-size:15px; font-weight:800; margin-top:2px;}
 .day-chip .dl{font-size:10.5px; color:var(--green); font-weight:700; margin-top:1px; min-height:14px;}
-.day-chip.sel{border-color:var(--green); background:rgba(46,232,158,0.12);}
+.day-chip.sel{border-color:var(--green); background:rgba(22,160,133,0.10);}
 .slots{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr));
   gap:8px; margin-top:4px;
@@ -76,8 +78,8 @@ h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
   font-size:14px; background:var(--card2); border:1.5px solid var(--line);
   color:var(--text); cursor:pointer; user-select:none;
 }
-.slot.busy{opacity:.32; cursor:not-allowed; text-decoration:line-through;}
-.slot.sel{border-color:var(--green); background:rgba(46,232,158,0.14); color:var(--green);}
+.slot.busy{opacity:.40; cursor:not-allowed; text-decoration:line-through;}
+.slot.sel{border-color:var(--green); background:rgba(22,160,133,0.12); color:var(--green);}
 .empty-slots{color:var(--text2); font-size:13px; text-align:center; padding:18px 6px;}
 label{display:block; font-size:13px; color:var(--text2); font-weight:600; margin:12px 0 5px;}
 input[type=text],input[type=tel],textarea{
@@ -88,8 +90,8 @@ input[type=text],input[type=tel],textarea{
 input:focus,textarea:focus{border-color:var(--green);}
 textarea{resize:vertical; min-height:64px;}
 .chosen{
-  display:flex; align-items:center; gap:8px; background:rgba(46,232,158,0.1);
-  border:1px solid rgba(46,232,158,0.3); border-radius:10px;
+  display:flex; align-items:center; gap:8px; background:rgba(22,160,133,0.10);
+  border:1px solid rgba(22,160,133,0.35); border-radius:10px;
   padding:9px 12px; font-size:13.5px; font-weight:700; margin-bottom:4px;
 }
 .btn{
@@ -97,15 +99,15 @@ textarea{resize:vertical; min-height:64px;}
   font-family:'Cairo',sans-serif; font-size:16px; font-weight:800;
   cursor:pointer; margin-top:16px;
 }
-.btn-go{background:var(--green); color:#06281a;}
+.btn-go{background:var(--green); color:#ffffff;}
 .btn-go:disabled{opacity:.5; cursor:not-allowed;}
 .btn-ghost{background:transparent; border:1.5px solid var(--line); color:var(--text); font-weight:700;}
 .btn-wa{background:#25D366; color:#fff; text-decoration:none; text-align:center; display:block;}
 .center{text-align:center;}
 .big-icon{font-size:52px; text-align:center; margin:6px 0 10px;}
 .err{
-  background:rgba(232,93,93,0.1); border:1px solid rgba(232,93,93,0.4);
-  color:#ffb3b3; border-radius:10px; padding:10px 12px; font-size:13.5px;
+  background:rgba(220,38,38,0.08); border:1px solid rgba(220,38,38,0.35);
+  color:#b91c1c; border-radius:10px; padding:10px 12px; font-size:13.5px;
   margin-top:12px; display:none;
 }
 .spin{
