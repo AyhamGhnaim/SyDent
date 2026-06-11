@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260608d"></script>
+<script src="theme.js?v=20260611a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260608d"></script>
-<script src="sidebar.js?v=20260608d"></script>
-<script src="timepicker.js?v=20260608d"></script>
+<script src="supabase-init.js?v=20260611a"></script>
+<script src="sidebar.js?v=20260611a"></script>
+<script src="timepicker.js?v=20260611a"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -294,6 +294,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);pointer-events:none;}
 .tooth-photo-badge{position:absolute;top:-7px;left:-7px;height:19px;padding:0 5px;border-radius:10px;background:var(--green);color:#04130d;border:2px solid var(--bg);z-index:6;box-shadow:0 0 0 1px rgba(0,0,0,0.25);font-size:10px;font-weight:800;display:flex;align-items:center;gap:1px;cursor:pointer;line-height:1;white-space:nowrap;font-family:'Cairo',sans-serif;}
 .tooth-photo-badge:hover{filter:brightness(1.12);}
+.tooth-lab-badge{position:absolute;bottom:-7px;left:-7px;height:19px;padding:0 5px;border-radius:10px;background:#63b3ed;color:#06283d;border:2px solid var(--bg);z-index:6;box-shadow:0 0 0 1px rgba(0,0,0,0.25);font-size:10px;font-weight:800;display:flex;align-items:center;gap:1px;cursor:pointer;line-height:1;white-space:nowrap;font-family:'Cairo',sans-serif;}
+.tooth-lab-badge:hover{filter:brightness(1.12);}
 .status-planned{background:#ef4444;}
 .status-completed{background:#3b82f6;}
 .status-existing_current{background:#10b981;opacity:.85;}  /* EC — done in our clinic */
@@ -669,11 +671,23 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 @media print {
   body.printing > *:not(#printRoot) { display: none !important; }
   #printRoot { display: block !important; }
+  /* Chart print (paper = white): force dark text, drop interactive badges +
+     hidden tooltip sources + horizontal scroll, shrink to fit A4 portrait.
+     zoom is Chromium-only — acceptable (clinic environment is Chrome). */
+  #printRoot .jaw-wrap{overflow:visible !important;padding:26px 0 6px !important;}
+  #printRoot .cp-jaw{zoom:0.68;}
+  #printRoot .tooth-num{color:#111 !important;}
+  #printRoot .leg{color:#222 !important;}
+  #printRoot .leg-sep{background:#bbb !important;}
+  #printRoot .midline{background:#c8c8c8 !important;}
+  #printRoot .tooth-tip{display:none !important;}
+  #printRoot .tooth-photo-badge,#printRoot .tooth-lab-badge{display:none !important;}
+  #printRoot *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   @page { margin: 14mm; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260608d">
+<link rel="stylesheet" href="theme.css?v=20260611a">
 </head>
 <body>
 <script>
@@ -769,6 +783,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="chart-card-head">
         <span class="chart-card-title">🦷 مخطط الأسنان</span>
         <span class="chart-hint">اضغط على المنطقة المحددة من السن لتسجيل العلاج</span>
+        <button class="btn btn-outline btn-sm" onclick="printChart()" title="طباعة مخطط الأسنان بترويسة العيادة">🖨️ طباعة</button>
       </div>
       <div class="seg" id="dentSeg" style="margin:0 auto 8px;width:max-content;">
         <button data-dent="permanent" class="active">دائمة</button>
@@ -780,6 +795,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button data-view="all" class="active">الكل</button>
         <button data-view="buc">دهليزي</button>
         <button data-view="occ">إطباقي</button>
+      </div>
+      <!-- Chart status filter (view-only): coloring + tooltips honor it; status badges stay raw as a "hidden content" hint -->
+      <div class="seg" id="statusFilterSeg" style="margin:0 auto 8px;width:max-content;">
+        <button data-sfilter="all" class="active">الكل</button>
+        <button data-sfilter="planned">مخطّط</button>
+        <button data-sfilter="completed">منجز</button>
+        <button data-sfilter="hide_existing">إخفاء الموجود مسبقاً</button>
       </div>
       <div class="ortho-banner" id="orthoBanner" style="display:none;"></div>
       <div class="jaw-wrap" id="jawWrap" data-occview="all" data-dent="permanent">
@@ -1614,6 +1636,7 @@ var paymentSplits = [];   // payment_splits for current patient (OpenDental-styl
 var adjustments = [];     // account_adjustments for current patient (discount / write_off / refund)
 var teethMap  = {};   // { tooth_num: { O: 'filling', M: 'crown', D: null, B: null, L: null, I: null } }
 var labOrders = [];   // lab orders for current patient
+var _chartStatusFilter = 'all';   // chart view filter: all | planned | completed | hide_existing (in-memory, like occViewSeg)
 var allLabs   = [];   // all labs for the doctor
 var upcomingAppts = []; // patient's upcoming/today appointments (for session-appointment linking)
 var plannedAppts  = []; // Gap 7: patient's planned (no-date) appointments
@@ -3851,6 +3874,33 @@ function effectiveSurfaceTreatment(sm, regionKey){
   return null;
 }
 
+/* CHART STATUS FILTER (view-only). Returns a filtered copy of a tooth's surface
+   map according to _chartStatusFilter. Value-only touch (rule #139 pattern):
+   geometry/builders are untouched — they just receive fewer keys, so coloring
+   AND both tooltips filter consistently. WHOLE + PONTIC are ALWAYS kept: they
+   carry the anatomy/prosthetic layer (extraction/implant/pontic branch from the
+   RAW teethMap before buildTooth anyway, so exempting them here keeps abutment
+   rings consistent with pontics under any filter). Status badges + occlusal
+   opacity intentionally read the RAW map — they hint that hidden content exists. */
+function chartFilterSM(sm){
+  if (_chartStatusFilter === 'all' || !sm) return sm;
+  var st = sm.__status || {}, out = {}, outSt = {};
+  for (var k in sm){
+    if (k === '__status') continue;
+    var keep;
+    if (k === 'WHOLE' || k === 'PONTIC') keep = true;          // anatomy/prosthetic layer
+    else {
+      var s = st[k] || 'completed';
+      if (_chartStatusFilter === 'planned')        keep = (s === 'planned');
+      else if (_chartStatusFilter === 'completed') keep = (s === 'completed');
+      else /* hide_existing */                     keep = (s !== 'existing_current' && s !== 'existing_other' && s !== 'existing');
+    }
+    if (keep){ out[k] = sm[k]; if (st[k]) outSt[k] = st[k]; }
+  }
+  out.__status = outSt;
+  return out;
+}
+
 /* Returns the Arabic display name for a tooth surface. Special case: the inner
    surface of UPPER (maxillary) teeth is anatomically the PALATAL surface
    ("حنكي"), not lingual — the surface key stays 'L' (no data change), but the
@@ -5207,6 +5257,54 @@ function buildTooth(num, surfaceMap, isUpper) {
   return html;
 }
 
+/* ── Print chart — reuses the prescriptions print mechanism (#printRoot + body.printing).
+   Snapshots the chart EXACTLY as displayed (active dentition, view toggle, status
+   filter — the filter is named in the header so paper readers know what they see).
+   The live #jawWrap is cloned AS-IS: SVG gradients reference url(#id), so ids must
+   NOT be stripped; duplicate ids are harmless (originals come first in the DOM and
+   the clone is short-lived). Pure read — zero DB writes, zero re-render. */
+function printChart(){
+  var jw = document.getElementById('jawWrap');
+  var root = document.getElementById('printRoot');
+  if (!jw || !root) return;
+  var c = (typeof rxClinicInfo === 'function') ? rxClinicInfo() : { clinic_name:'العيادة', clinic_phone:'', license_no:'' };
+  var dateStr = new Date().toLocaleDateString('ar-SY',{year:'numeric',month:'long',day:'numeric'});
+  var pName = (patient && patient.name) ? patient.name : '';
+  var pAge = (patient && patient.dob) ? calcAge(patient.dob) : '';
+  var dentLbl = (dentitionMode === 'primary') ? 'لبنية' : (dentitionMode === 'mixed' ? 'مختلطة' : 'دائمة');
+  var filtLbl = ({ planned:'المخطّط فقط', completed:'المنجز فقط', hide_existing:'بدون الموجود مسبقاً' })[_chartStatusFilter] || '';
+  var legEl = document.getElementById('chartLegend');
+
+  var h = '<div class="chart-print" style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;padding:10px 14px;">';
+  // الرأس — نفس بنية الروشتات
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:10px;margin-bottom:10px;">';
+  h += '<div><div style="font-size:22px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
+  if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';
+  h += '</div><div style="text-align:left;font-size:13px;color:#444;">';
+  if (c.clinic_phone) h += '<div>📞 ' + escapeHtml(c.clinic_phone) + '</div>';
+  h += '<div style="margin-top:4px;">' + escapeHtml(dateStr) + '</div></div></div>';
+  // شريط المريض
+  h += '<div style="background:#f6f6f6;border-radius:10px;padding:9px 14px;margin-bottom:10px;font-size:13px;color:#222;">';
+  h += '<strong>المريض:</strong> ' + escapeHtml(pName);
+  if (pAge !== '') h += ' &nbsp;•&nbsp; العمر: ' + escapeHtml(String(pAge));
+  h += ' &nbsp;•&nbsp; الإطباق: ' + dentLbl;
+  if (filtLbl) h += ' &nbsp;•&nbsp; <strong>عرض مفلتر:</strong> ' + filtLbl;
+  h += '</div>';
+  h += '<div class="cp-jaw">' + jw.outerHTML + '</div>';
+  if (legEl) h += '<div class="chart-legend cp-legend">' + legEl.innerHTML + '</div>';
+  h += '</div>';
+
+  root.innerHTML = h;
+  document.body.classList.add('printing');
+  var cleanup = function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(function(){ window.print(); }, 80);
+  setTimeout(cleanup, 60000);
+}
+
 function renderLegend() {
   var leg = document.getElementById('chartLegend');
   if (!leg) return;
@@ -5500,7 +5598,7 @@ function renderOcclusal(){
     var mid=R[1].length/2;
     for(var i=0;i<R[1].length;i++){
       if(i===mid) html+='<div class="midline"></div>';
-      var num=R[1][i], sm=teethMap[String(num)]||{};
+      var num=R[1][i], sm=chartFilterSM(teethMap[String(num)]||{});
       var op=1, st=getDominantStatus(num);
       if(st==='planned') op=0.55; else if(st==='referred') op=0.5; else if(st==='condition') op=0.45;
       else if(st==='existing_current') op=0.8; else if(st==='existing_other'||st==='existing') op=0.6;
@@ -5566,6 +5664,23 @@ function renderOcclusal(){
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wireOccViews);
   else wireOccViews();
 })();
+/* Chart status filter toggle (self-contained; wires once on DOM ready).
+   Re-renders the chart so chartFilterSM takes effect at the 3 read points
+   (renderTeeth upper/lower + renderOcclusal). */
+(function(){
+  function wireStatusFilter(){
+    var seg=document.getElementById('statusFilterSeg'); if(!seg || seg.__wired) return; seg.__wired=true;
+    seg.addEventListener('click',function(e){
+      var b=e.target.closest('button'); if(!b) return;
+      var bs=seg.querySelectorAll('button'); for(var i=0;i<bs.length;i++) bs[i].classList.remove('active');
+      b.classList.add('active');
+      _chartStatusFilter = b.getAttribute('data-sfilter') || 'all';
+      if (typeof renderTeeth === 'function') renderTeeth();
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wireStatusFilter);
+  else wireStatusFilter();
+})();
 
 function renderTeeth() {
   _T = rebuildToothMaps();
@@ -5616,7 +5731,7 @@ function renderTeeth() {
     if (isImplant(un)) uHtml += buildImplantTooth(un, true);
     else if (ponticSet[un]) uHtml += buildPonticTooth(un, true);
     else if (isExtracted(un)) uHtml += buildExtractedPlaceholder(un, true);
-    else uHtml += buildTooth(un, teethMap[String(un)], true);
+    else uHtml += buildTooth(un, chartFilterSM(teethMap[String(un)]), true);
   }
   for (var j=0; j<AL.length; j++) {
     if (j === lMid) lHtml += '<div class="midline"></div>';
@@ -5624,7 +5739,7 @@ function renderTeeth() {
     if (isImplant(ln)) lHtml += buildImplantTooth(ln, false);
     else if (ponticSet[ln]) lHtml += buildPonticTooth(ln, false);
     else if (isExtracted(ln)) lHtml += buildExtractedPlaceholder(ln, false);
-    else lHtml += buildTooth(ln, teethMap[String(ln)], false);
+    else lHtml += buildTooth(ln, chartFilterSM(teethMap[String(ln)]), false);
   }
   upperEl.innerHTML = uHtml;
   lowerEl.innerHTML = lHtml;
@@ -5634,6 +5749,7 @@ function renderTeeth() {
   attachSurfaceClicks();
   addStatusBadges();
   addPhotoBadges();   // P2 Phase B: photo-count badges, after status badges so both coexist
+  addLabBadges();     // open lab-order badges (bottom-left) — status ↗, photos ↖, lab ↙
   if (typeof renderOrthoOverlay === 'function') renderOrthoOverlay();
 }
 
@@ -9206,6 +9322,7 @@ function updateLabsBadge() {
 }
 
 function renderLabOrders() {
+  if (typeof addLabBadges === 'function') addLabBadges();   // keep chart badges in sync — save/advance/delete all funnel through this render
   var el = document.getElementById('labOrdersContent');
   if (!el) return;
   if (!labOrders.length) {
@@ -10081,6 +10198,36 @@ function addPhotoBadges(){
       switchTabByName('files');
     });
     cell.appendChild(badge);
+  });
+}
+
+/* Small clickable badge on teeth that have OPEN lab orders (status !== 'delivered';
+   sent/received/checked/redo are all open). Bottom-LEFT so it never collides with
+   the status badge (top-right) or the photo badge (top-left). Pure read from the
+   already-loaded labOrders array — zero extra queries, zero DB writes. Clicking
+   opens the labs tab. Re-synced from renderTeeth + every renderLabOrders. */
+function addLabBadges(){
+  document.querySelectorAll('.tooth-lab-badge').forEach(function(b){ b.remove(); });
+  var counts = {};
+  (labOrders || []).forEach(function(lo){
+    if (!lo || lo.status === 'delivered') return;   // delivered = closed/installed
+    String(lo.tooth_num || '').split(/[\s,،]+/).forEach(function(tn){
+      tn = (tn || '').trim();
+      if (tn) counts[tn] = (counts[tn] || 0) + 1;
+    });
+  });
+  Object.keys(counts).forEach(function(num){
+    var cell = document.querySelector('.tooth-cell[data-tooth-cell="' + num + '"]');
+    if (!cell) return;
+    var b = document.createElement('div');
+    b.className = 'tooth-lab-badge';
+    b.textContent = '🔬' + counts[num];
+    b.title = '🔬 ' + counts[num] + ' طلب مخبر مفتوح — اضغط للعرض';
+    b.addEventListener('click', function(ev){
+      ev.stopPropagation();   // don't open the tooth treatment modal
+      switchTabByName('labs');
+    });
+    cell.appendChild(b);
   });
 }
 
