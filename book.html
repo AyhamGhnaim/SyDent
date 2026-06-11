@@ -257,7 +257,7 @@ function renderMain(){
       html +=
         '<div class="day-chip' + (selDate === d.key ? ' sel' : '') + '" data-off="' + d.offset + '" onclick="pickDay(\'' + d.key + '\',' + d.offset + ')">'
         + '<div class="dn">' + DAYS_AR[d.date.getDay()] + '</div>'
-        + '<div class="dd">' + d.date.getDate() + ' ' + MONTHS_AR[d.date.getMonth()].split(' ')[0] + '</div>'
+        + '<div class="dd">' + d.date.getDate() + ' ' + MONTHS_AR[d.date.getMonth()].replace(' الأول', ' 1').replace(' الثاني', ' 2') + '</div>'
         + '<div class="dl">' + lbl + '</div>'
         + '</div>';
     });
