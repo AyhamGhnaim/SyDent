@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260611b"></script>
+<script src="theme.js?v=20260611c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260611b"></script>
-<script src="sidebar.js?v=20260611b"></script>
-<script src="timepicker.js?v=20260611b"></script>
+<script src="supabase-init.js?v=20260611c"></script>
+<script src="sidebar.js?v=20260611c"></script>
+<script src="timepicker.js?v=20260611c"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -687,7 +687,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260611b">
+<link rel="stylesheet" href="theme.css?v=20260611c">
 </head>
 <body>
 <script>
@@ -1909,7 +1909,7 @@ function doPrintRecord(withPrices){
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-  setTimeout(function(){ window.print(); }, 80);
+  window.print();   // sync inside the click gesture — iOS Safari blocks print() fired from setTimeout (transient user-activation is lost → 'blocked from automatically printing'). Content is inline SVG/CSS only; layout flushes before the print snapshot.
   // Safety net in case afterprint never fires (some mobile browsers)
   setTimeout(cleanup, 60000);
 }
@@ -5314,7 +5314,7 @@ function printChart(){
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-  setTimeout(function(){ window.print(); }, 80);
+  window.print();   // sync inside the click gesture — iOS Safari blocks print() fired from setTimeout (transient user-activation is lost → 'blocked from automatically printing'). Content is inline SVG/CSS only; layout flushes before the print snapshot.
   setTimeout(cleanup, 60000);
 }
 
@@ -11135,7 +11135,7 @@ async function printPrescription(rxId) {
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-  setTimeout(function(){ window.print(); }, 80);
+  window.print();   // sync inside the click gesture — iOS Safari blocks print() fired from setTimeout (transient user-activation is lost → 'blocked from automatically printing'). Content is inline SVG/CSS only; layout flushes before the print snapshot.
   setTimeout(cleanup, 60000);
 }
 
@@ -11524,7 +11524,7 @@ function printPostOp(id) {
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
-  setTimeout(function(){ window.print(); }, 80);
+  window.print();   // sync inside the click gesture — iOS Safari blocks print() fired from setTimeout (transient user-activation is lost → 'blocked from automatically printing'). Content is inline SVG/CSS only; layout flushes before the print snapshot.
   setTimeout(cleanup, 60000);
 }
 
