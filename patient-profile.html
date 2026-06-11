@@ -13,11 +13,11 @@
 <title>ملف المريض — SyDent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260611a"></script>
+<script src="theme.js?v=20260611b"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260611a"></script>
-<script src="sidebar.js?v=20260611a"></script>
-<script src="timepicker.js?v=20260611a"></script>
+<script src="supabase-init.js?v=20260611b"></script>
+<script src="sidebar.js?v=20260611b"></script>
+<script src="timepicker.js?v=20260611b"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -687,7 +687,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260611a">
+<link rel="stylesheet" href="theme.css?v=20260611b">
 </head>
 <body>
 <script>
@@ -5290,7 +5290,20 @@ function printChart(){
   h += ' &nbsp;•&nbsp; الإطباق: ' + dentLbl;
   if (filtLbl) h += ' &nbsp;•&nbsp; <strong>عرض مفلتر:</strong> ' + filtLbl;
   h += '</div>';
-  h += '<div class="cp-jaw">' + jw.outerHTML + '</div>';
+  // Self-contained clone — ROOT CAUSE of the black-roots print bug: while printing,
+  // the live chart sits under body.printing's display:none, and SVG paint servers
+  // (gradients / clipPaths) referenced ACROSS into a hidden subtree don't resolve
+  // (the clone's url(#id) hit the ORIGINAL hidden defs first — duplicate ids).
+  // Prefixing every id + url(#)/href(#) makes the clone resolve against ITS OWN
+  // visible defs, and kills the duplicate-id ambiguity as a bonus. Both quote
+  // styles are covered (facial builders use ", pontic/implant builders use ').
+  var jwHtml = jw.outerHTML
+    .replace(/id="/g,  'id="prn-')
+    .replace(/id='/g,  "id='prn-")
+    .replace(/url\(#/g, 'url(#prn-')
+    .replace(/href="#/g, 'href="#prn-')
+    .replace(/href='#/g, "href='#prn-");
+  h += '<div class="cp-jaw">' + jwHtml + '</div>';
   if (legEl) h += '<div class="chart-legend cp-legend">' + legEl.innerHTML + '</div>';
   h += '</div>';
 
