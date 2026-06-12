@@ -60,7 +60,7 @@
       '.tpw-cols{position:relative;display:flex;gap:4px;height:' + COL_H + 'px;direction:ltr;}',
       '.tpw-band{position:absolute;left:4px;right:4px;top:' + PAD + 'px;height:' + ITEM_H + 'px;',
         'border-top:1px solid var(--border);border-bottom:1px solid var(--border);',
-        'background:rgba(46,232,158,.10);border-radius:8px;pointer-events:none;}',
+        'background:rgba(var(--green-rgb),.10);border-radius:8px;pointer-events:none;}',
       '.tpw-col{flex:1 1 0;min-width:0;height:100%;overflow-y:scroll;',
         'scroll-snap-type:y mandatory;touch-action:pan-y;scrollbar-width:none;',
         '-ms-overflow-style:none;',
