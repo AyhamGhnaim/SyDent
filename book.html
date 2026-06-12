@@ -64,6 +64,7 @@ h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
   background:var(--card2); color:var(--text); font-size:18px; font-weight:800;
   font-family:'Cairo',sans-serif; cursor:pointer; padding:0; line-height:1;
   display:flex; align-items:center; justify-content:center;
+  direction:ltr; /* ‹ › are Bidi-Mirrored: RTL context flips them — neutralize */
 }
 .cal-nav:disabled{opacity:.30; cursor:default;}
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
@@ -285,7 +286,9 @@ function renderCalendar(){
   var y = calMonth.getFullYear(), mo = calMonth.getMonth();
   var todayKey = dateKey(new Date());
 
-  // RTL nav: previous points right (›), next points left (‹)
+  // RTL nav, outward-pointing: prev (right side) = › · next (left side) = ‹.
+  // .cal-nav has direction:ltr because U+2039/U+203A are Bidi-Mirrored —
+  // without it the RTL context flips the glyphs inward (live-reported).
   var html = '<div class="cal-head">'
     + '<button type="button" class="cal-nav" onclick="calNav(-1)" title="الشهر السابق"'
     + (monthIdx(calMonth) <= monthIdx(minM) ? ' disabled' : '') + '>&rsaquo;</button>'
