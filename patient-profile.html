@@ -7020,10 +7020,32 @@ async function saveToothTreatment() {
   var pendingTr = getTreatment(pendingToothStatus);
   var pendingTp = pendingTr ? (pendingTr.target_part || 'crown') : 'crown';
   var isBridgeTreatment = (pendingTp === 'bridge') || (pendingToothStatus === 'bridge');
+  // ── Clinical guard (primary teeth) ──
+  // Implants are never charted on a deciduous tooth number: fixtures are placed
+  // after growth completion, at which point the site belongs to the permanent
+  // tooth. Explicit message instead of charting a clinically-invalid record.
+  if (pendingTp === 'implant' && isPrimaryTooth(currentTooth)) {
+    showToast('🦷 الزراعة لا تُسجَّل على سن لبني — حوّل الموضع للسن الدائم ثم خطّطها');
+    return;
+  }
   // Track the bridge unit for ledger description (null if not a bridge save)
   var bridgeUnitForLedger = null;
   if (isBridgeTreatment) {
     var abuts = findBridgeAbutments(currentTooth);
+    // ── Clinical guard (primary teeth) ──
+    // Conventional bridges are never made on deciduous teeth: their roots resorb &
+    // exfoliate, and a fixed prosthesis would block the permanent successor's
+    // eruption (standard of care: a space maintainer). This also fixes a silent
+    // no-op: the unit math below maps abutments against the PERMANENT arch
+    // (UPPER_T/LOWER_T), so primary numbers returned indexOf=-1 → empty unit →
+    // nothing was saved, with no error and no message.
+    var _brProbe = [currentTooth, abuts.mesial, abuts.distal].concat(abuts.gap || []);
+    for (var _bp = 0; _bp < _brProbe.length; _bp++) {
+      if (_brProbe[_bp] != null && isPrimaryTooth(_brProbe[_bp])) {
+        showToast('🦷 الجسر التقليدي لا يُطبَّق على الأسنان اللبنية — البديل السريري: «حافظ مسافة»');
+        return;
+      }
+    }
     if (!abuts.mesial || !abuts.distal) {
       showToast('⚠️ يحتاج الجسر سن سليم على كلا الجانبين');
       return;
