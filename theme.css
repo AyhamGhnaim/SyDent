@@ -14,41 +14,42 @@
    --bg-primary/--text-primary).
    ============================================================================ */
 
-/* ---------- LIGHT MODE (default — Soft warm, Stripe-inspired) -------------- */
+/* ── Redesign v1 (12 Jun 2026): typeface ── */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+
+/* ---------- LIGHT MODE (default — Clinical cool, SyDent Redesign v1) ------ */
 :root,
 :root[data-theme="light"] {
-  /* Standard naming (landing/admin/most pages) */
-  --bg:        #ffffff;       /* page bg — pure white (Apple-style: page is clean, cards stand off slightly) */
-  --bg2:       #f8f7f2;       /* card bg — subtle off-white (~2% darker than --bg for soft contrast) */
-  --bg3:       #efeee9;       /* hover / subtle bg (darker than --bg2 to show hover state) */
-  --bg4:       #f3f2ed;       /* nested bg (between bg2 and bg3) */
+  --bg:        #f4f7fa;
+  --bg2:       #ffffff;
+  --bg3:       #edf2f7;
+  --bg4:       #f7fafc;
 
-  --text:      #1c1917;       /* primary text — warm near-black */
-  --text2:     #57534e;       /* secondary text — warm gray */
-  --text3:     #78716c;       /* tertiary / muted */
+  --text:      #102a43;
+  --text2:     #5a7184;
+  --text3:     #8fa6b8;
 
-  --border:    rgba(28,25,23,0.10);   /* subtle hairline */
-  --border2:   rgba(28,25,23,0.18);
+  --border:    #e2e9f0;
+  --border2:   #cbd8e3;
 
-  /* Semantic colors — slightly toned for light backgrounds */
-  --green:     #16a085;       /* primary action — readable on white */
-  --green2:    #138a72;
-  --green-dim: rgba(22,160,133,0.10);
+  --green:     #0d8577;
+  --green2:    #0a6b60;
+  --green-dim: rgba(13,133,119,0.10);
 
   --red:       #dc2626;
   --red-dim:   rgba(220,38,38,0.10);
 
-  --yellow:    #ca8a04;
-  --yellow-dim:rgba(202,138,4,0.12);
+  --yellow:    #d97706;
+  --yellow-dim:rgba(217,119,6,0.12);
 
   --blue:      #2563eb;
   --orange:    #ea580c;
   --purple:    #7c3aed;
   --amber:     #d97706;
-  --cyan:      #0e7490;       /* renew action — readable teal on white */
-  --wa:        #128c3e;       /* WhatsApp actions — darkened brand green for contrast */
+  --cyan:      #0e7490;
+  --wa:        #128c3e;
 
-  /* index.html alias naming */
   --bg-primary:    var(--bg);
   --bg-secondary:  var(--bg2);
   --bg-card:       var(--bg2);
@@ -58,9 +59,8 @@
   --text-secondary:var(--text2);
   --text-muted:    var(--text3);
 
-  /* Surface shadow — softer in light mode (slightly stronger to lift cards off the darker bg) */
-  --shadow-card:   0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-modal:  0 20px 50px rgba(0,0,0,0.15);
+  --shadow-card:   0 1px 2px rgba(16,42,67,0.06), 0 1px 3px rgba(16,42,67,0.05);
+  --shadow-modal:  0 20px 50px rgba(16,42,67,0.18);
 }
 
 /* ---------- DARK MODE (existing platform look, preserved) ------------------ */
@@ -293,7 +293,7 @@
   border-color: rgba(28,25,23,0.15);
 }
 :root[data-theme="light"] .sb-theme-row {
-  background: #f8f7f2;
+  background: var(--bg);
 }
 
 /* ========================================================================== */
@@ -303,7 +303,7 @@
 
 /* Hard-coded body gradient (#0a1628 → #0f2038) in all three Tier A pages */
 :root[data-theme="light"] body {
-  background: linear-gradient(135deg, #ffffff 0%, #f8f7f2 50%, #ffffff 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f4f7fa 50%, #ffffff 100%);
 }
 
 /* Card containers — dark navy box-shadow looks like a halo on white bg */
@@ -612,7 +612,7 @@
 }
 :root[data-theme="light"] .cbadge {
   background: color-mix(in srgb, var(--bc) 14%, #ffffff);
-  color: color-mix(in srgb, var(--bc) 68%, #1c1917);
+  color: color-mix(in srgb, var(--bc) 68%, #102a43);
   border: 1px solid color-mix(in srgb, var(--bc) 36%, #ffffff);
 }
 
@@ -627,7 +627,7 @@
 :root[data-theme="light"] .badge.blue   { color: var(--blue); }
 /* appointments.html appointment-status pills */
 :root[data-theme="light"] .status-scheduled { color: var(--blue); }
-:root[data-theme="light"] .status-broken     { color: color-mix(in srgb, #fb923c 70%, #1c1917); }
+:root[data-theme="light"] .status-broken     { color: color-mix(in srgb, #fb923c 70%, #102a43); }
 
 /* ========================================================================== */
 /*  Badge / pill legibility — Light Mode                                       */
@@ -655,3 +655,14 @@
 /* treatments.html — lab / builtin tags */
 :root[data-theme="light"] .treat-lab-tag     { background:rgba(37,99,235,0.12); }
 :root[data-theme="light"] .treat-builtin-tag { background:rgba(37,99,235,0.12); border-color:rgba(37,99,235,0.30); }
+
+
+/* ════════ Redesign v1 additions (12 Jun 2026) ════════ */
+:root, :root[data-theme="light"] { --green-rgb: 13,133,119; }
+:root[data-theme="dark"]         { --green-rgb: 46,232,158; }
+
+/* Universal typeface — overrides 147 inline 'Cairo' declarations. */
+html, body, body * {
+  font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, -apple-system, sans-serif !important;
+}
+pre, code, kbd, samp { font-family: ui-monospace, 'SF Mono', Consolas, monospace !important; }
