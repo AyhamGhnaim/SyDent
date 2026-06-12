@@ -1,0 +1,693 @@
+(function() {
+
+// ─── CSS ───
+// Theme variables (--bg, --bg2, --bg3, --green, --text, --text2, --border)
+// are owned by theme.css. We only define --sb-width here (sidebar-local) and
+// fallback values via var(...,fallback) for any rare case where theme.css
+// hasn't loaded yet (e.g. file:// preview). Removing the duplicate :root
+// block here lets the light/dark theme cascade work for the sidebar.
+const css = `
+  :root {
+    --sb-width: 240px;
+  }
+
+  /* ─── Sidebar ─── */
+  .sb-sidebar {
+    width: var(--sb-width);
+    background: var(--bg2);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    right: 0; top: 0; bottom: 0;
+    z-index: 200;
+    transition: transform .3s cubic-bezier(.25,.46,.45,.94);
+  }
+  .sb-logo {
+    padding: 22px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    text-decoration: none;
+  }
+  .sb-logo-icon {
+    width: 38px; height: 38px;
+    background: rgba(46,232,158,0.12);
+    border: 1.5px solid rgba(46,232,158,0.3);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sb-logo-name { font-size: 18px; font-weight: 900; color: var(--text); font-family: 'Cairo', sans-serif; }
+  .sb-logo-sub  { font-size: 10px; color: var(--text2); font-family: 'Cairo', sans-serif; }
+
+  .sb-nav { flex: 1; padding: 12px 0; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+  .sb-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .sb-section {
+    padding: 14px 20px 6px;
+    font-size: 10px; font-weight: 700;
+    color: var(--text2);
+    letter-spacing: 1px;
+    font-family: 'Cairo', sans-serif;
+  }
+  .sb-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 20px;
+    font-size: 14px; font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all .18s;
+    border-right: 3px solid transparent;
+    text-decoration: none;
+    font-family: 'Cairo', sans-serif;
+    position: relative;
+  }
+  .sb-item:hover { color: var(--text); background: var(--green-dim, rgba(46,232,158,0.12)); }
+  .sb-item.active {
+    color: var(--green);
+    background: var(--green-dim, rgba(46,232,158,0.12));
+    border-right-color: var(--green);
+  }
+  .sb-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sb-badge {
+    margin-right: auto;
+    background: var(--green);
+    color: #0a1628;
+    font-size: 10px; font-weight: 800;
+    min-width: 18px; height: 18px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0 5px;
+  }
+
+  /* ─── Footer: doctor identity + theme toggle on one row ─── */
+  .sb-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'Cairo', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .sb-footer-name {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.55;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ─── Theme toggle (pill style — matches auth/login page) ─── */
+  .sb-theme-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 56px;
+    height: 30px;
+    border-radius: 999px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    vertical-align: middle;
+    transition: background .2s ease, border-color .2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sb-theme-switch:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+  .sb-theme-switch-knob {
+    position: absolute;
+    top: 50%;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transform: translateY(-50%);
+    transition: right .22s cubic-bezier(0.4,0,0.2,1), background .22s ease;
+  }
+  /* RTL: in light mode knob sits on the right (sun side); in dark on the left (moon side) */
+  :root[data-theme="light"] .sb-theme-switch-knob { right: 2px; }
+  :root[data-theme="dark"]  .sb-theme-switch-knob { right: calc(100% - 26px); }
+  :root[data-theme="dark"]  .sb-theme-switch       { background: #1e3556; }
+  .sb-theme-icon-sun,
+  .sb-theme-icon-moon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    opacity: 0.55;
+    transition: opacity .2s ease;
+  }
+  .sb-theme-icon-sun  { right: 7px; color: #f59e0b; }
+  .sb-theme-icon-moon { left:  7px; color: #818cf8; }
+  :root[data-theme="light"] .sb-theme-icon-sun  { opacity: 1; }
+  :root[data-theme="dark"]  .sb-theme-icon-moon { opacity: 1; }
+
+  /* ─── Overlay ─── */
+  .sb-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(2px);
+    z-index: 199;
+  }
+  .sb-overlay.open { display: block; }
+
+  /* ─── Hamburger ─── */
+  .sb-hamburger {
+    display: none;
+    width: 40px; height: 40px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+    position: relative; z-index: 10;
+  }
+  .sb-hamburger span {
+    display: block;
+    width: 18px; height: 2px;
+    background: var(--text);
+    border-radius: 2px;
+    transition: all .25s ease;
+  }
+  .sb-hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .sb-hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+  .sb-hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  /* ─── Main content offset ─── */
+  body.sb-ready .sb-main-content {
+    margin-right: var(--sb-width);
+  }
+
+  /* ─── Mobile ─── */
+  @media (max-width: 820px) {
+    .sb-hamburger { display: flex !important; }
+    .sb-sidebar {
+      transform: translateX(110%);
+      box-shadow: -8px 0 32px rgba(0,0,0,0.5);
+    }
+    .sb-sidebar.open { transform: translateX(0); }
+    body.sb-ready .sb-main-content { margin-right: 0 !important; }
+  }
+`;
+
+// ─── HTML ───
+const navItems = [
+  { section: 'الرئيسية' },
+  { icon: '📊', label: 'لوحة التحكم', href: 'index.html',    id: 'dashboard' },
+  { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
+  { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
+  { section: 'الإدارة' },
+  { icon: '💉', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
+  { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
+  { icon: '👥', label: 'الموظفون',     href: 'employees.html', id: 'employees' },
+  { icon: '💳', label: 'المدفوعات',   href: 'payouts.html',  id: 'payouts'   },
+  { icon: '💰', label: 'المصاريف',    href: 'expenses.html', id: 'expenses'  },
+  { icon: '📦', label: 'المخزون',     href: 'inventory.html', id: 'inventory' },
+  { icon: '🥽', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
+  { section: 'تحليل' },
+  { icon: '📊', label: 'المحاسبة',       href: 'accounting.html', id: 'accounting' },
+  { icon: '📊', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
+  { icon: '📋', label: 'سجل النشاطات', href: 'audit-log.html', id: 'audit-log' },
+  { section: 'النظام' },
+  { icon: '💎', label: 'الاشتراك',   href: 'subscription.html', id: 'subscription' },
+  { icon: '⚙️', label: 'الإعدادات',  href: 'settings.html', id: 'settings'  },
+  { icon: '🚪', label: 'تسجيل خروج', href: '#',             id: 'logout', onClick: 'doLogout' },
+];
+
+function buildHTML(activeId) {
+  // Phase 4: filter nav items by current device role.
+  // Owner sees everything; Doctor hides Owner-only pages; Secretary hides
+  // both Owner-only pages and provider-reports. We compute this at render
+  // time so SyDentLock (attached synchronously by supabase-init.js) is ready.
+  var role = (window.SyDentLock && window.SyDentLock.getRole) ? window.SyDentLock.getRole() : 'owner';
+  var BLOCKED = {
+    owner:     [],
+    doctor:    ['treatments', 'doctors', 'employees', 'settings', 'subscription', 'audit-log', 'expenses', 'inventory', 'payouts', 'accounting'],
+    secretary: ['treatments', 'doctors', 'employees', 'settings', 'subscription', 'provider-reports', 'audit-log', 'expenses', 'inventory', 'payouts', 'accounting']
+  };
+  var blocked = BLOCKED[role] || [];
+
+  // Drop blocked items + drop adjacent section headers that would become orphans.
+  var filtered = navItems.filter(function(item){
+    if (item.section) return true; // keep sections for now, prune below
+    return blocked.indexOf(item.id) < 0;
+  });
+  // Prune sections that have no items following them before the next section
+  var pruned = [];
+  for (var i = 0; i < filtered.length; i++) {
+    var it = filtered[i];
+    if (it.section) {
+      // Look ahead — is there at least one non-section item before the next section/end?
+      var hasItems = false;
+      for (var j = i + 1; j < filtered.length; j++) {
+        if (filtered[j].section) break;
+        hasItems = true;
+        break;
+      }
+      if (hasItems) pruned.push(it);
+    } else {
+      pruned.push(it);
+    }
+  }
+
+  const navHTML = pruned.map(item => {
+    if (item.section) {
+      return `<div class="sb-section">${item.section}</div>`;
+    }
+    const isActive = item.id === activeId ? 'active' : '';
+    const badge = item.badge ? `<span class="sb-badge">${item.badge}</span>` : '';
+    const clickAttr = item.onClick ? `onclick="event.preventDefault();window.${item.onClick}();"` : '';
+    return `
+      <a class="sb-item ${isActive}" href="${item.href}" ${clickAttr}>
+        <span class="sb-icon">${item.icon}</span>
+        ${item.label}
+        ${badge}
+      </a>`;
+  }).join('');
+
+  return `
+    <div class="sb-overlay" id="sbOverlay"></div>
+    <aside class="sb-sidebar" id="sbSidebar">
+      <a href="index.html" class="sb-logo">
+        <div class="sb-logo-icon"><svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg></div>
+        <div>
+          <div class="sb-logo-name">SyDent</div>
+          <div class="sb-logo-sub" id="sbLogoSub">نظام إدارة العيادة</div>
+        </div>
+      </a>
+      <nav class="sb-nav">${navHTML}</nav>
+      <div class="sb-footer" id="sbDoctorFooter">
+        <div class="sb-footer-name" id="sbDoctorName">جارٍ التحميل…</div>
+        <button type="button" class="sb-theme-switch" id="sbThemeSwitch" role="switch" aria-label="تبديل الوضع الفاتح/الداكن" title="تبديل الوضع الفاتح/الداكن">
+          <svg class="sb-theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="sb-theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <span class="sb-theme-switch-knob" aria-hidden="true"></span>
+        </button>
+      </div>
+    </aside>`;
+}
+
+// تحديث اسم الدكتور وعدد مواعيد اليوم بشكل ديناميكي
+async function refreshSidebarDynamic() {
+  if (!window.sb) return;
+  const { data: u } = await window.sb.auth.getUser();
+  if (!u || !u.user) return;
+  const uid = u.user.id;
+
+  // فحص حالة الحساب — إذا موقوف يحجب الصفحة
+  const { data: trialData } = await window.sb.from('trial_requests')
+    .select('status, trial_end')
+    .eq('email', u.user.email)
+    .maybeSingle();
+
+  if (trialData && trialData.status === 'rejected') {
+    // Phase X11 — read vendor support_phone from platform_settings (Migration 33
+    // table + Migration 34 public-read policy). Falls back to the legacy
+    // hardcoded value on RLS/network failure so the suspension screen always
+    // shows a working WhatsApp link. Single query per suspension render.
+    var SB_SUPPORT_PHONE_FALLBACK = '963934012433';
+    var sbSupportPhone = SB_SUPPORT_PHONE_FALLBACK;
+    try {
+      const psRes = await window.sb.from('platform_settings')
+        .select('value')
+        .eq('key', 'support_phone')
+        .maybeSingle();
+      if (psRes && psRes.data && psRes.data.value) {
+        const v = String(psRes.data.value).trim();
+        if (/^\d{8,15}$/.test(v)) sbSupportPhone = v;
+      }
+    } catch (e) { /* keep fallback */ }
+
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+        <div style="font-size:60px;margin-bottom:16px;">🚫</div>
+        <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">تم إيقاف حسابك</div>
+        <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">للاستفسار أو تجديد الاشتراك، تواصل معنا عبر واتساب.</div>
+        <a href="https://wa.me/${sbSupportPhone}?text=${encodeURIComponent('مرحباً، حسابي في SyDent موقوف وأريد الاستفسار')}" target="_blank"
+          style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+          💬 تواصل معنا عبر واتساب
+        </a>
+        <button onclick="window.doLogout()"
+          style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
+          تسجيل الخروج
+        </button>
+      </div>`;
+    return;
+  }
+
+  if (trialData && trialData.status === 'new') {
+    document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+        <div style="font-size:60px;margin-bottom:16px;">⏳</div>
+        <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">طلبك قيد المراجعة</div>
+        <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">شكراً لتسجيلك في SyDent. سيتم مراجعة طلبك وتفعيل حسابك قريباً.</div>
+        <button onclick="window.doLogout()"
+          style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+          تسجيل الخروج
+        </button>
+      </div>`;
+    return;
+  }
+
+  // اسم الدكتور
+  const meta = u.user.user_metadata || {};
+  const name = meta.full_name || meta.name || u.user.email || 'دكتور';
+  const role = meta.role || 'طبيب أسنان';
+  const nameEl = document.getElementById('sbDoctorName');
+  if (nameEl) nameEl.innerHTML = name + '<br>' + role;
+
+  // Clinic name in the brand sub-line. The clinic name lives in
+  // clinic_settings.clinic_name (edited on settings.html) and was previously
+  // only surfaced on the dashboard; loading it here shows it on every tenant
+  // page via the shared sidebar. Falls back to the generic subtitle.
+  try {
+    const subEl = document.getElementById('sbLogoSub');
+    if (subEl && window.sb && u.user && u.user.id) {
+      const csRes = await window.sb.from('clinic_settings')
+        .select('clinic_name').eq('owner_id', u.user.id).maybeSingle();
+      const cn = csRes && csRes.data && csRes.data.clinic_name;
+      if (cn && String(cn).trim()) subEl.textContent = String(cn).trim();
+    }
+  } catch (e) { /* keep default subtitle on any error */ }
+
+  // Phase C: hide nav items for modules disabled by the tenant's plan.
+  // Composes with the device-role BLOCKED filter in buildHTML: an item shows
+  // only if (role allows) AND (plan allows). Fail-open via SyDentPlan.can.
+  try {
+    if (window.SyDentPlan) {
+      await window.SyDentPlan.load();
+      const nav = document.querySelector('.sb-nav');
+      if (nav) {
+        const GATEABLE = ['treatments','doctors','employees','payouts','expenses','inventory','labs','accounting','provider-reports','audit-log'];
+        GATEABLE.forEach(function(id){
+          if (window.SyDentPlan.can(id)) return;
+          let href = null;
+          for (let ni = 0; ni < navItems.length; ni++) { if (navItems[ni].id === id) { href = navItems[ni].href; break; } }
+          if (!href) return;
+          const a = nav.querySelector('.sb-item[href="' + href + '"]');
+          if (a) a.remove();
+        });
+        // Prune section headers left with no items (followed by another section or the end).
+        const secs = nav.querySelectorAll('.sb-section');
+        secs.forEach(function(sec){
+          const nx = sec.nextElementSibling;
+          if (!nx || (nx.classList && nx.classList.contains('sb-section'))) sec.remove();
+        });
+      }
+    }
+  } catch (entErr) { console.warn('[sidebar] entitlement filter skipped:', entErr); }
+
+  // badge المواعيد = عدد مواعيد اليوم
+  const today = new Date();
+  const todayStr = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  const { data: appts } = await window.sb.from('appointments').select('id')
+    .eq('doctor_id', uid).eq('date', todayStr);
+  const count = (appts || []).length;
+  const apptLink = document.querySelector('.sb-item[href="appointments.html"]');
+  if (apptLink) {
+    let badge = apptLink.querySelector('.sb-badge');
+    if (count > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'sb-badge';
+        apptLink.appendChild(badge);
+      }
+      badge.textContent = count;
+    } else if (badge) {
+      badge.remove();
+    }
+  }
+}
+
+// ─── JS ───
+function initSidebar(activeId) {
+  // انتظر DOM إذا لم يكن جاهزاً بعد
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initSidebar(activeId);
+    });
+    return;
+  }
+
+  // 1. Inject CSS
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+
+  // 2. Inject HTML
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = buildHTML(activeId);
+  document.body.insertBefore(wrapper, document.body.firstChild);
+
+  // 2.5. Wire theme toggle — self-contained (works whether theme.js is loaded or not).
+  //  Uses the same localStorage key 'sydent_theme' as theme.js for cross-page persistence.
+  //  IMPORTANT: hide the toggle on pages that don't ship theme.css (Tier B/C pages
+  //  not yet migrated) — otherwise the knob moves but the page doesn't change,
+  //  which is confusing. Detection: theme.css presence in document.styleSheets,
+  //  OR window.SyDentTheme (loaded via theme.js, which always accompanies theme.css).
+  try {
+    const sw  = document.getElementById('sbThemeSwitch');
+    const themeCssLoaded = !!(window.SyDentTheme) ||
+      Array.from(document.styleSheets || []).some(function(s){
+        try { return (s.href || '').indexOf('theme.css') !== -1; } catch(e) { return false; }
+      });
+    if (sw && !themeCssLoaded) {
+      sw.style.display = 'none';
+    }
+    if (sw && themeCssLoaded) {
+      const KEY = 'sydent_theme';
+      const VALID = { light: 1, dark: 1 };
+      const readMode = function() {
+        try {
+          const v = localStorage.getItem(KEY);
+          return (v && VALID[v]) ? v : 'light';
+        } catch (e) { return 'light'; }
+      };
+      const writeMode = function(m) {
+        try { localStorage.setItem(KEY, m); } catch (e) {}
+      };
+      const applyMode = function(m) {
+        if (!VALID[m]) m = 'light';
+        document.documentElement.setAttribute('data-theme', m);
+        sw.setAttribute('aria-checked', m === 'dark' ? 'true' : 'false');
+        // Update mobile status bar tint if a theme-color meta exists
+        try {
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', m === 'dark' ? '#0a1628' : '#fafaf7');
+        } catch (e) {}
+        // Notify other widgets (e.g. Chart.js) — same event name as theme.js
+        try {
+          window.dispatchEvent(new CustomEvent('sydent:themechange', { detail: { mode: m } }));
+        } catch (e) {}
+      };
+      // Initial sync: read stored or default, then apply (ensures sidebar + page agree)
+      const initial = readMode();
+      applyMode(initial);
+      // Click handler — toggles + persists
+      sw.addEventListener('click', function(e) {
+        e.preventDefault();
+        const next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+        writeMode(next);
+        applyMode(next);
+      });
+    }
+  } catch (e) { /* non-fatal */ }
+
+  // 3. Wrap main content
+  const mainEl = document.getElementById('sbMainContent') ||
+                 document.querySelector('.main') ||
+                 document.querySelector('main');
+  if (mainEl) {
+    mainEl.classList.add('sb-main-content');
+    document.body.classList.add('sb-ready');
+  }
+
+  // 4. Hamburger toggle
+  const sidebar = document.getElementById('sbSidebar');
+  const overlay = document.getElementById('sbOverlay');
+
+  function open()  {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    if (window._sbBtn) window._sbBtn.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    if (window._sbBtn) window._sbBtn.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  overlay.addEventListener('click', close);
+  sidebar.querySelectorAll('.sb-item').forEach(el => {
+    el.addEventListener('click', () => { if (window.innerWidth <= 820) close(); });
+  });
+
+  // Expose globally
+  window.sbOpen  = open;
+  window.sbClose = close;
+  window.sbToggle = function() {
+    sidebar.classList.contains('open') ? close() : open();
+  };
+
+  // 4.5 Dynamic refresh: doctor name + appointments badge
+  setTimeout(refreshSidebarDynamic, 200);
+
+  // 5. Pull-to-Refresh
+  initPTR();
+}
+
+// ─── Pull to Refresh ───────────────────────────────
+function initPTR() {
+  if (!('ontouchstart' in window)) return;
+
+  var s = document.createElement('style');
+  s.textContent =
+    '.ptr-bar{' +
+      'width:100%;overflow:hidden;height:0;' +
+      'display:flex;align-items:center;justify-content:center;gap:8px;' +
+      'background:#0a1628;' +
+      'font-size:13px;font-weight:700;color:#2ee89e;' +
+      'font-family:"Cairo",sans-serif;' +
+      'transition:height .25s ease;' +
+      'border-bottom:1px solid transparent;}' +
+    '.ptr-bar.show{height:38px;border-bottom-color:rgba(46,232,158,0.2);}' +
+    '.ptr-ring{' +
+      'width:15px;height:15px;' +
+      'border:2px solid rgba(46,232,158,0.25);' +
+      'border-top-color:#2ee89e;' +
+      'border-radius:50%;flex-shrink:0;}' +
+    '.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}' +
+    '@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  document.head.appendChild(s);
+
+  function attachHTML() {
+    if (document.getElementById('ptrBar')) return;
+
+    var bar = document.createElement('div');
+    bar.id        = 'ptrBar';
+    bar.className = 'ptr-bar';
+    bar.innerHTML = '<div class="ptr-ring" id="ptrRing"></div><span id="ptrLabel">↓ اسحب للتحديث</span>';
+
+    // ضعه قبل الـ topbar مباشرة داخل .main
+    var topbar = document.querySelector('.topbar');
+    if (topbar && topbar.parentNode) {
+      topbar.parentNode.insertBefore(bar, topbar);
+    } else {
+      var main = document.getElementById('sbMainContent') || document.querySelector('.main');
+      if (main) main.insertBefore(bar, main.firstChild);
+      else document.body.insertBefore(bar, document.body.firstChild);
+    }
+    startPTR();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachHTML);
+  } else {
+    attachHTML();
+  }
+
+  function startPTR() {
+    var THRESHOLD = 65, MAX = 95;
+    var sy = 0, cy = 0, active = false;
+
+    function bar()   { return document.getElementById('ptrBar'); }
+    function ring()  { return document.getElementById('ptrRing'); }
+    function label() { return document.getElementById('ptrLabel'); }
+
+    function setState(state, pull) {
+      var b = bar(), r = ring(), l = label();
+      if (!b) return;
+      if (state === 'hide') {
+        b.className = 'ptr-bar';
+      } else if (state === 'pull') {
+        b.className = 'ptr-bar show';
+        r.style.animation = 'none';
+        r.style.transform = 'rotate(' + Math.round((pull / THRESHOLD) * 270) + 'deg)';
+        l.textContent = pull >= THRESHOLD ? '\u2191 أفلت للتحديث' : '\u2193 اسحب للتحديث';
+      } else if (state === 'spin') {
+        b.className = 'ptr-bar show spin';
+        r.style.transform = '';
+        r.style.animation = '';
+        l.textContent = 'جارٍ التحديث\u2026';
+      } else if (state === 'done') {
+        b.className = 'ptr-bar show';
+        r.style.animation = 'none';
+        l.textContent = '\u2713 تم التحديث';
+      }
+    }
+
+    document.addEventListener('touchstart', function(e) {
+      if (document.querySelector('.modal-overlay.open')) return;
+      if (window.scrollY > 0) return;
+      sy = cy = e.touches[0].clientY;
+      active = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (!active) return;
+      if (window.scrollY > 0) { active = false; setState('hide'); return; }
+      cy = e.touches[0].clientY;
+      var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
+      if (pull > 4) setState('pull', pull);
+      else setState('hide');
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (!active) return;
+      active = false;
+      var pull = Math.min(Math.max(0, cy - sy) * 0.55, MAX);
+      if (pull >= THRESHOLD) {
+        setState('spin');
+        setTimeout(function() {
+          if (typeof window.onPTRRefresh === 'function') {
+            window.onPTRRefresh();
+          } else {
+            window.location.reload();
+          }
+          setState('done');
+          setTimeout(function() { setState('hide'); }, 1400);
+        }, 800);
+      } else {
+        setState('hide');
+      }
+      cy = 0;
+    });
+  }
+}
+
+window.initSidebar = initSidebar;
+
+})();
+
+// زر تسجيل خروج — معرّف على window عشان يقدر sidebar الـHTML يستدعيه
+window.doLogout = async function() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  try {
+    if (window.sb && window.sb.auth) {
+      await window.sb.auth.signOut({ scope: 'local' });
+    }
+  } catch(e) { console.error('signOut error', e); }
+  // Clear all Supabase auth storage manually as backup
+  try {
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf('sydent.auth') === 0 || k.indexOf('sb-') === 0 || k.indexOf('supabase') === 0) {
+        localStorage.removeItem(k);
+      }
+    });
+  } catch(e){}
+  // Hard redirect (replace prevents back button)
+  window.location.replace('auth.html?logged_out=1');
+};

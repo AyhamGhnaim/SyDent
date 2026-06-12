@@ -1,0 +1,664 @@
+/* ============================================================================
+   SyDent Theme System — Phase Theme v1 (27 May 2026)
+   ----------------------------------------------------------------------------
+   Light mode is the DEFAULT (matches user preference: "خلي ال لايت مود هو الاساسي").
+   Dark mode = the existing platform look, preserved exactly (--bg:#0a1628 etc.).
+
+   Loaded AFTER each page's existing inline <style>, so cascade order is:
+     1. inline :root           → page sets its own dark variables
+     2. theme.css :root        → overrides to Light defaults
+     3. theme.css [data-theme="dark"] → restores Dark when toggled
+
+   No inline color literals are touched in Phase 1; aliases cover both naming
+   conventions found in the codebase (standard --bg/--text and index.html's
+   --bg-primary/--text-primary).
+   ============================================================================ */
+
+/* ---------- LIGHT MODE (default — Soft warm, Stripe-inspired) -------------- */
+:root,
+:root[data-theme="light"] {
+  /* Standard naming (landing/admin/most pages) */
+  --bg:        #ffffff;       /* page bg — pure white (Apple-style: page is clean, cards stand off slightly) */
+  --bg2:       #f8f7f2;       /* card bg — subtle off-white (~2% darker than --bg for soft contrast) */
+  --bg3:       #efeee9;       /* hover / subtle bg (darker than --bg2 to show hover state) */
+  --bg4:       #f3f2ed;       /* nested bg (between bg2 and bg3) */
+
+  --text:      #1c1917;       /* primary text — warm near-black */
+  --text2:     #57534e;       /* secondary text — warm gray */
+  --text3:     #78716c;       /* tertiary / muted */
+
+  --border:    rgba(28,25,23,0.10);   /* subtle hairline */
+  --border2:   rgba(28,25,23,0.18);
+
+  /* Semantic colors — slightly toned for light backgrounds */
+  --green:     #16a085;       /* primary action — readable on white */
+  --green2:    #138a72;
+  --green-dim: rgba(22,160,133,0.10);
+
+  --red:       #dc2626;
+  --red-dim:   rgba(220,38,38,0.10);
+
+  --yellow:    #ca8a04;
+  --yellow-dim:rgba(202,138,4,0.12);
+
+  --blue:      #2563eb;
+  --orange:    #ea580c;
+  --purple:    #7c3aed;
+  --amber:     #d97706;
+  --cyan:      #0e7490;       /* renew action — readable teal on white */
+  --wa:        #128c3e;       /* WhatsApp actions — darkened brand green for contrast */
+
+  /* index.html alias naming */
+  --bg-primary:    var(--bg);
+  --bg-secondary:  var(--bg2);
+  --bg-card:       var(--bg2);
+  --accent:        var(--green);
+  --accent2:       var(--green2);
+  --text-primary:  var(--text);
+  --text-secondary:var(--text2);
+  --text-muted:    var(--text3);
+
+  /* Surface shadow — softer in light mode (slightly stronger to lift cards off the darker bg) */
+  --shadow-card:   0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-modal:  0 20px 50px rgba(0,0,0,0.15);
+}
+
+/* ---------- DARK MODE (existing platform look, preserved) ------------------ */
+:root[data-theme="dark"] {
+  /* Standard naming */
+  --bg:        #0a1628;
+  --bg2:       #0f2038;
+  --bg3:       #132840;
+  --bg4:       #0d1e33;
+
+  --text:      #e1f4ee;
+  --text2:     #8a9ab5;
+  --text3:     #5a7090;
+
+  --border:    rgba(46,232,158,0.15);
+  --border2:   rgba(46,232,158,0.28);
+
+  --green:     #2ee89e;
+  --green2:    #26d48e;
+  --green-dim: rgba(46,232,158,0.10);
+
+  --red:       #ef5350;
+  --red-dim:   rgba(239,83,80,0.10);
+
+  --yellow:    #f5c842;
+  --yellow-dim:rgba(245,200,66,0.12);
+
+  --blue:      #63b3ed;
+  --orange:    #ffa726;
+  --purple:    #a78bfa;
+  --amber:     #ffc107;
+  --cyan:      #4dd0e1;
+  --wa:        #25d366;
+
+  /* index.html alias naming */
+  --bg-primary:    var(--bg);
+  --bg-secondary:  var(--bg2);
+  --bg-card:       var(--bg3);
+  --accent:        var(--green);
+  --accent2:       #1ac5a8;
+  --text-primary:  var(--text);
+  --text-secondary:#8ab9a5;
+  --text-muted:    #607b8d;
+
+  /* Shadow stronger on dark */
+  --shadow-card:   0 4px 12px rgba(0,0,0,0.25);
+  --shadow-modal:  0 20px 60px rgba(0,0,0,0.4);
+}
+
+/* ---------- TOGGLE SWITCH (iOS-style) -------------------------------------- */
+.sydent-theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 56px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  flex-shrink: 0;
+  vertical-align: middle;
+  -webkit-tap-highlight-color: transparent;
+}
+.sydent-theme-toggle:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.sydent-theme-toggle .stt-knob {
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transform: translateY(-50%);
+  transition: right 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.22s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+}
+/* RTL: in light mode knob sits on the right (sun side); in dark on the left */
+:root[data-theme="light"] .sydent-theme-toggle .stt-knob { right: 2px; }
+:root[data-theme="dark"]  .sydent-theme-toggle .stt-knob { right: calc(100% - 26px); }
+:root[data-theme="dark"]  .sydent-theme-toggle           { background: #1e3556; }
+
+.sydent-theme-toggle .stt-icon-sun,
+.sydent-theme-toggle .stt-icon-moon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.sydent-theme-toggle .stt-icon-sun  { right: 7px;  color: #f59e0b; }
+.sydent-theme-toggle .stt-icon-moon { left:  7px;  color: #818cf8; }
+:root[data-theme="light"] .sydent-theme-toggle .stt-icon-sun  { opacity: 1; }
+:root[data-theme="dark"]  .sydent-theme-toggle .stt-icon-moon { opacity: 1; }
+
+/* Label variant — pairs the toggle with a text label */
+.sydent-theme-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+/* Sidebar variant — appears above the logout item in sidebar.js */
+.sb-theme-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin: 0 12px 6px;
+  border-radius: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  font-family: 'Cairo', sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+}
+.sb-theme-row .sb-theme-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Prevent FOUC: smooth theme swap when toggling AFTER initial paint */
+:root[data-theme-ready] body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ============================================================================
+   Page-specific LIGHT MODE overrides
+   ----------------------------------------------------------------------------
+   These rules patch elements that hard-code colors via rgba(10,22,40,...) or
+   similar dark literals that don't pick up CSS variables. Scoped to
+   [data-theme="light"] so dark mode stays untouched.
+   ============================================================================ */
+
+/* ---- landing.html navbar (rgba(10,22,40,0.85) hard-coded) ---------------- */
+:root[data-theme="light"] nav {
+  background: rgba(255,255,255,0.92);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+:root[data-theme="light"] .nav-logo-text .name { color: var(--green); }
+:root[data-theme="light"] .nav-logo-text .sub  { color: var(--text2); }
+:root[data-theme="light"] .nav-logo-icon svg   { stroke: var(--green); }
+:root[data-theme="light"] .btn-outline {
+  background: #ffffff;
+  border-color: rgba(28,25,23,0.18);
+  color: var(--text);
+}
+:root[data-theme="light"] .btn-outline:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+:root[data-theme="light"] .btn-primary {
+  background: var(--green);
+  color: #ffffff;
+}
+:root[data-theme="light"] .btn-primary:hover {
+  background: var(--green2);
+}
+
+/* ---- landing.html hero badges + headings -------------------------------- */
+:root[data-theme="light"] .hero-badge {
+  background: rgba(22,160,133,0.08);
+  border: 1px solid rgba(22,160,133,0.25);
+  color: var(--green2);
+}
+:root[data-theme="light"] .hero-bg,
+:root[data-theme="light"] .hero-grid {
+  /* dim the green ambient glow on white bg */
+  opacity: 0.5;
+}
+
+/* ---- admin.html header (rgba(10,22,40,0.9) hard-coded) ------------------ */
+:root[data-theme="light"] header {
+  background: rgba(255,255,255,0.95);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+:root[data-theme="light"] .header-logo .name { color: var(--green); }
+:root[data-theme="light"] .header-logo .badge {
+  background: var(--green-dim);
+  border: 1px solid rgba(22,160,133,0.25);
+  color: var(--green2);
+}
+:root[data-theme="light"] .btn-logout {
+  background: #ffffff;
+  border: 1px solid rgba(28,25,23,0.15);
+  color: var(--text2);
+}
+:root[data-theme="light"] .btn-logout:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* ---- admin.html login screen radial glow (rgba(46,232,158,0.06)) ------- */
+:root[data-theme="light"] #loginScreen {
+  background: radial-gradient(ellipse 600px 400px at 50% 40%, rgba(22,160,133,0.05) 0%, transparent 70%);
+}
+:root[data-theme="light"] .login-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal);
+}
+
+/* ---- sb-badge text on green (must stay readable in both modes) --------- */
+:root[data-theme="light"] .sb-badge { color: #ffffff; }
+:root[data-theme="dark"]  .sb-badge { color: #0a1628; }
+
+/* ---- Toggle switch: light-mode track tint ------------------------------- */
+:root[data-theme="light"] .sydent-theme-toggle {
+  background: rgba(28,25,23,0.08);
+  border-color: rgba(28,25,23,0.15);
+}
+:root[data-theme="light"] .sb-theme-row {
+  background: #f8f7f2;
+}
+
+/* ========================================================================== */
+/*  Tier A — Auth flow pages (Stage 2A)                                       */
+/*  Applies to: auth.html, pending.html, reset-password.html                  */
+/* ========================================================================== */
+
+/* Hard-coded body gradient (#0a1628 → #0f2038) in all three Tier A pages */
+:root[data-theme="light"] body {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f7f2 50%, #ffffff 100%);
+}
+
+/* Card containers — dark navy box-shadow looks like a halo on white bg */
+:root[data-theme="light"] .auth-card,
+:root[data-theme="light"] .modal-card,
+:root[data-theme="light"] .pending-card {
+  box-shadow: 0 20px 60px rgba(28,25,23,0.08);
+  border-color: var(--border);
+}
+
+/* Primary CTA text on green — in dark, color:var(--bg) = #0a1628 (dark on green ✓);
+   in light, var(--bg) = #fafaf7 which has poor contrast on #16a085. Force white. */
+:root[data-theme="light"] .btn-submit,
+:root[data-theme="light"] .btn-primary,
+:root[data-theme="light"] .tab.active {
+  color: #ffffff;
+}
+
+/* Spinner inside green button — border-top-color was hard-coded #0a1628 (dark) */
+:root[data-theme="light"] .spinner {
+  border-color: rgba(255,255,255,0.4);
+  border-top-color: #ffffff;
+}
+
+/* Password visibility toggle — hard-coded color #8a9ab5 + hover rgba(255,255,255) */
+:root[data-theme="light"] .pwd-toggle {
+  color: var(--text2);
+}
+:root[data-theme="light"] .pwd-toggle:hover {
+  background: rgba(28,25,23,0.05);
+  color: var(--text);
+}
+
+/* auth.html .ptr-bar (pull-to-refresh) — injected inline by JS with
+   hard-coded background:#0a1628 + color:#2ee89e. Override defensively with
+   !important since the inline style block is generated at runtime. */
+:root[data-theme="light"] .ptr-bar {
+  background: #ffffff !important;
+  color: var(--green) !important;
+  border-bottom-color: rgba(22,160,133,0.2) !important;
+}
+:root[data-theme="light"] .ptr-ring {
+  border-color: rgba(22,160,133,0.25) !important;
+  border-top-color: var(--green) !important;
+}
+
+/* ========================================================================== */
+/*  Tier B — Tenant primary pages (Stage 2B)                                  */
+/*  Applies to: patients.html, appointments.html, patient-profile.html        */
+/* ========================================================================== */
+
+/* Generic hover backgrounds — many tenant pages use rgba(255,255,255,0.04-0.06)
+   which is invisible on white. Replace with a subtle dark tint. */
+:root[data-theme="light"] tr:hover,
+:root[data-theme="light"] .row:hover,
+:root[data-theme="light"] .item:hover,
+:root[data-theme="light"] .list-item:hover,
+:root[data-theme="light"] .patient-row:hover,
+:root[data-theme="light"] .appt-row:hover {
+  background: rgba(28,25,23,0.04);
+}
+
+/* Empty-state / muted text — hard-coded #8da0bd renders poorly on light bg */
+:root[data-theme="light"] .empty,
+:root[data-theme="light"] .empty-state,
+:root[data-theme="light"] .muted,
+:root[data-theme="light"] .muted-text,
+:root[data-theme="light"] .placeholder-text {
+  color: var(--text2);
+}
+
+/* Search inputs + filter chips — common Tier B pattern (was bg3 on dark) */
+:root[data-theme="light"] .search-input,
+:root[data-theme="light"] .filter-chip,
+:root[data-theme="light"] input[type="search"] {
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ========================================================================== */
+/*  Dashboard cards (index.html) — Light Mode polish                          */
+/*  ----------------------------------------------------------------------    */
+/*  index.html uses `border-bottom: rgba(255,255,255,0.05)` for row           */
+/*  separators across "آخر المرضى" (patient-item), "مواعيد اليوم"             */
+/*  (appt-item), "ملخص مالي" (finance-row), and "طلبات المخابر" (lab-item).   */
+/*  On the dark background these read as subtle hairlines. On the light       */
+/*  background they're white-on-white = invisible → rows look stacked         */
+/*  and unstructured. Same story for the small inline `dash-time-stamp`       */
+/*  chips and the `progress-bar` track.                                       */
+/*                                                                            */
+/*  Fix: replace the white-tinted dividers/backgrounds with warm-tinted       */
+/*  equivalents (var(--border), var(--bg3)) scoped to data-theme="light".     */
+/*  Dark mode is untouched. Inspired by Stripe/Linear list density.           */
+/* ========================================================================== */
+
+/* ---- Row separators (invisible on white → warm hairline) ----------------- */
+:root[data-theme="light"] .patient-item,
+:root[data-theme="light"] .appt-item,
+:root[data-theme="light"] .finance-row,
+:root[data-theme="light"] .lab-item {
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="light"] .patient-item:last-child,
+:root[data-theme="light"] .appt-item:last-child,
+:root[data-theme="light"] .finance-row:last-child,
+:root[data-theme="light"] .lab-item:last-child {
+  border-bottom: none;
+}
+
+/* ---- Patient row spacing + hover (cards in "آخر المرضى") ----------------- */
+/* In dark, hover nudges the row right by 8px. On white that loses the row.  */
+/* Switch to a subtle background tint with rounded corners — cleaner read.   */
+:root[data-theme="light"] .patient-item {
+  padding: 12px 8px;
+  border-radius: 8px;
+  margin: 0 -8px;
+  transition: background 0.15s ease;
+}
+:root[data-theme="light"] .patient-item:hover {
+  padding: 12px 8px;          /* override the dark-mode padding-right shift */
+  background: var(--bg3);
+}
+
+/* ---- Appointment row spacing (cards in "مواعيد اليوم") ------------------- */
+:root[data-theme="light"] .appt-item {
+  padding: 12px 8px;
+  border-radius: 8px;
+  margin: 0 -8px;
+}
+
+/* ---- Inline timestamps chips (e.g. "19:33 ✓ 19:33 R 19:33 D") ----------- */
+/* Hard-coded background: rgba(255,255,255,0.04) → invisible on white.       */
+:root[data-theme="light"] .dash-time-stamp {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+
+/* ---- Progress bar track (rgba(255,255,255,0.08) → invisible on white) --- */
+:root[data-theme="light"] .progress-bar {
+  background: rgba(28,25,23,0.08);
+}
+
+/* ---- Patient status pills — re-tone for light mode readability ---------- */
+/* Dark uses rgba(46,232,158,0.15) on dark green text → fine.                */
+/* Light needs slightly stronger fill on white to keep the pill recognizable.*/
+:root[data-theme="light"] .status-paid {
+  background: rgba(22,160,133,0.12);
+  color: var(--green2);
+}
+:root[data-theme="light"] .status-due {
+  background: rgba(220,38,38,0.10);
+  color: var(--red);
+}
+
+/* ---- finance-row label tone (var(--text-muted) is fine, no change) ----- */
+/* (nothing extra needed — the alias points at --text3 in light mode)       */
+
+/* ========================================================================== */
+/*  Card elevation — Light Mode global polish                                 */
+/*  ----------------------------------------------------------------------    */
+/*  After darkening --bg to #f1f1ec, white cards already stand out by tone.   */
+/*  Adding a subtle shadow gives them the "lifted surface" feel users        */
+/*  expect from light-mode dashboards (Stripe/Notion/Linear pattern).        */
+/*                                                                            */
+/*  Targets the canonical card classes used across all 19 pages.             */
+/*  Dark mode untouched (rule is scoped to data-theme="light").              */
+/* ========================================================================== */
+:root[data-theme="light"] .card,
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .emp-card,
+:root[data-theme="light"] .treat-card,
+:root[data-theme="light"] .doc-card,
+:root[data-theme="light"] .prov-card,
+:root[data-theme="light"] .rpt-card,
+:root[data-theme="light"] .chart-card,
+:root[data-theme="light"] .health-card,
+:root[data-theme="light"] .maint-card,
+:root[data-theme="light"] .hcard,
+:root[data-theme="light"] .feature-card,
+:root[data-theme="light"] .modal-box,
+:root[data-theme="light"] .modal-card {
+  box-shadow: var(--shadow-card);
+}
+
+/* Admin customer cards (.req-card) get a STRONGER elevation than the generic
+   --shadow-card so they clearly pop off the white page: a slightly darker
+   surface + firmer border + a deeper, wider shadow. Light mode only. */
+:root[data-theme="light"] .req-card {
+  background: #f2f1ea;
+  border-color: rgba(28,25,23,0.13);
+  box-shadow: 0 2px 4px rgba(28,25,23,0.05), 0 8px 22px rgba(28,25,23,0.09);
+}
+
+/* Hover lift — only for cards that already have a hover transform.           */
+/* These selectors slightly deepen the shadow on hover (no transform added).  */
+:root[data-theme="light"] .stat-card:hover,
+:root[data-theme="light"] .emp-card:hover,
+:root[data-theme="light"] .treat-card:hover,
+:root[data-theme="light"] .doc-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* ========================================================================== */
+/*  Modals — keep pure white in Light Mode                                    */
+/*  ----------------------------------------------------------------------    */
+/*  When --bg2 became off-white (#f8f7f2) for card surfaces, modals that      */
+/*  share var(--bg2) inherited that tint. On top of a dark backdrop overlay  */
+/*  (rgba(0,0,0,0.5)), off-white reads as "dimmed" — modals should feel       */
+/*  bright/focused. Force them back to pure white in light mode.              */
+/* ========================================================================== */
+:root[data-theme="light"] .modal-box,
+:root[data-theme="light"] .modal-card,
+:root[data-theme="light"] .auth-card,
+:root[data-theme="light"] .pending-card {
+  background: #ffffff;
+}
+
+/* ========================================================================== */
+/*  patient-profile.html — Timeline (السجل الكامل) Light Mode fixes           */
+/*  ----------------------------------------------------------------------    */
+/*  The timeline uses heavy rgba(0,0,0,0.15-0.25) backgrounds that read       */
+/*  fine on dark navy but render as gray blocks on white. Same with the      */
+/*  rgba(255,255,255,...) hover/icon fills that vanish on white.              */
+/*  All overrides scoped to data-theme="light" — dark mode untouched.        */
+/* ========================================================================== */
+
+/* Timeline event rows (the main cards in the screenshot) */
+:root[data-theme="light"] .tl-row {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-row:hover {
+  background: var(--bg3);
+}
+:root[data-theme="light"] .tl-row-icon {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+:root[data-theme="light"] .tl-row-notes {
+  background: var(--bg4);
+  border-right-color: var(--border);
+}
+
+/* Timeline filters container + chips */
+:root[data-theme="light"] .tl-filters {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-chip {
+  background: var(--bg2);
+}
+:root[data-theme="light"] .tl-chip:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+
+/* Timeline search input + date select — were rgba(0,0,0,0.25) = too dark */
+:root[data-theme="light"] .tl-search-input,
+:root[data-theme="light"] .tl-date-select {
+  background: #ffffff;
+}
+
+/* Data table headers (used elsewhere on patient-profile) */
+:root[data-theme="light"] .data-table th {
+  background: var(--bg2);
+}
+
+/* =====================================================================
+ * v60 — iOS Safari input-focus zoom prevention (universal, all pages)
+ * iOS auto-zooms the viewport when a focused field has font-size < 16px,
+ * forcing the user to manually pinch back out — worst on form modals.
+ * Setting form controls to exactly 16px (the iOS threshold) kills the
+ * zoom. Scoped to ≤768px so desktop typography is completely untouched;
+ * only affects font-size, never padding/layout. checkbox/radio/range/file
+ * are excluded (font-size is irrelevant for them).
+ * ===================================================================== */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* =====================================================================
+ * v61 — LIGHT-MODE BADGE LEGIBILITY (color-mix adaptive badges)
+ * ---------------------------------------------------------------------
+ * The original badge palette is a DARK-mode palette: a vivid neon hue
+ * used as TEXT on a ~13% tint of the same hue. On the dark page bg this
+ * reads great; on the white light-mode bg the vivid text (esp. yellow /
+ * sky / green) collapses to near-zero contrast.
+ *
+ * `.cbadge` is a single adaptive mechanism: the element passes its accent
+ * colour inline via the `--bc` custom property; the colours are then
+ * derived with color-mix(). One rule covers BOTH fixed-semantic badges
+ * (paid/pending/planned/done…) and data-driven ones (treatment / provider
+ * / category colours chosen by the user). It is theme-reactive — toggling
+ * the theme restyles every badge instantly, no re-render needed.
+ *
+ *   Dark  : vivid hue on a faint tint  (matches the original look)
+ *   Light : same hue DARKENED toward ink for legible contrast on white
+ * ===================================================================== */
+.cbadge {
+  background: color-mix(in srgb, var(--bc) 13%, transparent);
+  color: var(--bc);
+  border: 1px solid color-mix(in srgb, var(--bc) 33%, transparent);
+}
+:root[data-theme="light"] .cbadge {
+  background: color-mix(in srgb, var(--bc) 14%, #ffffff);
+  color: color-mix(in srgb, var(--bc) 68%, #1c1917);
+  border: 1px solid color-mix(in srgb, var(--bc) 36%, #ffffff);
+}
+
+/* ---- Static badge classes that hardcode dark-palette text colours ---- *
+ * These live in page-level <style> blocks (loaded before theme.css) with
+ * literal hex, so they can't pick up the adaptive --x vars on their own.
+ * Light mode re-points their TEXT colour to the tuned light palette; the
+ * subtle tint background is fine in both modes. Dark mode is untouched. */
+:root[data-theme="light"] .badge.green  { color: var(--green); }
+:root[data-theme="light"] .badge.yellow { color: var(--yellow); }
+:root[data-theme="light"] .badge.red    { color: var(--red); }
+:root[data-theme="light"] .badge.blue   { color: var(--blue); }
+/* appointments.html appointment-status pills */
+:root[data-theme="light"] .status-scheduled { color: var(--blue); }
+:root[data-theme="light"] .status-broken     { color: color-mix(in srgb, #fb923c 70%, #1c1917); }
+
+/* ========================================================================== */
+/*  Badge / pill legibility — Light Mode                                       */
+/*  ----------------------------------------------------------------------     */
+/*  Role/status pills tint their background with rgba() of the DARK-mode       */
+/*  (bright) accent channels at low alpha. On white those tints nearly vanish, */
+/*  so the pill reads as floating text with no container. In light mode we     */
+/*  re-tint with the tuned dark-accent channels at a firmer alpha + a defined  */
+/*  hairline border, so each pill reads as a real labelled chip. Text colour   */
+/*  already adapts via var(--accent). Scoped to data-theme="light" only —      */
+/*  dark mode untouched. (Targets the people/treatment pages.)                 */
+/* ========================================================================== */
+/* employees.html — role badges */
+:root[data-theme="light"] .role-owner     { background:rgba(22,160,133,0.14); border:1px solid rgba(22,160,133,0.32); }
+:root[data-theme="light"] .role-doctor    { background:rgba(37,99,235,0.12);  border:1px solid rgba(37,99,235,0.30); }
+:root[data-theme="light"] .role-secretary { background:rgba(234,88,12,0.12);   border:1px solid rgba(234,88,12,0.30); }
+/* employees.html — PIN status pills */
+:root[data-theme="light"] .pin-set           { background:rgba(22,160,133,0.12); border:1px solid rgba(22,160,133,0.26); }
+:root[data-theme="light"] .pin-unset         { background:rgba(202,138,4,0.14);  border:1px solid rgba(202,138,4,0.30); }
+:root[data-theme="light"] .pin-none-required { background:rgba(37,99,235,0.10);  border:1px solid rgba(37,99,235,0.24); }
+/* doctors.html — role / status badges */
+:root[data-theme="light"] .role-badge   { background:rgba(124,58,237,0.12); border-color:rgba(124,58,237,0.30); }
+:root[data-theme="light"] .you-badge    { background:rgba(22,160,133,0.14); border-color:rgba(22,160,133,0.32); }
+:root[data-theme="light"] .linked-badge { background:rgba(37,99,235,0.12);  border-color:rgba(37,99,235,0.30); }
+/* treatments.html — lab / builtin tags */
+:root[data-theme="light"] .treat-lab-tag     { background:rgba(37,99,235,0.12); }
+:root[data-theme="light"] .treat-builtin-tag { background:rgba(37,99,235,0.12); border-color:rgba(37,99,235,0.30); }
+
+/* ── Compat shim (appended at freeze time, 12 Jun 2026) ──
+   The redesign converts inline mint literals to var(--green) / rgba(var(--green-rgb),α).
+   These two lines make the CLASSIC restore color-correct for those swept literals.
+   Restore procedure: cp theme-classic-backup.css theme.css && cp sidebar-classic-backup.js sidebar.js && bump cache-bust. */
+:root, :root[data-theme="light"] { --green-rgb: 22,160,133; }
+:root[data-theme="dark"]         { --green-rgb: 46,232,158; }
