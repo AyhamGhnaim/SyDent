@@ -2612,6 +2612,7 @@ async function loadTreatmentsFromSupabase() {
     const { data, error } = await window.sb
       .from('treatments').select('*').order('sort_order', { ascending: true });
     if (error) { console.error(error); return; }
+    window.__m61 = !!(data && data.length && Object.prototype.hasOwnProperty.call(data[0], 'post_extraction'));
     TREATMENTS = (data || []).map(function(t){
       return { id:t.treatment_key, dbId:t.id, name:t.name, label:t.label,
                fill:t.fill, stroke:t.stroke, price:t.price, builtin:t.builtin, is_favorite:!!t.is_favorite,
@@ -2623,6 +2624,7 @@ async function loadTreatmentsFromSupabase() {
                completion_note: t.completion_note || '',
                layman_name: t.layman_name || '',
                price_overrides: t.price_overrides || {},
+               post_extraction: !!t.post_extraction,
                is_bundle: !!t.is_bundle };
     });
     localStorage.setItem('sydent_treatments', JSON.stringify(TREATMENTS));
@@ -3837,7 +3839,8 @@ var SURFACE_LABELS = {
   'WHOLE': 'السن كاملاً',
   'CROWN_FULL': 'التاج كامل',
   'BRIDGE': 'جسر',
-  'PONTIC': 'سن وهمي (جسر)'
+  'PONTIC': 'سن وهمي (جسر)',
+  'SPACER': 'حافظ مسافة'
 };
 
 /* ── COMPOSITE SURFACE SUPPORT (multi-surface restorations, e.g. MOD) ──
@@ -4555,6 +4558,35 @@ function isExtracted(num) {
   return false;
 }
 
+/* ── Space maintainer (حافظ مسافة) helpers ──
+   Detected by key/name (ortho precedent) so old clinics whose stored row still has
+   target_part='arch' work without any data migration. All spacer behavior is gated
+   on window.__m61 (Migration 61 applied) — pre-migration the UI is unchanged. */
+function isSpacerTreatment(t){
+  if (!t) return false;
+  var key = t.id || t.treatment_key || '';
+  if (key === 'pedo-spacer') return true;
+  return /حافظ\s*مسافة|spacer/i.test(key + ' ' + (t.name || ''));
+}
+function isSpacerKey(key){ return key ? isSpacerTreatment(getTreatment(key)) : false; }
+function toothHasSpacer(num){
+  var sm = teethMap[String(num)];
+  return !!(sm && sm.SPACER && isSpacerKey(sm.SPACER));
+}
+function spacerColorFor(num){
+  var sm = teethMap[String(num)]; if (!sm || !sm.SPACER) return null;
+  var tr = getTreatment(sm.SPACER); return (tr && tr.fill) || '#d946ef';
+}
+/* Contiguous run of SPACER-marked teeth around num (abutments + gap). */
+function spacerUnitOf(num){
+  var arch = archOf(num), idx = arch.indexOf(parseInt(num,10));
+  if (idx < 0) return [parseInt(num,10)];
+  var s = idx, e = idx;
+  while (s > 0 && toothHasSpacer(arch[s-1])) s--;
+  while (e < arch.length - 1 && toothHasSpacer(arch[e+1])) e++;
+  return arch.slice(s, e + 1);
+}
+
 /* Is this stored treatment_key a bridge treatment (built-in 'bridge' or any custom variant)? */
 function isBridgeKey(key) {
   if (!key) return false;
@@ -5181,6 +5213,21 @@ function buildTooth(num, surfaceMap, isUpper) {
     svg += '</g>';
   }
 
+  // ── حافظ مسافة: cervical band on abutments + wire stub toward the gap side ──
+  if (typeof toothHasSpacer === 'function' && toothHasSpacer(num)) {
+    var __spC = spacerColorFor(num) || '#d946ef';
+    var __spY = isPrimaryTooth(num) ? 44 : 57;   // cervical third, below the ortho wire
+    var __spArr = archOf(num), __spIx = __spArr.indexOf(num);
+    var __spL = __spIx > 0 && toothHasSpacer(__spArr[__spIx - 1]);
+    var __spR = __spIx >= 0 && __spIx < __spArr.length - 1 && toothHasSpacer(__spArr[__spIx + 1]);
+    var __bx1 = anat.crownL - 2, __bx2 = anat.crownR + 2;
+    svg += '<g pointer-events="none">';
+    if (__spL) svg += '<line x1="-24" y1="' + __spY + '" x2="' + __bx1 + '" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="3" opacity="0.95" stroke-linecap="round"/>';
+    if (__spR) svg += '<line x1="' + __bx2 + '" y1="' + __spY + '" x2="124" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="3" opacity="0.95" stroke-linecap="round"/>';
+    svg += '<rect x="' + __bx1 + '" y="' + (__spY - 4.5) + '" width="' + (__bx2 - __bx1) + '" height="9" rx="3.5" fill="' + __spC + '" opacity="0.92" stroke="#ffffff" stroke-width="1.2"/>'
+        +  '</g>';
+  }
+
   svg += '</g></svg>';
   // Phase 3 Feature F follow-up: surface tooltip now shows the status badge
   // (مراقبة/مخطط/محوّل/...) inline after the treatment name. Previously the
@@ -5647,6 +5694,7 @@ function occTipRows(num, sm){
   var cfKey=cf||((wtp==='crown_full')?whole:null)||(isBr?whole:null);
   if(cfKey){ var cft=getTreatment(cfKey); rows+=row(T_FILL[cfKey]||'#fb923c', isBr?'دعامة جسر':'التاج كامل', cft?cft.name:cfKey, badge(cf?'CROWN_FULL':'WHOLE')); }
   if(whole && !isExtractionKey(whole) && !isImplantKey(whole) && !isBr && wtp!=='crown_full'){ var wtt=getTreatment(whole); rows+=row(T_FILL[whole]||'#f5e6c8','السن كاملاً', wtt?wtt.name:whole, badge('WHOLE')); }
+  if(sm.SPACER && isSpacerKey(sm.SPACER)){ var spT=getTreatment(sm.SPACER); rows+=row(T_FILL[sm.SPACER]||'#d946ef','حافظ مسافة', spT?spT.name:sm.SPACER, badge('SPACER')); }
   // Composite restorations (e.g. MOD) — ONE row each, before single surfaces.
   for(var compO in sm){ if(compO==='__status') continue; if(!isCompositeSurfaceCode(compO)||!sm[compO]) continue; var coTk=sm[compO], coObj=getTreatment(coTk); rows+=row(T_FILL[coTk]||'#888', surfLabelFor(compO, num), coObj?coObj.name:coTk, badge(compO)); }
   var keys = isAnterior(num) ? ['I','L','M','D'] : ['O','B','L','M','D'];
@@ -6341,9 +6389,13 @@ async function openToothModal(n, surface) {
       return tpA !== 'implant' && tpA !== 'extraction' && tpA !== 'bridge';
     }
     if (isAlreadyExtracted) {
-      // A missing tooth can only have bridge or implant treatments
-      // Match by target_part (so custom bridge variants like "جسر زركون" also work)
       var tp = t.target_part || 'crown';
+      // M61: doctor-flagged post-extraction treatments (ضماد، طعم…) + حافظ مسافة
+      if (window.__m61 === true && (t.post_extraction === true || isSpacerTreatment(t))) return true;
+      // Primary (deciduous) site: conventional bridges/implants are clinically
+      // invalid — hide them here (mirrors the explicit save-time guards).
+      if (isPrimaryTooth(n)) return false;
+      // Match by target_part (so custom bridge variants like "جسر زركون" also work)
       return tp === 'bridge' || tp === 'implant';
     }
     // Normal tooth — every treatment is allowed; smart routing handles the surface
@@ -6362,6 +6414,11 @@ async function openToothModal(n, surface) {
   else if (isPartOfBridge)     _special = '<button class="topt" style="border-color:#dc2626;color:#dc2626;font-weight:700;" onclick="undoExtraction(' + n + ')">🔗 إزالة الجسر</button>';
   else if (isAlreadyExtracted) _special = '<button class="topt" style="border-color:#ef5350;color:#ef5350;font-weight:700;" onclick="undoExtraction(' + n + ')">↩️ إلغاء القلع (إعادة السن)</button>';
   else                         _special = '<button class="topt" style="border-color:var(--text2)" onclick="clearToothStatus()">⬜ سليم (إلغاء)</button>';
+
+  // حافظ مسافة: removal action stacks on top of whatever context applies
+  if (typeof toothHasSpacer === 'function' && toothHasSpacer(n)) {
+    _special = '<button class="topt" style="border-color:#d946ef;color:#d946ef;font-weight:700;" onclick="removeSpacerUnit(' + n + ')">🧷 إزالة حافظ المسافة</button>' + _special;
+  }
 
   if (_allowed.length === 0) {
     // Phase 4: only show "add treatment" link to Owner (others would hit blocked page)
@@ -6387,6 +6444,35 @@ function switchToWholeTooth() {
   openToothModal(currentTooth, 'WHOLE');
 }
 
+/* Remove a space-maintainer unit: deletes ONLY the SPACER rows of the contiguous
+   unit (abutments + gap). Extraction markers are untouched — the gap stays a gap. */
+async function removeSpacerUnit(num) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل حالة الأسنان');
+    return;
+  }
+  var unit = spacerUnitOf(num);
+  if (!confirm('إزالة حافظ المسافة (الأسنان ' + unit.join('، ') + ')؟\nلن يتغير شيء آخر — السن المقلوع يبقى مقلوعاً.')) return;
+  await clearSpacerRows(unit);
+  closeModal('toothModal');
+  renderTeeth(); renderStats();
+  showToast('✅ تمت إزالة حافظ المسافة');
+}
+async function clearSpacerRows(unit) {
+  for (var i = 0; i < unit.length; i++) {
+    var tn = String(unit[i]);
+    if (!(teethMap[tn] && teethMap[tn].SPACER)) continue;
+    var dr = await window.sb.from('teeth_status').delete()
+      .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+      .eq('tooth_num', tn).eq('surface', 'SPACER');
+    if (dr.error) console.error('delete spacer entry error:', dr.error);
+    delete teethMap[tn].SPACER;
+    if (teethMap[tn].__status) delete teethMap[tn].__status.SPACER;
+    var _restK = Object.keys(teethMap[tn]).filter(function(k){ return k !== '__status'; });
+    if (_restK.length === 0) delete teethMap[tn];
+  }
+}
+
 /* Undo extraction: delete all teeth_status rows for this tooth, redraw */
 async function undoExtraction(num) {
   // Phase 4.1: defense-in-depth — block destructive ops if locked doctor is inactive
@@ -6401,6 +6487,11 @@ async function undoExtraction(num) {
     : 'إلغاء القلع وإعادة السن ' + num + '؟';
   if (!confirm(confirmMsg)) return;
 
+  // If this tooth carries a space maintainer, the appliance is no longer valid
+  // once the tooth returns — clear the WHOLE spacer unit first (no orphan wires).
+  if (typeof toothHasSpacer === 'function' && toothHasSpacer(num)) {
+    await clearSpacerRows(spacerUnitOf(num));
+  }
   var unitToClear = [num];
   if (isPartOfBridge) {
     var arch = (UPPER_T.indexOf(num) >= 0) ? UPPER_T : LOWER_T;
@@ -6790,9 +6881,19 @@ function pickToothTreatment(status, label) {
   // not where the user clicked. This way the list can stay unified.
   var tr = getTreatment(status);
   var tp = tr ? (tr.target_part || 'crown') : 'crown';
+  // ── حافظ مسافة: gap-unit flow (NOT regional) — gated on M61 ──
+  var spacerFlow = window.__m61 === true && isSpacerTreatment(tr);
+  if (spacerFlow) {
+    window.__regionalPickerMode = false;
+    if (!currentTooth) { showToast('🧷 انقر السن المفقود على المخطط لتطبيق حافظ المسافة'); closeModal('toothModal'); return; }
+    if (!isExtracted(currentTooth)) { showToast('🧷 حافظ المسافة يُطبَّق بالنقر على السن المفقود (المقلوع)'); return; }
+  }
+  // ── Post-extraction site treatment (ضماد/طعم…): session on the socket only ──
+  var socketCtx = !spacerFlow && window.__m61 === true && currentTooth && isExtracted(currentTooth)
+                && tr && tr.post_extraction === true && tp !== 'bridge' && tp !== 'implant';
   // Phase 3 Feature G: regional treatments (quadrant/arch/mouth) don't use a specific
   // tooth/surface — they route to a dedicated area picker instead.
-  if (tp === 'quadrant' || tp === 'arch' || tp === 'mouth') {
+  if (!spacerFlow && (tp === 'quadrant' || tp === 'arch' || tp === 'mouth')) {
     // currentTooth may be set (user clicked a tooth then picked a regional treatment)
     // OR null (user opened from "+ علاج جماعي" button). Both paths converge here.
     // Auto-detect the quadrant/arch from the clicked tooth (FDI numbering) if available.
@@ -6824,7 +6925,9 @@ function pickToothTreatment(status, label) {
   pendingRegionalQuadrant = null;
   pendingRegionalArch = null;
   // Special treatments override:
-  if (tp === 'implant' || tp === 'bridge') {
+  if (spacerFlow || socketCtx) {
+    currentSurface = 'WHOLE';            // unit/site flows anchor at WHOLE
+  } else if (tp === 'implant' || tp === 'bridge') {
     currentSurface = 'WHOLE';
   } else if (tp === 'extraction') {
     currentSurface = 'WHOLE';
@@ -6847,7 +6950,9 @@ function pickToothTreatment(status, label) {
   syncOrthoField();   // tooth treatments aren't ortho → keep the field hidden (resets stale state)
   // Build a label that reflects the area type (surface / root / whole)
   var areaLabel;
-  if (tr && tr.target_part === 'bridge') areaLabel = 'جسر (يشمل السن قبل وبعد)';
+  if (spacerFlow) areaLabel = 'حافظ مسافة — الفجوة + الجارَين';
+  else if (socketCtx) areaLabel = 'موقع القلع';
+  else if (tr && tr.target_part === 'bridge') areaLabel = 'جسر (يشمل السن قبل وبعد)';
   else if (currentSurface === 'WHOLE') areaLabel = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaLabel = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaLabel = 'الجذر ' + currentSurface.replace('R','');
@@ -7030,6 +7135,7 @@ async function saveToothTreatment() {
   }
   // Track the bridge unit for ledger description (null if not a bridge save)
   var bridgeUnitForLedger = null;
+  var spacerUnitForLedger = null;
   if (isBridgeTreatment) {
     var abuts = findBridgeAbutments(currentTooth);
     // ── Clinical guard (primary teeth) ──
@@ -7091,6 +7197,35 @@ async function saveToothTreatment() {
         }
       }
     }
+  } else if (window.__m61 === true && isSpacerTreatment(pendingTr) && isExtracted(currentTooth)) {
+    // ── حافظ مسافة: unit save (mirror of the bridge unit) ──
+    // findBridgeAbutments walks the ACTIVE arch (dentition-aware), so this works
+    // on primary/mixed charts — where space maintainers actually live.
+    var sAb = findBridgeAbutments(currentTooth);
+    if (!sAb.mesial || !sAb.distal) {
+      showToast('⚠️ حافظ المسافة يحتاج سنّين موجودَين على جانبي الفجوة');
+      return;
+    }
+    var sArch = archOf(currentTooth);
+    var sLo = sArch.indexOf(sAb.mesial), sHi = sArch.indexOf(sAb.distal);
+    var sA = Math.min(sLo, sHi), sB = Math.max(sLo, sHi);
+    spacerUnitForLedger = sArch.slice(sA, sB + 1);
+    for (var su = 0; su < spacerUnitForLedger.length; su++) {
+      var sun = String(spacerUnitForLedger[su]);
+      var rS = await upsertTeethStatusWithFallback({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: sun, surface: 'SPACER', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (rS.error) {
+        console.error('spacer save error:', rS.error);
+        showToast('⚠️ خطأ حفظ السن ' + sun + ': ' + rS.error.message);
+      } else {
+        if (!teethMap[sun]) teethMap[sun] = {};
+        teethMap[sun]['SPACER'] = pendingToothStatus;
+        if (!teethMap[sun].__status) teethMap[sun].__status = {};
+        teethMap[sun].__status.SPACER = pendingTreatStatus;
+      }
+    }
   } else {
     // For IMPLANT (built-in or any custom variant like 'زراعة سويسرية'):
     // wipe ALL existing surfaces for this tooth first
@@ -7129,6 +7264,12 @@ async function saveToothTreatment() {
         }
       }
     }
+    // ── Post-extraction site treatment (M61): ledger session only — the chart
+    //    keeps the extracted ghost; no teeth_status row is written. ──
+    var _socketSave = window.__m61 === true && pendingTr && pendingTr.post_extraction === true
+                   && pendingTp !== 'bridge' && pendingTp !== 'implant'
+                   && !isSpacerTreatment(pendingTr) && isExtracted(currentTooth);
+    if (!_socketSave) {
     // Normal save — DB constraint now accepts all valid surface values
     var rN = await upsertTeethStatusWithFallback({
       doctor_id: currentUser.id, patient_id: patientId,
@@ -7143,16 +7284,22 @@ async function saveToothTreatment() {
       if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
       teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
     }
+    }
   }
 
   // Build description for the ledger entry
   var areaForDesc, ledgerToothNum = String(currentTooth), ledgerDescription;
-  if (bridgeUnitForLedger) {
+  if (spacerUnitForLedger) {
+    areaForDesc = 'حافظ مسافة يشمل الأسنان ' + spacerUnitForLedger.join('، ');
+    ledgerToothNum = spacerUnitForLedger.join(',');
+    ledgerDescription = areaForDesc;
+  } else if (bridgeUnitForLedger) {
     areaForDesc = 'جسر يشمل الأسنان ' + bridgeUnitForLedger.join('، ');
     ledgerToothNum = bridgeUnitForLedger.join(',');
     ledgerDescription = areaForDesc;
   } else {
-    if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
+    if (_socketSave) areaForDesc = 'موقع القلع';
+    else if (currentSurface === 'WHOLE') areaForDesc = 'السن كاملاً';
     else if (currentSurface === 'CROWN_FULL') areaForDesc = 'التاج كامل';
     else if (/^R[123]$/.test(currentSurface)) areaForDesc = 'الجذر ' + currentSurface.replace('R','');
     else areaForDesc = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
@@ -7163,6 +7310,7 @@ async function saveToothTreatment() {
   // DB constraint now accepts the full set of surface keys (O/I/B/L/M/D/V/WHOLE/PONTIC/CROWN_FULL/BRIDGE/R1/R2/R3)
   // so we save the true surface key for accurate per-surface reporting.
   var dbSurface = currentSurface;
+  if (spacerUnitForLedger) dbSurface = 'SPACER';
   // Only create a ledger entry for completed and planned treatments (financial records).
   // 'existing_current'/'existing_other' (pre-existing work, whether ours or external) and
   // 'referred' (sent away) are clinical notes only — they don't represent current chargeable production.

@@ -339,6 +339,21 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </label>
       </div>
 
+      <!-- M61: doctor-controlled post-extraction option (hidden until column exists) -->
+      <div class="form-group" id="postExtWrap">
+        <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;margin-bottom:0;">
+          <span style="display:flex;align-items:center;gap:8px;font-weight:600;color:var(--text);font-size:14px;">
+            <span style="font-size:18px;">🕳️</span>
+            يظهر كخيار عند النقر على سن مقلوع
+          </span>
+          <label class="lab-toggle-switch" style="position:relative;display:inline-block;width:46px;height:24px;flex-shrink:0;">
+            <input type="checkbox" id="tPostExt" style="opacity:0;width:0;height:0;">
+            <span class="lab-toggle-slider"></span>
+          </label>
+        </label>
+        <div style="font-size:11.5px;color:var(--text2);margin-top:5px;padding:0 4px;">مثال: ضماد سنخ، طعم عظمي — يُسجَّل كجلسة على موقع القلع دون تغيير شكل السن بالمخطط.</div>
+      </div>
+
       <div class="form-group">
         <label>التصنيف</label>
         <select id="tCategory" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
@@ -559,6 +574,11 @@ async function loadTreatments() {
     showToast('⚠️ ' + error.message);
     return;
   }
+  // M61 detection: post_extraction column present? Gates the new toggle + payloads
+  // so a deploy BEFORE the migration changes nothing for live clinics.
+  window.__m61T = !!(data && data.length && Object.prototype.hasOwnProperty.call(data[0], 'post_extraction'));
+  var _peW = document.getElementById('postExtWrap');
+  if (_peW) _peW.style.display = window.__m61T ? '' : 'none';
   treatments = (data || []).map(function(t){
     // Derive label from name if it's empty (legacy data may have empty labels)
     var lbl = t.label;
@@ -574,6 +594,7 @@ async function loadTreatments() {
       stroke: t.stroke,
       price: t.price,
       builtin: t.builtin,
+      post_extraction: !!t.post_extraction,
       is_favorite: !!t.is_favorite,
       needs_lab: !!t.needs_lab,
       target_part: t.target_part || 'crown',
@@ -812,6 +833,7 @@ function openAddModal() {
   document.getElementById('tLabel').value = '';
   document.getElementById('tLaymanName').value = '';
   document.getElementById('tNeedsLab').checked = false;
+  var _peA = document.getElementById('tPostExt'); if (_peA) _peA.checked = false;
   document.getElementById('tCategory').value = 'restorative';
   document.getElementById('tDefaultNote').value = '';
   userTouchedLabToggle = false;  // new treatment — allow smart category defaults
@@ -832,6 +854,7 @@ function editTreatment(id) {
   document.getElementById('tLabel').value = t.label;
   document.getElementById('tLaymanName').value = t.layman_name || '';
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
+  var _peE = document.getElementById('tPostExt'); if (_peE) _peE.checked = !!t.post_extraction;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
   userTouchedLabToggle = true;  // editing existing — preserve current lab value
@@ -881,6 +904,7 @@ function duplicateTreatment(id) {
   document.getElementById('tNeedsLab').checked = !!t.needs_lab;
   document.getElementById('tCategory').value = t.category || 'other';
   document.getElementById('tDefaultNote').value = t.default_note || '';
+  var _peD = document.getElementById('tPostExt'); if (_peD) _peD.checked = !!t.post_extraction;
   userTouchedLabToggle = true;  // duplicate copies original's lab value — don't override
   // Reset readonly state (duplicate is a new treatment, name editable)
   var nameInputDup = document.getElementById('tName');
@@ -1054,9 +1078,12 @@ const EXTRA_TEMPLATES = [
   // ── Pediatric (🧒) ──
   { treatment_key:'pedo-filling',    name:'حشوة سن لبني', label:'ح', fill:'#f0abfc', stroke:'#c026d3', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:26 },
   { treatment_key:'pedo-pulpotomy',  name:'بتر لب',       label:'ب', fill:'#e879f9', stroke:'#a21caf', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:27 },
-  { treatment_key:'pedo-spacer',     name:'حافظ مسافة',   label:'م', fill:'#d946ef', stroke:'#86198f', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'pediatric', sort_order:28 },
+  { treatment_key:'pedo-spacer',     name:'حافظ مسافة',   label:'م', fill:'#d946ef', stroke:'#86198f', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'pediatric', sort_order:28, post_extraction:true },
   { treatment_key:'pedo-sealant',    name:'عازل شقوق',    label:'ع', fill:'#f5d0fe', stroke:'#d946ef', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:29 },
-  { treatment_key:'pedo-fluoride',   name:'فلوريد موضعي', label:'ف', fill:'#fae8ff', stroke:'#e879f9', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'pediatric', sort_order:30 }
+  { treatment_key:'pedo-fluoride',   name:'فلوريد موضعي', label:'ف', fill:'#fae8ff', stroke:'#e879f9', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'pediatric', sort_order:30 },
+  // ── Post-extraction site care (🕳️) — appear in the extracted-tooth modal (M61 flag) ──
+  { treatment_key:'socket-graft',    name:'طعم عظمي (حفاظ سنخ)', label:'ط', fill:'#f97316', stroke:'#c2410c', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:31, post_extraction:true },
+  { treatment_key:'socket-dressing', name:'ضماد سنخ',            label:'ض', fill:'#fbbf24', stroke:'#b45309', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:32, post_extraction:true }
 ];
 
 /* resetToDefaults (below) additively restores the default + template treatments. */
@@ -1083,6 +1110,7 @@ async function resetToDefaults() {
   var _toAdd = _all.filter(function(t){ return !_haveKey[t.treatment_key] && !_haveName[t.name]; });
   if (!_toAdd.length) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
   const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
+  if (!window.__m61T) rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 safety
   const { error } = await window.sb.from('treatments').insert(rows);
   if (error) { showToast('⚠️ ' + error.message); return; }
   await loadTreatments();
@@ -1102,6 +1130,8 @@ async function saveTreatment() {
   var existingLabel = document.getElementById('tLabel').value;
   var label = existingLabel || name.replace(/\s+/g, '').charAt(0) || '·';
   var needsLab = document.getElementById('tNeedsLab').checked;
+  var _peEl = document.getElementById('tPostExt');
+  var postExt = !!(_peEl && _peEl.checked);
   var category = document.getElementById('tCategory').value;
   var defaultNote = document.getElementById('tDefaultNote').value.trim();
   var laymanName = document.getElementById('tLaymanName').value.trim();
@@ -1131,6 +1161,7 @@ async function saveTreatment() {
       }
       // UPDATE existing
       var updatePayload = { name: name, price: price, label: label, fill: pickedFill, stroke: pickedStroke, needs_lab: needsLab, target_part: pickedTarget, category: category, default_note: defaultNote, layman_name: laymanName || null, updated_at: new Date().toISOString() };
+      if (window.__m61T) updatePayload.post_extraction = postExt;  // M61-gated
       var updRes = await window.sb
         .from('treatments')
         .update(updatePayload)
@@ -1162,6 +1193,7 @@ async function saveTreatment() {
         builtin: false,
         sort_order: maxOrder + 1
       };
+      if (window.__m61T) insertPayload.post_extraction = postExt;  // M61-gated
       var insRes = await window.sb
         .from('treatments')
         .insert(insertPayload);
