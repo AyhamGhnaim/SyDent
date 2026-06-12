@@ -576,6 +576,34 @@
     background: var(--accent, var(--green)); color: #0a1628; border-color: var(--accent, var(--green));
   }
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
+
+/* ════ Dash add-ons (Redesign v1): نبض اليوم + إجراءات سريعة + تنبيهات ════ */
+#dpCard .dp-track{position:relative;height:86px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;margin-top:12px;overflow:hidden}
+.dp-hours{position:absolute;inset:0;display:flex;flex-direction:row}
+.dp-hours span{flex:1;border-inline-start:1px dashed var(--border);font-size:10px;color:var(--text3);padding:4px 6px 0 0}
+.dp-hours span:first-child{border-inline-start:none}
+.dp-pill{position:absolute;height:26px;border-radius:13px;font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 2px rgba(16,42,67,.18)}
+.dp-pill:hover{filter:brightness(1.08)}
+.dp-done{background:#94a3b8}.dp-live{background:var(--green);box-shadow:0 0 0 3px rgba(var(--green-rgb),.25)}
+.dp-conf{background:#3b82f6}.dp-wait{background:#d97706}
+.dp-x{background:var(--bg2);color:var(--text3);text-decoration:line-through;border:1px dashed var(--border2);box-shadow:none}
+.dp-now{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:3}
+.dp-now::after{content:'';position:absolute;top:-1px;right:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
+.dp-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:10px}
+.dp-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
+.al-row{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-top:20px}
+@media(max-width:860px){.al-row{grid-template-columns:1fr}}
+.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.qa-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border:1.5px dashed var(--border2);border-radius:12px;color:var(--text);font-size:12.5px;font-weight:700;text-decoration:none;transition:all .15s;background:var(--bg2)}
+.qa-btn:hover{border-color:var(--green);color:var(--green);border-style:solid}
+.qa-btn svg{color:var(--green)}
+.al-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--border);text-decoration:none;color:inherit}
+.al-item:first-of-type{border-top:none}
+.al-item:hover .al-tt{color:var(--green)}
+.al-ic{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.al-tt{font-size:13px;font-weight:700;color:var(--text)}
+.al-sub{font-size:11.5px;color:var(--text2);margin-top:2px}
+.al-count{margin-inline-start:auto;background:var(--red-dim);color:var(--red);font-size:11px;font-weight:800;padding:3px 9px;border-radius:10px}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
 <link rel="stylesheet" href="theme.css?v=20260612a">
@@ -853,13 +881,58 @@
        ?newWithTemplate=<id>, which auto-opens the new-appt modal with the
        template's fields pre-filled (duration, treatment, provider, operatory,
        notes). Saves ~3 clicks per recurring appointment type. -->
-  <div class="card" id="quickTplCard" style="margin-top:20px;display:none;">
+    <div class="card" id="dpCard" style="margin-top:20px;display:none;">
+    <div class="card-header">
+      <div class="card-title">نبض اليوم</div>
+      <span id="dpMeta" style="font-size:12px;color:var(--text2);"></span>
+    </div>
+    <div class="dp-track" id="dpTrack"></div>
+    <div class="dp-legend">
+      <span><i style="background:#94a3b8"></i>مكتمل</span>
+      <span><i style="background:var(--green)"></i>جاري الآن</span>
+      <span><i style="background:#3b82f6"></i>مؤكد</span>
+      <span><i style="background:#d97706"></i>بانتظار</span>
+    </div>
+  </div>
+
+<div class="card" id="quickTplCard" style="margin-top:20px;display:none;">
     <div class="card-header">
       <div class="card-title">⚡ موعد سريع</div>
       <a class="card-action" href="settings.html#apptTypes">إدارة القوالب ←</a>
     </div>
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">اضغط قالباً لفتح موعد جديد بكل الحقول جاهزة — فقط اكتب اسم المريض.</div>
     <div id="quickTplChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+  </div>
+
+  <div class="al-row">
+    <div class="card">
+      <div class="card-header"><div class="card-title">إجراءات سريعة</div></div>
+      <div class="qa-grid">
+        <a class="qa-btn" href="patients.html" data-doctor-inactive-block>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.4"/><path d="M3.5 20c.8-3.3 3.4-4.9 6.5-4.9 1 0 2 .17 2.8.5M17 14v6M14 17h6"/></svg>
+          مريض جديد
+        </a>
+        <a class="qa-btn" href="appointments.html">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17M12 13.5v4M10 15.5h4"/></svg>
+          حجز موعد
+        </a>
+        <a class="qa-btn" href="labs.html">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M11 3v5.2L5.8 17a3.4 3.4 0 0 0 3 5h6.4a3.4 3.4 0 0 0 3-5L13 8.2V3"/><path d="M7.5 14h9"/></svg>
+          طلب مخبر
+        </a>
+        <a class="qa-btn" href="patients.html">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14.5 18 8.5"/><path d="M10 21a2.3 2.3 0 0 0 4 0"/></svg>
+          متابعة المرضى
+        </a>
+      </div>
+    </div>
+    <div class="card" id="alCard" style="display:none;">
+      <div class="card-header">
+        <div class="card-title">تنبيهات تحتاج انتباهك</div>
+        <span class="al-count" id="alTotal" style="margin-inline-start:0;">0</span>
+      </div>
+      <div id="alList"></div>
+    </div>
   </div>
 
   <div class="grid-2">
@@ -2091,6 +2164,131 @@ async function obKeepClinicName() {
 
 loadDashboard();
 obInit();
+
+/* ════ Dash add-ons (Redesign v1) — معزولة بالكامل، كل ميزة بحارس try/catch ════ */
+(function(){
+  'use strict';
+  function dpMin(t){ var p=(t||'').split(':'); return (+p[0]||0)*60+(+p[1]||0); }
+  function dpEsc(s){ return String(s||'').replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  function renderDashPulse(){
+    try{
+      var card=document.getElementById('dpCard'), track=document.getElementById('dpTrack');
+      if(!card||!track) return;
+      var src=(typeof _dashApptsToday!=='undefined'&&Array.isArray(_dashApptsToday))?_dashApptsToday:[];
+      if(!src.length){ card.style.display='none'; return; }
+      var items=src.map(function(a){
+        var s=dpMin(a.time), d=parseInt(a.duration_min,10)||30;
+        var st=String(a.status||'');
+        var cls = (st==='cancelled'||st==='no_show'||st==='broken') ? 'dp-x'
+                : (a.dismissed_at||st==='completed') ? 'dp-done'
+                : (a.seated_at||a.arrived_at) ? 'dp-live'
+                : (st==='confirmed') ? 'dp-conf' : 'dp-wait';
+        return {s:s,e:s+d,cls:cls,name:dpEsc(String(a.patient_name||a.name||'').split(' ')[0]||'موعد'),pid:a.patient_id||''};
+      }).filter(function(x){ return x.e>x.s; }).sort(function(a,b){ return a.s-b.s; });
+      if(!items.length){ card.style.display='none'; return; }
+      var lo=Math.max(7*60, Math.min.apply(null, items.map(function(x){return x.s;}))-45);
+      var hi=Math.min(21*60, Math.max.apply(null, items.map(function(x){return x.e;}))+45);
+      lo=Math.floor(lo/60)*60; hi=Math.ceil(hi/60)*60; if(hi-lo<120) hi=lo+120;
+      var span=hi-lo;
+      function pct(m){ return Math.max(0, Math.min(100, (m-lo)/span*100)); }
+      // ساعات الخلفية
+      var html='<div class="dp-hours">';
+      for(var hh=lo; hh<hi; hh+=60) html+='<span>'+(hh/60)+':00</span>';
+      html+='</div>';
+      // تكديس بدون تداخل (حتى 3 صفوف)
+      var rows=[];
+      items.forEach(function(x){
+        var r=rows.findIndex(function(end){ return end<=x.s; });
+        if(r===-1){ if(rows.length<3){ rows.push(x.e); r=rows.length-1; } else { r=rows.length-1; rows[r]=Math.max(rows[r],x.e); } }
+        else rows[r]=x.e;
+        var right=pct(x.s), w=Math.max(3.5, pct(x.e)-pct(x.s));
+        html+='<div class="dp-pill '+x.cls+'" style="right:'+right.toFixed(2)+'%;width:'+w.toFixed(2)+'%;top:'+(6+r*30)+'px;"'
+            +(x.pid?' onclick="window.location.href=\'patient-profile.html?id='+x.pid+'\'"':'')
+            +' title="'+x.name+'">'+x.name+'</div>';
+      });
+      // خط الآن
+      var now=new Date(), nm=now.getHours()*60+now.getMinutes();
+      if(nm>=lo&&nm<=hi) html+='<div class="dp-now" style="right:'+pct(nm).toFixed(2)+'%;"></div>';
+      track.style.height=(6+rows.length*30+8)+'px';
+      track.innerHTML=html;
+      // الإشغال
+      var busy=items.filter(function(x){return x.cls!=='dp-x';}).reduce(function(t,x){return t+(x.e-x.s);},0);
+      var meta=document.getElementById('dpMeta');
+      if(meta) meta.textContent='إشغال '+Math.min(100,Math.round(busy/span*100))+'% · '+items.length+' موعد';
+      card.style.display='';
+    }catch(e){ try{ document.getElementById('dpCard').style.display='none'; }catch(_){} }
+  }
+
+  function renderDashAlerts(){
+    try{
+      var card=document.getElementById('alCard'), list=document.getElementById('alList');
+      if(!card||!list) return;
+      var rows=[];
+      // (أ) مخبر متأخر — نقرأ من شارة اللوحة الموجودة (مصدر الحقيقة، صفر استعلام مكرر)
+      try{
+        var b=document.getElementById('labsOverdueBadge');
+        if(b && b.style.display!=='none'){
+          var n=parseInt(b.textContent,10)||0;
+          if(n>0) rows.push({href:'labs.html',ic:'🥽',bg:'var(--red-dim)',tt:n+' طلب مخبر متأخر',sub:'افتح المخابر لمتابعة الطلبات',cnt:n});
+        }
+      }catch(_){ }
+      // (ب) مخزون منخفض — نفس شرط صفحة المخزون حرفياً (r>0 && q<=r)
+      try{
+        window.sb.from('inventory_items').select('name,quantity,reorder_level,alert_threshold,min_quantity').limit(200)
+          .then(function(res){
+            try{
+              var low=(res.data||[]).filter(function(it){
+                var q=parseFloat(it.quantity)||0;
+                var r=parseFloat(it.reorder_level!=null?it.reorder_level:(it.alert_threshold!=null?it.alert_threshold:it.min_quantity))||0;
+                return r>0 && q<=r;
+              });
+              if(low.length){
+                rows.push({href:'inventory.html',ic:'📦',bg:'var(--yellow-dim)',tt:low.length+' صنف تحت حد التنبيه',sub:dpEsc(low[0].name||'')+(low.length>1?' و'+(low.length-1)+' غيره':''),cnt:low.length});
+              }
+              paint();
+            }catch(_){ paint(); }
+          }, function(){ paint(); });
+      }catch(_){ paint(); }
+      function paint(){
+        try{
+          if(!rows.length){ card.style.display='none'; return; }
+          var total=rows.reduce(function(t,r){return t+(r.cnt||0);},0);
+          document.getElementById('alTotal').textContent=total;
+          list.innerHTML=rows.map(function(r){
+            return '<a class="al-item" href="'+r.href+'">'
+              +'<span class="al-ic" style="background:'+r.bg+';">'+r.ic+'</span>'
+              +'<span><div class="al-tt">'+r.tt+'</div><div class="al-sub">'+r.sub+'</div></span>'
+              +'<span class="al-count">'+(r.cnt||'')+'</span></a>';
+          }).join('');
+          card.style.display='';
+        }catch(_){ }
+      }
+      paint();
+    }catch(_){ }
+  }
+
+  // ربط آمن: نعيد الرسم كلما أعادت اللوحة رسم "مواعيد اليوم" (يشمل وصل/جلس/خرج)
+  function dpBoot(){
+    renderDashPulse(); renderDashAlerts();
+    try{
+      var t=document.getElementById('todayAppts');
+      if(t&&window.MutationObserver){
+        var deb=null;
+        new MutationObserver(function(){ clearTimeout(deb); deb=setTimeout(renderDashPulse,150); })
+          .observe(t,{childList:true,subtree:true});
+      }
+      var lb=document.getElementById('labsOverdueBadge');
+      if(lb&&window.MutationObserver){
+        new MutationObserver(function(){ renderDashAlerts(); })
+          .observe(lb,{childList:true,characterData:true,subtree:true,attributes:true});
+      }
+      setInterval(renderDashPulse, 60000); // تحريك خط "الآن"
+    }catch(_){ }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(dpBoot,800); });
+  else setTimeout(dpBoot,800);
+})();
 </script>
 
 <script>
