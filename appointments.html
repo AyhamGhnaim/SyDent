@@ -505,6 +505,14 @@ body {
 }
 .list-action-btn:hover { border-color: var(--green); color: var(--green); }
 .list-action-btn.danger:hover { border-color: var(--red); color: var(--red); }
+/* P5 — booking request cards: labeled action pills + non-clickable row */
+.bk-act {
+  width: auto; padding: 0 12px; gap: 4px;
+  font-family: 'Cairo', sans-serif; font-size: 12.5px; font-weight: 700;
+  color: var(--text);
+}
+.list-item.booking-item { cursor: default; }
+.list-item.booking-item:hover { transform: none; }
 
 /* ─── Gap 7: Planned Appointments ──────────────────── */
 .main-tabs {
@@ -826,6 +834,18 @@ textarea { resize: vertical; min-height: 72px; }
   .modal-footer { flex-direction: column; }
   .btn-cancel, .btn-save { width: 100%; padding: 12px; text-align: center; }
   .list-actions { display: none; }
+  /* P5 — cards whose ONLY interactions live in .list-actions (booking
+     requests + reminder quick-actions) re-show them on mobile as a
+     full-width touch row; higher specificity beats the rule above. */
+  .list-item.show-acts { flex-wrap: wrap; }
+  .list-item.show-acts .list-info { min-width: 0; }
+  .list-item.show-acts .list-actions {
+    display: flex; flex: 1 1 100%;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed var(--border); gap: 8px;
+  }
+  .list-item.show-acts .list-action-btn { height: 40px; min-width: 44px; }
+  .list-item.show-acts .bk-act { flex: 1 1 auto; font-size: 13px; }
   .day-view-scroll { overflow-x: auto; }
 }
 @media (max-width: 480px) {
@@ -4600,7 +4620,7 @@ function renderCalls() {
       var confBtn = confirmed ? ''
         : '<button class="list-action-btn" title="تم التأكيد" onclick="event.stopPropagation(); recordApptTime(\'' + e.id + '\', \'confirmed_at\', this)">✅</button>';
       html +=
-        '<div class="list-item" style="border-right:3px solid ' + getApptColor(e).fill + ';' + (confirmed ? 'opacity:0.6;' : '') + '" onclick="editAppt(\'' + e.id + '\')">'
+        '<div class="list-item show-acts" style="border-right:3px solid ' + getApptColor(e).fill + ';' + (confirmed ? 'opacity:0.6;' : '') + '" onclick="editAppt(\'' + e.id + '\')">'
         + '<div class="list-time">' + fmtTime12(e.time) + '</div>'
         + '<div class="list-avatar" style="background:' + avatarColor(e.patient_name||'؟') + '22;color:' + avatarColor(e.patient_name||'؟') + '">' + escapeHtml(initials(e.patient_name||'؟')) + '</div>'
         + '<div class="list-info">'
@@ -6649,11 +6669,11 @@ function bookingCard(req, isPending) {
   if (req.status === 'confirmed') statusChip = ' <span class="list-badge status-confirmed">✅ مؤكّد</span>';
   if (req.status === 'rejected')  statusChip = ' <span class="list-badge" style="opacity:0.7;">✖ مرفوض</span>';
   var actions = isPending
-    ? '<button class="list-action-btn" title="تأكيد كموعد" onclick="event.stopPropagation(); confirmBookingRequest(\'' + req.id + '\')">✅</button>'
-      + '<button class="list-action-btn" title="رفض الطلب" onclick="event.stopPropagation(); rejectBookingRequest(\'' + req.id + '\')">❌</button>'
+    ? '<button class="list-action-btn bk-act" title="تأكيد كموعد" onclick="event.stopPropagation(); confirmBookingRequest(\'' + req.id + '\')">✅ تأكيد</button>'
+      + '<button class="list-action-btn bk-act danger" title="رفض الطلب" onclick="event.stopPropagation(); rejectBookingRequest(\'' + req.id + '\')">✖ رفض</button>'
       + waBtn
     : waBtn;
-  return '<div class="list-item" style="border-right:3px solid var(--green);' + (isPending ? '' : 'opacity:0.62;') + '">'
+  return '<div class="list-item booking-item show-acts" style="border-right:3px solid var(--green);' + (isPending ? '' : 'opacity:0.62;') + '">'
     + '<div class="list-time">' + fmtTime12(req.requested_time) + '</div>'
     + '<div class="list-avatar" style="background:' + avatarColor(req.patient_name || '؟') + '22;color:' + avatarColor(req.patient_name || '؟') + '">' + escapeHtml(initials(req.patient_name || '؟')) + '</div>'
     + '<div class="list-info">'
@@ -6663,7 +6683,7 @@ function bookingCard(req, isPending) {
     +     (req.note ? ' · 📝 ' + escapeHtml(req.note) : '')
     +     ' <span style="opacity:0.6;">· ' + bookingAgo(req.created_at) + '</span></div>'
     + '</div>'
-    + '<div class="list-actions" onclick="event.stopPropagation()">' + actions + '</div>'
+    + (actions ? '<div class="list-actions" onclick="event.stopPropagation()">' + actions + '</div>' : '')
     + '</div>';
 }
 
