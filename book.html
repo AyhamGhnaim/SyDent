@@ -56,19 +56,42 @@ h1{font-size:21px; font-weight:800; margin:0 0 4px; text-align:center;}
   width:22px; height:22px; border-radius:50%; background:var(--green);
   color:#06281a; font-size:12px; font-weight:800; margin-inline-end:7px;
 }
-.days{
-  display:flex; gap:8px; overflow-x:auto; padding-bottom:6px;
-  scrollbar-width:thin;
+/* ── Calendar (روزنامة) — Saturday-start month grid ── */
+.cal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+.cal-title{font-size:15px; font-weight:800; color:var(--text);}
+.cal-nav{
+  width:36px; height:36px; border-radius:10px; border:1.5px solid var(--line);
+  background:var(--card2); color:var(--text); font-size:18px; font-weight:800;
+  font-family:'Cairo',sans-serif; cursor:pointer; padding:0; line-height:1;
+  display:flex; align-items:center; justify-content:center;
 }
-.day-chip{
-  flex:0 0 auto; min-width:74px; padding:9px 10px; border-radius:12px;
-  background:var(--card2); border:1.5px solid var(--line); color:var(--text);
-  text-align:center; cursor:pointer; user-select:none;
+.cal-nav:disabled{opacity:.30; cursor:default;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+.cal-dow{text-align:center; font-size:10.5px; font-weight:700; color:var(--text2); padding:3px 0 6px;}
+.cal-cell{
+  height:42px; display:flex; align-items:center; justify-content:center;
+  border-radius:10px; font-size:14.5px; font-weight:700; color:var(--text);
+  background:var(--card2); border:1.5px solid var(--line);
+  cursor:pointer; user-select:none; position:relative;
 }
-.day-chip .dn{font-size:12px; color:var(--text2); font-weight:600;}
-.day-chip .dd{font-size:15px; font-weight:800; margin-top:2px;}
-.day-chip .dl{font-size:10.5px; color:var(--green); font-weight:700; margin-top:1px; min-height:14px;}
-.day-chip.sel{border-color:var(--green); background:rgba(22,160,133,0.10);}
+@media (hover:hover){ .cal-cell.ok:hover{border-color:var(--green);} }
+.cal-cell.blank{background:transparent; border-color:transparent; cursor:default;}
+.cal-cell.off{
+  background:transparent; border-color:transparent; color:var(--text2);
+  opacity:.35; cursor:default; font-weight:600;
+}
+.cal-cell.today::after{
+  content:''; position:absolute; bottom:5px; width:4px; height:4px;
+  border-radius:50%; background:var(--green);
+}
+.cal-cell.sel{border-color:var(--green); background:rgba(22,160,133,0.12); color:var(--green);}
+.cal-hint{
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  font-size:11px; color:var(--text2); font-weight:600; margin-top:10px;
+}
+.cal-hint .dot-ok{width:11px; height:11px; border-radius:4px; background:var(--card2); border:1.5px solid var(--line); display:inline-block;}
+.cal-hint .dot-today{width:5px; height:5px; border-radius:50%; background:var(--green); display:inline-block;}
+.day-lbl{color:var(--green); font-weight:700; font-size:12.5px;}
 .slots{
   display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr));
   gap:8px; margin-top:4px;
@@ -140,6 +163,7 @@ var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 var DAYS_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
 var MONTHS_AR = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
+var DOW_AR = ['سبت','أحد','اثنين','ثلاثاء','أربعاء','خميس','جمعة']; // Saturday-start week (Syrian convention)
 
 var ERR_MAP = {
   booking_disabled:  'الحجز الإلكتروني غير متاح حالياً لدى هذه العيادة.',
@@ -232,6 +256,64 @@ function buildDays(){
   return out;
 }
 
+// ── Calendar (روزنامة): month grid over the booking window, Saturday-start ──
+var calMonth = null; // Date = first day of the displayed month
+
+function monthIdx(d){ return d.getFullYear()*12 + d.getMonth(); }
+
+window.calNav = function(dir){
+  if (!calMonth) return;
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + dir, 1);
+  renderCalendar();
+};
+
+function renderCalendar(){
+  var box = document.getElementById('calBox');
+  if (!box) return;
+  var days = buildDays();
+  if (days.length === 0){
+    box.innerHTML = '<div class="empty-slots">لا أيام متاحة للحجز حالياً.</div>';
+    return;
+  }
+  var map = {};
+  days.forEach(function(d){ map[d.key] = d.offset; });
+  var minM = new Date(days[0].date.getFullYear(), days[0].date.getMonth(), 1);
+  var lastD = days[days.length - 1].date;
+  var maxM = new Date(lastD.getFullYear(), lastD.getMonth(), 1);
+  if (!calMonth || monthIdx(calMonth) < monthIdx(minM) || monthIdx(calMonth) > monthIdx(maxM)) calMonth = minM;
+
+  var y = calMonth.getFullYear(), mo = calMonth.getMonth();
+  var todayKey = dateKey(new Date());
+
+  // RTL nav: previous points right (›), next points left (‹)
+  var html = '<div class="cal-head">'
+    + '<button type="button" class="cal-nav" onclick="calNav(-1)" title="الشهر السابق"'
+    + (monthIdx(calMonth) <= monthIdx(minM) ? ' disabled' : '') + '>&rsaquo;</button>'
+    + '<div class="cal-title">' + MONTHS_AR[mo] + ' ' + y + '</div>'
+    + '<button type="button" class="cal-nav" onclick="calNav(1)" title="الشهر التالي"'
+    + (monthIdx(calMonth) >= monthIdx(maxM) ? ' disabled' : '') + '>&lsaquo;</button>'
+    + '</div>';
+
+  html += '<div class="cal-grid">';
+  DOW_AR.forEach(function(n){ html += '<div class="cal-dow">' + n + '</div>'; });
+  var lead = (new Date(y, mo, 1).getDay() + 1) % 7; // getDay(): Sat=6 → col 0
+  for (var b = 0; b < lead; b++) html += '<div class="cal-cell blank"></div>';
+  var dim = new Date(y, mo + 1, 0).getDate();
+  for (var dn = 1; dn <= dim; dn++){
+    var k = dateKey(new Date(y, mo, dn));
+    var off = map[k];
+    var cls = (off !== undefined ? 'ok' : 'off')
+      + (selDate === k ? ' sel' : '')
+      + (todayKey === k ? ' today' : '');
+    html += '<div class="cal-cell ' + cls + '"'
+      + (off !== undefined ? ' onclick="pickDay(\'' + k + '\',' + off + ')"' : '')
+      + '>' + dn + '</div>';
+  }
+  html += '</div>'
+    + '<div class="cal-hint"><span class="dot-ok"></span>متاح للحجز<span style="opacity:.5">·</span><span class="dot-today"></span>اليوم</div>';
+  box.innerHTML = html;
+}
+
 function buildSlots(dayKey, offset){
   var startMin = timeToMin(CLINIC.work_start), endMin = timeToMin(CLINIC.work_end);
   var slot = CLINIC.slot_minutes || 30;
@@ -252,7 +334,6 @@ function buildSlots(dayKey, offset){
 }
 
 function renderMain(){
-  var days = buildDays();
   var html =
     '<div class="card">'
     + '<h1>' + esc(CLINIC.clinic_name || 'عيادة الأسنان') + '</h1>'
@@ -260,24 +341,10 @@ function renderMain(){
     + (CLINIC.booking_note ? '<div class="note">' + esc(CLINIC.booking_note) + '</div>' : '')
     + '</div>';
 
-  html += '<div class="card"><div class="step-title"><span class="n">1</span>اختر اليوم</div><div class="days" id="dayStrip">';
-  if (days.length === 0){
-    html += '<div class="empty-slots" style="width:100%">لا أيام متاحة للحجز حالياً.</div>';
-  } else {
-    days.forEach(function(d){
-      var lbl = d.offset === 0 ? 'اليوم' : (d.offset === 1 ? 'غداً' : '');
-      html +=
-        '<div class="day-chip' + (selDate === d.key ? ' sel' : '') + '" data-off="' + d.offset + '" onclick="pickDay(\'' + d.key + '\',' + d.offset + ')">'
-        + '<div class="dn">' + DAYS_AR[d.date.getDay()] + '</div>'
-        + '<div class="dd">' + d.date.getDate() + ' ' + MONTHS_AR[d.date.getMonth()].replace(' الأول', ' 1').replace(' الثاني', ' 2') + '</div>'
-        + '<div class="dl">' + lbl + '</div>'
-        + '</div>';
-    });
-  }
-  html += '</div></div>';
+  html += '<div class="card"><div class="step-title"><span class="n">1</span>اختر اليوم</div><div id="calBox"></div></div>';
 
   html += '<div class="card" id="slotsCard" style="display:' + (selDate ? 'block' : 'none') + ';">'
-    + '<div class="step-title"><span class="n">2</span>اختر الوقت</div>'
+    + '<div class="step-title"><span class="n">2</span>اختر الوقت <span class="day-lbl" id="slotsDayLbl"></span></div>'
     + '<div class="slots" id="slotsGrid"></div></div>';
 
   html += '<div class="card" id="formCard" style="display:none;">'
@@ -297,6 +364,7 @@ function renderMain(){
     + '</form></div>';
 
   app().innerHTML = html;
+  renderCalendar();
   if (selDate){
     var off = 0, ds = buildDays();
     for (var i = 0; i < ds.length; i++) if (ds[i].key === selDate){ off = ds[i].offset; break; }
@@ -306,9 +374,10 @@ function renderMain(){
 
 window.pickDay = function(key, offset){
   selDate = key; selTime = null;
-  document.querySelectorAll('.day-chip').forEach(function(c){ c.classList.remove('sel'); });
-  var chip = document.querySelector('.day-chip[data-off="' + offset + '"]');
-  if (chip) chip.classList.add('sel');
+  renderCalendar();
+  var pd = new Date(key + 'T00:00:00');
+  var dl = document.getElementById('slotsDayLbl');
+  if (dl) dl.textContent = '— ' + DAYS_AR[pd.getDay()] + ' ' + pd.getDate() + ' ' + MONTHS_AR[pd.getMonth()];
   document.getElementById('slotsCard').style.display = 'block';
   document.getElementById('formCard').style.display = 'none';
   renderSlots(offset);
