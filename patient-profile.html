@@ -4577,6 +4577,20 @@ function spacerColorFor(num){
   var sm = teethMap[String(num)]; if (!sm || !sm.SPACER) return null;
   var tr = getTreatment(sm.SPACER); return (tr && tr.fill) || '#d946ef';
 }
+/* Band & loop anatomy: the BAND goes on the abutment DISTAL to the gap (farther
+   from the midline); the loop only RESTS against the mesial tooth — nothing is
+   charted or drawn on it. Falls back to the same-quadrant abutment when the gap
+   touches the midline. */
+function spacerBandToothOf(gapNum, abA, abB){
+  function pos(n){ return parseInt(n,10) % 10; }
+  var gq = normQuad(gapNum), aq = normQuad(abA), bq = normQuad(abB);
+  var inA = (aq === gq), inB = (bq === gq);
+  if (inA && inB) return pos(abA) > pos(abB) ? abA : abB;
+  if (inA) return abA;
+  if (inB) return abB;
+  return abB;
+}
+
 /* Contiguous run of SPACER-marked teeth around num (abutments + gap). */
 function spacerUnitOf(num){
   var arch = archOf(num), idx = arch.indexOf(parseInt(num,10));
@@ -4706,6 +4720,19 @@ function buildExtractedPlaceholder(num, isUpper) {
   var ghost = '<path d="' + anat.outlineD + '" ' + DASH + '/>'; // crown silhouette
   for (var ri = 0; ri < anat.roots.length; ri++) {                // roots
     ghost += '<path d="' + anat.roots[ri].d + '" ' + DASH + '/>';
+  }
+  // حافظ مسافة: thin wire across the gap + ridge loop. Toward a SPACER-marked
+  // neighbor the wire bleeds into the seam (visual continuity with the band);
+  // toward the UNMARKED mesial tooth it stops at the cell edge — zero ink on it.
+  if (typeof toothHasSpacer === 'function' && toothHasSpacer(num)) {
+    var _spc = spacerColorFor(num) || '#d946ef';
+    var _spY = isPrimaryTooth(num) ? 44 : 57;
+    var _gArr = archOf(num), _gIx = _gArr.indexOf(parseInt(num,10));
+    var _gL = _gIx > 0 && toothHasSpacer(_gArr[_gIx - 1]);
+    var _gR = _gIx >= 0 && _gIx < _gArr.length - 1 && toothHasSpacer(_gArr[_gIx + 1]);
+    var _gx1 = _gL ? -24 : 4, _gx2 = _gR ? 124 : 96;
+    ghost += '<line x1="' + _gx1 + '" y1="' + _spY + '" x2="' + _gx2 + '" y2="' + _spY + '" stroke="' + _spc + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>'
+          +  '<path d="M 22 ' + _spY + ' Q 50 ' + (_spY + 26) + ' 78 ' + _spY + '" fill="none" stroke="' + _spc + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
   }
   var svg = '<svg class="tooth-shape extract-ghost" data-tooth="' + num + '" '
     + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
@@ -5222,9 +5249,9 @@ function buildTooth(num, surfaceMap, isUpper) {
     var __spR = __spIx >= 0 && __spIx < __spArr.length - 1 && toothHasSpacer(__spArr[__spIx + 1]);
     var __bx1 = anat.crownL - 2, __bx2 = anat.crownR + 2;
     svg += '<g pointer-events="none">';
-    if (__spL) svg += '<line x1="-24" y1="' + __spY + '" x2="' + __bx1 + '" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="3" opacity="0.95" stroke-linecap="round"/>';
-    if (__spR) svg += '<line x1="' + __bx2 + '" y1="' + __spY + '" x2="124" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="3" opacity="0.95" stroke-linecap="round"/>';
-    svg += '<rect x="' + __bx1 + '" y="' + (__spY - 4.5) + '" width="' + (__bx2 - __bx1) + '" height="9" rx="3.5" fill="' + __spC + '" opacity="0.92" stroke="#ffffff" stroke-width="1.2"/>'
+    if (__spL) svg += '<line x1="-24" y1="' + __spY + '" x2="' + __bx1 + '" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
+    if (__spR) svg += '<line x1="' + __bx2 + '" y1="' + __spY + '" x2="124" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
+    svg += '<rect x="' + __bx1 + '" y="' + (__spY - 5.5) + '" width="' + (__bx2 - __bx1) + '" height="11" rx="4" fill="' + __spC + '" opacity="0.92" stroke="#ffffff" stroke-width="1.2"/>'
         +  '</g>';
   }
 
@@ -7206,10 +7233,13 @@ async function saveToothTreatment() {
       showToast('⚠️ حافظ المسافة يحتاج سنّين موجودَين على جانبي الفجوة');
       return;
     }
+    // Band & loop: rows ONLY on the gap teeth + the DISTAL (band) abutment.
+    // The mesial tooth gets NOTHING — the loop merely rests against it.
     var sArch = archOf(currentTooth);
-    var sLo = sArch.indexOf(sAb.mesial), sHi = sArch.indexOf(sAb.distal);
-    var sA = Math.min(sLo, sHi), sB = Math.max(sLo, sHi);
-    spacerUnitForLedger = sArch.slice(sA, sB + 1);
+    var sBand = spacerBandToothOf(currentTooth, sAb.mesial, sAb.distal);
+    spacerUnitForLedger = (sAb.gap || [currentTooth]).slice();
+    if (spacerUnitForLedger.indexOf(sBand) < 0) spacerUnitForLedger.push(sBand);
+    spacerUnitForLedger.sort(function(a, b){ return sArch.indexOf(a) - sArch.indexOf(b); });
     for (var su = 0; su < spacerUnitForLedger.length; su++) {
       var sun = String(spacerUnitForLedger[su]);
       var rS = await upsertTeethStatusWithFallback({
