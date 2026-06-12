@@ -4731,8 +4731,8 @@ function buildExtractedPlaceholder(num, isUpper) {
     var _gL = _gIx > 0 && toothHasSpacer(_gArr[_gIx - 1]);
     var _gR = _gIx >= 0 && _gIx < _gArr.length - 1 && toothHasSpacer(_gArr[_gIx + 1]);
     var _gx1 = _gL ? -24 : 4, _gx2 = _gR ? 124 : 96;
-    ghost += '<line x1="' + _gx1 + '" y1="' + _spY + '" x2="' + _gx2 + '" y2="' + _spY + '" stroke="' + _spc + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>'
-          +  '<path d="M 22 ' + _spY + ' Q 50 ' + (_spY + 26) + ' 78 ' + _spY + '" fill="none" stroke="' + _spc + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
+    ghost += '<line x1="' + _gx1 + '" y1="' + _spY + '" x2="' + _gx2 + '" y2="' + _spY + '" stroke="' + _spc + '" stroke-width="2.5" opacity="0.95" stroke-linecap="round"/>'
+          +  '<path d="M 22 ' + _spY + ' Q 50 ' + (_spY + 26) + ' 78 ' + _spY + '" fill="none" stroke="' + _spc + '" stroke-width="2.5" opacity="0.95" stroke-linecap="round"/>';
   }
   var svg = '<svg class="tooth-shape extract-ghost" data-tooth="' + num + '" '
     + 'viewBox="0 0 100 210" width="' + W + '" height="' + H + '" '
@@ -5244,13 +5244,16 @@ function buildTooth(num, surfaceMap, isUpper) {
   if (typeof toothHasSpacer === 'function' && toothHasSpacer(num)) {
     var __spC = spacerColorFor(num) || '#d946ef';
     var __spY = isPrimaryTooth(num) ? 44 : 57;   // cervical third, below the ortho wire
-    var __spArr = archOf(num), __spIx = __spArr.indexOf(num);
-    var __spL = __spIx > 0 && toothHasSpacer(__spArr[__spIx - 1]);
-    var __spR = __spIx >= 0 && __spIx < __spArr.length - 1 && toothHasSpacer(__spArr[__spIx + 1]);
     var __bx1 = anat.crownL - 2, __bx2 = anat.crownR + 2;
+    // The wire leaves the band on the GAP side ONLY — anatomically the MIDLINE
+    // side of the band tooth. Quadrant-based (not neighbor-row based), so stale
+    // rows can never paint a distal-side stub. The stub runs 8 units UNDER the
+    // band (drawn first, rect covers the joint) → seamless connection.
+    var __spQ = normQuad(num);
+    var __spGapLeft = (__spQ === 2 || __spQ === 3);   // arch arrays: midline sits at the LEFT of Q2/Q3 teeth
     svg += '<g pointer-events="none">';
-    if (__spL) svg += '<line x1="-24" y1="' + __spY + '" x2="' + __bx1 + '" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
-    if (__spR) svg += '<line x1="' + __bx2 + '" y1="' + __spY + '" x2="124" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2" opacity="0.95" stroke-linecap="round"/>';
+    if (__spGapLeft) svg += '<line x1="-24" y1="' + __spY + '" x2="' + (__bx1 + 8) + '" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2.5" opacity="0.95" stroke-linecap="round"/>';
+    else             svg += '<line x1="' + (__bx2 - 8) + '" y1="' + __spY + '" x2="124" y2="' + __spY + '" stroke="' + __spC + '" stroke-width="2.5" opacity="0.95" stroke-linecap="round"/>';
     svg += '<rect x="' + __bx1 + '" y="' + (__spY - 5.5) + '" width="' + (__bx2 - __bx1) + '" height="11" rx="4" fill="' + __spC + '" opacity="0.92" stroke="#ffffff" stroke-width="1.2"/>'
         +  '</g>';
   }
