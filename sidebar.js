@@ -31,8 +31,9 @@ const css = `
   }
   .sb-logo-icon {
     width: 38px; height: 38px;
-    background: rgba(46,232,158,0.12);
-    border: 1.5px solid rgba(46,232,158,0.3);
+    color: var(--green);
+    background: rgba(var(--green-rgb),0.12);
+    border: 1.5px solid rgba(var(--green-rgb),0.3);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
@@ -61,17 +62,17 @@ const css = `
     font-family: 'Cairo', sans-serif;
     position: relative;
   }
-  .sb-item:hover { color: var(--text); background: var(--green-dim, rgba(46,232,158,0.12)); }
+  .sb-item:hover { color: var(--text); background: var(--green-dim, rgba(var(--green-rgb),0.12)); }
   .sb-item.active {
     color: var(--green);
-    background: var(--green-dim, rgba(46,232,158,0.12));
+    background: var(--green-dim, rgba(var(--green-rgb),0.12));
     border-right-color: var(--green);
   }
   .sb-icon { font-size: 16px; width: 20px; text-align: center; }
   .sb-badge {
     margin-right: auto;
     background: var(--green);
-    color: #0a1628;
+    color: #ffffff;
     font-size: 10px; font-weight: 800;
     min-width: 18px; height: 18px;
     border-radius: 9px;
@@ -280,7 +281,7 @@ function buildHTML(activeId) {
     <div class="sb-overlay" id="sbOverlay"></div>
     <aside class="sb-sidebar" id="sbSidebar">
       <a href="index.html" class="sb-logo">
-        <div class="sb-logo-icon"><svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg></div>
+        <div class="sb-logo-icon"><svg viewBox="0 0 64 72" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg></div>
         <div>
           <div class="sb-logo-name">SyDent</div>
           <div class="sb-logo-sub" id="sbLogoSub">نظام إدارة العيادة</div>
@@ -330,7 +331,7 @@ async function refreshSidebarDynamic() {
     } catch (e) { /* keep fallback */ }
 
     document.body.innerHTML = `
-      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
         <div style="font-size:60px;margin-bottom:16px;">🚫</div>
         <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">تم إيقاف حسابك</div>
         <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">للاستفسار أو تجديد الاشتراك، تواصل معنا عبر واتساب.</div>
@@ -348,7 +349,7 @@ async function refreshSidebarDynamic() {
 
   if (trialData && trialData.status === 'new') {
     document.body.innerHTML = `
-      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+      <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
         <div style="font-size:60px;margin-bottom:16px;">⏳</div>
         <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">طلبك قيد المراجعة</div>
         <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">شكراً لتسجيلك في SyDent. سيتم مراجعة طلبك وتفعيل حسابك قريباً.</div>
@@ -484,7 +485,7 @@ function initSidebar(activeId) {
         // Update mobile status bar tint if a theme-color meta exists
         try {
           const meta = document.querySelector('meta[name="theme-color"]');
-          if (meta) meta.setAttribute('content', m === 'dark' ? '#0a1628' : '#fafaf7');
+          if (meta) meta.setAttribute('content', m === 'dark' ? '#0a1628' : '#f4f7fa');
         } catch (e) {}
         // Notify other widgets (e.g. Chart.js) — same event name as theme.js
         try {
@@ -558,16 +559,16 @@ function initPTR() {
     '.ptr-bar{' +
       'width:100%;overflow:hidden;height:0;' +
       'display:flex;align-items:center;justify-content:center;gap:8px;' +
-      'background:#0a1628;' +
-      'font-size:13px;font-weight:700;color:#2ee89e;' +
+      'background:var(--bg3);' +
+      'font-size:13px;font-weight:700;color:var(--green);' +
       'font-family:"Cairo",sans-serif;' +
       'transition:height .25s ease;' +
       'border-bottom:1px solid transparent;}' +
-    '.ptr-bar.show{height:38px;border-bottom-color:rgba(46,232,158,0.2);}' +
+    '.ptr-bar.show{height:38px;border-bottom-color:rgba(var(--green-rgb),0.2);}' +
     '.ptr-ring{' +
       'width:15px;height:15px;' +
-      'border:2px solid rgba(46,232,158,0.25);' +
-      'border-top-color:#2ee89e;' +
+      'border:2px solid rgba(var(--green-rgb),0.25);' +
+      'border-top-color:var(--green);' +
       'border-radius:50%;flex-shrink:0;}' +
     '.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}' +
     '@keyframes ptrSpin{to{transform:rotate(360deg);}}';
