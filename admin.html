@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="SyDent">
-<meta name="theme-color" content="#0a1628">
+<meta name="theme-color" content="#f4f7fa">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="manifest" href="manifest.json">
 <title>SyDent — لوحة الإدارة</title>
@@ -11408,7 +11408,7 @@ function rptRenderMovementChart(d) {
     data: {
       labels: labels,
       datasets: [
-        { label: 'جديد',        data: newArr,   backgroundColor: 'rgba(var(--green-rgb),0.78)', stack: 'mov' },
+        { label: 'جديد',        data: newArr,   backgroundColor: 'rgba(13,133,119,0.78)', stack: 'mov' },
         { label: 'إعادة تفعيل', data: reactArr, backgroundColor: 'rgba(56,189,248,0.78)', stack: 'mov' },
         { label: 'مفقود',       data: churnArr, backgroundColor: 'rgba(239,68,68,0.78)',  stack: 'mov' }
       ]
@@ -11429,7 +11429,7 @@ function rptRenderMovementChart(d) {
 }
 
 // Distribution helpers (plan-agnostic): order trial → paid plans by sort_order → permanent.
-var RPT_DIST_PALETTE = ['rgba(56,189,248,0.85)','rgba(var(--green-rgb),0.85)','rgba(244,114,182,0.85)','rgba(250,204,21,0.85)','rgba(129,140,248,0.85)','rgba(248,113,113,0.85)'];
+var RPT_DIST_PALETTE = ['rgba(56,189,248,0.85)','rgba(13,133,119,0.85)','rgba(244,114,182,0.85)','rgba(250,204,21,0.85)','rgba(129,140,248,0.85)','rgba(248,113,113,0.85)'];
 function rptDistOrder(dist) {
   return Object.keys(dist || {}).sort(function(a, b){
     var rank = function(k){ return k === 'trial' ? -1 : k === 'permanent' ? 1e15 : srqPlanSort(k); };
