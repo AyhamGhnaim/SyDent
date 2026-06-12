@@ -2206,16 +2206,16 @@ obInit();
       }catch(_){ }
       // (ب) مخزون منخفض — نفس شرط صفحة المخزون حرفياً (r>0 && q<=r)
       try{
-        window.sb.from('inventory_items').select('name,quantity,reorder_level,alert_threshold,min_quantity').limit(200)
+        window.sb.from('inventory_items').select('name,quantity,reorder_level').eq('is_active', true).limit(200)
           .then(function(res){
             try{
               var low=(res.data||[]).filter(function(it){
-                var q=parseFloat(it.quantity)||0;
-                var r=parseFloat(it.reorder_level!=null?it.reorder_level:(it.alert_threshold!=null?it.alert_threshold:it.min_quantity))||0;
-                return r>0 && q<=r;
+                var q=Number(it.quantity||0);
+                var r=Number(it.reorder_level||0);
+                return q<=0 || (r>0 && q<=r);
               });
               if(low.length){
-                rows.push({href:'inventory.html',ic:'📦',bg:'var(--yellow-dim)',tt:low.length+' صنف تحت حد التنبيه',sub:dpEsc(low[0].name||'')+(low.length>1?' و'+(low.length-1)+' غيره':''),cnt:low.length});
+                rows.push({href:'inventory.html',ic:'📦',bg:'var(--yellow-dim)',tt:low.length+' صنف منخفض أو نافد',sub:dpEsc(low[0].name||'')+(low.length>1?' و'+(low.length-1)+' غيره':''),cnt:low.length});
               }
               paint();
             }catch(_){ paint(); }
