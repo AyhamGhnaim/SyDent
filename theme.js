@@ -36,7 +36,7 @@
     try {
       var meta = document.querySelector('meta[name="theme-color"]');
       if (meta) {
-        meta.setAttribute('content', mode === 'dark' ? '#0a1628' : '#fafaf7');
+        meta.setAttribute('content', mode === 'dark' ? '#0a1628' : '#f4f7fa');
       }
     } catch (e) {}
   }

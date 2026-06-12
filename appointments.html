@@ -23,9 +23,9 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
-  --green-dim: rgba(46,232,158,0.10);
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
+  --green-dim: rgba(var(--green-rgb),0.10);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --blue:      #63b3ed;
@@ -160,9 +160,9 @@ body {
   position: relative;
 }
 .cal-cell:nth-child(7n+1) { border-right: none; }
-.cal-cell:hover { background: rgba(46,232,158,0.04); }
+.cal-cell:hover { background: rgba(var(--green-rgb),0.04); }
 .cal-cell.other-month .cal-date { color: rgba(255,255,255,0.2); }
-.cal-cell.today { background: rgba(46,232,158,0.06); }
+.cal-cell.today { background: rgba(var(--green-rgb),0.06); }
 .cal-cell.today .cal-date {
   background: var(--green);
   color: #0a1628;
@@ -171,7 +171,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-weight: 800;
 }
-.cal-cell.selected { background: rgba(46,232,158,0.1); }
+.cal-cell.selected { background: rgba(var(--green-rgb),0.1); }
 .cal-date {
   font-size: 13px; font-weight: 700;
   width: 26px; height: 26px;
@@ -186,7 +186,7 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   cursor: pointer;
 }
-.cal-event.green  { background: rgba(46,232,158,0.2);  color: var(--green); }
+.cal-event.green  { background: rgba(var(--green-rgb),0.2);  color: var(--green); }
 .cal-event.yellow { background: rgba(245,200,66,0.2);  color: var(--yellow); }
 .cal-event.red    { background: rgba(239,83,80,0.2);   color: var(--red); }
 .cal-event.blue   { background: rgba(99,179,237,0.2);  color: var(--blue); }
@@ -265,7 +265,7 @@ body {
   cursor: pointer; transition: all .15s;
 }
 .k3-view-toggle button.active {
-  background: var(--accent, #2ee89e);
+  background: var(--accent, var(--green));
   color: #0a1628;
 }
 
@@ -332,8 +332,8 @@ body {
 }
 /* Drag-target highlight — applied via JS on dragover */
 .k3-slot-cell.k3-drag-over {
-  background: rgba(46,232,158,0.18);
-  outline: 1px dashed rgba(46,232,158,0.6);
+  background: rgba(var(--green-rgb),0.18);
+  outline: 1px dashed rgba(var(--green-rgb),0.6);
   outline-offset: -1px;
 }
 .k3-appt {
@@ -397,7 +397,7 @@ body {
   position: relative;
 }
 .appt-block:hover { filter: brightness(1.1); transform: translateX(-2px); }
-.appt-block.green  { background: rgba(46,232,158,0.12); border-color: var(--green); }
+.appt-block.green  { background: rgba(var(--green-rgb),0.12); border-color: var(--green); }
 .appt-block.yellow { background: rgba(245,200,66,0.12);  border-color: var(--yellow); }
 .appt-block.red    { background: rgba(239,83,80,0.12);   border-color: var(--red); }
 .appt-block.blue   { background: rgba(99,179,237,0.12);  border-color: var(--blue); }
@@ -410,7 +410,7 @@ body {
   font-size: 10px; font-weight: 700;
   padding: 2px 7px; border-radius: 10px;
 }
-.status-confirmed { background: rgba(46,232,158,0.2);  color: var(--green); }
+.status-confirmed { background: rgba(var(--green-rgb),0.2);  color: var(--green); }
 .status-pending   { background: rgba(245,200,66,0.2);  color: var(--yellow); }
 .status-cancelled { background: rgba(239,83,80,0.2);   color: var(--red); }
 /* Gap 1: new lifecycle statuses */
@@ -536,7 +536,7 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 22px; height: 22px; padding: 0 7px;
   border-radius: 11px; font-size: 11px; font-weight: 800;
-  background: rgba(46,232,158,0.22); color: var(--green);
+  background: rgba(var(--green-rgb),0.22); color: var(--green);
 }
 .main-tab.active .count-badge { background: var(--green); color: #0a1628; }
 
@@ -639,7 +639,7 @@ body {
   display: inline-block;
   width: 22px;
   height: 22px;
-  border: 2px solid #2ee89e;
+  border: 2px solid var(--green);
   border-radius: 6px;
   background: transparent;
   position: relative;
@@ -650,8 +650,8 @@ body {
   pointer-events: none;
 }
 .dcm-chk.dcm-chk-checked {
-  background: #2ee89e;
-  border-color: #2ee89e;
+  background: var(--green);
+  border-color: var(--green);
 }
 .dcm-chk.dcm-chk-checked::after {
   content: '✓';
@@ -663,9 +663,9 @@ body {
   font-weight: 900;
   line-height: 1;
 }
-.dcm-row:hover { background: rgba(46,232,158,0.06); }
-.dcm-row:hover .dcm-chk { border-color: #2ee89e; background: rgba(46,232,158,0.14); }
-.dcm-row:hover .dcm-chk.dcm-chk-checked { background: #2ee89e; }
+.dcm-row:hover { background: rgba(var(--green-rgb),0.06); }
+.dcm-row:hover .dcm-chk { border-color: var(--green); background: rgba(var(--green-rgb),0.14); }
+.dcm-row:hover .dcm-chk.dcm-chk-checked { background: var(--green); }
 .planned-toggle.is-checked {
   background: rgba(99,179,237,0.18);
   border-color: rgba(99,179,237,0.6);
@@ -870,7 +870,7 @@ textarea { resize: vertical; min-height: 72px; }
 }
 .wa-badge:hover { transform: translateY(-1px); filter: brightness(1.1); }
 .wa-badge.sent {
-  background: rgba(46,232,158,0.14); color: var(--green); border-color: rgba(46,232,158,0.35);
+  background: rgba(var(--green-rgb),0.14); color: var(--green); border-color: rgba(var(--green-rgb),0.35);
 }
 .wa-badge.pending {
   background: rgba(245,200,66,0.14); color: var(--yellow); border-color: rgba(245,200,66,0.35);
@@ -1170,7 +1170,7 @@ textarea { resize: vertical; min-height: 72px; }
            In 'active' mode the existing renderApptProcedures function paints
            apptProcList directly. In 'create' mode our render paints pending
            items into the same DOM node. -->
-      <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
+      <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(var(--green-rgb),0.06);border:1px solid rgba(var(--green-rgb),0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
           <div id="apptProcStats" style="font-size:12px;color:var(--text2);"></div>
@@ -1180,9 +1180,9 @@ textarea { resize: vertical; min-height: 72px; }
         <div id="apptProcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
         <div id="apptProcControls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
-          <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
+          <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
         </div>
-        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:#2ee89e;color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
+        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:var(--green);color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
 
       <!-- 🥽 Lab orders section (visible only when editing + lab orders exist) -->
@@ -1249,7 +1249,7 @@ textarea { resize: vertical; min-height: 72px; }
     <div id="apptMatDeductRows" style="max-height:48vh;overflow:auto;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
       <button type="button" onclick="closeApptMatDeductModal()" style="padding:10px 18px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;">تخطّي</button>
-      <button type="button" id="apptMatDeductBtn" onclick="apptConfirmMaterialDeduction()" style="padding:10px 18px;border:none;border-radius:8px;background:var(--green,#2ee89e);color:#06371f;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">تأكيد الخصم</button>
+      <button type="button" id="apptMatDeductBtn" onclick="apptConfirmMaterialDeduction()" style="padding:10px 18px;border:none;border-radius:8px;background:var(--green,var(--green));color:#06371f;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">تأكيد الخصم</button>
     </div>
   </div>
 </div>
@@ -1317,7 +1317,7 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-footer" style="gap:10px;">
       <button type="button" class="btn-cancel" onclick="closeDismissedCompleteModal()">إلغاء</button>
       <button type="button" id="dcmSkipBtn" onclick="dismissedSkipComplete()" style="background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:600;">⏸️ فقط تسجيل الخروج</button>
-      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:#2ee89e;color:#0a1628;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
+      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:var(--green);color:#0a1628;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
     </div>
   </div>
 </div>
@@ -1383,7 +1383,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 // ─── Data ───────────────────────────────────────────
 const COLORS_MAP = {
-  green:  '#2ee89e',
+  green:  'var(--green)',
   blue:   '#63b3ed',
   yellow: '#f5c842',
   red:    '#ef5350',
@@ -1392,9 +1392,9 @@ const COLORS_MAP = {
 
 // Resolve appt color: if it's a hex code use directly, else look up the named color
 function resolveColor(c) {
-  if (!c) return '#2ee89e';
+  if (!c) return 'var(--green)';
   if (typeof c === 'string' && c.charAt(0) === '#') return c;
-  return COLORS_MAP[c] || '#2ee89e';
+  return COLORS_MAP[c] || 'var(--green)';
 }
 // Compatibility: legacy appts (before this change) may have stored a color BY TREATMENT NAME.
 // Try to look up the treatment by stored type name to get its actual color.
@@ -1418,7 +1418,7 @@ function getApptColor(appt) {
 }
 // Convert hex (#rrggbb) to rgba with alpha
 function hexA(hex, a) {
-  if (!hex || hex.charAt(0) !== '#') hex = '#2ee89e';
+  if (!hex || hex.charAt(0) !== '#') hex = 'var(--green)';
   var h = hex.replace('#','');
   if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
   var r = parseInt(h.substr(0,2),16),
@@ -2075,7 +2075,7 @@ function getApptLabBadge(appt) {
   if (hasReady) {
     return {
       icon: '🥽',
-      color: '#2ee89e',
+      color: 'var(--green)',
       title: hasDirect
         ? 'شغل المخبر جاهز للتركيب في هذا الموعد'
         : 'يوجد شغل جاهز للتركيب من المخبر'
@@ -2345,7 +2345,7 @@ function apptsByDate(ds) {
 }
 
 function avatarColor(name) {
-  const CLRS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
+  const CLRS = ['var(--green)','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
   let h=0; for(let c of name) h=(h*31+c.charCodeAt(0))%CLRS.length;
   return CLRS[h];
 }
@@ -3003,7 +3003,7 @@ var TIME_STAGES = [
   { key: 'confirmed_at', label: '📞 تأكيد', icon: '📞', color: '#63b3ed' },
   { key: 'arrived_at',   label: '🚪 وصل',   icon: '🚪', color: '#f5c842' },
   { key: 'seated_at',    label: '🪑 جلس',   icon: '🪑', color: '#fb923c' },
-  { key: 'dismissed_at', label: '✅ خرج',   icon: '✅', color: '#2ee89e' }
+  { key: 'dismissed_at', label: '✅ خرج',   icon: '✅', color: 'var(--green)' }
 ];
 
 // Returns the next action button for an appointment, or null if no action is
@@ -3415,7 +3415,7 @@ function dcmUpdateLabsHeader() {
   // Subset (some unchecked) → lab stays.
   var willDeliver = (totalPlanned === 0) || (checkedCount === totalPlanned);
   if (willDeliver) {
-    headerEl.innerHTML = '🔬 طلبات مخبر مرتبطة (<span style="color:#2ee89e;">ستُسجَّل كـ "تم التركيب" ✓</span>):';
+    headerEl.innerHTML = '🔬 طلبات مخبر مرتبطة (<span style="color:var(--green);">ستُسجَّل كـ "تم التركيب" ✓</span>):';
   } else {
     headerEl.innerHTML = '🔬 طلبات مخبر مرتبطة (<span style="color:#f5c842;">⚠️ لن تُسجَّل — يلزم تحديد جميع الجلسات أولاً</span>):';
   }
@@ -4034,7 +4034,7 @@ function renderDay() {
         : '';
       var ps = getApptProceduresSummary(e.id);
       var psHtml = ps
-        ? `<span class="cbadge" style="display:inline-block;--bc:#2ee89e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
+        ? `<span class="cbadge" style="display:inline-block;--bc:var(--green);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count} • ${fmtCost(ps.totalCost)}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
       var opHtml = getApptOperatoryBadge(e);
@@ -4516,7 +4516,7 @@ function renderList() {
         : '';
       var ps = getApptProceduresSummary(e.id);
       var psHtml = ps
-        ? `<span class="cbadge" style="display:inline-block;--bc:#2ee89e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
+        ? `<span class="cbadge" style="display:inline-block;--bc:var(--green);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;margin-right:6px;" title="${ps.count} علاج — ${fmtCost(ps.totalCost)} ل.س">🦷 ${ps.count}</span>`
         : '';
       var waHtml = getReminderBadgeHtml(e);
       var opHtml = getApptOperatoryBadge(e);
@@ -5089,7 +5089,7 @@ function renderApptLabOrders(appt) {
     var statusCol = 'var(--text2)';
     if (o.status === 'sent')     { statusAr = 'تم التسليم للمخبر';    statusBg = 'rgba(99,179,237,0.15)';  statusCol = '#63b3ed'; }
     else if (o.status === 'received')  { statusAr = 'تم الاستلام من المخبر'; statusBg = 'rgba(245,200,66,0.15)';  statusCol = '#f5c842'; }
-    else if (o.status === 'checked')   { statusAr = 'تم الفحص';              statusBg = 'rgba(46,232,158,0.15)';  statusCol = '#2ee89e'; }
+    else if (o.status === 'checked')   { statusAr = 'تم الفحص';              statusBg = 'rgba(var(--green-rgb),0.15)';  statusCol = 'var(--green)'; }
     else if (o.status === 'redo')      { statusAr = 'إعادة';                 statusBg = 'rgba(245,158,11,0.15)';  statusCol = '#f59e0b'; }
 
     // Late tag only applies when work hasn't physically arrived yet (status='sent').
@@ -5277,7 +5277,7 @@ function renderPendingPP_A() {
         var ALBL = {'U':'الفك العلوي','L':'الفك السفلي'};
         toothPart = ' • ' + (ALBL[s.arch] || escapeHtml(s.arch));
       }
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(46,232,158,0.05);border-radius:8px;border:1px solid rgba(46,232,158,0.2);flex-wrap:wrap;">'
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(var(--green-rgb),0.05);border-radius:8px;border:1px solid rgba(var(--green-rgb),0.2);flex-wrap:wrap;">'
         + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
         + '<div style="font-size:12px;color:var(--text2);">' + fmtCost(s.cost) + ' ل.س</div>'
         + '<span class="cbadge" style="--bc:#fb923c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
@@ -5871,7 +5871,7 @@ function updateColorPreview() {
   var dot = document.getElementById('colorPreviewDot');
   if (!dot) return;
   if (t) { dot.style.background = t.fill; dot.style.borderColor = t.stroke; }
-  else   { dot.style.background = '#2ee89e'; dot.style.borderColor = 'rgba(255,255,255,0.15)'; }
+  else   { dot.style.background = 'var(--green)'; dot.style.borderColor = 'rgba(255,255,255,0.15)'; }
 }
 
 async function submitAppt(e) {
@@ -5884,7 +5884,7 @@ async function submitAppt(e) {
   var typeVal   = document.getElementById('fType').value;
   var _t        = getTreatment(typeVal);
   var typeName  = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
-  const apptColor  = _t ? _t.fill   : '#2ee89e';
+  const apptColor  = _t ? _t.fill   : 'var(--green)';
   const apptStroke = _t ? _t.stroke : '#1fba7e';
 
   const btn = document.getElementById('saveBtn');

@@ -22,9 +22,9 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
-  --green-dim: rgba(46,232,158,0.12);
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
+  --green-dim: rgba(var(--green-rgb),0.12);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --blue:      #63b3ed;
@@ -146,7 +146,7 @@ body {
   display: flex; align-items: center; gap: 5px;
   white-space: nowrap;
 }
-.chip:hover { background: rgba(46,232,158,0.08); }
+.chip:hover { background: rgba(var(--green-rgb),0.08); }
 .chip.active { background: var(--green); color: #0a1628; border-color: var(--green); }
 .chip .dot { width: 10px; height: 10px; border-radius: 50%; }
 
@@ -187,7 +187,7 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.table-row:hover { background: rgba(46,232,158,0.04); }
+.table-row:hover { background: rgba(var(--green-rgb),0.04); }
 .table-row:last-child { border-bottom: none; }
 .cell-amt { font-weight: 700; color: var(--green); }
 .cell-employee { display: flex; align-items: center; gap: 8px; }
@@ -213,14 +213,14 @@ body {
   font-size: 14px;
   transition: all 0.15s;
 }
-.icon-btn:hover { background: rgba(46,232,158,0.08); border-color: var(--green); }
+.icon-btn:hover { background: rgba(var(--green-rgb),0.08); border-color: var(--green); }
 .icon-btn.danger:hover { background: rgba(239,83,80,0.12); border-color: var(--red); color: var(--red); }
 
 /* Expandable breakdown row */
 .breakdown-row {
   grid-column: 1 / -1;
   padding: 8px 16px 12px;
-  background: rgba(46,232,158,0.04);
+  background: rgba(var(--green-rgb),0.04);
   border-top: 1px dashed var(--border);
   font-size: 12px; color: var(--text2);
   display: none;
@@ -285,7 +285,7 @@ body {
   font-size: 13px;
 }
 .field input[readonly] {
-  background: rgba(46,232,158,0.06);
+  background: rgba(var(--green-rgb),0.06);
   color: var(--green);
   font-weight: 700;
   cursor: default;
@@ -311,7 +311,7 @@ body {
   text-align: center;
   transition: all 0.15s;
 }
-.method-chip:hover { background: rgba(46,232,158,0.08); }
+.method-chip:hover { background: rgba(var(--green-rgb),0.08); }
 .method-chip.active { background: var(--green); color: #0a1628; border-color: var(--green); }
 
 /* Breakdown section (collapsible) */
@@ -329,7 +329,7 @@ body {
   font-size: 13px; font-weight: 600;
   user-select: none;
 }
-.breakdown-toggle:hover { background: rgba(46,232,158,0.06); }
+.breakdown-toggle:hover { background: rgba(var(--green-rgb),0.06); }
 .breakdown-toggle .arrow { transition: transform 0.2s; }
 .breakdown-section.open .breakdown-toggle .arrow { transform: rotate(180deg); }
 .breakdown-body {
@@ -1173,7 +1173,7 @@ function renderEmployeeFilters() {
 
   doctors.forEach(function(d){
     if (!seen[d.id]) return;
-    var safeColor = (d.color && /^#[0-9a-f]{6}$/i.test(d.color)) ? d.color : '#2ee89e';
+    var safeColor = (d.color && /^#[0-9a-f]{6}$/i.test(d.color)) ? d.color : 'var(--green)';
     html += '<div class="chip ' + (employeeFilter === d.id ? 'active' : '')
          + '" data-id="' + escapeHtml(d.id) + '" onclick="setEmployeeFilter(\'' + escapeHtml(d.id) + '\')">'
          + '<span class="dot" style="background:' + safeColor + ';"></span>'

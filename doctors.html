@@ -28,8 +28,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
-  --border:rgba(46,232,158,0.15);
-  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --border:rgba(var(--green-rgb),0.15);
+  --green:var(--green);--red:#ef5350;--yellow:#f5c842;
   --blue:#63b3ed;--purple:#a78bfa;
   --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
 }
@@ -50,7 +50,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;border:none;transition:all .2s;
 }
 .btn-primary{background:var(--green);color:var(--bg);}
-.btn-primary:hover{background:#26d48e;}
+.btn-primary:hover{background:var(--green2);}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
 .btn-outline:hover{border-color:var(--green);color:var(--green);}
 .btn-sm{padding:7px 14px;font-size:12px;}
@@ -69,7 +69,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .doc-card{
   background:linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.06) 100%), var(--bg2);
-  border:1px solid rgba(46,232,158,0.22);
+  border:1px solid rgba(var(--green-rgb),0.22);
   border-radius:var(--radius);overflow:hidden;
   transition:transform .2s, box-shadow .2s, border-color .2s;
   position:relative;
@@ -91,15 +91,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .doc-meta b{color:var(--text);font-weight:600;}
 .doc-actions{
   display:flex;gap:6px;margin-top:14px;padding-top:12px;
-  border-top:1px solid rgba(46,232,158,0.06);
+  border-top:1px solid rgba(var(--green-rgb),0.06);
   flex-wrap:wrap;
 }
 .doc-actions button{flex:1;min-width:calc(50% - 3px);padding:8px 7px;font-size:12px;font-weight:700;border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;border:1px solid var(--border);background:var(--bg3);color:var(--text);transition:all .15s;}
 .doc-actions button:hover{transform:translateY(-1px);}
-.doc-actions .btn-edit{background:rgba(46,232,158,0.12);border-color:rgba(46,232,158,0.38);color:var(--green);}
-.doc-actions .btn-edit:hover{background:rgba(46,232,158,0.2);color:var(--green);border-color:var(--green);}
+.doc-actions .btn-edit{background:rgba(var(--green-rgb),0.12);border-color:rgba(var(--green-rgb),0.38);color:var(--green);}
+.doc-actions .btn-edit:hover{background:rgba(var(--green-rgb),0.2);color:var(--green);border-color:var(--green);}
 .doc-actions .btn-del:hover{color:var(--red);border-color:var(--red);background:rgba(239,83,80,.14);}
-.doc-actions .btn-make-owner:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
+.doc-actions .btn-make-owner:hover{color:var(--green);border-color:var(--green);background:rgba(var(--green-rgb),0.08);}
 /* Phase 6 S: 'Default provider' toggle.
    Two visual states make it instantly clear which doctor is the default
    treating provider for the current logged-in user:
@@ -110,10 +110,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
        Default outline + hollow star + green hover hint — same shape so
        toggling between states doesn't shift layout. */
 .doc-actions .btn-default-on{background:var(--green);border-color:var(--green);color:#0a1628;font-weight:800;}
-.doc-actions .btn-default-on:hover{background:rgba(46,232,158,0.85);border-color:rgba(46,232,158,0.85);}
-.doc-actions .btn-default-off:hover{color:var(--green);border-color:var(--green);background:rgba(46,232,158,0.08);}
+.doc-actions .btn-default-on:hover{background:rgba(var(--green-rgb),0.85);border-color:rgba(var(--green-rgb),0.85);}
+.doc-actions .btn-default-off:hover{color:var(--green);border-color:var(--green);background:rgba(var(--green-rgb),0.08);}
 
-.you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(46,232,158,.15);color:var(--green);border:1px solid rgba(46,232,158,.4);margin-right:4px;}
+.you-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(var(--green-rgb),.15);color:var(--green);border:1px solid rgba(var(--green-rgb),.4);margin-right:4px;}
 .linked-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.4);margin-right:4px;}
 
 .empty-state{
@@ -258,10 +258,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              component. Hidden #dColor preserves the get/set API used by
              saveDoctor() and editDoctor() — they read pickedColor unchanged. -->
         <div style="display:flex;align-items:center;gap:10px;">
-          <input type="hidden" id="dColor" value="#2ee89e">
+          <input type="hidden" id="dColor" value="#0d8577">
           <button type="button" id="dColorSwatch" onclick="openDocColorPicker()"
                   aria-label="اختيار اللون"
-                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
+                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--green);flex-shrink:0;"></button>
           <span style="font-size:12px;color:var(--text-muted);">اختر أي لون — يظهر بجانب اسم الطبيب</span>
         </div>
       </div>
@@ -297,7 +297,7 @@ var currentUser = null;
 var doctorOwner = null;  // The clinic-owner doctor record
 var doctors = [];
 var editingId = null;
-var pickedColor = '#2ee89e';
+var pickedColor = 'var(--green)';
 
 // Phase 6 K2.2: keeps the hidden #dColor input, the visible swatch button,
 // and the legacy pickedColor variable all in sync. Every call site (openAdd,
@@ -307,7 +307,7 @@ var pickedColor = '#2ee89e';
 function _setDocColor(hex) {
   var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
     ? window.SyDentColorPicker.sanitizeHex(hex)
-    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : '#2ee89e');
+    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : 'var(--green)');
   pickedColor = safe;
   var inp = document.getElementById('dColor');
   if (inp) inp.value = safe;
@@ -322,7 +322,7 @@ function openDocColorPicker() {
   if (!window.SyDentColorPicker) {
     // Defensive fallback: if supabase-init.js failed to load the picker
     // block, let the user type a hex value manually (extremely rare).
-    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', pickedColor);
+    var typed = prompt('أدخل لون hex (مثال: var(--green)):', pickedColor);
     if (typed) _setDocColor(typed);
     return;
   }
@@ -456,7 +456,7 @@ async function loadDoctors() {
       name: ownerName,
       role: ownerRole,
       phone: ownerPhone,
-      color: '#2ee89e',
+      color: 'var(--green)',
       is_owner: true,
       is_active: true
     }).select().single();
@@ -589,10 +589,10 @@ function renderList() {
       : '<button class="btn-default-off" onclick="linkToUser(\'' + d.id + '\')" title="تعيين هذا الطبيب كمعالج افتراضي عند تسجيلك للجلسات">☆ تعيين كمعالج افتراضي</button>';
 
     html += '<div class="doc-card">'
-      + '<div class="doc-color-bar" style="background:' + (d.color || '#2ee89e') + '"></div>'
+      + '<div class="doc-color-bar" style="background:' + (d.color || 'var(--green)') + '"></div>'
       + '<div class="doc-body">'
       + '<div class="doc-head">'
-      + '<div class="doc-avatar" style="background:' + (d.color || '#2ee89e') + '">' + initials(d.name) + '</div>'
+      + '<div class="doc-avatar" style="background:' + (d.color || 'var(--green)') + '">' + initials(d.name) + '</div>'
       + '<div style="flex:1;">'
       + '<div class="doc-name">' + escapeHtml(d.name) + ' ' + youBadge + ' ' + linkedBadge + '</div>'
       + '<div class="doc-role">' + roleBadge + ' ' + typeBadge + '</div>'
@@ -684,7 +684,7 @@ function editDoctor(id) {
   document.getElementById('dShare').value = (d.share_percent !== null && d.share_percent !== undefined) ? d.share_percent : '';
   document.getElementById('dHours').value = d.weekly_hours || '';
   document.getElementById('dNotes').value = d.notes || '';
-  _setDocColor(d.color || '#2ee89e');
+  _setDocColor(d.color || 'var(--green)');
   document.getElementById('docModal').classList.add('show');
 }
 

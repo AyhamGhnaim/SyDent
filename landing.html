@@ -39,8 +39,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;--bg4:#0d1e33;
-  --border:rgba(46,232,158,0.15);--border2:rgba(46,232,158,0.25);
-  --green:#2ee89e;--green2:#26d48e;--green-dim:rgba(46,232,158,0.1);
+  --border:rgba(var(--green-rgb),0.15);--border2:rgba(var(--green-rgb),0.25);
+  --green:var(--green);--green2:var(--green2);--green-dim:rgba(var(--green-rgb),0.1);
   --text:#e1f4ee;--text2:#8a9ab5;--text3:#5a7090;
 }
 html{scroll-behavior:smooth}
@@ -113,15 +113,15 @@ nav{
 .hero-bg{
   position:absolute;inset:0;
   background:
-    radial-gradient(ellipse 700px 500px at 50% 30%, rgba(46,232,158,0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 400px 300px at 80% 80%, rgba(46,232,158,0.04) 0%, transparent 60%);
+    radial-gradient(ellipse 700px 500px at 50% 30%, rgba(var(--green-rgb),0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 300px at 80% 80%, rgba(var(--green-rgb),0.04) 0%, transparent 60%);
   pointer-events:none;
 }
 .hero-grid{
   position:absolute;inset:0;
   background-image:
-    linear-gradient(rgba(46,232,158,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(46,232,158,0.04) 1px, transparent 1px);
+    linear-gradient(rgba(var(--green-rgb),0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(var(--green-rgb),0.04) 1px, transparent 1px);
   background-size:60px 60px;
   pointer-events:none;
   mask-image:radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
@@ -166,7 +166,7 @@ nav{
   font-family:'Cairo',sans-serif;font-size:15px;font-weight:800;
   cursor:pointer;transition:all .25s;text-decoration:none;
 }
-.btn-hero:hover{background:var(--green2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(46,232,158,0.25);}
+.btn-hero:hover{background:var(--green2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(var(--green-rgb),0.25);}
 .btn-hero-outline{
   padding:14px 28px;
   background:transparent;
@@ -184,7 +184,7 @@ nav{
   border:1px solid var(--border);
   border-radius:16px;
   overflow:hidden;
-  box-shadow:0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(46,232,158,0.08);
+  box-shadow:0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(var(--green-rgb),0.08);
   animation:fadeUp .6s .4s ease both;
 }
 .mock-topbar{
@@ -232,7 +232,7 @@ nav{
   cursor:pointer;
 }
 .mock-nav-item.active{
-  background:rgba(46,232,158,0.08);
+  background:rgba(var(--green-rgb),0.08);
   color:var(--green);
   border-right:2px solid var(--green);
 }
@@ -267,7 +267,7 @@ nav{
 .mock-appt-badge{
   font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700;
 }
-.mock-appt-badge.done{background:rgba(46,232,158,0.12);color:var(--green);}
+.mock-appt-badge.done{background:rgba(var(--green-rgb),0.12);color:var(--green);}
 .mock-appt-badge.pending{background:rgba(255,167,38,0.12);color:#ffa726;}
 
 /* ========= FEATURES ========= */
@@ -342,7 +342,7 @@ nav{
   display:flex;align-items:center;justify-content:center;
   font-size:20px;font-weight:900;color:var(--bg);
   margin:0 auto 16px;
-  box-shadow:0 4px 16px rgba(46,232,158,0.3);
+  box-shadow:0 4px 16px rgba(var(--green-rgb),0.3);
 }
 .step-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;}
 .step-desc{font-size:13px;color:var(--text2);line-height:1.7;}
@@ -359,12 +359,12 @@ nav{
   max-width:1100px;margin:0 auto;
 }
 /* Phase X13: monthly/yearly toggle on the public pricing page */
-.pricing-cycle-toggle{display:inline-flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(46,232,158,0.18);border-radius:999px;padding:5px;margin:0 auto 26px;}
+.pricing-cycle-toggle{display:inline-flex;gap:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(var(--green-rgb),0.18);border-radius:999px;padding:5px;margin:0 auto 26px;}
 .pricing-cycle-opt{border:none;background:transparent;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:14px;font-weight:800;padding:9px 22px;border-radius:999px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:8px;}
-.pricing-cycle-opt.active{background:#2ee89e;color:#062018;}
-.pricing-cycle-save{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(46,232,158,0.18);color:#2ee89e;}
+.pricing-cycle-opt.active{background:var(--green);color:#062018;}
+.pricing-cycle-save{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(var(--green-rgb),0.18);color:var(--green);}
 .pricing-cycle-opt.active .pricing-cycle-save{background:rgba(6,32,24,0.18);color:#062018;}
-.pricing-card-save{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(46,232,158,0.15);color:#2ee89e;margin-inline-start:6px;}
+.pricing-card-save{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:rgba(var(--green-rgb),0.15);color:var(--green);margin-inline-start:6px;}
 .pricing-card{
   position:relative;
   background:var(--bg2);
@@ -427,7 +427,7 @@ nav{
 }
 .pricing-savings-badge{
   display:inline-block;
-  background:rgba(46,232,158,0.15);
+  background:rgba(var(--green-rgb),0.15);
   color:var(--green);
   border:1px solid var(--border2);
   padding:3px 8px;border-radius:5px;
@@ -531,7 +531,7 @@ nav{
 }
 .msg-box.show{display:block;}
 .msg-box.error{background:rgba(239,83,80,0.1);border:1px solid rgba(239,83,80,0.3);color:#ef9a9a;}
-.msg-box.success{background:rgba(46,232,158,0.1);border:1px solid var(--border2);color:var(--green);}
+.msg-box.success{background:rgba(var(--green-rgb),0.1);border:1px solid var(--border2);color:var(--green);}
 
 /* ========= FOOTER ========= */
 footer{
@@ -599,7 +599,7 @@ footer{
 <nav>
   <a href="landing.html" class="nav-logo">
     <div class="nav-logo-icon">
-      <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
+      <svg viewBox="0 0 64 72" fill="none" stroke="currentColor" style="color:var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
     </div>
     <div class="nav-logo-text">
       <div class="name">SyDent</div>
@@ -638,7 +638,7 @@ footer{
       <div class="mock-sidebar">
         <div class="mock-sidebar-logo">
           <div class="mock-logo-icon">
-            <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
+            <svg viewBox="0 0 64 72" fill="none" stroke="currentColor" style="color:var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
           </div>
           <span class="mock-logo-text">SyDent</span>
         </div>
@@ -781,7 +781,7 @@ footer{
 <footer>
   <a href="landing.html" class="footer-logo">
     <div class="footer-logo-icon">
-      <svg viewBox="0 0 64 72" fill="none" stroke="#2ee89e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
+      <svg viewBox="0 0 64 72" fill="none" stroke="currentColor" style="color:var(--green)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8 C14 8 8 10 8 20 C8 30 12 34 14 40 C16 46 16 58 18 64 C19 67 22 68 24 64 C26 60 27 54 32 54 C37 54 38 60 40 64 C42 68 45 67 46 64 C48 58 48 46 50 40 C52 34 56 30 56 20 C56 10 50 8 50 8 C46 6 42 5 32 5 C22 5 18 6 14 8 Z"/></svg>
     </div>
     <span class="footer-logo-text">SyDent</span>
   </a>
@@ -838,7 +838,7 @@ footer{
     grid.innerHTML = '<div class="pricing-error">' +
       '⚠️ تعذّر تحميل الأسعار حالياً.' +
       '<br>' + (msg ? escHtml(msg) : 'يرجى المحاولة لاحقاً.') +
-      '<br><br>للاستفسار: <a href="auth.html?tab=register" style="color:#2ee89e;text-decoration:underline;">سجّل اهتمامك</a> وسنتواصل معك.' +
+      '<br><br>للاستفسار: <a href="auth.html?tab=register" style="color:var(--green);text-decoration:underline;">سجّل اهتمامك</a> وسنتواصل معك.' +
       '</div>';
   }
   function renderEmpty(){
@@ -846,7 +846,7 @@ footer{
     if (!grid) return;
     grid.innerHTML = '<div class="pricing-error">' +
       'لا توجد خطط متاحة حالياً.' +
-      '<br><br><a href="auth.html?tab=register" style="color:#2ee89e;text-decoration:underline;">تواصل معنا</a> لمعرفة المزيد.' +
+      '<br><br><a href="auth.html?tab=register" style="color:var(--green);text-decoration:underline;">تواصل معنا</a> لمعرفة المزيد.' +
       '</div>';
   }
   // ---- Phase X13: billing-cycle state + helpers (public pricing) ----
@@ -1032,7 +1032,7 @@ footer{
 (function(){
   if(!('ontouchstart' in window)) return;
   var s=document.createElement('style');
-  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:#2ee89e;font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(46,232,158,0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(46,232,158,0.25);border-top-color:#2ee89e;border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:var(--green);font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(var(--green-rgb),0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(var(--green-rgb),0.25);border-top-color:var(--green);border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
   document.head.appendChild(s);
   var bar=document.createElement('div');
   bar.id='ptrBar';bar.className='ptr-bar';

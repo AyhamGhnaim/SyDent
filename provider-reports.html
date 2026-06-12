@@ -21,8 +21,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
-  --border:rgba(46,232,158,0.15);
-  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --border:rgba(var(--green-rgb),0.15);
+  --green:var(--green);--red:#ef5350;--yellow:#f5c842;
   --blue:#63b3ed;--purple:#a78bfa;--orange:#fb923c;
   --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
 }
@@ -44,7 +44,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;border:none;transition:all .2s;
 }
 .btn-primary{background:var(--green);color:var(--bg);}
-.btn-primary:hover{background:#26d48e;}
+.btn-primary:hover{background:var(--green2);}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
 .btn-outline:hover{border-color:var(--green);color:var(--green);}
 .btn-sm{padding:7px 14px;font-size:12px;}
@@ -78,7 +78,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;font-family:'Cairo',sans-serif;transition:all .15s;
 }
 .preset-btn:hover{border-color:var(--green);color:var(--green);}
-.preset-btn.active{background:var(--green-dim,rgba(46,232,158,0.12));border-color:var(--green);color:var(--green);}
+.preset-btn.active{background:var(--green-dim,rgba(var(--green-rgb),0.12));border-color:var(--green);color:var(--green);}
 
 /* Calc-basis toggle */
 .basis-toggle{
@@ -107,7 +107,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat-card .lbl{font-size:11px;color:var(--text2);font-weight:600;margin-bottom:6px;letter-spacing:.3px;}
 .stat-card .val{font-size:22px;font-weight:800;color:var(--text);font-family:'Cairo',sans-serif;}
 .stat-card .sub{font-size:11px;color:var(--text2);margin-top:3px;}
-.stat-card.green{border-color:rgba(46,232,158,0.35);}
+.stat-card.green{border-color:rgba(var(--green-rgb),0.35);}
 .stat-card.green .val{color:var(--green);}
 .stat-card.blue{border-color:rgba(99,179,237,0.35);}
 .stat-card.blue .val{color:var(--blue);}
@@ -137,7 +137,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .prov-rows{
   background:var(--bg);border-radius:8px;padding:12px 14px;
-  border:1px solid rgba(46,232,158,0.06);
+  border:1px solid rgba(var(--green-rgb),0.06);
   margin-bottom:12px;
 }
 .prov-row{
@@ -146,10 +146,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .prov-row .k{color:var(--text2);font-weight:600;}
 .prov-row .v{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;}
-.prov-row.divider{border-top:1px dashed rgba(46,232,158,0.15);margin-top:4px;padding-top:8px;}
+.prov-row.divider{border-top:1px dashed rgba(var(--green-rgb),0.15);margin-top:4px;padding-top:8px;}
 
 .payout-box{
-  background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.3);
+  background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.3);
   border-radius:8px;padding:11px 14px;
   display:flex;justify-content:space-between;align-items:center;
   margin-bottom:12px;
@@ -207,10 +207,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   font-size:11px;letter-spacing:.3px;
 }
 .data-table tbody td{
-  padding:9px 10px;border-bottom:1px solid rgba(46,232,158,0.05);
+  padding:9px 10px;border-bottom:1px solid rgba(var(--green-rgb),0.05);
   color:var(--text);
 }
-.data-table tbody tr:hover{background:rgba(46,232,158,0.03);}
+.data-table tbody tr:hover{background:rgba(var(--green-rgb),0.03);}
 .data-table .num{font-variant-numeric:tabular-nums;text-align:left;}
 
 .form-group{margin-bottom:14px;}
@@ -225,7 +225,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 /* Payout history */
 .payout-history-item{
-  background:var(--bg);border:1px solid rgba(46,232,158,0.08);
+  background:var(--bg);border:1px solid rgba(var(--green-rgb),0.08);
   border-radius:8px;padding:10px 14px;
   display:flex;justify-content:space-between;align-items:center;
   margin-bottom:6px;
@@ -976,7 +976,7 @@ function render() {
     var payout = computePayout(d, stats);
     var sharePctDisplay = formatSharePctDisplay(d);
 
-    var color = d.color || '#2ee89e';
+    var color = d.color || '#0d8577';
     var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي' : 'التحصيل');
     var baseValue = getShareBase(stats);
 
@@ -1170,7 +1170,7 @@ function printSlip(provId) {
 
   var html = ''
     + '<div style="font-family:Cairo,sans-serif;color:#000;direction:rtl;padding:20px;">'
-    + '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #2ee89e;padding-bottom:14px;">'
+    + '<div style="text-align:center;margin-bottom:24px;border-bottom:2px solid var(--green);padding-bottom:14px;">'
       + '<div style="font-size:22px;font-weight:800;color:#0a1628;">SyDent — كشف إنتاج طبيب</div>'
       + '<div style="font-size:13px;color:#666;margin-top:4px;">' + escapeHtml(d.name) + (d.role ? ' — ' + escapeHtml(d.role) : '') + '</div>'
       + '<div style="font-size:11px;color:#888;margin-top:6px;">الفترة: ' + from + ' ← ' + to + '</div>'
@@ -1195,7 +1195,7 @@ function printSlip(provId) {
       + '</div>'
     + '</div>'
 
-    + '<div style="background:#f0fdf4;border:2px solid #2ee89e;padding:14px;border-radius:8px;margin-bottom:22px;">'
+    + '<div style="background:#f0fdf4;border:2px solid var(--green);padding:14px;border-radius:8px;margin-bottom:22px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;">'
         + '<div>'
           + '<div style="font-size:12px;color:#666;">المستحق (' + sharePct + '% من ' + basisLabel + ')</div>'
@@ -1204,7 +1204,7 @@ function printSlip(provId) {
         + '<div style="font-size:26px;font-weight:800;color:#0a1628;">' + fmtSY(payout) + '</div>'
       + '</div>'
       + (paidInRange > 0
-        ? '<div style="border-top:1px dashed #2ee89e;margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;font-size:13px;">'
+        ? '<div style="border-top:1px dashed var(--green);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;font-size:13px;">'
           + '<span>المدفوع سابقاً: <b>' + fmtSY(paidInRange) + '</b></span>'
           + '<span style="font-weight:800;">المتبقي: ' + fmtSY(payout - paidInRange) + '</span>'
           + '</div>'
@@ -1494,7 +1494,7 @@ window.onPTRRefresh = function() { loadAll(); };
             'حسابك معطّل من قِبَل صاحب العيادة. ' +
             'الرجاء التواصل معه لإعادة التفعيل.' +
           '</div>' +
-          '<a href="index.html" style="margin-top:28px;padding:12px 28px;background:#2ee89e;border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;">' +
+          '<a href="index.html" style="margin-top:28px;padding:12px 28px;background:var(--green);border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;">' +
             '↩ العودة للصفحة الرئيسية' +
           '</a>' +
         '</div>';

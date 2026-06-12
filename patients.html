@@ -19,9 +19,9 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
-  --green-dim: rgba(46,232,158,0.12);
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
+  --green-dim: rgba(var(--green-rgb),0.12);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --text:      #e1f4ee;
@@ -121,7 +121,7 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; flex-shrink: 0;
 }
-.stat-icon.g { background: rgba(46,232,158,0.15); }
+.stat-icon.g { background: rgba(var(--green-rgb),0.15); }
 .stat-icon.b { background: rgba(99,179,237,0.15); }
 .stat-icon.y { background: rgba(245,200,66,0.15); }
 .stat-icon.r { background: rgba(239,83,80,0.15); }
@@ -182,7 +182,7 @@ tbody tr {
   cursor: pointer;
 }
 tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: rgba(46,232,158,0.04); }
+tbody tr:hover { background: rgba(var(--green-rgb),0.04); }
 td {
   padding: 14px 18px;
   font-size: 14px;
@@ -199,9 +199,9 @@ td {
   width: 38px; height: 38px; border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; font-weight: 800; flex-shrink: 0;
-  background: rgba(46,232,158,0.10);
+  background: rgba(var(--green-rgb),0.10);
   color: var(--green);
-  border: 1px solid rgba(46,232,158,0.25);
+  border: 1px solid rgba(var(--green-rgb),0.25);
 }
 .patient-name { font-weight: 600; font-size: 14px; }
 .patient-id   { font-size: 11px; color: var(--text2); }
@@ -211,7 +211,7 @@ td {
   padding: 4px 10px; border-radius: 6px;
   font-size: 12px; font-weight: 600;
 }
-.badge.green  { background: rgba(46,232,158,0.15); color: #2ee89e; }
+.badge.green  { background: rgba(var(--green-rgb),0.15); color: var(--green); }
 .badge.yellow { background: rgba(245,200,66,0.15);  color: #f5c842; }
 .badge.red    { background: rgba(239,83,80,0.15);   color: #ef5350; }
 .badge.blue   { background: rgba(99,179,237,0.15);  color: #63b3ed; }
@@ -232,8 +232,8 @@ td {
   color: var(--text2);
 }
 .btn-sm.outline:hover { border-color: var(--green); color: var(--green); }
-.btn-sm.pay { background: rgba(46,232,158,0.12); border: 1px solid rgba(46,232,158,0.3); color: var(--green); }
-.btn-sm.pay:hover { background: rgba(46,232,158,0.22); }
+.btn-sm.pay { background: rgba(var(--green-rgb),0.12); border: 1px solid rgba(var(--green-rgb),0.3); color: var(--green); }
+.btn-sm.pay:hover { background: rgba(var(--green-rgb),0.22); }
 .dots-btn {
   background: transparent; border: 1px solid var(--border);
   color: var(--text2); border-radius: 7px;
@@ -675,7 +675,7 @@ textarea { resize: vertical; min-height: 80px; }
       <button class="modal-close" onclick="prmClose()">✕</button>
     </div>
     <div style="display:flex;gap:8px;padding:4px 0 12px;border-bottom:1px solid var(--border,#1e3556);margin-bottom:6px;">
-      <button id="prmTabRecall" onclick="prmSwitchTab('recall')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--green,#2ee89e);color:#06371f;font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🔁 الاستدعاء الدوري <span id="prmRecallCount" style="opacity:.8;">0</span></button>
+      <button id="prmTabRecall" onclick="prmSwitchTab('recall')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--green,var(--green));color:#06371f;font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🔁 الاستدعاء الدوري <span id="prmRecallCount" style="opacity:.8;">0</span></button>
       <button id="prmTabBday" onclick="prmSwitchTab('bday')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🎂 أعياد الميلاد <span id="prmBdayCount" style="opacity:.8;">0</span></button>
     </div>
     <div id="prmRecallView" style="max-height:58vh;overflow:auto;"></div>
@@ -1409,7 +1409,7 @@ function renderPrmRecall(){
         : '';
       var actions = waBtn
         + '<button class="btn-sm" onclick="prmDoCopyRecall(\'' + p.id + '\')" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>'
-        + '<button class="btn-sm" onclick="prmMarkRecalled(\'' + p.id + '\')" title="إخفاؤه من القائمة لمدة ' + (PRM_COOLDOWN_DAYS||30) + ' يوم" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--green,#2ee89e);">✓ تم</button>';
+        + '<button class="btn-sm" onclick="prmMarkRecalled(\'' + p.id + '\')" title="إخفاؤه من القائمة لمدة ' + (PRM_COOLDOWN_DAYS||30) + ' يوم" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--green,var(--green));">✓ تم</button>';
       return prmRowHtml(p.name || '—', phone, sub, actions);
     }).join('');
 }
@@ -1468,9 +1468,9 @@ function prmSwitchTab(which){
   document.getElementById('prmBdayView').style.display   = onR ? 'none' : '';
   var tR = document.getElementById('prmTabRecall'), tB = document.getElementById('prmTabBday');
   if (tR && tB) {
-    tR.style.background = onR ? 'var(--green,#2ee89e)' : 'transparent';
+    tR.style.background = onR ? 'var(--green,var(--green))' : 'transparent';
     tR.style.color      = onR ? '#06371f' : 'var(--text2,#8da0bd)';
-    tB.style.background = onR ? 'transparent' : 'var(--green,#2ee89e)';
+    tB.style.background = onR ? 'transparent' : 'var(--green,var(--green))';
     tB.style.color      = onR ? 'var(--text2,#8da0bd)' : '#06371f';
   }
 }

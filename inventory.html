@@ -21,9 +21,9 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
-  --green-dim: rgba(46,232,158,0.12);
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
+  --green-dim: rgba(var(--green-rgb),0.12);
   --red:       #ef5350;
   --amber:     #f5a623;
   --text:      #e8f0f7;
@@ -69,10 +69,10 @@ body {
 }
 .data-table td {
   padding:13px 14px; font-size:13px;
-  border-bottom:1px solid rgba(46,232,158,0.05); vertical-align:middle;
+  border-bottom:1px solid rgba(var(--green-rgb),0.05); vertical-align:middle;
 }
 .data-table tr:last-child td { border-bottom:none; }
-.data-table tr:hover td { background:rgba(46,232,158,0.025); }
+.data-table tr:hover td { background:rgba(var(--green-rgb),0.025); }
 .qty-pill {
   display:inline-block; padding:3px 12px; border-radius:20px;
   font-weight:700; font-size:13px;

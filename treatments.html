@@ -21,8 +21,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
-  --border:rgba(46,232,158,0.15);
-  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --border:rgba(var(--green-rgb),0.15);
+  --green:var(--green);--red:#ef5350;--yellow:#f5c842;
   --blue:#63b3ed;--purple:#a78bfa;
   --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
 }
@@ -44,7 +44,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;border:none;transition:all .2s;
 }
 .btn-primary{background:var(--green);color:var(--bg);}
-.btn-primary:hover{background:#26d48e;}
+.btn-primary:hover{background:var(--green2);}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
 .btn-outline:hover{border-color:var(--green);color:var(--green);}
 .btn-sm{padding:7px 14px;font-size:12px;}
@@ -70,7 +70,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .treat-card{
   background:linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.06) 100%), var(--bg2);
-  border:1px solid rgba(46,232,158,0.22);
+  border:1px solid rgba(var(--green-rgb),0.22);
   border-radius:var(--radius);overflow:hidden;
   transition:transform .2s, box-shadow .2s, border-color .2s;
   position:relative;
@@ -95,7 +95,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .treat-price .currency{font-size:12px;color:var(--text2);font-weight:600;}
 .treat-actions{
   display:flex;gap:6px;margin-top:14px;padding-top:12px;
-  border-top:1px solid rgba(46,232,158,0.06);
+  border-top:1px solid rgba(var(--green-rgb),0.06);
   flex-wrap:wrap;
 }
 .treat-actions button{min-width:calc(50% - 3px);}
@@ -124,14 +124,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .treat-card.dragging{opacity:.4;}
 .treat-card.drag-over{border-color:var(--green) !important;border-width:2px;}
 .treat-actions button:hover{transform:translateY(-1px);}
-.treat-actions .ed-btn{background:rgba(46,232,158,0.12);border-color:rgba(46,232,158,0.38);color:var(--green);}
-.treat-actions .ed-btn:hover{background:rgba(46,232,158,0.2);border-color:var(--green);color:var(--green);}
+.treat-actions .ed-btn{background:rgba(var(--green-rgb),0.12);border-color:rgba(var(--green-rgb),0.38);color:var(--green);}
+.treat-actions .ed-btn:hover{background:rgba(var(--green-rgb),0.2);border-color:var(--green);color:var(--green);}
 .treat-actions .fav-btn:hover{border-color:#f0b429;color:#f0b429;}
 .treat-actions .fav-on{background:rgba(240,180,41,0.16);border-color:rgba(240,180,41,0.55);color:#f0b429;}
 .treat-actions .fav-on:hover{background:rgba(240,180,41,0.26);border-color:#f0b429;color:#f0b429;}
 .treat-actions .dup-btn:hover{background:rgba(99,179,237,.14);border-color:var(--blue);color:var(--blue);}
 .treat-actions .inact-btn:hover{background:rgba(245,158,11,.14);border-color:#f59e0b;color:#f59e0b;}
-.treat-actions .act-btn:hover{background:rgba(46,232,158,.14);border-color:var(--green);color:var(--green);}
+.treat-actions .act-btn:hover{background:rgba(var(--green-rgb),.14);border-color:var(--green);color:var(--green);}
 .treat-actions .del-btn:hover{background:rgba(239,83,80,.14);border-color:var(--red);color:var(--red);}
 .treat-builtin-tag{
   position:absolute;top:8px;left:8px;
@@ -182,10 +182,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .target-opt .target-title{font-size:12px;font-weight:700;color:var(--text);}
 .target-opt .target-sub{font-size:10px;color:var(--text2);margin-top:2px;}
-.target-opt:hover{background:rgba(46,232,158,0.06);}
+.target-opt:hover{background:rgba(var(--green-rgb),0.06);}
 .target-opt.selected{
   border-color:var(--green);
-  background:rgba(46,232,158,0.1);
+  background:rgba(var(--green-rgb),0.1);
   box-shadow:0 0 0 1px var(--green);
 }
 
@@ -211,7 +211,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 /* Lab toggle switch */
 .lab-toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg);border:1px solid var(--border);border-radius:24px;transition:.25s;}
 .lab-toggle-slider:before{position:absolute;content:"";height:18px;width:18px;right:2px;top:2px;background:var(--text2);border-radius:50%;transition:.25s;}
-.lab-toggle-switch input:checked + .lab-toggle-slider{background:rgba(46,232,158,.18);border-color:var(--green);}
+.lab-toggle-switch input:checked + .lab-toggle-slider{background:rgba(var(--green-rgb),.18);border-color:var(--green);}
 .lab-toggle-switch input:checked + .lab-toggle-slider:before{transform:translateX(-22px);background:var(--green);}
 
 /* Lab tag on treatment card */
@@ -371,7 +371,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div id="targetPartPicker" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
           <div class="target-opt selected" data-target="crown">
             <svg width="32" height="32" viewBox="0 0 64 64" style="margin-bottom:4px;" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 8 C14 8 8 10 8 20 C8 26 10 30 12 34 L52 34 C54 30 56 26 56 20 C56 10 50 8 50 8 C44 4 38 2 32 2 C26 2 20 4 14 8Z" fill="rgba(46,232,158,0.15)"/>
+              <path d="M14 8 C14 8 8 10 8 20 C8 26 10 30 12 34 L52 34 C54 30 56 26 56 20 C56 10 50 8 50 8 C44 4 38 2 32 2 C26 2 20 4 14 8Z" fill="rgba(var(--green-rgb),0.15)"/>
               <line x1="8" y1="34" x2="56" y2="34" stroke-dasharray="2,2" opacity="0.5"/>
               <path d="M14 40 L14 50 M50 40 L50 50 M32 40 L32 52" opacity="0.3"/>
             </svg>
@@ -481,10 +481,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              #fTreatmentColor preserves the get/set .value API used by the
              rest of the file — pickedFill/pickedStroke flow unchanged. -->
         <div style="display:flex;align-items:center;gap:10px;">
-          <input type="hidden" id="fTreatmentColor" value="#2ee89e">
+          <input type="hidden" id="fTreatmentColor" value="#0d8577">
           <button type="button" id="fTreatmentColorSwatch" onclick="openTreatColorPicker()"
                   aria-label="اختيار اللون"
-                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
+                  style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--green);flex-shrink:0;"></button>
           <span style="font-size:12px;color:var(--text-muted);">اختر أي لون — يُعرض على مخطط الأسنان</span>
         </div>
       </div>
@@ -756,7 +756,7 @@ function escapeHtml(s) {
 
 // ── Modal logic ──
 var editingId = null;
-var pickedFill = '#2ee89e', pickedStroke = '#1fba7e';
+var pickedFill = 'var(--green)', pickedStroke = '#1fba7e';
 var pickedTarget = 'crown';
 
 // ── Smart lab default by category (Phase 3 Feature E) ──
@@ -815,7 +815,7 @@ function openAddModal() {
   document.getElementById('tCategory').value = 'restorative';
   document.getElementById('tDefaultNote').value = '';
   userTouchedLabToggle = false;  // new treatment — allow smart category defaults
-  pickColor('#2ee89e','#1fba7e');
+  pickColor('var(--green)','#1fba7e');
   pickTarget('crown');
   updatePreview();
   openModal();
@@ -1063,7 +1063,7 @@ const EXTRA_TEMPLATES = [
 async function resetToDefaults() {
   if (!confirm('استعادة كل العلاجات الافتراضية والجاهزة الناقصة؟\nتُضاف الناقصة فقط — لن يُحذف أو يُعدّل أي علاج موجود (بما فيها المخصصة).')) return;
   const DEFAULTS = [
-    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'#2ee89e', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
+    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'var(--green)', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
     { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
     { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', category:'prosthodontics', sort_order:3 },
     { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  category:'endodontics', sort_order:4 },
@@ -1218,7 +1218,7 @@ function pickColor(fill, stroke) {
   // funnels through here so the four never drift apart.
   var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
     ? window.SyDentColorPicker.sanitizeHex(fill)
-    : (/^#[0-9A-Fa-f]{6}$/.test(fill || '') ? fill : '#2ee89e');
+    : (/^#[0-9A-Fa-f]{6}$/.test(fill || '') ? fill : 'var(--green)');
   pickedFill = safe;
   // If a stroke is passed (editing an existing treatment with a stored
   // stroke from the legacy palette), preserve it for visual continuity.
@@ -1245,7 +1245,7 @@ function openTreatColorPicker() {
   if (!window.SyDentColorPicker) {
     // Defensive fallback: if supabase-init.js failed to load the picker
     // block, let the user type a hex value manually (extremely rare).
-    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', pickedFill);
+    var typed = prompt('أدخل لون hex (مثال: var(--green)):', pickedFill);
     if (typed) {
       pickColor(typed, _darkenHex(typed, 30));
       updatePreview();
@@ -1350,7 +1350,7 @@ function printLegend() {
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0;font-family:Cairo,sans-serif;}';
   html += 'body{padding:30px 20px;color:#1a1a1a;background:#fff;direction:rtl;}';
-  html += '.header{text-align:center;margin-bottom:24px;border-bottom:3px solid #2ee89e;padding-bottom:14px;}';
+  html += '.header{text-align:center;margin-bottom:24px;border-bottom:3px solid var(--green);padding-bottom:14px;}';
   html += '.header h1{font-size:26px;color:#1a1a1a;margin-bottom:4px;}';
   html += '.header .sub{font-size:13px;color:#666;}';
   html += '.cat-section{margin-bottom:22px;page-break-inside:avoid;}';
@@ -1363,7 +1363,7 @@ function printLegend() {
   html += '.footer{margin-top:30px;text-align:center;font-size:11px;color:#888;border-top:1px solid #ccc;padding-top:10px;}';
   html += '@media print { body{padding:10px;} .no-print{display:none;} }';
   html += '.no-print{position:fixed;top:10px;left:10px;display:flex;gap:8px;}';
-  html += '.no-print button{padding:8px 16px;border:none;border-radius:6px;background:#2ee89e;color:#000;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif;}';
+  html += '.no-print button{padding:8px 16px;border:none;border-radius:6px;background:var(--green);color:#000;font-weight:700;cursor:pointer;font-family:Cairo,sans-serif;}';
   html += '.no-print button.close-btn{background:#ddd;color:#333;}';
   html += '</style></head><body>';
   html += '<div class="no-print"><button onclick="window.print()">🖨️ طباعة</button><button class="close-btn" onclick="window.close()">إغلاق</button></div>';
@@ -1587,7 +1587,7 @@ document.addEventListener('DOMContentLoaded', function() {
 (function(){
   if(!('ontouchstart' in window)) return;
   var s=document.createElement('style');
-  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:#2ee89e;font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:9999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(46,232,158,0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(46,232,158,0.25);border-top-color:#2ee89e;border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:var(--green);font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:9999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(var(--green-rgb),0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(var(--green-rgb),0.25);border-top-color:var(--green);border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
   document.head.appendChild(s);
   var bar=document.createElement('div');
   bar.id='ptrBar';bar.className='ptr-bar';

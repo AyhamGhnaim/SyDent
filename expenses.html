@@ -24,9 +24,9 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
-  --green-dim: rgba(46,232,158,0.12);
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
+  --green-dim: rgba(var(--green-rgb),0.12);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --blue:      #63b3ed;
@@ -134,7 +134,7 @@ body {
   font-size: 20px; flex-shrink: 0;
 }
 .stat-icon.b { background: rgba(99,179,237,0.15); }
-.stat-icon.g { background: rgba(46,232,158,0.15); }
+.stat-icon.g { background: rgba(var(--green-rgb),0.15); }
 .stat-icon.y { background: rgba(245,200,66,0.15); }
 .stat-icon.o { background: rgba(255,167,38,0.15); }
 .stat-icon.r { background: rgba(239,83,80,0.15); }
@@ -222,7 +222,7 @@ tbody tr {
   transition: background .15s;
 }
 tbody tr:last-child { border-bottom: none; }
-tbody tr:hover { background: rgba(46,232,158,0.04); }
+tbody tr:hover { background: rgba(var(--green-rgb),0.04); }
 tbody td {
   padding: 12px 16px;
   font-size: 13px;
@@ -338,23 +338,23 @@ tbody td {
 .modal-overlay.show { display: flex; }
 .modal-box {
   background: var(--bg2);
-  border: 1.5px solid rgba(46,232,158,0.25);
+  border: 1.5px solid rgba(var(--green-rgb),0.25);
   border-radius: 14px;
   max-width: 480px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(46,232,158,0.35) transparent;
+  scrollbar-color: rgba(var(--green-rgb),0.35) transparent;
 }
 .modal-box::-webkit-scrollbar { width: 8px; height: 8px; }
 .modal-box::-webkit-scrollbar-track { background: transparent; }
 .modal-box::-webkit-scrollbar-thumb {
-  background: rgba(46,232,158,0.35);
+  background: rgba(var(--green-rgb),0.35);
   border-radius: 4px;
   border: 2px solid var(--bg2);
 }
-.modal-box::-webkit-scrollbar-thumb:hover { background: rgba(46,232,158,0.55); }
+.modal-box::-webkit-scrollbar-thumb:hover { background: rgba(var(--green-rgb),0.55); }
 
 .modal-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -428,7 +428,7 @@ tbody td {
 }
 .msg.show { display: block; }
 .msg.err { background: rgba(239,83,80,0.1); color: var(--red); border: 1px solid rgba(239,83,80,0.3); }
-.msg.ok  { background: rgba(46,232,158,0.1); color: var(--green); border: 1px solid rgba(46,232,158,0.3); }
+.msg.ok  { background: rgba(var(--green-rgb),0.1); color: var(--green); border: 1px solid rgba(var(--green-rgb),0.3); }
 
 .modal-foot {
   display: flex;

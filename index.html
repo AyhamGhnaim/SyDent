@@ -48,7 +48,7 @@
     --bg-primary: #0a1628;
     --bg-secondary: #0f2038;
     --bg-card: #132840;
-    --accent: #2ee89e;
+    --accent: var(--green);
     --accent2: #1ac5a8;
     --text-primary: #e4f1ee;
     --text-secondary: #8ab9a5;
@@ -56,7 +56,7 @@
     --red: #ef5350;
     --yellow: #f5c842;
     --blue: #425f5a;
-    --border: rgba(46,232,158,0.15);
+    --border: rgba(var(--green-rgb),0.15);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -198,14 +198,14 @@
     animation: dashRowIn .38s cubic-bezier(.22,.61,.36,1) backwards;
   }
   .patient-item:hover {
-    background: rgba(46,232,158,0.07);
+    background: rgba(var(--green-rgb),0.07);
     transform: translateX(-3px);
   }
   .patient-item:active { transform: translateX(-1px) scale(0.995); }
   .patient-item:hover .patient-name { color: var(--accent); }
   .patient-item:hover .patient-avatar {
     transform: scale(1.08);
-    box-shadow: 0 0 0 3px rgba(46,232,158,0.18);
+    box-shadow: 0 0 0 3px rgba(var(--green-rgb),0.18);
   }
 
   .patient-avatar {
@@ -226,7 +226,7 @@
     font-size: 11px;
     font-weight: 700;
   }
-  .status-paid { background: rgba(46,232,158,0.15); color: var(--accent); }
+  .status-paid { background: rgba(var(--green-rgb),0.15); color: var(--accent); }
   .status-due { background: rgba(239,83,80,0.15); color: var(--red); }
   .status-advance { background: rgba(99,179,237,0.15); color: #63b3ed; }
 
@@ -239,7 +239,7 @@
     animation: dashRowIn .38s cubic-bezier(.22,.61,.36,1) backwards;
   }
   .appt-item:hover {
-    background: rgba(46,232,158,0.07);
+    background: rgba(var(--green-rgb),0.07);
     transform: translateX(-3px);
   }
   .appt-item:hover .appt-name { color: var(--accent); }
@@ -248,7 +248,7 @@
     min-width: 50px;
     font-size: 13px; font-weight: 800;
     color: var(--accent);
-    background: rgba(46,232,158,0.1);
+    background: rgba(var(--green-rgb),0.1);
     padding: 5px 8px;
     border-radius: 8px;
     text-align: center;
@@ -342,7 +342,7 @@
     font-size: 11px; font-weight: 700;
   }
   .lab-s1 { background: rgba(245,200,66,0.15); color: var(--yellow); }
-  .lab-s2 { background: rgba(46,232,158,0.15); color: var(--accent); }
+  .lab-s2 { background: rgba(var(--green-rgb),0.15); color: var(--accent); }
   .lab-s3 { background: rgba(100,150,255,0.15); color: #7cb3ff; }
 
   .search-bar {
@@ -361,8 +361,8 @@
   .search-bar::placeholder { color: var(--text-muted); }
 
   .today-badge {
-    background: rgba(46,232,158,0.1);
-    border: 1px solid rgba(46,232,158,0.3);
+    background: rgba(var(--green-rgb),0.1);
+    border: 1px solid rgba(var(--green-rgb),0.3);
     color: var(--accent);
     padding: 4px 12px;
     border-radius: 20px;
@@ -417,7 +417,7 @@
   }
   .wa-badge-dash:hover { transform: translateY(-1px); filter: brightness(1.1); }
   .wa-badge-dash.sent {
-    background: rgba(46,232,158,0.14); color: var(--accent); border-color: rgba(46,232,158,0.35);
+    background: rgba(var(--green-rgb),0.14); color: var(--accent); border-color: rgba(var(--green-rgb),0.35);
   }
   .wa-badge-dash.pending {
     background: rgba(245,200,66,0.14); color: var(--yellow); border-color: rgba(245,200,66,0.35);
@@ -441,8 +441,8 @@
      corresponding checkmark on next dashboard load.
      ═══════════════════════════════════════════════════════════════════ */
   .ob-banner {
-    background: linear-gradient(135deg, rgba(46,232,158,0.10), rgba(46,232,158,0.04));
-    border: 1px solid rgba(46,232,158,0.25);
+    background: linear-gradient(135deg, rgba(var(--green-rgb),0.10), rgba(var(--green-rgb),0.04));
+    border: 1px solid rgba(var(--green-rgb),0.25);
     border-radius: 14px;
     padding: 18px 22px;
     margin: 0 0 18px 0;
@@ -457,7 +457,7 @@
     margin-bottom: 6px;
   }
   .ob-banner-title {
-    font-size: 17px; font-weight: 800; color: var(--accent, #2ee89e);
+    font-size: 17px; font-weight: 800; color: var(--accent, var(--green));
     line-height: 1.5;
   }
   .ob-banner-sub {
@@ -485,9 +485,9 @@
     transition: background .15s, border-color .15s;
     cursor: pointer;
   }
-  .ob-item:hover { background: rgba(46,232,158,0.06); border-color: rgba(46,232,158,0.20); }
+  .ob-item:hover { background: rgba(var(--green-rgb),0.06); border-color: rgba(var(--green-rgb),0.20); }
   .ob-item.done {
-    background: rgba(46,232,158,0.06); border-color: rgba(46,232,158,0.18);
+    background: rgba(var(--green-rgb),0.06); border-color: rgba(var(--green-rgb),0.18);
     color: var(--text-muted, #8a9ab5);
   }
   .ob-item.done .ob-item-label { text-decoration: line-through; opacity: 0.7; }
@@ -502,7 +502,7 @@
     color: var(--text-muted, #8a9ab5);
   }
   .ob-item.done .ob-check {
-    background: var(--accent, #2ee89e); color: #0a1628; border-color: var(--accent, #2ee89e);
+    background: var(--accent, var(--green)); color: #0a1628; border-color: var(--accent, var(--green));
   }
   .ob-item-label { flex: 1; font-size: 14px; font-weight: 600; }
   .ob-item-hint  { font-size: 12px; color: var(--text-muted, #8a9ab5); font-weight: 500; }
@@ -512,7 +512,7 @@
     font-size: 14px;
     transition: transform .15s, color .15s;
   }
-  .ob-item:hover .ob-arrow { transform: translateX(-3px); color: var(--accent, #2ee89e); }
+  .ob-item:hover .ob-arrow { transform: translateX(-3px); color: var(--accent, var(--green)); }
   .ob-item.done .ob-arrow  { opacity: 0; }
   .ob-progress {
     display: flex; align-items: center; gap: 12px;
@@ -526,7 +526,7 @@
   }
   .ob-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent, #2ee89e), #54f0b5);
+    background: linear-gradient(90deg, var(--accent, var(--green)), #54f0b5);
     border-radius: 3px;
     transition: width .4s ease;
   }
@@ -573,7 +573,7 @@
     cursor: pointer;
   }
   .ob-clinic-prompt-actions button.primary {
-    background: var(--accent, #2ee89e); color: #0a1628; border-color: var(--accent, #2ee89e);
+    background: var(--accent, var(--green)); color: #0a1628; border-color: var(--accent, var(--green));
   }
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 </style>
@@ -671,7 +671,7 @@
           <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">${expiredTitle}</div>
           <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، اختر خطتك من صفحة الاشتراك.</div>
           <a href="subscription.html"
-            style="padding:14px 28px;background:#2ee89e;border-radius:12px;color:#062018;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+            style="padding:14px 28px;background:var(--green);border-radius:12px;color:#062018;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
             💎 تجديد الاشتراك
           </a>
           <button onclick="window.sb.auth.signOut().then(()=>window.location.href='landing.html')"
@@ -684,13 +684,13 @@
 
     // === تحديد ما إذا كان يظهر banner أم لا (حسب الخطة) ===
     var showBanner = false;
-    var bannerColor = '#2ee89e';
+    var bannerColor = 'var(--green)';
     var bannerText = '';
 
     if (isTrial) {
       // تجربة: banner دائم بألوان تدريجية (السلوك القديم)
       showBanner = true;
-      bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : '#2ee89e';
+      bannerColor = daysLeft <= 5 ? '#ef5350' : daysLeft <= 10 ? '#ffa726' : 'var(--green)';
       bannerText = '⏰ تنتهي تجربتك خلال ' + daysLeft + ' يوم — <a href="subscription.html" style="color:inherit;text-decoration:underline;">تواصل معنا للتجديد</a>';
     } else if (cycle === 'yearly') {
       // سنوي: banner فقط ≤30 يوم (Notion/Stripe pattern)
@@ -913,7 +913,7 @@ document.getElementById('dateDisplay').textContent =
   days[now.getDay()] + '، ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
 document.getElementById('dayName').textContent = days[now.getDay()];
 
-const COLORS = ['#2ee89e','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
+const COLORS = ['var(--green)','#63b3ed','#f5c842','#ef5350','#a78bfa','#fb923c'];
 function avatarColor(name) {
   let h = 0;
   for (let c of name) h = (h * 31 + c.charCodeAt(0)) % COLORS.length;
@@ -1102,7 +1102,7 @@ async function loadDashboard() {
         : { label: (p.payment || '—'), cls: (p.payment === 'مسدّد' ? 'status-paid' : 'status-due') };
       return `
       <a class="patient-item" href="patient-profile.html?id=${p.id}">
-        <div class="patient-avatar" style="background:rgba(46,232,158,0.10);color:var(--accent, #2ee89e);font-weight:800;border-radius:10px;">${seqMap[p.id] || '—'}</div>
+        <div class="patient-avatar" style="background:rgba(var(--green-rgb),0.10);color:var(--accent, var(--green));font-weight:800;border-radius:10px;">${seqMap[p.id] || '—'}</div>
         <div>
           <div class="patient-name">${p.name}</div>
           <div class="patient-info">${p.status||'—'} — ${p.local_id||''}</div>
@@ -1420,7 +1420,7 @@ async function loadDashQuickTemplates(uid) {
 var DASH_TIME_STAGES = [
   { key: 'arrived_at',   label: '🚪 وصل', color: '#f5c842' },
   { key: 'seated_at',    label: '🪑 جلس', color: '#fb923c' },
-  { key: 'dismissed_at', label: '✅ خرج', color: '#2ee89e' }
+  { key: 'dismissed_at', label: '✅ خرج', color: 'var(--green)' }
 ];
 
 // Statuses that disable the action button — appointment is logically done.
@@ -1618,7 +1618,7 @@ function renderTodayApptsCard() {
          +     (stamps ? '<div style="margin-top:3px">' + stamps + '</div>' : '')
          +   '</div>'
          +   btn
-         +   '<div class="appt-dot" style="background:' + (a.color || '#2ee89e') + ';margin-right:0"></div>'
+         +   '<div class="appt-dot" style="background:' + (a.color || 'var(--green)') + ';margin-right:0"></div>'
          + '</div>';
   }).join('');
 }

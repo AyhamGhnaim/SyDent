@@ -21,8 +21,8 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --text:      #e1f4ee;
@@ -145,7 +145,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 .maint-val.red{color:var(--red);}
 .maint-progress{margin-top:12px;}
 .maint-progress-bar{width:100%;height:8px;background:var(--bg2);border-radius:4px;overflow:hidden;border:1px solid var(--border);}
-.maint-progress-fill{height:100%;background:linear-gradient(90deg,var(--green),#26d48e);width:0%;transition:width .3s;}
+.maint-progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--green2));width:0%;transition:width .3s;}
 .maint-progress-text{text-align:center;font-size:12px;color:var(--text2);margin-top:6px;font-weight:600;}
 
 .toast {
@@ -314,8 +314,8 @@ textarea::placeholder { color: var(--text2); }
   margin: 6px 0 14px;
 }
 .wa-placeholder-pill {
-  background: rgba(46,232,158,0.12);
-  border: 1px solid rgba(46,232,158,0.3);
+  background: rgba(var(--green-rgb),0.12);
+  border: 1px solid rgba(var(--green-rgb),0.3);
   color: var(--green);
   padding: 4px 10px;
   border-radius: 12px;
@@ -326,7 +326,7 @@ textarea::placeholder { color: var(--text2); }
   font-family: 'Cairo', sans-serif;
 }
 .wa-placeholder-pill:hover {
-  background: rgba(46,232,158,0.22);
+  background: rgba(var(--green-rgb),0.22);
   transform: translateY(-1px);
 }
 
@@ -356,7 +356,7 @@ textarea::placeholder { color: var(--text2); }
 
 /* Preview modal (reusing modal-overlay base but green-themed) */
 .modal-overlay .modal.wa-preview {
-  border-color: rgba(46,232,158,0.3);
+  border-color: rgba(var(--green-rgb),0.3);
   max-width: 520px;
 }
 .modal-overlay .modal.wa-preview .modal-title {
@@ -397,7 +397,7 @@ textarea::placeholder { color: var(--text2); }
   transition:background .15s ease,color .15s ease;
 }
 .pwd-toggle:hover{background:rgba(255,255,255,0.06);color:#e6ecf5;}
-.pwd-toggle:focus-visible{outline:2px solid #2ee89e;outline-offset:2px;}
+.pwd-toggle:focus-visible{outline:2px solid var(--green);outline-offset:2px;}
 .pwd-toggle:active{transform:translateY(-50%) scale(0.92);}
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
@@ -526,7 +526,7 @@ textarea::placeholder { color: var(--text2); }
     </div>
 
     <!-- Phase 2A: WhatsApp Reminders -->
-    <div class="section" style="border-color: rgba(46,232,158,0.25);">
+    <div class="section" style="border-color: rgba(var(--green-rgb),0.25);">
       <div class="section-title">🔔 تذكيرات WhatsApp للمواعيد</div>
       <div class="section-sub">أرسل تذكيرات للمرضى عبر WhatsApp قبل مواعيدهم بنقرة واحدة. <strong style="color:var(--green)">مجاني تماماً</strong> — يفتح WhatsApp Web/Mobile مع الرسالة جاهزة.</div>
 
@@ -604,7 +604,7 @@ textarea::placeholder { color: var(--text2); }
     </div>
 
     <!-- ═══ P5: Online Booking Portal (بوابة الحجز الإلكتروني) ═══ -->
-    <div class="section" style="border-color: rgba(46,232,158,0.25);" id="bookingSection">
+    <div class="section" style="border-color: rgba(var(--green-rgb),0.25);" id="bookingSection">
       <div class="section-title">🌐 الحجز الإلكتروني</div>
       <div class="section-sub">بوابة عامة يحجز منها مرضاك بأنفسهم — يصلك الطلب في تبويب «طلبات الحجز» بصفحة المواعيد وتؤكّده بنقرة. <strong style="color:var(--green)">بلا تسجيل وبلا تطبيقات للمريض.</strong></div>
       <div id="bookingMigNotice" style="display:none;padding:10px 12px;border-radius:10px;background:rgba(232,93,93,0.1);border:1px solid rgba(232,93,93,0.35);font-size:13px;margin-bottom:12px;">⚠️ يلزم تطبيق <b>Migration 59</b> على قاعدة البيانات لتفعيل هذا القسم.</div>
@@ -771,10 +771,10 @@ textarea::placeholder { color: var(--text2); }
              below preserves the existing get/set API (.value) so all the
              code in saveOperatory / openOperatoryModal / editOperatory keeps
              working without any changes. -->
-        <input type="hidden" id="fOpColor" value="#2ee89e">
+        <input type="hidden" id="fOpColor" value="#0d8577">
         <button type="button" id="fOpColorSwatch" onclick="openOpColorPicker()"
                 aria-label="اختيار اللون"
-                style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:#2ee89e;flex-shrink:0;"></button>
+                style="width:50px;height:40px;padding:0;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--green);flex-shrink:0;"></button>
         <span style="font-size:12px;color:var(--text-muted);">يُستخدم لاحقاً في عرض جدول الغرف</span>
       </div>
     </div>
@@ -1814,7 +1814,7 @@ function renderApptTypesList() {
     if (Object.keys(_apptTypesUsageCounts).length || _apptTypesUsageCounts[t.id]) {
       var cnt = _apptTypesUsageCounts[t.id] || 0;
       if (cnt > 0) {
-        usageBadge = '<span style="display:inline-block;background:rgba(46,232,158,0.15);color:#2ee89e;border:1px solid rgba(46,232,158,0.35);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;" title="عدد المواعيد التي استخدمت هذا القالب">🔢 ' + cnt + ' مرة</span>';
+        usageBadge = '<span style="display:inline-block;background:rgba(var(--green-rgb),0.15);color:var(--green);border:1px solid rgba(var(--green-rgb),0.35);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;" title="عدد المواعيد التي استخدمت هذا القالب">🔢 ' + cnt + ' مرة</span>';
       } else {
         usageBadge = '<span style="display:inline-block;background:rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.35);padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:6px;" title="لم يُستخدم بعد">جديد</span>';
       }
@@ -1976,7 +1976,7 @@ function onApptTypeRowDragOver(ev) {
   ev.preventDefault();
   try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {}
   row.dataset.k3Dragover = '1';
-  row.style.outline = '2px dashed rgba(46,232,158,0.6)';
+  row.style.outline = '2px dashed rgba(var(--green-rgb),0.6)';
   row.style.outlineOffset = '-2px';
 }
 
@@ -2338,7 +2338,7 @@ async function deleteApptType(id) {
 //
 // Storage: operatories table. RLS isolates by doctor_id = auth.uid().
 // Schema (Migration 12 K-Standard):
-//   id, doctor_id, name (1-50), color (default #2ee89e),
+//   id, doctor_id, name (1-50), color (default var(--green)),
 //   default_provider_id (FK clinic_doctors), sort_order INT, is_active BOOL,
 //   created_at, updated_at (auto-managed by trg_operatories_updated_at).
 
@@ -2428,8 +2428,8 @@ function renderOperatoriesList() {
     // Defensive: even though saveOperatory enforces #RRGGBB, an old/manual
     // DB row could contain something else. Sanitize before inlining into
     // style="background:..." to avoid CSS injection.
-    var rawColor = o.color || '#2ee89e';
-    var color = /^#[0-9A-Fa-f]{6}$/.test(rawColor) ? rawColor : '#2ee89e';
+    var rawColor = o.color || 'var(--green)';
+    var color = /^#[0-9A-Fa-f]{6}$/.test(rawColor) ? rawColor : 'var(--green)';
     var providerBadge = '';
     if (o.default_provider_id) {
       var pName = provMap[o.default_provider_id]
@@ -2497,7 +2497,7 @@ function openOperatoryModal() {
   _editingOperatoryId = null;
   document.getElementById('operatoryModalTitle').textContent = 'إضافة غرفة جديدة';
   document.getElementById('fOpName').value = '';
-  _setOpColor('#2ee89e');
+  _setOpColor('var(--green)');
   populateOperatoryProviderSelect();
   document.getElementById('fOpDefaultProvider').value = '';
   document.getElementById('fOpActive').checked = true;
@@ -2511,7 +2511,7 @@ function openOperatoryModal() {
 function _setOpColor(hex) {
   var safe = (window.SyDentColorPicker && window.SyDentColorPicker.sanitizeHex)
     ? window.SyDentColorPicker.sanitizeHex(hex)
-    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : '#2ee89e');
+    : (/^#[0-9A-Fa-f]{6}$/.test(hex || '') ? hex : 'var(--green)');
   document.getElementById('fOpColor').value = safe;
   var sw = document.getElementById('fOpColorSwatch');
   if (sw) sw.style.background = safe;
@@ -2524,12 +2524,12 @@ function openOpColorPicker() {
   if (!window.SyDentColorPicker) {
     // Defensive: if supabase-init.js failed to load the picker block, fall
     // back to letting the user type a hex value manually (extremely rare).
-    var current = document.getElementById('fOpColor').value || '#2ee89e';
-    var typed = prompt('أدخل لون hex (مثال: #2ee89e):', current);
+    var current = document.getElementById('fOpColor').value || 'var(--green)';
+    var typed = prompt('أدخل لون hex (مثال: var(--green)):', current);
     if (typed) _setOpColor(typed);
     return;
   }
-  var currentHex = document.getElementById('fOpColor').value || '#2ee89e';
+  var currentHex = document.getElementById('fOpColor').value || 'var(--green)';
   window.SyDentColorPicker.open(currentHex, function(newHex) {
     _setOpColor(newHex);
   });
@@ -2543,7 +2543,7 @@ function editOperatory(id) {
   _editingOperatoryId = id;
   document.getElementById('operatoryModalTitle').textContent = 'تعديل غرفة';
   document.getElementById('fOpName').value = o.name || '';
-  _setOpColor(o.color || '#2ee89e');
+  _setOpColor(o.color || 'var(--green)');
   populateOperatoryProviderSelect();
   var provSel = document.getElementById('fOpDefaultProvider');
   if (o.default_provider_id) {
@@ -2585,7 +2585,7 @@ async function saveOperatory() {
   }
 
   var name = (document.getElementById('fOpName').value || '').trim();
-  var color = document.getElementById('fOpColor').value || '#2ee89e';
+  var color = document.getElementById('fOpColor').value || 'var(--green)';
   var defaultProvider = document.getElementById('fOpDefaultProvider').value || null;
   var isActive = !!document.getElementById('fOpActive').checked;
 
@@ -2601,7 +2601,7 @@ async function saveOperatory() {
 
   // Sanity-check color: HTML5 color picker always returns #RRGGBB, but a
   // hostile state could feed us garbage. Fall back to default if not hex.
-  if (!/^#[0-9A-Fa-f]{6}$/.test(color)) color = '#2ee89e';
+  if (!/^#[0-9A-Fa-f]{6}$/.test(color)) color = 'var(--green)';
 
   var btn = document.getElementById('btnSaveOperatory');
   btn.disabled = true; btn.textContent = 'جارٍ الحفظ…';
@@ -3186,7 +3186,7 @@ document.addEventListener('DOMContentLoaded', function() {
 (function(){
   if(!('ontouchstart' in window)) return;
   var s=document.createElement('style');
-  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:#2ee89e;font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:9999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(46,232,158,0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(46,232,158,0.25);border-top-color:#2ee89e;border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
+  s.textContent='.ptr-bar{width:100%;overflow:hidden;height:0;display:flex;align-items:center;justify-content:center;gap:8px;background:#0a1628;font-size:13px;font-weight:700;color:var(--green);font-family:"Cairo",sans-serif;transition:height .25s ease;border-bottom:1px solid transparent;position:fixed;top:0;left:0;right:0;z-index:9999;}.ptr-bar.show{height:44px;border-bottom-color:rgba(var(--green-rgb),0.2);}.ptr-ring{width:15px;height:15px;border:2px solid rgba(var(--green-rgb),0.25);border-top-color:var(--green);border-radius:50%;flex-shrink:0;}.ptr-bar.spin .ptr-ring{animation:ptrSpin .65s linear infinite;}@keyframes ptrSpin{to{transform:rotate(360deg);}}';
   document.head.appendChild(s);
   var bar=document.createElement('div');
   bar.id='ptrBar';bar.className='ptr-bar';

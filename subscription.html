@@ -22,8 +22,8 @@
   --bg:        #0a1628;
   --bg2:       #0f2038;
   --bg3:       #132840;
-  --border:    rgba(46,232,158,0.15);
-  --green:     #2ee89e;
+  --border:    rgba(var(--green-rgb),0.15);
+  --green:     var(--green);
   --red:       #ef5350;
   --yellow:    #f5c842;
   --orange:    #ffa726;
@@ -74,7 +74,7 @@ body {
   font-size: 12px; font-weight: 800; padding: 4px 12px; border-radius: 999px;
   white-space: nowrap;
 }
-.sub-badge.ok   { background: rgba(46,232,158,0.15); color: var(--green); }
+.sub-badge.ok   { background: rgba(var(--green-rgb),0.15); color: var(--green); }
 .sub-badge.warn { background: rgba(255,167,38,0.15); color: var(--orange); }
 .sub-badge.bad  { background: rgba(239,83,80,0.15);  color: var(--red); }
 .sub-current-meta {
@@ -97,8 +97,8 @@ body {
 .sub-pending-text { flex: 1; font-size: 14px; font-weight: 600; line-height: 1.6; min-width: 200px; }
 .sub-pending-text b { color: var(--orange); }
 .sub-perm-note {
-  background: rgba(46,232,158,0.10);
-  border: 1px solid rgba(46,232,158,0.30);
+  background: rgba(var(--green-rgb),0.10);
+  border: 1px solid rgba(var(--green-rgb),0.30);
   border-radius: var(--radius);
   padding: 14px 18px;
   margin-bottom: 18px;
@@ -144,12 +144,12 @@ body {
 .sub-cycle-opt.active { background: var(--green); color: #062018; }
 .sub-cycle-save {
   font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px;
-  background: rgba(46,232,158,0.18); color: var(--green);
+  background: rgba(var(--green-rgb),0.18); color: var(--green);
 }
 .sub-cycle-opt.active .sub-cycle-save { background: rgba(6,32,24,0.18); color: #062018; }
 .plan-savings {
   display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px;
-  border-radius: 999px; background: rgba(46,232,158,0.15); color: var(--green); margin-inline-start: 6px;
+  border-radius: 999px; background: rgba(var(--green-rgb),0.15); color: var(--green); margin-inline-start: 6px;
 }
 .sub-card-permo { font-size: 12px; color: var(--text2); font-weight: 600; margin-top: 2px; }
 .sub-card-na    { font-size: 14px; color: var(--text2); font-weight: 700; margin-top: 6px; }
@@ -188,7 +188,7 @@ body {
   border: 1px solid var(--border); border-radius: 10px; padding: 12px; cursor: pointer;
   font-size: 13px; font-weight: 700; text-align: center; background: var(--bg3); transition: all .12s;
 }
-.sub-method.sel { border-color: var(--green); background: rgba(46,232,158,0.12); color: var(--green); }
+.sub-method.sel { border-color: var(--green); background: rgba(var(--green-rgb),0.12); color: var(--green); }
 .sub-note {
   width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
   padding: 11px 12px; color: var(--text); font-family: 'Cairo', sans-serif; font-size: 13px; resize: vertical; min-height: 64px;

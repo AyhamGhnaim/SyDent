@@ -235,7 +235,7 @@
         '<div style="font-size:60px;margin-bottom:16px;">🔒</div>' +
         '<div style="font-size:22px;font-weight:800;color:var(--text,#e1f4ee);margin-bottom:10px;">هذه الميزة غير متاحة في خطتك</div>' +
         '<div style="font-size:14px;color:var(--text2,#8a9ab5);margin-bottom:28px;max-width:340px;line-height:1.7;">' + nameLine + '<br>للترقية والوصول لكل الميزات، تواصل معنا.</div>' +
-        '<a href="index.html" style="padding:14px 28px;background:var(--green,#2ee89e);border-radius:12px;color:#062a1c;font-size:15px;font-weight:800;text-decoration:none;">← العودة للوحة التحكم</a>' +
+        '<a href="index.html" style="padding:14px 28px;background:var(--green,var(--green));border-radius:12px;color:#062a1c;font-size:15px;font-weight:800;text-decoration:none;">← العودة للوحة التحكم</a>' +
       '</div>';
   };
 
@@ -366,7 +366,7 @@
     secretary: '👩‍💼'
   };
   const ROLE_COLORS = {
-    owner:     { bg: 'rgba(46,232,158,0.14)',  border: 'rgba(46,232,158,0.40)',  text: '#2ee89e' },
+    owner:     { bg: 'rgba(var(--green-rgb),0.14)',  border: 'rgba(var(--green-rgb),0.40)',  text: 'var(--green)' },
     doctor:    { bg: 'rgba(99,179,237,0.14)',  border: 'rgba(99,179,237,0.40)',  text: '#63b3ed' },
     secretary: { bg: 'rgba(255,167,38,0.14)',  border: 'rgba(255,167,38,0.40)',  text: '#ffa726' }
   };
@@ -789,7 +789,7 @@
           '<div style="font-size:14px;color:var(--text2,#8a9ab5);margin-bottom:28px;max-width:360px;line-height:1.7;">' +
             'الوضع الحالي (' + (ROLE_LABELS[role] || role) + ') لا يسمح بالوصول إلى هذه الصفحة.' +
           '</div>' +
-          '<a href="index.html" style="padding:12px 24px;background:var(--green,#2ee89e);border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:10px;">' +
+          '<a href="index.html" style="padding:12px 24px;background:var(--green,var(--green));border-radius:10px;color:#0a1628;font-size:14px;font-weight:800;text-decoration:none;margin-bottom:10px;">' +
             '↩ العودة للصفحة الرئيسية' +
           '</a>' +
           '<button onclick="window.SyDentLock.openSwitchModal()" style="padding:10px 22px;background:transparent;border:1px solid var(--border2,rgba(255,255,255,0.18));border-radius:10px;color:var(--text2,#8a9ab5);font-family:\'Cairo\',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">' +
@@ -986,13 +986,13 @@
     style.textContent =
       '.sd-lock-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;transition:transform .15s,filter .15s;border:1.5px solid transparent;background:transparent;white-space:nowrap;}' +
       '.sd-lock-btn:hover{transform:translateY(-1px);filter:brightness(1.1);}' +
-      '.sd-lock-btn.sd-owner{background:rgba(46,232,158,0.14);border-color:rgba(46,232,158,0.40);color:var(--green,#2ee89e);}' +
+      '.sd-lock-btn.sd-owner{background:rgba(var(--green-rgb),0.14);border-color:rgba(var(--green-rgb),0.40);color:var(--green,var(--green));}' +
       '.sd-lock-btn.sd-doctor{background:rgba(99,179,237,0.14);border-color:rgba(99,179,237,0.40);color:var(--blue,#63b3ed);}' +
       '.sd-lock-btn.sd-secretary{background:rgba(255,167,38,0.14);border-color:rgba(255,167,38,0.40);color:var(--orange,#ffa726);}' +
       '.sd-lock-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;direction:rtl;font-family:\'Cairo\',sans-serif;}' +
-      '.sd-lock-modal{background:var(--bg2,#0f2038);border:1.5px solid var(--border2,rgba(46,232,158,0.25));border-radius:14px;padding:24px;max-width:440px;width:100%;color:var(--text,#e1f4ee);max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-modal,0 20px 60px rgba(0,0,0,0.4));}' +
-      '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--green,#2ee89e);}' +
-      '.sd-lock-modal .sd-cur{font-size:13px;color:var(--text2,#8a9ab5);margin-bottom:16px;padding:10px 12px;background:var(--green-dim,rgba(46,232,158,0.06));border-radius:8px;}' +
+      '.sd-lock-modal{background:var(--bg2,#0f2038);border:1.5px solid var(--border2,rgba(var(--green-rgb),0.25));border-radius:14px;padding:24px;max-width:440px;width:100%;color:var(--text,#e1f4ee);max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-modal,0 20px 60px rgba(0,0,0,0.4));}' +
+      '.sd-lock-modal h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--green,var(--green));}' +
+      '.sd-lock-modal .sd-cur{font-size:13px;color:var(--text2,#8a9ab5);margin-bottom:16px;padding:10px 12px;background:var(--green-dim,rgba(var(--green-rgb),0.06));border-radius:8px;}' +
       '.sd-lock-modal .sd-opt{display:block;padding:12px 14px;margin-bottom:8px;background:var(--bg3,#132840);border:1.5px solid transparent;border-radius:10px;cursor:pointer;transition:all .15s;' +
         // Defense vs global label rules (patients.html: label{font-size:13px;
         // font-weight:600;color:var(--text2)}, appointments.html: label{
@@ -1000,8 +1000,8 @@
         // IS a <label>, those global rules apply and dim the text + shrink it.
         // Force the modal's own typography explicitly.
         'color:var(--text,#e1f4ee);font-size:14px;font-weight:600;line-height:1.5;}' +
-      '.sd-lock-modal .sd-opt:hover{border-color:rgba(46,232,158,0.30);background:rgba(46,232,158,0.05);}' +
-      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:var(--green,#2ee89e);' +
+      '.sd-lock-modal .sd-opt:hover{border-color:rgba(var(--green-rgb),0.30);background:rgba(var(--green-rgb),0.05);}' +
+      '.sd-lock-modal .sd-opt input[type=radio]{margin-left:8px;accent-color:var(--green,var(--green));' +
         // Defense vs global input resets (patients.html / appointments.html
         // define `input, select, textarea { width:100%; appearance:none }`
         // which would otherwise hide the radio circle AND stretch it to
@@ -1011,20 +1011,20 @@
         'background:transparent !important;border:none !important;' +
         'padding:0 !important;height:auto !important;vertical-align:middle;' +
         'flex-shrink:0;}' +
-      '.sd-lock-modal .sd-opt.sd-active{border-color:rgba(46,232,158,0.55);background:rgba(46,232,158,0.08);}' +
+      '.sd-lock-modal .sd-opt.sd-active{border-color:rgba(var(--green-rgb),0.55);background:rgba(var(--green-rgb),0.08);}' +
       '.sd-lock-modal .sd-sub{padding:8px 12px 8px 28px;margin-top:6px;display:none;}' +
       '.sd-lock-modal .sd-opt.sd-active .sd-sub{display:block;}' +
-      '.sd-lock-modal select{width:100%;padding:9px 10px;background:var(--bg,#0a1628);border:1px solid rgba(46,232,158,0.20);border-radius:8px;color:var(--text,#e1f4ee);font-family:\'Cairo\',sans-serif;font-size:13px;}' +
+      '.sd-lock-modal select{width:100%;padding:9px 10px;background:var(--bg,#0a1628);border:1px solid rgba(var(--green-rgb),0.20);border-radius:8px;color:var(--text,#e1f4ee);font-family:\'Cairo\',sans-serif;font-size:13px;}' +
       '.sd-lock-modal .sd-pin-row{margin-top:14px;padding:12px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;}' +
       '.sd-lock-modal .sd-pin-row label{display:block;font-size:12px;color:var(--text2,#8a9ab5);margin-bottom:6px;font-weight:700;}' +
       '.sd-lock-modal .sd-pin-row input{width:100%;padding:10px 12px;background:var(--bg,#0a1628);border:1.5px solid rgba(99,179,237,0.30);border-radius:8px;color:var(--text,#e1f4ee);font-family:\'Cairo\',sans-serif;font-size:18px;font-weight:800;text-align:center;letter-spacing:8px;-webkit-appearance:none;appearance:none;}' +
       '.sd-lock-modal .sd-msg{font-size:12px;color:var(--red,#ef5350);margin-top:8px;min-height:18px;font-weight:700;}' +
-      '.sd-lock-modal .sd-msg.sd-ok{color:var(--green,#2ee89e);}' +
+      '.sd-lock-modal .sd-msg.sd-ok{color:var(--green,var(--green));}' +
       '.sd-lock-modal .sd-actions{display:flex;gap:10px;margin-top:18px;}' +
       '.sd-lock-modal .sd-btn{flex:1;padding:11px 14px;border-radius:10px;font-family:\'Cairo\',sans-serif;font-size:13px;font-weight:800;cursor:pointer;border:1.5px solid transparent;}' +
       '.sd-lock-modal .sd-btn-cancel{background:transparent;border-color:var(--border2,rgba(255,255,255,0.18));color:var(--text2,#8a9ab5);}' +
       '.sd-lock-modal .sd-btn-cancel:hover{background:var(--bg3,rgba(255,255,255,0.06));}' +
-      '.sd-lock-modal .sd-btn-primary{background:var(--green,#2ee89e);color:#0a1628;}' +
+      '.sd-lock-modal .sd-btn-primary{background:var(--green,var(--green));color:#0a1628;}' +
       '.sd-lock-modal .sd-btn-primary:hover{filter:brightness(1.08);}' +
       '.sd-lock-modal .sd-btn-primary:disabled{opacity:0.5;cursor:not-allowed;}';
     document.head.appendChild(style);
@@ -2460,7 +2460,7 @@
 //
 // Public API:
 //   window.SyDentColorPicker.open(currentHex, callback)
-//     • currentHex: '#RRGGBB' (sanitized; falls back to #2ee89e on bad input)
+//     • currentHex: '#RRGGBB' (sanitized; falls back to var(--green) on bad input)
 //     • callback(newHex):    called with the confirmed color, or NOT called if
 //                            the user cancels
 //   window.SyDentColorPicker.injectDOM()  // idempotent; called automatically
@@ -2476,15 +2476,15 @@
     // Only accept strings — numbers/objects/etc. fall back to default. This
     // protects against accidental sanitizeHex(123) returning '#112233' due to
     // the short-form expansion path.
-    if (typeof h !== 'string') return '#2ee89e';
-    if (!h) return '#2ee89e';
+    if (typeof h !== 'string') return '#0d8577';
+    if (!h) return '#0d8577';
     var s = h.trim();
     if (s.charAt(0) !== '#') s = '#' + s;
     if (/^#[0-9A-Fa-f]{3}$/.test(s)) {
       // Expand short form #abc → #aabbcc
       s = '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
     }
-    return /^#[0-9A-Fa-f]{6}$/.test(s) ? s.toLowerCase() : '#2ee89e';
+    return /^#[0-9A-Fa-f]{6}$/.test(s) ? s.toLowerCase() : '#0d8577';
   }
   function hexToRgb(hex) {
     var h = sanitizeHex(hex).slice(1);
@@ -2537,7 +2537,7 @@
 
   // ── State (per-open invocation) ─────────────────────────────────────────
   var _isInjected = false;
-  var _currentHex = '#2ee89e';
+  var _currentHex = '#0d8577';
   var _onConfirm = null;
   var _activeTab = 'grid'; // 'grid' | 'spectrum' | 'sliders'
   var _spectrumState = { h: 150, s: 0.8, v: 0.9 }; // synced from hex on open
@@ -2620,7 +2620,7 @@
       '  border:2px solid transparent;transition:transform .1s;}',
       '#sydentCpOverlay .cp-swatch:hover{transform:scale(1.12);}',
       '#sydentCpOverlay .cp-swatch.selected{border-color:#fff;',
-      '  box-shadow:0 0 0 2px var(--bg2,#0f1f35),0 0 0 4px var(--green,#2ee89e);}',
+      '  box-shadow:0 0 0 2px var(--bg2,#0f1f35),0 0 0 4px var(--green,var(--green));}',
       // Spectrum tab
       '#sydentCpOverlay .cp-spectrum{position:relative;width:100%;aspect-ratio:1.6;',
       '  border-radius:12px;overflow:hidden;cursor:crosshair;',
@@ -2669,7 +2669,7 @@
       '#sydentCpOverlay .cp-btn:hover{opacity:0.85;}',
       '#sydentCpOverlay .cp-btn-cancel{background:rgba(255,255,255,0.08);',
       '  color:var(--text2);}',
-      '#sydentCpOverlay .cp-btn-confirm{background:var(--green,#2ee89e);',
+      '#sydentCpOverlay .cp-btn-confirm{background:var(--green,var(--green));',
       '  color:#0a1628;}'
     ].join('\n');
     document.head.appendChild(style);

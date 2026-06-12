@@ -22,8 +22,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
-  --border:rgba(46,232,158,0.15);
-  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --border:rgba(var(--green-rgb),0.15);
+  --green:var(--green);--red:#ef5350;--yellow:#f5c842;
   --blue:#63b3ed;--purple:#a78bfa;
   --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
 }
@@ -52,7 +52,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;border:none;transition:all .2s;
 }
 .btn-primary{background:var(--green);color:var(--bg);}
-.btn-primary:hover{background:#26d48e;}
+.btn-primary:hover{background:var(--green2);}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
 .btn-outline:hover{border-color:var(--green);color:var(--green);}
 .btn-sm{padding:7px 14px;font-size:12px;}
@@ -108,9 +108,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
    element that could overflow visually is .card-head's background, which
    is contained by its own bounds (it doesn't extend past the card). */
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(46,232,158,0.03);border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);background:rgba(var(--green-rgb),0.03);border-top-left-radius:var(--radius);border-top-right-radius:var(--radius);}
 .card-title{font-size:14px;font-weight:700;color:var(--green);}
-.irow{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;border-bottom:1px solid rgba(46,232,158,0.05);font-size:13px;}
+.irow{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;border-bottom:1px solid rgba(var(--green-rgb),0.05);font-size:13px;}
 .irow:last-child{border-bottom:none;}
 .ikey{color:var(--text2);}
 .ival{font-weight:600;}
@@ -127,7 +127,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .jaw-wrap[data-dent="mixed"] .jaw-row{gap:7px;}
 .jaw-wrap[data-dent="mixed"] .tooth-num{cursor:pointer;text-decoration:underline dotted rgba(148,163,184,.55);text-underline-offset:2px;}
 .jaw-wrap[data-dent="mixed"] [data-tooth-cell]:hover .tooth-num,.jaw-wrap[data-dent="mixed"] [data-occ-cell]:hover .tooth-num{color:var(--green);text-decoration-color:var(--green);}
-.mix-hint{display:none;max-width:560px;margin:8px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(46,232,158,.06);border:1px solid rgba(46,232,158,.22);border-radius:9px;padding:8px 12px;}
+.mix-hint{display:none;max-width:560px;margin:8px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(var(--green-rgb),.06);border:1px solid rgba(var(--green-rgb),.22);border-radius:9px;padding:8px 12px;}
 .mix-hint b{color:var(--green);}
 .chart-hint{font-size:12px;color:var(--text2);}
 .jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;padding:0 12px;}
@@ -206,12 +206,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── Table ── */
 .data-table{width:100%;border-collapse:collapse;}
 .data-table th{padding:11px 16px;font-size:12px;color:var(--text2);font-weight:600;text-align:right;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.12);white-space:nowrap;}
-.data-table td{padding:13px 16px;font-size:13px;border-bottom:1px solid rgba(46,232,158,0.05);vertical-align:middle;}
+.data-table td{padding:13px 16px;font-size:13px;border-bottom:1px solid rgba(var(--green-rgb),0.05);vertical-align:middle;}
 .data-table tr:last-child td{border-bottom:none;}
-.data-table tr:hover td{background:rgba(46,232,158,0.025);}
+.data-table tr:hover td{background:rgba(var(--green-rgb),0.025);}
 .tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
 .tag-blue{background:rgba(99,179,237,0.15);color:var(--blue);}
-.tag-green{background:rgba(46,232,158,0.15);color:var(--green);}
+.tag-green{background:rgba(var(--green-rgb),0.15);color:var(--green);}
 .amount-red{color:var(--red);font-weight:700;}
 .amount-green{color:var(--green);font-weight:700;}
 .balance-summary{background:var(--bg3);border-top:1px solid var(--border);padding:16px 20px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:12px;}
@@ -224,8 +224,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .del-btn:hover{color:var(--red);background:rgba(239,83,80,.1);}
 /* Phase 8A: complete session button — same shape as del-btn but green semantic.
    Distinct class so :hover doesn't paint it red on mouseover. */
-.complete-btn{background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:4px;}
-.complete-btn:hover{background:rgba(46,232,158,0.28);border-color:rgba(46,232,158,0.6);}
+.complete-btn{background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:4px;}
+.complete-btn:hover{background:rgba(var(--green-rgb),0.28);border-color:rgba(var(--green-rgb),0.6);}
 
 /* ── Bug #3: Payment Split Editor (manual allocation override) ── */
 .split-edit-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:2px;}
@@ -278,7 +278,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .modal-foot{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);justify-content:flex-end;}
 .btn-cancel-m{padding:9px 22px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;}
-.btn-save-m:hover{background:#26d48e;}
+.btn-save-m:hover{background:var(--green2);}
 .tooth-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .tx-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);}
 .tx-tabs:empty{display:none;border:none;padding:0;margin:0;}
@@ -287,8 +287,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tx-tab-active{background:var(--green);color:#0a1628;border-color:var(--green);}
 .status-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
 .status-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:9px;transition:all .15s;text-align:right;}
-.status-opt:hover{background:rgba(46,232,158,.08);border-color:var(--green);}
-.status-opt.selected{background:rgba(46,232,158,.12);border-color:var(--green);}
+.status-opt:hover{background:rgba(var(--green-rgb),.08);border-color:var(--green);}
+.status-opt.selected{background:rgba(var(--green-rgb),.12);border-color:var(--green);}
 .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
 /* Treatment status badges on chart */
 .tooth-status-badge{position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;border:2px solid var(--bg);z-index:5;box-shadow:0 0 0 1px rgba(0,0,0,0.25);pointer-events:none;}
@@ -304,7 +304,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-referred{background:#f59e0b;}
 .status-condition{background:#6b7280;opacity:.70;}         /* Cn — clinical watch only, no charge */
 .topt{padding:14px 12px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
-.topt:hover{background:rgba(46,232,158,.08);}
+.topt:hover{background:rgba(var(--green-rgb),.08);}
 
 /* ── Lab Orders ── */
 .lab-badge{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:10px;padding:1px 7px;min-width:18px;text-align:center;margin-right:4px;vertical-align:middle;}
@@ -314,7 +314,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .lab-icon-btn:hover{color:#63b3ed;background:rgba(99,179,237,.1);}
 .lab-action-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;margin-left:3px;}
 .lab-action-btn:hover{border-color:var(--green);color:var(--green);}
-.lab-action-btn.next{border-color:rgba(46,232,158,.4);color:var(--green);}
+.lab-action-btn.next{border-color:rgba(var(--green-rgb),.4);color:var(--green);}
 .lab-action-btn.reject{border-color:rgba(239,83,80,.3);color:var(--red);}
 .lab-action-btn.reject:hover{background:rgba(239,83,80,.1);}
 .lab-action-btn.redo{border-color:rgba(245,158,11,.4);color:#f59e0b;}
@@ -551,9 +551,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .tl-chip:hover{ background:rgba(255,255,255,0.07); color:var(--text); }
 .tl-chip.active{
-  background:rgba(46,232,158,0.15);
+  background:rgba(var(--green-rgb),0.15);
   color:var(--green);
-  border-color:rgba(46,232,158,0.4);
+  border-color:rgba(var(--green-rgb),0.4);
 }
 .tl-search-input{
   flex:1; min-width:180px;
@@ -653,14 +653,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tl-load-more{
   padding:8px 18px;
   font-size:12px; font-weight:600; font-family:inherit;
-  background:rgba(46,232,158,0.1);
+  background:rgba(var(--green-rgb),0.1);
   color:var(--green);
-  border:1px solid rgba(46,232,158,0.3);
+  border:1px solid rgba(var(--green-rgb),0.3);
   border-radius:9px;
   cursor:pointer;
   transition:background .15s;
 }
-.tl-load-more:hover{ background:rgba(46,232,158,0.18); }
+.tl-load-more:hover{ background:rgba(var(--green-rgb),0.18); }
 .tl-count{
   text-align:center;
   font-size:11px; color:var(--text2);
@@ -1096,7 +1096,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              • 'hidden' — planned appointment (no chair-side reality yet).
            Hidden by default until openApptModal / editPlannedFromProfile
            / quickSchedulePlannedFromProfile explicitly pick a mode. -->
-      <div id="appProcSectionPP" style="display:none;margin-top:18px;padding:14px;background:rgba(46,232,158,0.06);border:1px solid rgba(46,232,158,0.18);border-radius:12px;">
+      <div id="appProcSectionPP" style="display:none;margin-top:18px;padding:14px;background:rgba(var(--green-rgb),0.06);border:1px solid rgba(var(--green-rgb),0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
           <div id="appProcStatsPP" style="font-size:12px;color:var(--text2);"></div>
@@ -1110,7 +1110,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              routes to the correct path via the section's current mode. -->
         <div id="appProcControlsPP" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="appAddPlannedSelectPP" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
-          <button type="button" id="appAddPlannedBtnPP" onclick="onAddPlannedClickPP()" style="padding:8px 14px;background:rgba(46,232,158,0.15);border:1px solid rgba(46,232,158,0.4);color:#2ee89e;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
+          <button type="button" id="appAddPlannedBtnPP" onclick="onAddPlannedClickPP()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
         </div>
       </div>
     </div>
@@ -1176,10 +1176,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <!-- Step 1: choose treatment (populated dynamically) -->
       <div id="toothStep1">
         <!-- Phase 8B: planned-session shortcut banner (populated when this tooth+surface has a planned session) -->
-        <div id="toothPlannedBanner" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.35);border-radius:8px;">
+        <div id="toothPlannedBanner" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.35);border-radius:8px;">
           <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">⚠️ يوجد علاج مخطّط على هذا السن:</div>
           <div id="toothPlannedInfo" style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:8px;"></div>
-          <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:#2ee89e;color:#0a1628;border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✅ تم إنجاز العلاج المخطّط</button>
+          <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:var(--green);color:#0a1628;border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✅ تم إنجاز العلاج المخطّط</button>
         </div>
         <!-- Composite surfaces: multi-select chips (crown-surface clicks only). Lets the
              dentist mark one restoration spanning several surfaces, e.g. MOD. -->
@@ -1278,7 +1278,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </select>
         <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
         <!-- Inline new-appointment fields (shown when "تحديد موعد التركيب" is chosen) -->
-        <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(46,232,158,0.08);border:1px solid rgba(46,232,158,0.3);border-radius:9px;">
+        <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.3);border-radius:9px;">
           <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;">📅 موعد التركيب الجديد</div>
           <div class="form-row" style="margin:0;">
             <div class="form-group" style="margin:0;">
@@ -1297,7 +1297,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>المخبر</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
           <select id="labOrderLabSelect" style="flex:1;"></select>
-          <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(46,232,158,0.12);border:1px solid var(--green);color:var(--green);border-radius:9px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
+          <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(var(--green-rgb),0.12);border:1px solid var(--green);color:var(--green);border-radius:9px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
         </div>
         <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:var(--yellow);padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
           ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
@@ -2514,7 +2514,7 @@ function needsLab(treatmentKey) {
 var LAB_STATUSES = {
   'sent':      { ar: 'تم التسليم للمخبر',    color: '#63b3ed', bg: 'rgba(99,179,237,0.15)' },
   'received':  { ar: 'تم الاستلام من المخبر', color: '#f5c842', bg: 'rgba(245,200,66,0.15)' },
-  'checked':   { ar: 'تم الفحص',              color: '#2ee89e', bg: 'rgba(46,232,158,0.15)' },
+  'checked':   { ar: 'تم الفحص',              color: 'var(--green)', bg: 'rgba(var(--green-rgb),0.15)' },
   'delivered': { ar: 'تم التركيب',            color: '#a3a3a3', bg: 'rgba(163,163,163,0.15)' },
   'redo':      { ar: 'إعادة',                  color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
   'rejected':  { ar: 'مرفوض',                  color: '#ef5350', bg: 'rgba(239,83,80,0.15)' }
@@ -2751,7 +2751,7 @@ function buildTimelineEvents() {
       ts: tlBestTs(s.date, s.created_at),
       data: s,
       providerName: prov ? prov.name : '',
-      providerColor: prov ? (prov.color || '#2ee89e') : null,
+      providerColor: prov ? (prov.color || '#0d8577') : null,
       typeFill: typeMatch ? typeMatch.fill : '#63b3ed',
       statusKey: st,
       statusLabel: STATUS_LABELS[st] || st,
@@ -2814,7 +2814,7 @@ function buildTimelineEvents() {
       ts: ts,
       data: a,
       providerName: prov ? prov.name : '',
-      providerColor: prov ? (prov.color || '#2ee89e') : null,
+      providerColor: prov ? (prov.color || '#0d8577') : null,
       statusKey: a.status,
       statusLabel: statusLabel,
       isPlanned: a.is_planned === true,
@@ -2978,7 +2978,7 @@ function renderTimelineRow(e) {
   else if (e.type === 'payment') {
     var p = e.data;
     title = 'دفعة: ' + fmt(p.amount) + ' ل.س';
-    var methodBadge = '<span class="tl-badge" style="background:rgba(46,232,158,0.15);color:var(--green);border-color:rgba(46,232,158,0.4);">' + escapeHtml(p.method || '—') + '</span>';
+    var methodBadge = '<span class="tl-badge" style="background:rgba(var(--green-rgb),0.15);color:var(--green);border-color:rgba(var(--green-rgb),0.4);">' + escapeHtml(p.method || '—') + '</span>';
     var manualBadge = e.isManual
       ? '<span class="tl-badge" style="background:rgba(99,179,237,0.15);color:var(--blue);border-color:rgba(99,179,237,0.4);" title="موزّعة يدوياً">يدوي</span>'
       : '';
@@ -2996,7 +2996,7 @@ function renderTimelineRow(e) {
       : '📋 موعد مخطّط (بلا تاريخ)';
     title = escapeHtml(a.type || 'موعد') + ' — ' + dateLabel;
     var stColor = '#63b3ed';
-    if (e.statusKey === 'completed') stColor = '#2ee89e';
+    if (e.statusKey === 'completed') stColor = 'var(--green)';
     else if (e.statusKey === 'cancelled' || e.statusKey === 'no_show' || e.statusKey === 'broken') stColor = '#a3a3a3';
     var statBadge2 = '<span class="tl-badge cbadge" style="--bc:' + stColor + ';">' + escapeHtml(e.statusLabel || '—') + '</span>';
     var plannedBadge = e.isPlanned
@@ -3040,7 +3040,7 @@ function renderTimelineRow(e) {
     if (lg.status === 'failed')    { stColor2 = '#ef5350'; stLabel = 'فشل الإرسال'; }
     else if (lg.status === 'pending') { stColor2 = '#f5c842'; stLabel = 'قيد الإرسال'; }
     else if (lg.status === 'sent' || lg.status === 'delivered' || lg.status === 'read') {
-      stColor2 = '#2ee89e'; stLabel = 'تم الإرسال';
+      stColor2 = 'var(--green)'; stLabel = 'تم الإرسال';
     }
     var stBadge4 = '<span class="tl-badge cbadge" style="--bc:' + stColor2 + ';">' + escapeHtml(stLabel) + '</span>';
     var phonePart = lg.recipient_phone
@@ -3536,9 +3536,9 @@ function renderHeader() {
   var seq  = getSeqNumber();
   var av   = document.getElementById('avatarEl');
   av.classList.add('avatar-seq');
-  av.style.background = 'rgba(46,232,158,0.12)';
+  av.style.background = 'rgba(var(--green-rgb),0.12)';
   av.style.color      = 'var(--green)';
-  av.style.border     = '2px solid rgba(46,232,158,0.35)';
+  av.style.border     = '2px solid rgba(var(--green-rgb),0.35)';
   av.textContent      = '#' + seq;
   document.getElementById('pName').textContent = name;
   var sub = '<span>' + (patient.gender||'—') + '</span><span>•</span><span>' + calcAge(patient.dob) + '</span>';
@@ -3788,7 +3788,7 @@ function orthoForArch(isUpper){
   }
   return null;
 }
-function orthoColorForArch(isUpper){ var t = orthoForArch(isUpper); return t ? (t.fill || '#2ee89e') : null; }
+function orthoColorForArch(isUpper){ var t = orthoForArch(isUpper); return t ? (t.fill || '#0d8577') : null; }
 function orthoNameForArch(isUpper){ var t = orthoForArch(isUpper); return t ? t.name : null; }
 /* Slim active-ortho banner above the chart. Called at the end of renderTeeth. */
 function renderOrthoOverlay(){
@@ -5165,7 +5165,7 @@ function buildTooth(num, surfaceMap, isUpper) {
   // automatically. pointer-events:none → surface clicks still pass through.
   var __orthoT = (typeof orthoForArch === 'function') ? orthoForArch(isUpper) : null;
   if (__orthoT) {
-    var __orthoC   = __orthoT.fill || '#2ee89e';
+    var __orthoC   = __orthoT.fill || '#0d8577';
     var __orthoRem = (typeof orthoIsRemovable === 'function') && orthoIsRemovable(__orthoT);  // removable = labial bow only
     var bxM = (anat.crownL + anat.crownR) / 2;
     // ارتفاع ثابت لكل القوس (cellWidth ثابت = 60 دائم / 48 لبني) → سلك مستوٍ بلا
@@ -5289,7 +5289,7 @@ function printChart(){
 
   var h = '<div class="chart-print" style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;padding:10px 14px;">';
   // الرأس — نفس بنية الروشتات
-  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:10px;margin-bottom:10px;">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--green);padding-bottom:10px;margin-bottom:10px;">';
   h += '<div><div style="font-size:22px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
   if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';
   h += '</div><div style="text-align:left;font-size:13px;color:#444;">';
@@ -6086,7 +6086,7 @@ function renderSurfaceChips(){
     var on = currentSurfaces.indexOf(sk) !== -1;
     html += '<button type="button" onclick="toggleSurfaceChip(\'' + sk + '\')" '
          + 'style="padding:5px 12px;border-radius:16px;font-family:Cairo,sans-serif;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid '
-         + (on ? 'var(--green);background:rgba(46,232,158,0.18);color:var(--green);' : 'var(--border);background:transparent;color:var(--text2);')
+         + (on ? 'var(--green);background:rgba(var(--green-rgb),0.18);color:var(--green);' : 'var(--border);background:transparent;color:var(--text2);')
          + '">' + (on ? '✓ ' : '') + surfLabelFor(sk, currentTooth) + '</button>';
   }
   rowEl.innerHTML = html;
@@ -7330,13 +7330,13 @@ function renderSessions() {
     var stBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + stColor + ';margin-right:4px;">' + stLbl + '</span>';
     var apptBadge = '';
     if (s.appointment_id) {
-      apptBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:#2ee89e;margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
+      apptBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:var(--green);margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
     }
     var provBadge = '';
     if (showProviderCol && s.provider_id) {
       var prov = CLINIC_DOCTORS.find(function(d){ return d.id === s.provider_id; });
       if (prov) {
-        provBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + (prov.color || '#2ee89e') + ';margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
+        provBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + (prov.color || 'var(--green)') + ';margin-right:4px;" title="الطبيب المعالج">👨‍⚕️ ' + escapeHtml(prov.name) + '</span>';
       }
     }
     // OpenDental-style: show per-session paid amount when payment_splits exist.
@@ -7348,7 +7348,7 @@ function renderSessions() {
     if (sessPaid > 0) {
       fullyPaid = sessPaid >= sessCost - 0.5;  // epsilon for float drift
       partiallyPaid = !fullyPaid;
-      var badgeColor = fullyPaid ? '#2ee89e' : '#f5c842';
+      var badgeColor = fullyPaid ? 'var(--green)' : '#f5c842';
       var badgeText = fullyPaid ? '💰 مدفوع' : '💰 ' + fmt(sessPaid) + '/' + fmt(sessCost);
       paidBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + badgeColor + ';margin-right:4px;" title="مدفوع من هذه الجلسة">' + badgeText + '</span>';
     }
@@ -8548,7 +8548,7 @@ async function saveAppt() {
   var typeVal    = document.getElementById('aType').value;
   var _t         = getTreatment(typeVal);
   var type       = _t ? _t.name : (typeVal === '_other' ? 'أخرى' : typeVal);
-  var apptColor  = _t ? _t.fill   : '#2ee89e';
+  var apptColor  = _t ? _t.fill   : '#0d8577';
   var apptStroke = _t ? _t.stroke : '#1fba7e';
 
   // Gap 7: planned mode toggles whether date/time are required
@@ -8882,7 +8882,7 @@ function renderApptProcedureListPP() {
           toothPart = ' • ' + (ALBL[s.arch] || escapeHtml(s.arch));
         }
         var costStr = (typeof fmt === 'function') ? fmt(s.cost) : String(s.cost || 0);
-        html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(46,232,158,0.05);border-radius:8px;border:1px solid rgba(46,232,158,0.2);flex-wrap:wrap;">'
+        html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(var(--green-rgb),0.05);border-radius:8px;border:1px solid rgba(var(--green-rgb),0.2);flex-wrap:wrap;">'
           + '<div style="flex:1;min-width:140px;font-size:13px;color:var(--text);">' + escapeHtml(s.type || s.description || 'علاج') + toothPart + '</div>'
           + '<div style="font-size:12px;color:var(--text2);">' + costStr + ' ل.س</div>'
           + '<span class="cbadge" style="--bc:#fb923c;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">سيُربط</span>'
@@ -9758,7 +9758,7 @@ async function _saveLabOrderInner() {
     if (!nTime) { showToast('⚠️ اختر ساعة موعد التركيب'); return; }
     // Match the lab work-type treatment to inherit colors/treatment_id when possible.
     var trObj = workKey ? getTreatment(workKey) : null;
-    var apptColor  = trObj ? trObj.fill   : '#2ee89e';
+    var apptColor  = trObj ? trObj.fill   : '#0d8577';
     var apptStroke = trObj ? trObj.stroke : '#1fba7e';
     // Provider: prefer the most-recent provider used on this patient's sessions
     // (so the new appointment isn't orphaned), else fall back to the clinic default.
@@ -11111,7 +11111,7 @@ function buildPrescriptionHtml(rx) {
   var h = '<div style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;max-width:780px;margin:0 auto;padding:24px;">';
 
   // الرأس
-  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:14px;margin-bottom:6px;">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--green);padding-bottom:14px;margin-bottom:6px;">';
   h += '<div>';
   h += '<div style="font-size:24px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
   if (dr) h += '<div style="font-size:15px;color:#333;margin-top:4px;">' + escapeHtml(dr) + '</div>';
@@ -11124,7 +11124,7 @@ function buildPrescriptionHtml(rx) {
   h += '</div>';
 
   // رمز الروشتة الطبي ℞
-  h += '<div style="font-size:38px;font-weight:800;color:#2ee89e;line-height:1;margin:8px 0;">℞</div>';
+  h += '<div style="font-size:38px;font-weight:800;color:var(--green);line-height:1;margin:8px 0;">℞</div>';
 
   // بيانات المريض
   h += '<div style="background:#f6f6f6;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:#222;">';
@@ -11136,7 +11136,7 @@ function buildPrescriptionHtml(rx) {
   // جدول الأدوية
   if (rx.items && rx.items.length) {
     h += '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
-    h += '<thead><tr style="background:#2ee89e;color:#06371f;">'
+    h += '<thead><tr style="background:var(--green);color:#06371f;">'
       + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;width:34px;">#</th>'
       + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">الدواء</th>'
       + '<th style="padding:10px 12px;text-align:right;border:1px solid #d0d0d0;">الجرعة</th>'
@@ -11161,7 +11161,7 @@ function buildPrescriptionHtml(rx) {
 
   // ملاحظات
   if (head.notes) {
-    h += '<div style="margin-top:16px;font-size:13px;color:#333;border-right:3px solid #2ee89e;padding-right:12px;"><strong>ملاحظات:</strong> ' + escapeHtml(head.notes) + '</div>';
+    h += '<div style="margin-top:16px;font-size:13px;color:#333;border-right:3px solid var(--green);padding-right:12px;"><strong>ملاحظات:</strong> ' + escapeHtml(head.notes) + '</div>';
   }
 
   // التذييل
@@ -11538,7 +11538,7 @@ function buildPostOpHtml(note) {
   var bodyHtml = escapeHtml(note.body || '').replace(/\n/g, '<br>');
 
   var h = '<div style="direction:rtl;font-family:Cairo,Tahoma,sans-serif;color:#111;max-width:780px;margin:0 auto;padding:24px;">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2ee89e;padding-bottom:14px;margin-bottom:6px;">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--green);padding-bottom:14px;margin-bottom:6px;">';
   h += '<div>';
   h += '<div style="font-size:24px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
   if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';

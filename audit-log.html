@@ -21,8 +21,8 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#0a1628;--bg2:#0f2038;--bg3:#132840;
-  --border:rgba(46,232,158,0.15);
-  --green:#2ee89e;--red:#ef5350;--yellow:#f5c842;
+  --border:rgba(var(--green-rgb),0.15);
+  --green:var(--green);--red:#ef5350;--yellow:#f5c842;
   --blue:#63b3ed;--orange:#ffa726;--purple:#a78bfa;
   --text:#e1f4ee;--text2:#8a9ab5;--radius:12px;
 }
@@ -43,7 +43,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   cursor:pointer;border:none;transition:all .2s;
 }
 .btn-primary{background:var(--green);color:var(--bg);}
-.btn-primary:hover{background:#26d48e;}
+.btn-primary:hover{background:var(--green2);}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2);}
 .btn-outline:hover{border-color:var(--green);color:var(--green);}
 .btn-sm{padding:7px 14px;font-size:12px;}
@@ -117,7 +117,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   transition:all .15s;
 }
 .log-row.alert{border-color:rgba(239,83,80,0.4);background:rgba(239,83,80,0.05);}
-.log-row:hover{border-color:rgba(46,232,158,0.30);}
+.log-row:hover{border-color:rgba(var(--green-rgb),0.30);}
 /* Archived rows: dimmed + purple left accent */
 .log-row.archived{
   opacity:0.78;border-color:rgba(167,139,250,0.30);
@@ -205,7 +205,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .modal-overlay.show{display:flex;}
 .modal-box{
-  background:var(--bg2);border:1.5px solid rgba(46,232,158,0.25);
+  background:var(--bg2);border:1.5px solid rgba(var(--green-rgb),0.25);
   border-radius:14px;max-width:440px;width:100%;
 }
 .modal-head{
@@ -236,7 +236,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   border-radius:8px;margin-top:8px;min-height:0;display:none;
 }
 .modal-msg.show{display:block;}
-.modal-msg.ok{background:rgba(46,232,158,0.10);color:var(--green);}
+.modal-msg.ok{background:rgba(var(--green-rgb),0.10);color:var(--green);}
 .modal-msg.err{background:rgba(239,83,80,0.10);color:var(--red);}
 .modal-footer{
   display:flex;gap:10px;padding:14px 22px;
@@ -1027,7 +1027,7 @@ function openExportChoiceModal() {
         '<button type="button" id="expBtnLoaded" style="background:#142a45;border:1px solid #1e3556;color:#e7eef9;padding:12px;border-radius:8px;font-family:inherit;font-size:13px;text-align:right;cursor:pointer;">' +
           '<strong>📄 تصدير المحمّل فقط</strong> — ' + allLogs.length + ' سجل (سريع)' +
         '</button>' +
-        '<button type="button" id="expBtnAll" style="background:#1a3a2b;border:1px solid #2ee89e;color:#2ee89e;padding:12px;border-radius:8px;font-family:inherit;font-size:13px;text-align:right;cursor:pointer;">' +
+        '<button type="button" id="expBtnAll" style="background:#1a3a2b;border:1px solid var(--green);color:var(--green);padding:12px;border-radius:8px;font-family:inherit;font-size:13px;text-align:right;cursor:pointer;">' +
           '<strong>📦 تحميل الكل ثم تصدير</strong> — كل السجلات المطابقة (حتى ' + EXPORT_MAX_ROWS + ' سجل، أبطأ)' +
         '</button>' +
       '</div>' +
