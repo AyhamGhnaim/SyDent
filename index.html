@@ -591,12 +591,6 @@
 .dp-now::after{content:'';position:absolute;top:-1px;right:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
 .dp-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:10px}
 .dp-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
-.al-row{display:grid;grid-template-columns:1fr 1.4fr;gap:16px;margin-top:20px}
-@media(max-width:860px){.al-row{grid-template-columns:1fr}}
-.qa-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.qa-btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border:1.5px dashed var(--border2);border-radius:12px;color:var(--text);font-size:12.5px;font-weight:700;text-decoration:none;transition:all .15s;background:var(--bg2)}
-.qa-btn:hover{border-color:var(--green);color:var(--green);border-style:solid}
-.qa-btn svg{color:var(--green)}
 .al-item{display:flex;align-items:center;gap:12px;padding:12px 4px;border-top:1px solid var(--border);text-decoration:none;color:inherit}
 .al-item:first-of-type{border-top:none}
 .al-item:hover .al-tt{color:var(--green)}
@@ -904,37 +898,6 @@
     <div id="quickTplChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
   </div>
 
-  <div class="al-row">
-    <div class="card">
-      <div class="card-header"><div class="card-title">إجراءات سريعة</div></div>
-      <div class="qa-grid">
-        <a class="qa-btn" href="patients.html" data-doctor-inactive-block>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.4"/><path d="M3.5 20c.8-3.3 3.4-4.9 6.5-4.9 1 0 2 .17 2.8.5M17 14v6M14 17h6"/></svg>
-          مريض جديد
-        </a>
-        <a class="qa-btn" href="appointments.html">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17M12 13.5v4M10 15.5h4"/></svg>
-          حجز موعد
-        </a>
-        <a class="qa-btn" href="labs.html">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5M11 3v5.2L5.8 17a3.4 3.4 0 0 0 3 5h6.4a3.4 3.4 0 0 0 3-5L13 8.2V3"/><path d="M7.5 14h9"/></svg>
-          طلب مخبر
-        </a>
-        <a class="qa-btn" href="patients.html">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7-2.5 7h17S18 14.5 18 8.5"/><path d="M10 21a2.3 2.3 0 0 0 4 0"/></svg>
-          متابعة المرضى
-        </a>
-      </div>
-    </div>
-    <div class="card" id="alCard" style="display:none;">
-      <div class="card-header">
-        <div class="card-title">تنبيهات تحتاج انتباهك</div>
-        <span class="al-count" id="alTotal" style="margin-inline-start:0;">0</span>
-      </div>
-      <div id="alList"></div>
-    </div>
-  </div>
-
   <div class="grid-2">
 
     <div class="card">
@@ -973,6 +936,14 @@
       <a class="card-action" href="labs.html">عرض الكل ←</a>
     </div>
     <div id="dashLabsList"></div>
+  </div>
+
+  <div class="card" id="alCard" style="margin-top:20px;display:none;">
+    <div class="card-header">
+      <div class="card-title">تنبيهات تحتاج انتباهك</div>
+      <span class="al-count" id="alTotal" style="margin-inline-start:0;">0</span>
+    </div>
+    <div id="alList"></div>
   </div>
 
 </div><!-- /main -->
