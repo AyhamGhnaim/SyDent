@@ -1,29 +1,45 @@
 -- ═══════════════════════════════════════════════════════════════
--- Migration 60 — Booking window ceiling: 35 → 90 days
+-- Migration 60 — Dynamic booking window (doctor-set, absolute cap 365)
 -- ─────────────────────────────────────────────────────────────
--- WHY: clinics can configure أقصى مدى للحجز, but booking_busy_slots
+-- WHY: clinics configure أقصى مدى للحجز freely, but booking_busy_slots
 -- hard-rejected ranges > 35 days, so book.html clamped the visible
 -- window to 35 regardless of the setting (reported live 12 Jun 2026:
 -- setting=90 → portal stopped at today+35 = 17 Jul).
+-- v2 of this migration (file rewritten BEFORE first apply — never ran
+-- as the interim "fixed 90" draft): the range guard now compares the
+-- requested span against the CLINIC'S OWN stored booking_max_days_ahead
+-- instead of any hardcoded constant. One absolute ceiling remains —
+-- 365 days — because this is an ANON endpoint (abuse/typo guard), not
+-- a product limit. Within 1..365 the doctor's number rules, fully
+-- dynamic.
 -- Mirrored client-side the same day:
---   · book.html   — buildDays() + loadBusy() clamp 35 → 90
---   · settings.html — bkMaxDays input max + save clamp 35 → 90
+--   · book.html   — buildDays() + loadBusy() clamp → 365
+--   · settings.html — bkMaxDays input max + save clamp → 365
 -- booking_clinic_info returns the stored value unclamped and
--- booking_create_request validates against the stored value, so
--- neither needs changes.
+-- booking_create_request already validates against the stored value,
+-- so neither needs changes.
 -- Idempotent: CREATE OR REPLACE only — no schema changes.
--- Still range-capped (90) on an anon endpoint returning zero PII
--- (date, time, duration tuples only).
+-- Payload stays PII-free: (date, time, duration) tuples only;
+-- worst case ≈ 365d × ~20 appts ≈ 7.3k rows — acceptable, capped.
 -- ═══════════════════════════════════════════════════════════════
 
--- RPC #2 — busy slots (body identical to Migration 59 except the cap)
+-- RPC #2 — busy slots (vs Migration 59: dynamic range guard; the old
+-- separate EXISTS availability gate is folded into the SELECT INTO —
+-- zero rows from booking_clinic_info ⇒ v_max IS NULL ⇒ RETURN).
 CREATE OR REPLACE FUNCTION public.booking_busy_slots(p_clinic UUID, p_from DATE, p_to DATE)
 RETURNS TABLE (d DATE, t TIME, dur INTEGER)
 LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public
 AS $$
+DECLARE v_max INTEGER;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM public.booking_clinic_info(p_clinic)) THEN RETURN; END IF;
-  IF p_from IS NULL OR p_to IS NULL OR p_to < p_from OR (p_to - p_from) > 90 THEN RETURN; END IF;
+  -- availability gate + clinic's own window in one call
+  SELECT i.max_days_ahead INTO v_max
+  FROM public.booking_clinic_info(p_clinic) i;
+  IF v_max IS NULL THEN RETURN; END IF;          -- booking unavailable
+  v_max := LEAST(GREATEST(v_max, 1), 365);       -- doctor's number, abs cap 365
+
+  IF p_from IS NULL OR p_to IS NULL OR p_to < p_from
+     OR (p_to - p_from) > v_max THEN RETURN; END IF;
 
   RETURN QUERY
   SELECT a.date, a.time, COALESCE(a.duration, 30)

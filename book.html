@@ -241,7 +241,7 @@ function buildDays(){
     .map(function(x){ return parseInt(String(x).trim(),10); })
     .filter(function(x){ return !isNaN(x); });
   var out = [], today = new Date(); today.setHours(0,0,0,0);
-  var maxD = Math.min(CLINIC.max_days_ahead || 30, 90);
+  var maxD = Math.min(CLINIC.max_days_ahead || 30, 365);
   for (var i = 0; i <= maxD; i++){
     var d = new Date(today.getTime() + i*86400000);
     if (workDays.indexOf(d.getDay()) === -1) continue;
@@ -502,7 +502,7 @@ async function loadBusy(){
   BUSY = {};
   try {
     var today = new Date(); today.setHours(0,0,0,0);
-    var maxD = Math.min(CLINIC.max_days_ahead || 30, 90);
+    var maxD = Math.min(CLINIC.max_days_ahead || 30, 365);
     var to = new Date(today.getTime() + maxD*86400000);
     var res = await sb.rpc('booking_busy_slots', {
       p_clinic: clinicId, p_from: dateKey(today), p_to: dateKey(to)
