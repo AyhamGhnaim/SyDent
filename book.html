@@ -179,12 +179,24 @@ function fmtTime12(m){
 }
 // Same normalization the platform uses for wa.me (Syrian numbers).
 function normalizePhone(raw){
+  // ── 4-COPY MIRROR ── identical logic lives in: appointments.html normalizePhone ·
+  // book.html normalizePhone · patients.html prmNormalizePhone · patient-profile.html ppNormalizePhone.
+  // Any semantic change MUST be applied to ALL FOUR copies (FIFO-mirror pattern).
+  // Accepted: Syrian mobile 09XXXXXXXX (10) · Syrian landline 0XX… (9-10 digits) ·
+  // 9-digit mobile without the leading 0 · any international form (+CC… / 00CC… / CC…).
+  // 0-leading with 11+ digits = FOREIGN local format (TR 05…, EG 01…, EU 0…): we cannot
+  // guess the country → return null; callers show the "add country code" hint instead
+  // of silently messaging a wrong Syrian number.
   if (!raw) return null;
   var p = String(raw).replace(/\D/g, '');
   if (!p) return null;
   if (p.indexOf('00') === 0) p = p.substring(2);
-  if (p.indexOf('0') === 0 && p.length >= 9) p = '963' + p.substring(1);
-  else if (p.indexOf('963') !== 0 && p.length === 9) p = '963' + p;
+  if (p.indexOf('0') === 0) {
+    if (p.length === 9 || p.length === 10) p = '963' + p.substring(1);
+    else return null; // foreign local — needs country code
+  } else if (p.indexOf('963') !== 0 && p.length === 9) {
+    p = '963' + p;
+  }
   if (p.length < 10 || p.length > 15) return null;
   return p;
 }
@@ -274,8 +286,8 @@ function renderMain(){
     + '<form onsubmit="submitBooking(event)">'
     +   '<label>الاسم الكامل *</label>'
     +   '<input type="text" id="bName" maxlength="80" autocomplete="name" required>'
-    +   '<label>رقم الهاتف *</label>'
-    +   '<input type="tel" id="bPhone" maxlength="16" inputmode="tel" autocomplete="tel" placeholder="09XXXXXXXX" required>'
+    +   '<label>رقم الهاتف (واتساب WhatsApp) *</label>'
+    +   '<input type="tel" id="bPhone" maxlength="16" inputmode="tel" autocomplete="tel" placeholder="09XXXXXXXX — غير سوري؟ +رمز الدولة" required>'
     +   '<label>ملاحظة (اختياري)</label>'
     +   '<textarea id="bNote" maxlength="300" placeholder="مثال: ألم بضرس علوي يمين"></textarea>'
     +   '<div class="hp-field" aria-hidden="true"><label>website</label>'
