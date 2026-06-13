@@ -645,12 +645,17 @@ function isSpacerTreatment(t) {
 }
 function isProtectedTreatment(t) {
   // A doctor's own copy or custom treatment (key 'custom_…') is always deletable, even if it
-  // inherits a protected target_part/category. Only the canonical built-in/template treatments
-  // are protected.
+  // matches a protected pattern. Otherwise protection mirrors patient-profile.html's chart
+  // geometry detectors EXACTLY (isExtractionKey / isImplantKey / isBridgeKey / isOrtho /
+  // isSpacerKey) — so every treatment the chart draws with dedicated geometry is protected, and
+  // editing a default's category/target_part can't silently un-protect it.
   if (/^custom_/.test(t.treatment_key || '')) return false;
-  var tp = t.target_part || '';
-  return tp === 'extraction' || tp === 'implant' || tp === 'bridge'
-      || (t.category || '') === 'orthodontics' || isSpacerTreatment(t);
+  var key = t.treatment_key || '', tp = t.target_part || '', name = t.name || '';
+  return key === 'extracted' || tp === 'extraction'                                     // extraction ghost
+      || key === 'implant'   || tp === 'implant'                                        // implant
+      || key === 'bridge'    || tp === 'bridge'                                         // bridge pontic
+      || (t.category || '') === 'orthodontics' || /تقويم|ortho/i.test(key + ' ' + name) // ortho brackets/archwire
+      || isSpacerTreatment(t);                                                          // space-maintainer Band&Loop
 }
 
 function render() {
