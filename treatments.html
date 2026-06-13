@@ -1107,16 +1107,10 @@ const EXTRA_TEMPLATES = [
   { treatment_key:'ortho-fixed',     name:'تقويم ثابت',   label:'⚓', fill:'#14b8a6', stroke:'#0d8276', price:0, builtin:false, needs_lab:false, target_part:'arch',     category:'orthodontics', sort_order:20 },
   { treatment_key:'ortho-removable', name:'تقويم متحرك',  label:'⚙', fill:'#22d3ee', stroke:'#0e90a8', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'orthodontics', sort_order:21 },
   { treatment_key:'ortho-retainer',  name:'مثبّت تقويم',  label:'ث', fill:'#5eead4', stroke:'#2bb3a3', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'orthodontics', sort_order:22 },
-  // ── Periodontics (🌿) ──
+  // ── Periodontics (🌿) — trimmed to scaling-only per clinic preference ──
   { treatment_key:'perio-scaling',   name:'تقليح وتلميع', label:'ت', fill:'#34d399', stroke:'#1f9d6f', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'periodontics', sort_order:23 },
-  { treatment_key:'perio-srp',       name:'تسوية جذور',   label:'ج', fill:'#10b981', stroke:'#0a7d57', price:0, builtin:false, needs_lab:false, target_part:'quadrant', category:'periodontics', sort_order:24 },
-  { treatment_key:'perio-surgery',   name:'جراحة لثة',    label:'ل', fill:'#059669', stroke:'#046b4d', price:0, builtin:false, needs_lab:false, target_part:'quadrant', category:'periodontics', sort_order:25 },
-  // ── Pediatric (🧒) ──
-  { treatment_key:'pedo-filling',    name:'حشوة سن لبني', label:'ح', fill:'#f0abfc', stroke:'#c026d3', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:26 },
-  { treatment_key:'pedo-pulpotomy',  name:'بتر لب',       label:'ب', fill:'#e879f9', stroke:'#a21caf', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:27 },
+  // ── Pediatric (🧒) — trimmed to space-maintainer only (dedicated chart geometry; protected) ──
   { treatment_key:'pedo-spacer',     name:'حافظ مسافة',   label:'م', fill:'#d946ef', stroke:'#86198f', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'pediatric', sort_order:28, post_extraction:true },
-  { treatment_key:'pedo-sealant',    name:'عازل شقوق',    label:'ع', fill:'#f5d0fe', stroke:'#d946ef', price:0, builtin:false, needs_lab:false, target_part:'crown',    category:'pediatric', sort_order:29 },
-  { treatment_key:'pedo-fluoride',   name:'فلوريد موضعي', label:'ف', fill:'#fae8ff', stroke:'#e879f9', price:0, builtin:false, needs_lab:false, target_part:'mouth',    category:'pediatric', sort_order:30 },
   // ── Post-extraction site care (🕳️) — appear in the extracted-tooth modal (M61 flag) ──
   { treatment_key:'socket-graft',    name:'طعم عظمي (حفاظ سنخ)', label:'ط', fill:'#f97316', stroke:'#c2410c', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:31, post_extraction:true },
   { treatment_key:'socket-dressing', name:'ضماد سنخ',            label:'ض', fill:'#fbbf24', stroke:'#b45309', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:32, post_extraction:true }
