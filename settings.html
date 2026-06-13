@@ -468,6 +468,11 @@ textarea::placeholder { color: var(--text2); }
           <label>المسمى الوظيفي</label>
           <input type="text" id="fRole" placeholder="طبيب أسنان">
         </div>
+        <div class="form-group">
+          <label>رقم اتصال إضافي (اختياري — بدون واتساب)</label>
+          <input type="tel" id="fContactPhone" placeholder="مثال: 011 1234567" dir="ltr" autocomplete="off">
+          <div class="section-sub" style="margin-top:6px;">رقم ثانٍ للتواصل إذا عندك خط بدون واتساب. أمّا رقم الواتساب المستخدَم للتذكيرات وللإدارة فبيتحدّد من قسم «تذكيرات WhatsApp» أدناه.</div>
+        </div>
         <button type="submit" class="btn btn-primary" id="btnSaveProfile">حفظ التغييرات</button>
       </form>
     </div>
@@ -1015,6 +1020,15 @@ async function copyBookingLink() {
   await loadAppointmentTypes();
   // Phase 2A: load WhatsApp Reminders settings (fault-tolerant)
   await loadClinicSettingsWa();
+  // Load the optional extra contact phone (a non-WhatsApp line) into the profile
+  // field. Read after loadClinicSettingsWa so the clinic_settings row exists.
+  // Guarded: contact_phone is added by Migration 62; if absent the field stays empty.
+  try {
+    const { data: _cp } = await window.sb.from('clinic_settings')
+      .select('contact_phone').eq('owner_id', currentUser.id).maybeSingle();
+    const _cpEl = document.getElementById('fContactPhone');
+    if (_cpEl) _cpEl.value = (_cp && _cp.contact_phone) || '';
+  } catch (e) { /* non-fatal — column may predate Migration 62 */ }
   await loadBookingSettings();
   // Bug #2: auto-scan for orphaned payment splits (fault-tolerant)
   await scanOrphanedPayments();
@@ -1397,6 +1411,26 @@ async function saveProfile(e) {
   btn.disabled = false; btn.textContent = 'حفظ التغييرات';
   if (error) { showToast('❌ ' + (error.message || 'فشل الحفظ'), true); return; }
   showToast('✅ تم حفظ المعلومات');
+
+  // ── Extra contact phone (optional, non-WhatsApp) → clinic_settings.contact_phone.
+  // The clinic_settings row is guaranteed to exist (auto-created by
+  // loadClinicSettingsWa on page load), so a scoped UPDATE is enough and can NEVER
+  // touch the WhatsApp reminder columns. Best-effort, with a clear migration hint.
+  const contactPhone = (document.getElementById('fContactPhone')
+    ? document.getElementById('fContactPhone').value.trim() : '') || null;
+  try {
+    const { error: cpErr } = await window.sb.from('clinic_settings')
+      .update({ contact_phone: contactPhone })
+      .eq('owner_id', currentUser.id);
+    if (cpErr) {
+      const cpEm = (cpErr.message || '') + ' ' + (cpErr.code || '');
+      if (/contact_phone/i.test(cpEm) || /\b42703\b|PGRST204/i.test(cpEm)) {
+        showToast('⚠️ يلزم تطبيق Migration 62 لحفظ رقم الاتصال الإضافي', true);
+      } else {
+        showToast('⚠️ تعذّر حفظ رقم الاتصال الإضافي', true);
+      }
+    }
+  } catch (e) { /* non-fatal */ }
 
   // ── Name unification — write-time sync ──
   // user_metadata.full_name is the single source of truth for the owner's

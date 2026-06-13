@@ -3154,6 +3154,16 @@ var allRequests = [];
 // admin RLS read policy is absent or no clinic_name set → falls back to r.name.
 var clinicNameByUid = {};
 
+// owner_id → live clinic WhatsApp number (clinic_settings.clinic_phone). This is
+// the ONE operational WhatsApp line: the tenant uses it for patient reminders and
+// the admin uses it for تذكير/ترحيب/تجديد/إيقاف messages + the رقم الواتساب display.
+// Doctor-controlled and dynamic. Empty → falls back to the registration phone
+// (trial_requests.phone) for old leads with no clinic_settings row (no regression).
+var clinicWaByUid = {};
+// owner_id → optional extra contact phone (clinic_settings.contact_phone) — a
+// second NON-WhatsApp line some doctors keep for calls only. Display-only here.
+var clinicContactByUid = {};
+
 // owner_id → live owner personal name (clinic_employees.name of the owner row,
 // which is kept synced to auth user_metadata.full_name). Lets the admin show
 // the owner's CURRENT name as the account contact instead of the frozen
@@ -3828,17 +3838,35 @@ async function loadAndRender() {
     allRequests.forEach(function(r){
       if (r.user_id && !_seen[r.user_id]) { _seen[r.user_id] = 1; _uids.push(r.user_id); }
     });
-    clinicNameByUid = {};
+    clinicNameByUid = {}; clinicWaByUid = {}; clinicContactByUid = {};
     if (_uids.length) {
+      // One batched read resolves clinic name + the operational WhatsApp number
+      // (clinic_phone) + the optional extra contact line (contact_phone).
       var csRes = await window.sb.from('clinic_settings')
-        .select('owner_id, clinic_name').in('owner_id', _uids);
+        .select('owner_id, clinic_name, clinic_phone, contact_phone').in('owner_id', _uids);
+      // Graceful: contact_phone is added by Migration 62. Until it's applied,
+      // PostgREST 42703 fails the whole select — retry with the core columns so
+      // clinic name AND the WhatsApp number still resolve (no regression).
+      if (csRes && csRes.error) {
+        var _csEm = (csRes.error.message || '') + ' ' + (csRes.error.code || '');
+        if (/contact_phone/i.test(_csEm) || /\b42703\b|PGRST204/i.test(_csEm)) {
+          csRes = await window.sb.from('clinic_settings')
+            .select('owner_id, clinic_name, clinic_phone').in('owner_id', _uids);
+        }
+      }
       (csRes && csRes.data ? csRes.data : []).forEach(function(row){
         if (row.clinic_name && String(row.clinic_name).trim()) {
           clinicNameByUid[row.owner_id] = String(row.clinic_name).trim();
         }
+        if (row.clinic_phone && String(row.clinic_phone).trim()) {
+          clinicWaByUid[row.owner_id] = String(row.clinic_phone).trim();
+        }
+        if (row.contact_phone && String(row.contact_phone).trim()) {
+          clinicContactByUid[row.owner_id] = String(row.contact_phone).trim();
+        }
       });
     }
-  } catch (e) { clinicNameByUid = {}; }
+  } catch (e) { clinicNameByUid = {}; clinicWaByUid = {}; clinicContactByUid = {}; }
 
   // Resolve each owner's live personal name (clinic_employees.name of the
   // role='owner' row, kept synced to auth full_name). Phase E1: batched via the
@@ -9431,9 +9459,16 @@ function renderList() {
     // <a href> can't be built inline in this sync loop. Instead the anchor
     // calls openWaReminder() which builds + opens on click. jsAttr() escapes
     // the name for safe embedding in the onclick string literal.
+    // Resolve the operational WhatsApp number once: the clinic's settings phone
+    // (clinic_settings.clinic_phone — doctor-controlled, dynamic) takes priority;
+    // fall back to the registration phone for old leads with no clinic_settings
+    // row. Used for BOTH the send target and the show/hide gates below, so a
+    // doctor who set their WhatsApp number in settings always gets the buttons.
+    var waPhoneRaw = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
+
     var waReminderBtn = '';
     if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
-      var safePhone = jsAttr(r.phone || '');
+      var safePhone = jsAttr(waPhoneRaw);
       var safeName  = jsAttr(r.name || '');
       var safeEnd   = jsAttr(r.trial_end || '');
       waReminderBtn = '<a href="#" onclick="return openWaReminder(\'' + safePhone +
@@ -9447,8 +9482,8 @@ function renderList() {
     // to a paused account is contradictory — wa_suspended is the right
     // template for that case instead). Phone gate is mandatory.
     var waWelcomeBtn = '';
-    if (s.state !== 'new' && s.state !== 'suspended' && r.phone) {
-      var wlPhone = jsAttr(r.phone || '');
+    if (s.state !== 'new' && s.state !== 'suspended' && waPhoneRaw) {
+      var wlPhone = jsAttr(waPhoneRaw);
       var wlName  = jsAttr(r.name || '');
       var wlEmail = jsAttr(r.email || '');
       waWelcomeBtn = '<a href="#" onclick="return openWaWelcome(\'' + wlPhone +
@@ -9459,8 +9494,8 @@ function renderList() {
     // ⏸ Suspended notice — only meaningful for currently-suspended rows.
     // No daysLeft/trial_end variables to pre-fill; just {name}.
     var waSuspendedBtn = '';
-    if (s.state === 'suspended' && r.phone) {
-      var spPhone = jsAttr(r.phone || '');
+    if (s.state === 'suspended' && waPhoneRaw) {
+      var spPhone = jsAttr(waPhoneRaw);
       var spName  = jsAttr(r.name || '');
       waSuspendedBtn = '<a href="#" onclick="return openWaSuspended(\'' + spPhone +
                        '\',\'' + spName + '\',event)" class="btn-whatsapp">⏸ إشعار إيقاف</a>';
@@ -9471,8 +9506,8 @@ function renderList() {
     // label is the Arabic display string already used by planPillHtml so
     // the rendered WA body reads "📋 الخطة: سنوي" not "yearly".
     var waRenewedBtn = '';
-    if (s.state === 'paid' && !s.isPermanent && r.phone && r.trial_end) {
-      var rnPhone = jsAttr(r.phone || '');
+    if (s.state === 'paid' && !s.isPermanent && waPhoneRaw && r.trial_end) {
+      var rnPhone = jsAttr(waPhoneRaw);
       var rnName  = jsAttr(r.name || '');
       var rnPlanLabel = planDisplayName(s.plan);
       var rnPlan  = jsAttr(rnPlanLabel);
@@ -9927,7 +9962,9 @@ function c360BuildOverview(r) {
     +   c360Row(((r.user_id && clinicNameByUid[r.user_id]) ? 'جهة الاتصال' : 'الاسم'),
                  c360EscapeHtml(((r.user_id && ownerNameByUid[r.user_id]) ? ownerNameByUid[r.user_id] : (r.name || '—'))))
     +   c360Row('البريد', c360EscapeHtml(r.email || '—'))
-    +   c360Row('الهاتف', c360EscapeHtml(r.phone || '—'))
+    +   c360Row('رقم الواتساب', c360EscapeHtml(((r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '—'))))
+    +   (((r.user_id && clinicContactByUid[r.user_id]))
+          ? c360Row('رقم اتصال إضافي', c360EscapeHtml(clinicContactByUid[r.user_id])) : '')
     +   c360Row('المدينة', c360EscapeHtml(r.city || '—'))
     +   c360Row('آخر تسجيل دخول', lastSignInText)
     + '</div>';
@@ -10060,7 +10097,11 @@ function c360BuildActions(r) {
 
   // WhatsApp group
   var waBtns = [];
-  var safePhone = jsAttr(r.phone || '');
+  // Same operational WhatsApp number resolution as the customer list: clinic
+  // settings phone first (dynamic, doctor-controlled), registration phone as a
+  // fallback. Drives all four message buttons below.
+  var _waPhone = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
+  var safePhone = jsAttr(_waPhone);
   var safeName  = jsAttr(r.name || '');
   var safeEmail = jsAttr(r.email || '');
   if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
@@ -10121,7 +10162,9 @@ function c360BuildComm(r) {
     + '</div>'
     + '<div class="c360-card">'
     +   '<div class="c360-card-title">📞 معلومات الاتصال الحالية</div>'
-    +   c360Row('رقم الواتساب', c360EscapeHtml(r.phone || '—'))
+    +   c360Row('رقم الواتساب', c360EscapeHtml(((r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '—'))))
+    +   (((r.user_id && clinicContactByUid[r.user_id]))
+          ? c360Row('رقم اتصال إضافي', c360EscapeHtml(clinicContactByUid[r.user_id])) : '')
     +   c360Row('البريد الإلكتروني', c360EscapeHtml(r.email || '—'))
     + '</div>';
 }
