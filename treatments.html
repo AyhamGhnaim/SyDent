@@ -736,7 +736,6 @@ function render() {
           + '<div class="treat-head-main">'
             + '<div class="treat-name">' + escapeHtml(t.name) + '</div>'
             + '<div class="treat-tags">' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + inactiveBadge + '</div>'
-            + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
             + laymanRow
           + '</div>'
           + favStar
@@ -1117,7 +1116,6 @@ const EXTRA_TEMPLATES = [
   // ── Pediatric (🧒) — trimmed to space-maintainer only (dedicated chart geometry; protected) ──
   { treatment_key:'pedo-spacer',     name:'حافظ مسافة',   label:'م', fill:'#d946ef', stroke:'#86198f', price:0, builtin:false, needs_lab:true,  target_part:'arch',     category:'pediatric', sort_order:28, post_extraction:true },
   // ── Post-extraction site care (🕳️) — appear in the extracted-tooth modal (M61 flag) ──
-  { treatment_key:'socket-graft',    name:'طعم عظمي (حفاظ سنخ)', label:'ط', fill:'#f97316', stroke:'#c2410c', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:31, post_extraction:true },
   { treatment_key:'socket-dressing', name:'ضماد سنخ',            label:'ض', fill:'#fbbf24', stroke:'#b45309', price:0, builtin:false, needs_lab:false, target_part:'whole', category:'surgical', sort_order:32, post_extraction:true }
 ];
 
