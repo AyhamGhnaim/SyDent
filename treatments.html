@@ -601,7 +601,11 @@ function filteredTreatments() {
       if (activeFilter === 'lab') {
         if (!t.needs_lab) return false;
       } else if (activeFilter === 'custom') {
-        if (t.builtin) return false;
+        // "مخصصة" = treatments that have a DEDICATED tooth-chart application (extraction ghost,
+        // implant, bridge/pontic, ortho brackets, space-maintainer Band&Loop) — i.e. exactly the
+        // delete-protected set. Single source of truth: isProtectedTreatment. (Was wrongly
+        // `!t.builtin`, which also listed every ready-made template + cleaning/whitening/xray/etc.)
+        if (!isProtectedTreatment(t)) return false;
       } else if (activeFilter === 'inactive') {
         if (t.is_active !== false) return false;
       } else {
