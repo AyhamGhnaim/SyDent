@@ -440,6 +440,7 @@ var doctors = [];           // clinic_doctors
 var sessions = [];          // ledger_sessions in date range
 var payments = [];          // ledger_payments in date range
 var paymentSplits = [];     // payment_splits in date range (Migration 3) — empty on legacy DBs
+var splitSessionStatus = {}; // id→status for each session referenced by a split (canonical earned-split rule)
 var labOrders = [];         // lab_orders for cost matching
 var payouts = [];           // provider_payouts for history
 var basis = 'production';   // 'production' | 'net' | 'collection'
@@ -672,6 +673,9 @@ async function loadFilteredData() {
       }
     } catch(e) { console.warn('payment_splits load threw:', e); }
   }
+  // Status of every session referenced by a split (for the canonical earned-split rule
+  // below — excludes allocations sitting on planned/not-yet-done sessions).
+  await loadSplitSessionStatuses();
 
   // Load all lab_orders (we filter per session by patient+tooth)
   // Use status filter: include only sent/received/checked/delivered (not rejected)
@@ -733,6 +737,56 @@ function sumSessionLabCost(session, matchedSet) {
   return cost;
 }
 
+// Populate splitSessionStatus for every distinct session_id referenced by the loaded
+// splits. Fetched independently of the range-filtered `sessions` array because a split's
+// session may be completed-but-out-of-range (must still count as earned) or planned (must
+// count as unearned) — neither is reliably present in `sessions`. Chunked to keep the
+// PostgREST .in() URL within length limits. Parity with accounting.html.
+async function loadSplitSessionStatuses() {
+  splitSessionStatus = {};
+  var idSet = {};
+  for (var i = 0; i < paymentSplits.length; i++) {
+    var sid = paymentSplits[i].session_id;
+    if (sid) idSet[sid] = true;
+  }
+  var ids = Object.keys(idSet);
+  if (!ids.length) return;
+  var CHUNK = 150;
+  for (var c = 0; c < ids.length; c += CHUNK) {
+    var slice = ids.slice(c, c + CHUNK);
+    try {
+      var res = await window.sb.from('ledger_sessions')
+        .select('id, status')
+        .eq('doctor_id', currentUser.id)
+        .in('id', slice);
+      if (res.error) {
+        // On error, leave these ids unmapped → splitIsEarned treats them as NOT-completed
+        // (conservative: avoids inflating collection). A pre-Migration-3 DB has no splits anyway.
+        var msg = (res.error.message || '').toLowerCase();
+        var missing = res.error.code === '42P01' || res.error.code === 'PGRST205' ||
+                      msg.indexOf('ledger_sessions') !== -1;
+        if (!missing) console.warn('loadSplitSessionStatuses:', res.error);
+        continue;
+      }
+      (res.data || []).forEach(function(row){
+        // Legacy sessions with empty/null status fold to 'completed' (system-wide convention).
+        splitSessionStatus[row.id] = row.status || 'completed';
+      });
+    } catch(e) { console.warn('loadSplitSessionStatuses threw:', e); }
+  }
+}
+
+// Canonical earned-split test (parity with accounting.html / patient-profile.html
+// computeFinancials): a split is EARNED collection only when it is not unearned AND it
+// sits on a COMPLETED session. Non-unearned splits on planned sessions (or with no
+// session_id) are mobile credit — money received for work not yet done — not collected
+// revenue. Without this, legacy un-healed prepayments-on-planned-sessions would overstate
+// a provider's collection figure relative to the clinic accounting page.
+function splitIsEarned(sp) {
+  if (!sp || sp.is_unearned) return false;
+  return !!sp.session_id && splitSessionStatus[sp.session_id] === 'completed';
+}
+
 // ─── Compute provider stats ───
 // For a given provider, compute production/lab/net from sessions and
 // allocated collection from payments based on provider's share of patient production.
@@ -777,10 +831,12 @@ function computeProviderStats(provId, sharedMatchedSet) {
     paymentIdsWithSplits[paymentSplits[k].payment_id] = true;
   }
   // Part A — splits-based attribution (exact).
-  // is_unearned splits have provider_id = null and don't belong to any provider.
+  // Canonical earned-split rule: count a split only if it is earned (not unearned AND on a
+  // completed session). Unearned credit and allocations on planned sessions are excluded —
+  // matching accounting.html so per-provider collection can't exceed clinic revenue.
   for (var i = 0; i < paymentSplits.length; i++) {
     var sp = paymentSplits[i];
-    if (sp.is_unearned) continue;
+    if (!splitIsEarned(sp)) continue;
     var matchesProv = (provId === '_unassigned')
       ? !sp.provider_id
       : sp.provider_id === provId;
