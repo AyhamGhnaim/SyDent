@@ -623,13 +623,30 @@ function filteredTreatments() {
 }
 
 // ── Render grid ──
-// Treatments that drive special chart geometry (extraction placeholder, implant, pontic/bridge, ortho overlay)
-// must NOT be deletable — deleting them would break existing patient charts that reference them.
-// (Deactivate instead via the toggle button.) Non-special treatments (fillings, crowns, RCT, cleaning,
-// whitening, x-ray, consult, perio, pedo) and ALL custom treatments remain freely deletable.
+// Treatments that drive special chart geometry (extraction placeholder, implant, pontic/bridge,
+// ortho overlay, space-maintainer Band&Loop) must NOT be deletable — deleting them would break
+// existing patient charts that reference them. (Deactivate instead via the toggle button.)
+// Non-special treatments (fillings, crowns, RCT, cleaning, whitening, x-ray, consult, perio, pedo)
+// AND any doctor copy / custom treatment (treatment_key 'custom_…') remain freely deletable — even
+// a copy of a protected treatment, which inherits its target_part/category but is the doctor's own
+// entry to manage.
+// Mirror of patient-profile.html isSpacerTreatment: a space-maintainer drives the Band&Loop chart
+// geometry (surface='SPACER'), so it is protected like the other geometry-driving types. (Here the
+// logical key lives in treatment_key; id is the DB UUID.)
+function isSpacerTreatment(t) {
+  if (!t) return false;
+  var key = t.treatment_key || '';
+  if (key === 'pedo-spacer') return true;
+  return /حافظ\s*مسافة|spacer/i.test(key + ' ' + (t.name || ''));
+}
 function isProtectedTreatment(t) {
+  // A doctor's own copy or custom treatment (key 'custom_…') is always deletable, even if it
+  // inherits a protected target_part/category. Only the canonical built-in/template treatments
+  // are protected.
+  if (/^custom_/.test(t.treatment_key || '')) return false;
   var tp = t.target_part || '';
-  return tp === 'extraction' || tp === 'implant' || tp === 'bridge' || (t.category || '') === 'orthodontics';
+  return tp === 'extraction' || tp === 'implant' || tp === 'bridge'
+      || (t.category || '') === 'orthodontics' || isSpacerTreatment(t);
 }
 
 function render() {
@@ -1067,6 +1084,8 @@ async function toggleFavorite(id) {
 }
 
 async function deleteTreatment(id) {
+  var _t = treatments.find(function(x){ return x.id === id; });
+  if (_t && isProtectedTreatment(_t)) { showToast('🚫 هذا العلاج محمي من الحذف (له تطبيق خاص على المخطط) — استخدم «تعطيل» بدلاً منه'); return; }
   if (!confirm('حذف هذا العلاج؟ الجلسات السابقة لن تتأثر.')) return;
   const { error } = await window.sb.from('treatments').delete().eq('id', id);
   if (error) { showToast('⚠️ ' + error.message); return; }
@@ -1118,11 +1137,21 @@ async function resetToDefaults() {
   // (matched by treatment_key OR name). NEVER deletes or edits anything — custom
   // treatments (and any edits the dentist made to defaults) are fully preserved.
   var _all = DEFAULTS.concat(EXTRA_TEMPLATES);
+  // Restore ordering: deletion-protected treatments (special chart geometry — extraction, implant,
+  // bridge, ortho, space-maintainer) sort to the top; the rest keep their original relative order.
+  // Uses isProtectedTreatment as the single source of truth. Templates are never mutated — only the
+  // newly-inserted rows below receive the computed sort_order, so existing rows stay untouched.
+  var _ordered = _all.slice().sort(function(a, b){
+    var pa = isProtectedTreatment(a) ? 0 : 1, pb = isProtectedTreatment(b) ? 0 : 1;
+    return pa !== pb ? pa - pb : (a.sort_order || 0) - (b.sort_order || 0);
+  });
+  var _orderOf = {};
+  _ordered.forEach(function(t, i){ _orderOf[t.treatment_key] = i + 1; });
   var _haveKey = {}, _haveName = {};
   for (var _i = 0; _i < treatments.length; _i++) { _haveKey[treatments[_i].treatment_key] = 1; _haveName[treatments[_i].name] = 1; }
   var _toAdd = _all.filter(function(t){ return !_haveKey[t.treatment_key] && !_haveName[t.name]; });
   if (!_toAdd.length) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
-  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id }, d));
+  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id }, d, { sort_order: _orderOf[d.treatment_key] }));
   if (!window.__m61T) rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 safety
   const { error } = await window.sb.from('treatments').insert(rows);
   if (error) { showToast('⚠️ ' + error.message); return; }
