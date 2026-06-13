@@ -3647,6 +3647,8 @@ function matchesSearch(r) {
     (clinicNameByUid[r.user_id] || '') + ' ' +
     (r.name  || '') + ' ' +
     (r.phone || '') + ' ' +
+    (clinicWaByUid[r.user_id] || '') + ' ' +
+    (clinicContactByUid[r.user_id] || '') + ' ' +
     (r.email || '') + ' ' +
     (r.city  || '') + ' ' +
     (r.notes || '')
@@ -7056,7 +7058,7 @@ function openPayModal(reqId, opts) {
     reqId: reqId,
     tenantUserId: r.user_id,
     name: r.name || r.email || '',
-    phone: r.phone || '',
+    phone: ((r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '')),
     planCode: planCode,
     cycle: cycle,
     eventId: (typeof opts.eventId === 'string') ? opts.eventId : null
@@ -7256,7 +7258,8 @@ function issuePaymentReceiptById(payId) {
   var p = (C360_PAYMENTS.rows || []).filter(function(x){ return x.id === payId; })[0];
   if (!p) { alert('لم يُعثر على الدفعة.'); return; }
   var r = allRequests.find(function(x){ return x.user_id === C360_PAYMENTS.userId; });
-  issuePaymentReceipt(p, (r && (r.name || r.email)) || '', (r && r.phone) || '');
+  var _rcWa = r ? ((r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '')) : '';
+  issuePaymentReceipt(p, (r && (r.name || r.email)) || '', _rcWa);
 }
 
 function issuePaymentReceipt(p, name, phone) {
@@ -9465,6 +9468,7 @@ function renderList() {
     // row. Used for BOTH the send target and the show/hide gates below, so a
     // doctor who set their WhatsApp number in settings always gets the buttons.
     var waPhoneRaw = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
+    var waContactExtra = (r.user_id && clinicContactByUid[r.user_id]) ? clinicContactByUid[r.user_id] : '';
 
     var waReminderBtn = '';
     if ((s.state === 'trial' || s.state === 'paid') && !s.isPermanent && r.trial_end && s.daysLeft !== null && s.daysLeft > 0) {
@@ -9644,7 +9648,8 @@ function renderList() {
         stateBadge +
       '</div>' +
       '<div class="req-info">' +
-        '<div class="req-info-row">📱 <span>' + (escapeHtml(r.phone) || '—') + '</span></div>' +
+        '<div class="req-info-row">📱 <span>' + (escapeHtml(waPhoneRaw) || '—') + '</span></div>' +
+        (waContactExtra ? '<div class="req-info-row">📞 <span>' + escapeHtml(waContactExtra) + '</span></div>' : '') +
         (r.email ? '<div class="req-info-row">📧 <span>' + escapeHtml(r.email) + '</span></div>' : '') +
         (r.city ? '<div class="req-info-row">📍 <span>' + escapeHtml(r.city) + '</span></div>' : '') +
         (r.notes ? '<div class="req-info-row">📝 <span>' + escapeHtml(r.notes) + '</span></div>' : '') +
@@ -9733,7 +9738,8 @@ function openCustomer360(reqId) {
   var createdEl = document.getElementById('c360Created');
   var userIdEl  = document.getElementById('c360UserId');
   if (nameEl)   nameEl.textContent = _c360Clinic || _c360Contact || '—';
-  if (emailEl)  emailEl.textContent = r.email || (r.phone ? ('📞 ' + r.phone) : '—');
+  var _c360Wa = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
+  if (emailEl)  emailEl.textContent = r.email || (_c360Wa ? ('📞 ' + _c360Wa) : '—');
   if (avatarEl) avatarEl.textContent = c360AvatarInitial(_c360Clinic || _c360Contact || r.email || '?');
   if (createdEl) createdEl.textContent = r.created_at ? ('انضم: ' + evfFormatTimestamp(r.created_at)) : '';
   if (userIdEl)  userIdEl.textContent = r.user_id ? ('uid: ' + String(r.user_id).slice(0, 8) + '…') : '';
@@ -10783,7 +10789,8 @@ async function bkOpenWaTabs(kind) {
   // meaningful: trial or paid (non-permanent) with active days left.
   // Welcome is meaningful for any non-'new' row.
   rows = rows.filter(function(r){
-    if (!r.phone) return false;
+    var waNum = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
+    if (!waNum) return false;
     var s = computeAccountState(r);
     if (kind === 'reminder') {
       return (s.state === 'trial' || s.state === 'paid') && !s.isPermanent
@@ -10807,13 +10814,14 @@ async function bkOpenWaTabs(kind) {
   var batch = rows.slice(0, willOpen);
   for (var i = 0; i < batch.length; i++) {
     var r = batch[i];
+    var waNum = (r.user_id && clinicWaByUid[r.user_id]) ? clinicWaByUid[r.user_id] : (r.phone || '');
     var url;
     try {
       if (kind === 'reminder') {
         var st = computeAccountState(r);
-        url = await waReminderLink(r.phone, r.name, st.daysLeft, r.trial_end);
+        url = await waReminderLink(waNum, r.name, st.daysLeft, r.trial_end);
       } else {
-        url = await waWelcomeLink(r.phone, r.name, r.email);
+        url = await waWelcomeLink(waNum, r.name, r.email);
       }
     } catch(e) {
       console.warn('bulk WA link build failed for', r.id, e);
