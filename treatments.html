@@ -62,17 +62,21 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .info-box .info-icon{font-size:24px;}
 
 /* ── Treatments grid — Redesign v1 (clinical cards) ── */
-.treat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-bottom:20px;}
+.treat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;margin-bottom:20px;}
 .treat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;position:relative;transition:transform .18s,box-shadow .18s,border-color .18s;box-shadow:var(--shadow-card);}
 .treat-card:hover{transform:translateY(-2px);border-color:rgba(var(--green-rgb),.45);box-shadow:0 10px 28px -8px rgba(16,42,67,.14),0 0 0 3px rgba(var(--green-rgb),.08);}
 .treat-color-bar{height:4px;width:100%;}
-.treat-body{padding:15px 17px 14px;}
-.treat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px;}
-.treat-icon{width:34px;height:34px;border-radius:10px;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(16,42,67,.06);}
-.treat-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.45;}
-.treat-key{font-size:11px;color:var(--text3);margin-top:3px;}
+.treat-body{padding:14px 16px 13px;}
+.treat-head{display:flex;align-items:flex-start;gap:11px;margin-bottom:6px;}
+.treat-swatch{width:34px;height:34px;border-radius:10px;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(16,42,67,.06);}
+.treat-head-main{flex:1;min-width:0;}
+.treat-name{font-size:15px;font-weight:800;color:var(--text);line-height:1.35;}
+.treat-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
+.treat-key{font-size:11px;color:var(--text3);margin-top:5px;}
 .treat-layman{color:var(--cyan);}
-.treat-price{display:flex;align-items:baseline;gap:5px;font-size:21px;font-weight:800;color:var(--green);margin-top:10px;font-variant-numeric:tabular-nums;}
+.treat-fav-star{flex-shrink:0;font-size:19px;line-height:1;color:var(--text3);opacity:.5;}
+.treat-fav-star.on{color:var(--yellow);opacity:1;}
+.treat-price{display:flex;align-items:baseline;gap:5px;font-size:21px;font-weight:800;color:var(--green);margin-top:11px;font-variant-numeric:tabular-nums;}
 .treat-price .currency{font-size:11px;color:var(--text3);font-weight:600;}
 .treat-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:13px;padding-top:12px;border-top:1px solid var(--border);}
 .treat-actions button{padding:8px 4px;font-size:12px;font-weight:700;border-radius:9px;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text2);transition:all .15s;}
@@ -95,9 +99,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .chip{padding:7px 13px;font-size:12px;font-weight:700;border-radius:10px;background:var(--bg2);border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .chip:hover{border-color:var(--green);color:var(--green);}
 .chip-active{background:var(--green);color:#fff;border-color:var(--green);}
-.drag-handle{position:absolute;top:9px;left:9px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:grab;font-size:15px;font-weight:900;letter-spacing:-2px;line-height:1;user-select:none;border-radius:8px;background:var(--bg3);opacity:.6;transition:opacity .15s,background .15s,color .15s;z-index:2;}
-.treat-card:hover .drag-handle{opacity:1;}
-.drag-handle:hover{background:var(--green-dim);color:var(--green);}
+/* Drag handle — top-RIGHT corner so it never overlaps the color swatch (top-left) */
+.drag-handle{position:absolute;top:9px;right:9px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:grab;font-size:13px;font-weight:900;letter-spacing:-2px;line-height:1;user-select:none;border-radius:7px;background:var(--bg3);opacity:0;transition:opacity .15s,background .15s,color .15s;z-index:2;}
+.treat-card:hover .drag-handle{opacity:.75;}
+.drag-handle:hover{background:var(--green-dim);color:var(--green);opacity:1;}
 .drag-handle:active{cursor:grabbing;}
 .treat-card.dragging{opacity:.9;transform:rotate(1.5deg) scale(1.02);box-shadow:0 22px 46px -12px rgba(16,42,67,.32),0 0 0 1px var(--green);cursor:grabbing;}
 .treat-card.drag-ghost{background:transparent !important;border:2px dashed rgba(var(--green-rgb),.5) !important;box-shadow:none !important;}
@@ -692,18 +697,23 @@ function render() {
     var laymanRow = (t.layman_name && t.layman_name.trim())
       ? '<div class="treat-key" style="color:#7dd3fc;" title="الاسم المبسّط للمريض (يظهر في الطباعة والإيصالات)">👤 ' + escapeHtml(t.layman_name) + '</div>'
       : '';
+    var favStar = t.is_favorite
+      ? '<span class="treat-fav-star on" title="مفضّل">★</span>'
+      : '<span class="treat-fav-star" title="غير مفضّل">☆</span>';
     html += '<div class="treat-card" draggable="true" data-treat-id="' + t.id + '" style="' + inactiveStyle + '">'
       + '<div class="treat-color-bar" style="' + bar + '"></div>'
       + '<div class="drag-handle" title="اسحب لإعادة الترتيب">⋮⋮</div>'
       + builtinTag
       + '<div class="treat-body">'
         + '<div class="treat-head">'
-          + '<div>'
-            + '<div class="treat-name">' + escapeHtml(t.name) + ' ' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + inactiveBadge + '</div>'
+          + '<div class="treat-swatch" style="' + iconBg + 'border:2px solid ' + fg + ';"></div>'
+          + '<div class="treat-head-main">'
+            + '<div class="treat-name">' + escapeHtml(t.name) + '</div>'
+            + '<div class="treat-tags">' + labTag + ' ' + targetTag + ' ' + catTag + ' ' + inactiveBadge + '</div>'
             + '<div class="treat-key">المعرّف: ' + (t.treatment_key || t.id) + '</div>'
             + laymanRow
           + '</div>'
-          + '<div class="treat-icon" style="' + iconBg + 'border:2px solid ' + fg + ';"></div>'
+          + favStar
         + '</div>'
         + '<div class="treat-price">' + fmt(t.price) + ' <span class="currency">ل.س</span></div>'
         + '<div class="treat-actions">'
