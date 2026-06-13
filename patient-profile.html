@@ -3840,7 +3840,8 @@ var SURFACE_LABELS = {
   'CROWN_FULL': 'التاج كامل',
   'BRIDGE': 'جسر',
   'PONTIC': 'سن وهمي (جسر)',
-  'SPACER': 'حافظ مسافة'
+  'SPACER': 'حافظ مسافة',
+  'SOCKET': 'موقع القلع'
 };
 
 /* ── COMPOSITE SURFACE SUPPORT (multi-surface restorations, e.g. MOD) ──
@@ -4577,6 +4578,17 @@ function spacerColorFor(num){
   var sm = teethMap[String(num)]; if (!sm || !sm.SPACER) return null;
   var tr = getTreatment(sm.SPACER); return (tr && tr.fill) || '#d946ef';
 }
+/* Post-extraction site treatment (M63): stored on surface='SOCKET' of an extracted tooth,
+   a separate row from the extraction (WHOLE='extracted') so the ghost is kept and the
+   treatment colour renders on top. surface is a pure clinical LABEL — zero financial effect. */
+function toothHasSocket(num){
+  var sm = teethMap[String(num)];
+  return !!(sm && sm.SOCKET);
+}
+function socketColorFor(num){
+  var sm = teethMap[String(num)]; if (!sm || !sm.SOCKET) return null;
+  var tr = getTreatment(sm.SOCKET); return (tr && tr.fill) || '#f97316';
+}
 /* Band & loop anatomy: the BAND goes on the abutment DISTAL to the gap (farther
    from the midline); the loop only RESTS against the mesial tooth — nothing is
    charted or drawn on it. Falls back to the same-quadrant abutment when the gap
@@ -4717,7 +4729,19 @@ function buildExtractedPlaceholder(num, isUpper) {
   var H = Math.round(W * 2.1);
   var transform = isUpper ? 'transform="translate(0,210) scale(1,-1)"' : '';
   var DASH = 'fill="none" stroke="#9aa3b0" stroke-width="2.6" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"';
-  var ghost = '<path d="' + anat.outlineD + '" ' + DASH + '/>'; // crown silhouette
+  var ghost = '';
+  // موقع القلع (M63): a post-extraction site treatment (طعم عظمي / ضماد سنخ / …) fills the
+  // silhouette in the treatment colour UNDERNEATH the dashed extraction outline — the tooth
+  // reads "extracted (dashed) + treated (colour)". The dashes stay on top so it's never
+  // mistaken for a present tooth.
+  if (typeof toothHasSocket === 'function' && toothHasSocket(num)) {
+    var _skc = socketColorFor(num) || '#f97316';
+    ghost += '<path d="' + anat.outlineD + '" fill="' + _skc + '" fill-opacity="0.32" stroke="none"/>';
+    for (var rk = 0; rk < anat.roots.length; rk++) {
+      ghost += '<path d="' + anat.roots[rk].d + '" fill="' + _skc + '" fill-opacity="0.32" stroke="none"/>';
+    }
+  }
+  ghost += '<path d="' + anat.outlineD + '" ' + DASH + '/>'; // crown silhouette (dashed, on top)
   for (var ri = 0; ri < anat.roots.length; ri++) {                // roots
     ghost += '<path d="' + anat.roots[ri].d + '" ' + DASH + '/>';
   }
@@ -5601,7 +5625,11 @@ function buildOcclusalTooth(num, sm, isUpper){
     +'<clipPath id="cl'+gid+'"><path d="'+outline+'"/></clipPath></defs>';
   var occSz=cellWidth(num);
   var svg='<svg class="tooth-shape" viewBox="16.67 16.67 66.67 66.67" width="'+occSz+'" height="'+occSz+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
-  if(isExtract){ svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg; }
+  if(isExtract){
+    // موقع القلع (M63): tint the occlusal silhouette in the treatment colour under the dashes
+    if(typeof toothHasSocket==='function' && toothHasSocket(num)){ svg+='<path d="'+outline+'" fill="'+(socketColorFor(num)||'#f97316')+'" fill-opacity="0.32" stroke="none"/>'; }
+    svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg;
+  }
   svg+='<path d="'+outline+'" fill="url(#en'+gid+')" stroke="#b08d5b" stroke-width="1.4"/>';
   // surface tints — clipped to the real outline, with directional OVERSHOOT so a
   // colored surface fills its full (curved) area instead of a floating rectangle
@@ -5725,6 +5753,7 @@ function occTipRows(num, sm){
   if(cfKey){ var cft=getTreatment(cfKey); rows+=row(T_FILL[cfKey]||'#fb923c', isBr?'دعامة جسر':'التاج كامل', cft?cft.name:cfKey, badge(cf?'CROWN_FULL':'WHOLE')); }
   if(whole && !isExtractionKey(whole) && !isImplantKey(whole) && !isBr && wtp!=='crown_full'){ var wtt=getTreatment(whole); rows+=row(T_FILL[whole]||'#f5e6c8','السن كاملاً', wtt?wtt.name:whole, badge('WHOLE')); }
   if(sm.SPACER && isSpacerKey(sm.SPACER)){ var spT=getTreatment(sm.SPACER); rows+=row(T_FILL[sm.SPACER]||'#d946ef','حافظ مسافة', spT?spT.name:sm.SPACER, badge('SPACER')); }
+  if(sm.SOCKET){ var skT=getTreatment(sm.SOCKET); rows+=row(T_FILL[sm.SOCKET]||'#f97316','موقع القلع', skT?skT.name:sm.SOCKET, badge('SOCKET')); }
   // Composite restorations (e.g. MOD) — ONE row each, before single surfaces.
   for(var compO in sm){ if(compO==='__status') continue; if(!isCompositeSurfaceCode(compO)||!sm[compO]) continue; var coTk=sm[compO], coObj=getTreatment(coTk); rows+=row(T_FILL[coTk]||'#888', surfLabelFor(compO, num), coObj?coObj.name:coTk, badge(compO)); }
   var keys = isAnterior(num) ? ['I','L','M','D'] : ['O','B','L','M','D'];
@@ -6449,6 +6478,10 @@ async function openToothModal(n, surface) {
   if (typeof toothHasSpacer === 'function' && toothHasSpacer(n)) {
     _special = '<button class="topt" style="border-color:#d946ef;color:#d946ef;font-weight:700;" onclick="removeSpacerUnit(' + n + ')">🧷 إزالة حافظ المسافة</button>' + _special;
   }
+  // موقع القلع: removal of a post-extraction site treatment stacks on top too
+  if (typeof toothHasSocket === 'function' && toothHasSocket(n)) {
+    _special = '<button class="topt" style="border-color:#f97316;color:#f97316;font-weight:700;" onclick="removeSocket(' + n + ')">🦴 إزالة علاج موقع القلع</button>' + _special;
+  }
 
   if (_allowed.length === 0) {
     // Phase 4: only show "add treatment" link to Owner (others would hit blocked page)
@@ -6501,6 +6534,29 @@ async function clearSpacerRows(unit) {
     var _restK = Object.keys(teethMap[tn]).filter(function(k){ return k !== '__status'; });
     if (_restK.length === 0) delete teethMap[tn];
   }
+}
+
+/* Remove a post-extraction site treatment: deletes ONLY the SOCKET row of this tooth.
+   The extraction (WHOLE='extracted') is untouched — the tooth stays missing. */
+async function removeSocket(num) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل حالة الأسنان');
+    return;
+  }
+  var tn = String(num);
+  if (!(teethMap[tn] && teethMap[tn].SOCKET)) return;
+  if (!confirm('إزالة علاج موقع القلع عن السن ' + num + '؟\nلن يتغير شيء آخر — السن المقلوع يبقى مقلوعاً.')) return;
+  var dr = await window.sb.from('teeth_status').delete()
+    .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+    .eq('tooth_num', tn).eq('surface', 'SOCKET');
+  if (dr.error) { console.error('delete socket entry error:', dr.error); showToast('⚠️ ' + dr.error.message); return; }
+  delete teethMap[tn].SOCKET;
+  if (teethMap[tn].__status) delete teethMap[tn].__status.SOCKET;
+  var _restK = Object.keys(teethMap[tn]).filter(function(k){ return k !== '__status'; });
+  if (_restK.length === 0) delete teethMap[tn];
+  closeModal('toothModal');
+  renderTeeth(); renderStats();
+  showToast('✅ تمت إزالة علاج موقع القلع');
 }
 
 /* Undo extraction: delete all teeth_status rows for this tooth, redraw */
@@ -6572,6 +6628,16 @@ async function undoExtraction(num) {
           if (dr2.error) console.error('delete extracted error:', dr2.error);
           delete teethMap[tn][sk2];
         }
+      }
+      // A post-extraction site treatment (SOCKET) is no longer valid once the tooth returns —
+      // delete its row too so no orphan SOCKET lingers on a now-present tooth.
+      if (sm.SOCKET) {
+        var drSk = await window.sb.from('teeth_status').delete()
+          .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+          .eq('tooth_num', tn).eq('surface', 'SOCKET');
+        if (drSk.error) console.error('delete socket entry error:', drSk.error);
+        delete teethMap[tn].SOCKET;
+        if (teethMap[tn].__status) delete teethMap[tn].__status.SOCKET;
       }
     }
     if (Object.keys(teethMap[tn] || {}).length === 0) delete teethMap[tn];
@@ -7297,12 +7363,29 @@ async function saveToothTreatment() {
         }
       }
     }
-    // ── Post-extraction site treatment (M61): ledger session only — the chart
-    //    keeps the extracted ghost; no teeth_status row is written. ──
+    // ── Post-extraction site treatment (M61/M63): store on surface='SOCKET' — a SEPARATE
+    //    row from the extraction (WHOLE='extracted'), so the ghost is kept AND the treatment
+    //    colour renders on top. surface is a pure clinical LABEL → zero financial effect. ──
     var _socketSave = window.__m61 === true && pendingTr && pendingTr.post_extraction === true
                    && pendingTp !== 'bridge' && pendingTp !== 'implant'
                    && !isSpacerTreatment(pendingTr) && isExtracted(currentTooth);
-    if (!_socketSave) {
+    if (_socketSave) {
+      // dedicated SOCKET surface (mirrors SPACER). The fallback wrapper only ever rewrites
+      // `status` (never `surface`), so the WHOLE='extracted' row can never be clobbered.
+      var rSk = await upsertTeethStatusWithFallback({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: String(currentTooth), surface: 'SOCKET', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (rSk.error) {
+        console.error('socket save error:', rSk.error);
+        showToast('⚠️ خطأ حفظ الحالة: ' + rSk.error.message);
+      } else {
+        if (!teethMap[String(currentTooth)]) teethMap[String(currentTooth)] = {};
+        teethMap[String(currentTooth)].SOCKET = pendingToothStatus;
+        if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
+        teethMap[String(currentTooth)].__status.SOCKET = pendingTreatStatus;
+      }
+    } else {
     // Normal save — DB constraint now accepts all valid surface values
     var rN = await upsertTeethStatusWithFallback({
       doctor_id: currentUser.id, patient_id: patientId,
@@ -7344,6 +7427,7 @@ async function saveToothTreatment() {
   // so we save the true surface key for accurate per-surface reporting.
   var dbSurface = currentSurface;
   if (spacerUnitForLedger) dbSurface = 'SPACER';
+  if (_socketSave) dbSurface = 'SOCKET';
   // Only create a ledger entry for completed and planned treatments (financial records).
   // 'existing_current'/'existing_other' (pre-existing work, whether ours or external) and
   // 'referred' (sent away) are clinical notes only — they don't represent current chargeable production.
