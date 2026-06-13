@@ -77,6 +77,21 @@ body {
   border-bottom-color: rgba(255,107,107,0.28);
 }
 
+/* Settings hub — index cards (Redesign v1) */
+.settings-hub{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:13px;margin-bottom:28px;}
+.shub-card{display:flex;align-items:center;gap:12px;padding:15px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;text-decoration:none;color:inherit;box-shadow:var(--shadow-card);transition:transform .16s,box-shadow .16s,border-color .16s;}
+.shub-card:hover{transform:translateY(-2px);border-color:rgba(var(--green-rgb),.45);box-shadow:0 10px 24px -8px rgba(16,42,67,.14);}
+.shub-card.danger:hover{border-color:rgba(220,38,38,.45);}
+.shub-ic{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.shub-ic.a{background:var(--green-dim);color:var(--green);}
+.shub-ic.c{background:rgba(37,99,235,.10);color:var(--blue);}
+.shub-ic.v{background:rgba(14,116,144,.10);color:var(--cyan);}
+.shub-ic.d{background:var(--red-dim);color:var(--red);}
+.shub-body{flex:1;min-width:0;}
+.shub-title{font-size:14px;font-weight:800;color:var(--text);}
+.shub-desc{font-size:11.5px;color:var(--text-muted);margin-top:3px;line-height:1.5;}
+.shub-arrow{color:var(--text3);flex-shrink:0;}
+.settings-group-title{scroll-margin-top:16px;}
 .section {
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -416,7 +431,30 @@ textarea::placeholder { color: var(--text2); }
   <div class="content">
    <div class="settings-grid">
 
-    <h2 class="settings-group-title first-group">👤 الحساب</h2>
+    <div class="settings-hub">
+      <a class="shub-card" href="#grp-account">
+        <div class="shub-ic a"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.9-3.6 3.7-5.3 7-5.3s6.1 1.7 7 5.3"/></svg></div>
+        <div class="shub-body"><div class="shub-title">الحساب</div><div class="shub-desc">الاسم، الروشتة، البريد، كلمة المرور</div></div>
+        <svg class="shub-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+      </a>
+      <a class="shub-card" href="#grp-clinic">
+        <div class="shub-ic c"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+        <div class="shub-body"><div class="shub-title">العيادة</div><div class="shub-desc">المواعيد، القوالب، الغرف، واتساب، الحجز</div></div>
+        <svg class="shub-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+      </a>
+      <a class="shub-card" href="#grp-advanced">
+        <div class="shub-ic v"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09c0-.7-.42-1.32-1.06-1.58a1.7 1.7 0 0 0-1.85.36l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06c.47-.47.6-1.18.34-1.88a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09c.7 0 1.32-.42 1.58-1.06a1.7 1.7 0 0 0-.36-1.85l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06c.47.47 1.18.6 1.88.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09c0 .7.41 1.3 1.03 1.56.7.26 1.41.13 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.88V9c.26.62.86 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09c-.7 0-1.3.41-1.51.97z"/></svg></div>
+        <div class="shub-body"><div class="shub-title">متقدّم</div><div class="shub-desc">صيانة البيانات والأدوات</div></div>
+        <svg class="shub-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+      </a>
+      <a class="shub-card danger" href="#grp-danger">
+        <div class="shub-ic d"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg></div>
+        <div class="shub-body"><div class="shub-title">منطقة الخطر</div><div class="shub-desc">حذف الحساب نهائياً</div></div>
+        <svg class="shub-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+      </a>
+    </div>
+
+    <h2 class="settings-group-title first-group" id="grp-account">👤 الحساب</h2>
     <!-- 1. المعلومات الشخصية -->
     <div class="section">
       <div class="section-title">👤 المعلومات الشخصية</div>
@@ -479,7 +517,7 @@ textarea::placeholder { color: var(--text2); }
       </form>
     </div>
 
-    <h2 class="settings-group-title">🏥 العيادة</h2>
+    <h2 class="settings-group-title" id="grp-clinic">🏥 العيادة</h2>
     <!-- 1.5 إعدادات المواعيد — Gap 5 -->
     <div class="section">
       <div class="section-title">🗓️ إعدادات المواعيد</div>
@@ -669,7 +707,7 @@ textarea::placeholder { color: var(--text2); }
       <button type="button" class="btn btn-primary" id="btnSaveBooking" onclick="saveBookingSettings()">💾 حفظ إعدادات الحجز</button>
     </div>
 
-    <h2 class="settings-group-title">🛠️ متقدّم</h2>
+    <h2 class="settings-group-title" id="grp-advanced">🛠️ متقدّم</h2>
     <!-- Bug #2: Backfill orphaned payment splits -->
     <div class="section">
       <div class="section-title">🛠️ صيانة البيانات</div>
@@ -694,7 +732,7 @@ textarea::placeholder { color: var(--text2); }
       </div>
     </div>
 
-    <h2 class="settings-group-title danger">⚠️ منطقة الخطر</h2>
+    <h2 class="settings-group-title danger" id="grp-danger">⚠️ منطقة الخطر</h2>
     <!-- 4. حذف الحساب -->
     <div class="section danger danger-section">
       <div class="section-title danger">⚠️ حذف الحساب</div>
