@@ -1149,8 +1149,13 @@ async function resetToDefaults() {
   for (var _i = 0; _i < treatments.length; _i++) { _haveKey[treatments[_i].treatment_key] = 1; _haveName[treatments[_i].name] = 1; }
   var _toAdd = _all.filter(function(t){ return !_haveKey[t.treatment_key] && !_haveName[t.name]; });
   if (!_toAdd.length) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
-  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id }, d, { sort_order: _orderOf[d.treatment_key] }));
-  if (!window.__m61T) rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 safety
+  // post_extraction MUST be explicit on every row. PostgREST bulk-insert builds its column
+  // list from the UNION of keys across the array and writes NULL (not the column DEFAULT) for
+  // any row missing a key. Only the spacer/socket templates carry post_extraction, so omitting
+  // it on the rest sent NULL into a NOT-NULL column → 400. Seed false; the template overrides
+  // with true where needed. (Single-row saves elsewhere don't hit this — only bulk arrays do.)
+  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id, post_extraction: false }, d, { sort_order: _orderOf[d.treatment_key] }));
+  if (!window.__m61T) rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 safety (column absent)
   const { error } = await window.sb.from('treatments').insert(rows);
   if (error) { showToast('⚠️ ' + error.message); return; }
   await loadTreatments();
