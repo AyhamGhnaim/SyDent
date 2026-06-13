@@ -578,7 +578,11 @@
   .ob-clinic-prompt-actions button:hover { filter: brightness(1.1); }
 
 /* ════ Dash add-ons (Redesign v1): نبض اليوم + إجراءات سريعة + تنبيهات ════ */
-#dpCard .dp-track{position:relative;height:86px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;margin-top:12px;overflow:hidden}
+#dpCard .dp-track{position:relative;height:86px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;margin-top:12px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+#dpCard .dp-track::-webkit-scrollbar{height:8px}
+#dpCard .dp-track::-webkit-scrollbar-thumb{background:var(--border2);border-radius:8px}
+#dpCard .dp-track::-webkit-scrollbar-track{background:transparent}
+#dpCard .dp-inner{position:relative;min-width:100%}
 .dp-hours{position:absolute;inset:0;display:flex;flex-direction:row}
 .dp-hours span{flex:1;border-inline-start:1px dashed var(--border);font-size:10px;color:var(--text3);padding:4px 6px 0 0}
 .dp-hours span:first-child{border-inline-start:none}
@@ -772,6 +776,7 @@
       <div class="header-title">لوحة التحكم</div>
       <div class="header-sub" id="dateDisplay">جارٍ التحميل...</div>
       <div class="header-sub" id="dateDisplayDoctor" style="margin-top:4px;color:var(--accent);font-weight:600"></div>
+      <div class="header-sub" id="dashApptLine" style="margin-top:2px"></div>
     </div>
     <div class="header-actions">
       <input class="search-bar" placeholder="🔍  بحث عن مريض..." onclick="window.location.href='patients.html'" readonly />
@@ -1167,6 +1172,11 @@ async function loadDashboard() {
   _dashApptsToday = apptsToday;
   _dashUid = uid;
   document.getElementById('statApptToday').textContent = apptsToday.length;
+  // Header subtitle — formal-Arabic appointment count (لديك … موعد اليوم).
+  var _dashApptLine = document.getElementById('dashApptLine');
+  if (_dashApptLine) _dashApptLine.textContent = apptsToday.length
+    ? ('لديك ' + apptsToday.length + ' موعد اليوم')
+    : 'لا مواعيد اليوم';
   const nowTime = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   const upcoming = apptsToday.filter(a => (a.time||'') >= nowTime).length;
   document.getElementById('statApptUpcoming').textContent = upcoming ? upcoming + ' متبقية' : '';
@@ -2181,12 +2191,23 @@ obInit();
       // خط الآن
       var now=new Date(), nm=now.getHours()*60+now.getMinutes();
       if(nm>=lo&&nm<=hi) html+='<div class="dp-now" style="right:'+pct(nm).toFixed(2)+'%;"></div>';
-      track.style.height=(6+rows.length*30+8)+'px';
-      track.innerHTML=html;
+      // Fixed scale (120px/hour) wrapped in a scrollable inner layer so the
+      // full day is pannable when it doesn't fit. min-width:100% keeps short
+      // days filling the card exactly as before (percent positions resolve
+      // against the rendered inner width). RTL → starts at the day's start on
+      // the right; scroll left toward later hours.
+      var dpInnerH=(6+rows.length*30+8);
+      var dpTotalW=Math.round(span/60*120);
+      track.style.height=dpInnerH+'px';
+      track.innerHTML='<div class="dp-inner" style="width:'+dpTotalW+'px;height:'+dpInnerH+'px;">'+html+'</div>';
       // الإشغال
       var busy=items.filter(function(x){return x.cls!=='dp-x';}).reduce(function(t,x){return t+(x.e-x.s);},0);
       var meta=document.getElementById('dpMeta');
-      if(meta) meta.textContent='إشغال '+Math.min(100,Math.round(busy/span*100))+'% · '+items.length+' موعد';
+      if(meta){
+        var dpMetaTxt='إشغال '+Math.min(100,Math.round(busy/span*100))+'% · '+items.length+' موعد';
+        try{ if(track.scrollWidth - track.clientWidth > 8) dpMetaTxt+=' · اسحب لعرض اليوم كامل'; }catch(_){}
+        meta.textContent=dpMetaTxt;
+      }
       card.style.display='';
     }catch(e){ try{ document.getElementById('dpCard').style.display='none'; }catch(_){} }
   }
