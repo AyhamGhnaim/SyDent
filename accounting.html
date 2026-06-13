@@ -902,11 +902,16 @@ async function loadMaterialCost(from, to) {
     var priceById = {};
     itemsRes.data.forEach(function(it){ priceById[it.id] = Number(it.purchase_price) || 0; });
 
-    // 2) حركات الاستهلاك (نجلب نطاقاً أوسع قليلاً ثم نفلتر محلياً بالتوقيت المحلي)
+    // 2) حركات الاستهلاك: created_at من نوع TIMESTAMPTZ — نجلب نافذة UTC موسّعة (±يوم)
+    //    ثم نقصّ محلياً بـ inLocalRange (نفس نمط loadPayouts/loadLabOrders). التقييد يمنع
+    //    مسح كل حركات الاستهلاك مدى عمر العيادة؛ النتيجة الرقمية لا تتغيّر (الفلتر المحلي ذاته).
+    var loUtc = widenStartUtc(from), hiUtc = widenEndUtc(to);
     var movRes = await window.sb.from('inventory_movements')
       .select('item_id, change, reason, created_at')
       .eq('owner_id', currentUser.id)
-      .eq('reason', 'consume');
+      .eq('reason', 'consume')
+      .gte('created_at', loUtc)
+      .lte('created_at', hiUtc);
     if (movRes.error || !movRes.data) return;  // graceful
 
     var total = 0;
