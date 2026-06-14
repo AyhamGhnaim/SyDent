@@ -2593,6 +2593,62 @@ function _apptBuildFifoSplits(payment, sessionsList, existingSplits) {
 //   'insert-failed'      (DELETE succeeded but INSERT failed even on retry)
 //   'exception'          (unhandled throw)
 //   'ok'                 (success)
+// Detect a "function does not exist" error so we can fall back gracefully when
+// the atomic RPC (Migration 64) isn't deployed to this DB yet.
+function _apptIsRpcMissing(err) {
+  if (!err) return false;
+  if (err.code === '42883' || err.code === 'PGRST202') return true; // undefined_function / not in schema cache
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('could not find the function') !== -1
+      || (m.indexOf('function') !== -1
+          && (m.indexOf('does not exist') !== -1 || m.indexOf('not found') !== -1));
+}
+
+// Persist a rebuilt split set for a patient. Prefers the atomic RPC
+// realloc_patient_splits (Migration 64) — DELETE+INSERT in one transaction —
+// and falls back to the legacy non-atomic DELETE→INSERT (+1 retry) when absent.
+// Returns one of: 'ok' | 'no-splits-feature' | 'delete-failed' | 'insert-failed'.
+async function _apptPersistSplits(pid, splitsToInsert) {
+  var rows = Array.isArray(splitsToInsert) ? splitsToInsert : [];
+  // 1) Atomic RPC first.
+  try {
+    var rpc = await window.sb.rpc('realloc_patient_splits', {
+      p_patient_id: pid,
+      p_splits: rows
+    });
+    if (!rpc.error) return 'ok';
+    if (_apptIsPaymentSplitsTableMissing(rpc.error)) return 'no-splits-feature';
+    if (!_apptIsRpcMissing(rpc.error)) {
+      console.warn('_apptPersistSplits: rpc failed:', rpc.error);
+      return 'insert-failed';
+    }
+    // RPC missing → fall through to legacy path.
+  } catch (e) {
+    console.warn('_apptPersistSplits: rpc threw, using legacy path:', e);
+  }
+  // 2) Legacy non-atomic fallback: DELETE → INSERT (+1 retry).
+  var delRes = await window.sb.from('payment_splits').delete()
+    .eq('patient_id', pid).eq('doctor_id', currentUser.id);
+  if (delRes.error) {
+    if (_apptIsPaymentSplitsTableMissing(delRes.error)) return 'no-splits-feature';
+    console.warn('_apptPersistSplits: delete failed', delRes.error);
+    return 'delete-failed';
+  }
+  if (!rows.length) return 'ok';
+  var insRes = await window.sb.from('payment_splits').insert(rows).select();
+  if (insRes.error) {
+    if (_apptIsPaymentSplitsTableMissing(insRes.error)) return 'no-splits-feature';
+    console.warn('_apptPersistSplits: insert failed, retrying once:', insRes.error);
+    await new Promise(function(r){ setTimeout(r, 200); });
+    var retry = await window.sb.from('payment_splits').insert(rows).select();
+    if (retry.error) {
+      console.warn('_apptPersistSplits: retry also failed:', retry.error);
+      return 'insert-failed';
+    }
+  }
+  return 'ok';
+}
+
 async function reallocateAfterNoShowFee(patientId) {
   if (!patientId || !currentUser || !currentUser.id) {
     return { ok: false, reason: 'no-context' };
@@ -2668,17 +2724,8 @@ async function reallocateAfterNoShowFee(patientId) {
       }
     }
 
-    // 3. DELETE all splits for this patient (we'll re-insert manual
-    //    allocated splits + freshly-computed FIFO splits).
-    var delRes = await window.sb.from('payment_splits').delete()
-      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
-    if (delRes.error) {
-      if (_apptIsPaymentSplitsTableMissing(delRes.error)) {
-        return { ok: true, reason: 'no-splits-feature' };
-      }
-      console.warn('reallocateAfterNoShowFee: delete failed', delRes.error);
-      return { ok: false, reason: 'delete-failed' };
-    }
+    // 3. (Splits are persisted atomically at step 7 via _apptPersistSplits —
+    //    the DELETE now happens inside the same transaction as the INSERT.)
 
     // 4. Sort all payments oldest-first (chronological FIFO).
     var sortedPayments = payments.slice().sort(function(a, b){
@@ -2729,25 +2776,12 @@ async function reallocateAfterNoShowFee(patientId) {
       return copy;
     });
 
-    // 7. Bulk-insert. One retry on failure because DELETE has already
-    //    committed — leaving the table empty would corrupt the balance
-    //    display for this patient.
-    if (splitsToInsert.length) {
-      var insRes = await window.sb.from('payment_splits')
-        .insert(splitsToInsert).select();
-      if (insRes.error) {
-        if (_apptIsPaymentSplitsTableMissing(insRes.error)) {
-          return { ok: true, reason: 'no-splits-feature' };
-        }
-        console.warn('reallocateAfterNoShowFee: insert failed, retrying once:', insRes.error);
-        await new Promise(function(r){ setTimeout(r, 200); });
-        var retry = await window.sb.from('payment_splits')
-          .insert(splitsToInsert).select();
-        if (retry.error) {
-          console.warn('reallocateAfterNoShowFee: retry also failed:', retry.error);
-          return { ok: false, reason: 'insert-failed' };
-        }
-      }
+    // 7. Persist atomically (RPC realloc_patient_splits) with graceful fallback to
+    //    the legacy non-atomic DELETE→INSERT. Worst case (RPC absent) = exactly the
+    //    previous behaviour.
+    var persistReason = await _apptPersistSplits(patientId, splitsToInsert);
+    if (persistReason !== 'ok') {
+      return { ok: persistReason === 'no-splits-feature', reason: persistReason };
     }
     return { ok: true, reason: 'ok' };
   } catch (e) {

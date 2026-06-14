@@ -2271,6 +2271,73 @@ async function persistPaymentSplits(splitRows) {
    If retry also fails, an in-memory marker is left and a warning toast fires
    so the user knows the patient's allocation needs manual attention. */
 var _reallocateInFlight = false;
+// Detect a "function does not exist" error so callers can fall back gracefully
+// when the atomic RPC (Migration 64) hasn't been deployed to this DB yet.
+function _isRpcMissing(err) {
+  if (!err) return false;
+  if (err.code === '42883' || err.code === 'PGRST202') return true; // undefined_function / not in schema cache
+  var m = (err.message || '').toLowerCase();
+  return m.indexOf('could not find the function') !== -1
+      || (m.indexOf('function') !== -1
+          && (m.indexOf('does not exist') !== -1 || m.indexOf('not found') !== -1));
+}
+
+// Persist a patient's freshly-computed split set. Prefers the atomic RPC
+// realloc_patient_splits(p_patient_id, p_splits) — Migration 64 — which performs
+// DELETE-then-INSERT inside one transaction (no window where the patient has zero
+// splits). Falls back to the legacy non-atomic DELETE→INSERT (+1 retry) when the
+// RPC is absent, so client / migration deploy order doesn't matter.
+// Refreshes module-level `paymentSplits` on success.
+// Returns: true (ok) | false (failed) | 'table-missing' (pre-Migration-3).
+async function _persistSplits(pid, splitsToInsert) {
+  var rows = Array.isArray(splitsToInsert) ? splitsToInsert : [];
+  // ── 1) Atomic RPC (preferred) ──
+  try {
+    var rpc = await window.sb.rpc('realloc_patient_splits', {
+      p_patient_id: pid,
+      p_splits: rows
+    });
+    if (!rpc.error) {
+      paymentSplits = rpc.data || [];
+      return true;
+    }
+    if (_isPaymentSplitsTableMissing(rpc.error)) return 'table-missing';
+    if (!_isRpcMissing(rpc.error)) {
+      console.warn('_persistSplits: rpc failed:', rpc.error);
+      return false;
+    }
+    // RPC missing → fall through to the legacy path below.
+  } catch (e) {
+    console.warn('_persistSplits: rpc threw, using legacy path:', e);
+  }
+
+  // ── 2) Legacy non-atomic fallback: DELETE → INSERT (+1 retry) ──
+  var delRes = await window.sb.from('payment_splits').delete()
+    .eq('patient_id', pid).eq('doctor_id', currentUser.id);
+  if (delRes.error) {
+    if (_isPaymentSplitsTableMissing(delRes.error)) return 'table-missing';
+    console.warn('_persistSplits: delete failed:', delRes.error);
+    return false;
+  }
+  paymentSplits = [];
+  if (!rows.length) return true;
+  var insRes = await window.sb.from('payment_splits').insert(rows).select();
+  if (insRes.error) {
+    if (_isPaymentSplitsTableMissing(insRes.error)) return 'table-missing';
+    console.warn('_persistSplits: insert failed, retrying once:', insRes.error);
+    await new Promise(function(r){ setTimeout(r, 200); });
+    var retry = await window.sb.from('payment_splits').insert(rows).select();
+    if (retry.error) {
+      console.warn('_persistSplits: retry also failed:', retry.error);
+      return false;
+    }
+    for (var k = 0; k < (retry.data || []).length; k++) paymentSplits.push(retry.data[k]);
+    return true;
+  }
+  for (var k2 = 0; k2 < (insRes.data || []).length; k2++) paymentSplits.push(insRes.data[k2]);
+  return true;
+}
+
 async function reallocatePatientFunds() {
   if (!patientId || !currentUser) return true;
 
@@ -2353,26 +2420,11 @@ async function reallocatePatientFunds() {
       }
     }
 
-    // 1. DELETE existing splits — but keep manual ALLOCATED splits.
-    // PostgREST has no clean "in.()" on UUID list with extra clauses, so we use
-    // two filters: not.in payment_id list AND not.in split id list.
-    // Simpler approach: delete by patient, then re-insert the preserved manual
-    // allocated splits along with the new FIFO splits. This is atomic-enough
-    // for our use because we only swap rows owned by a single patient.
-    var delQuery = window.sb.from('payment_splits').delete()
-      .eq('patient_id', patientId).eq('doctor_id', currentUser.id);
-    var delRes = await delQuery;
-    if (delRes.error) {
-      if (_isPaymentSplitsTableMissing(delRes.error)) {
-        // Pre-Migration-3 DB: silently skip. The app still works in legacy mode.
-        return true;
-      }
-      console.warn('reallocate: delete splits failed:', delRes.error);
-      return false;
-    }
-
-    // Sync memory: start from scratch; we'll repopulate as we go.
-    paymentSplits = [];
+    // 1. Build the new split set IN MEMORY first (no DB writes yet); it is then
+    // persisted by _persistSplits() at the end. Persistence prefers the atomic RPC
+    // realloc_patient_splits (Migration 64) — DELETE+INSERT in one transaction, so
+    // the patient is never left with zero splits — and falls back to the legacy
+    // non-atomic DELETE→INSERT when the RPC isn't deployed yet.
 
     // 2. Sort ALL payments oldest-first. Manual payments still participate so
     // their unearned chunks get re-allocated in chronological position.
@@ -2433,33 +2485,16 @@ async function reallocatePatientFunds() {
       return copy;
     });
 
-    var newSplitsToInsert = splitsToInsert;
-
-    // 4. Bulk-insert the new splits. One retry on failure because DELETE has
-    // already committed — leaving DB empty would corrupt the balance display.
-    if (newSplitsToInsert.length) {
-      var insRes = await window.sb.from('payment_splits')
-        .insert(newSplitsToInsert).select();
-      if (insRes.error) {
-        if (_isPaymentSplitsTableMissing(insRes.error)) return true;
-        console.warn('reallocate: insert failed, retrying once:', insRes.error);
-        // One retry — transient network errors clear up on second try.
-        await new Promise(function(r){ setTimeout(r, 200); });
-        var retry = await window.sb.from('payment_splits')
-          .insert(newSplitsToInsert).select();
-        if (retry.error) {
-          console.warn('reallocate: retry also failed:', retry.error);
-          if (typeof showToast === 'function') {
-            showToast('⚠️ تعذّر توزيع الدفعات — أعد المحاولة لاحقاً');
-          }
-          return false;
-        }
-        // Append new splits to memory.
-          for (var k = 0; k < (retry.data || []).length; k++) paymentSplits.push(retry.data[k]);
-        return true;
+    // 4. Persist atomically (RPC realloc_patient_splits) with graceful fallback to
+    // the legacy non-atomic DELETE→INSERT. Worst case (RPC absent) = exactly the
+    // previous behaviour. _persistSplits refreshes `paymentSplits` on success.
+    var persisted = await _persistSplits(patientId, splitsToInsert);
+    if (persisted === 'table-missing') return true;   // pre-Migration-3 → legacy mode
+    if (persisted === false) {
+      if (typeof showToast === 'function') {
+        showToast('⚠️ تعذّر توزيع الدفعات — أعد المحاولة لاحقاً');
       }
-      // Append new splits to memory.
-      for (var k2 = 0; k2 < (insRes.data || []).length; k2++) paymentSplits.push(insRes.data[k2]);
+      return false;
     }
 
     // Clear the manual_allocation flag for any payments we detected as corrupted
