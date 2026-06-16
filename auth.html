@@ -203,9 +203,14 @@ body{
       <input type="text" id="regName" placeholder="د. أيهم غنيم" required>
     </div>
     <div class="form-group">
-      <label>رقم الموبايل أو البريد الإلكتروني</label>
-      <input type="text" id="regContact" placeholder="09xxxxxxxx أو doctor@example.com" required>
-      <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5;">يمكنك استخدام رقم موبايلك أو بريدك الإلكتروني — ستستخدم نفسه لتسجيل الدخول لاحقاً.</div>
+      <label>رقم الموبايل</label>
+      <input type="tel" id="regPhone" placeholder="09xxxxxxxx" autocomplete="tel" inputmode="numeric" required>
+      <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5;">إلزامي — نستخدمه للتواصل معك (واتساب: ترحيب، تذكير، تجديد).</div>
+    </div>
+    <div class="form-group">
+      <label>البريد الإلكتروني (اختياري)</label>
+      <input type="email" id="regEmail" placeholder="doctor@example.com" autocomplete="email">
+      <div style="font-size:11px;color:var(--text2);margin-top:5px;line-height:1.5;">إذا أضفته، تقدر تسجّل الدخول بالرقم أو بالإيميل — وتستعيد كلمة المرور عبر البريد.</div>
     </div>
     <div class="form-group">
       <label>المدينة</label>
@@ -438,9 +443,24 @@ async function doLogin(e) {
   hideMsg();
   const btn = document.getElementById('loginBtn');
   var rawInput = document.getElementById('loginEmail').value.trim();
-  // إذا كان رقم موبايل (أرقام فقط) نحوّله لإيميل
-  var email = /^[\d]+$/.test(rawInput.replace(/\s/g,'')) ? rawInput.replace(/\D/g,'') + '@sydent.com' : rawInput.toLowerCase();
   const password = document.getElementById('loginPass').value;
+  // Resolve the entered identifier (phone OR email) to the account's canonical
+  // auth email via Migration 65 resolve_login_email(). Falls back to the legacy
+  // client-side digits→@sydent.com transform if the RPC is unavailable, so the
+  // page works whether or not the migration has been applied yet (deploy-order
+  // independent).
+  function legacyTransform(v){
+    return (v.indexOf('@') === -1 && /^[\d\s+\-()]+$/.test(v))
+      ? v.replace(/\D/g,'') + '@sydent.com'
+      : v.toLowerCase();
+  }
+  var email;
+  try {
+    const { data: resolved, error: rErr } = await window.sb.rpc('resolve_login_email', { p_input: rawInput });
+    email = (!rErr && resolved) ? resolved : legacyTransform(rawInput);
+  } catch (_e) {
+    email = legacyTransform(rawInput);
+  }
   btn.disabled = true;
   btn.innerHTML = 'جارٍ التحقق<span class="spinner"></span>';
   try {
@@ -499,38 +519,35 @@ async function doRegister(e) {
   hideMsg();
   const btn = document.getElementById('regBtn');
   const name = document.getElementById('regName').value.trim();
-  const contact = document.getElementById('regContact').value.trim();
+  const phoneRaw = document.getElementById('regPhone').value.trim();
+  const emailRaw = document.getElementById('regEmail').value.trim();
   const city = document.getElementById('regCity').value;
   const notes = document.getElementById('regNotes').value.trim();
   const password = document.getElementById('regPass').value;
 
-  // Phase 7.6F: validation
+  // Validation — phone is MANDATORY (admin contact), email is OPTIONAL.
   if (!name) { showMsg('❌ يرجى إدخال الاسم الكامل', 'error'); return; }
-  if (!contact) { showMsg('❌ يرجى إدخال رقم الموبايل أو الإيميل', 'error'); return; }
-  if (password.length < 6) { showMsg('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
-
-  // Phase 7.6F: detect whether contact is an email or a phone number.
-  // Email: contains '@'. Phone: digits only (with optional separators).
-  // The trader uses the SAME value to log in later (auth.html doLogin already
-  // applies the same digits-only → @sydent.com transform).
-  var isEmail = contact.indexOf('@') !== -1;
-  var email, phoneForRow;
-  if (isEmail) {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact)) {
+  if (!phoneRaw) { showMsg('❌ رقم الموبايل إلزامي', 'error'); return; }
+  if (!/^[\d\s+\-()]+$/.test(phoneRaw)) { showMsg('❌ رقم الموبايل غير صحيح', 'error'); return; }
+  var digits = phoneRaw.replace(/\D/g, '');
+  if (digits.length < 9) { showMsg('❌ رقم الموبايل قصير جداً', 'error'); return; }
+  var hasEmail = emailRaw.length > 0;
+  if (hasEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
       showMsg('❌ تنسيق الإيميل غير صحيح', 'error'); return;
     }
-    email = contact.toLowerCase();
-    phoneForRow = null;
-  } else {
-    // Phone path: digits only allowed (with optional separators we strip)
-    if (!/^[\d\s+\-()]+$/.test(contact)) {
-      showMsg('❌ أدخل رقم موبايل أو إيميل صحيح', 'error'); return;
+    if (emailRaw.toLowerCase().endsWith('@sydent.com')) {
+      // @sydent.com is our internal phone→email identifier (rule #62) — not a user email.
+      showMsg('❌ هذا النطاق محجوز للنظام. استخدم بريداً آخر أو اتركه فارغاً.', 'error'); return;
     }
-    var digits = contact.replace(/\D/g, '');
-    if (digits.length < 9) { showMsg('❌ رقم الموبايل قصير جداً', 'error'); return; }
-    email = digits + '@sydent.com';
-    phoneForRow = digits;
   }
+  if (password.length < 6) { showMsg('❌ كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
+
+  // Phone is ALWAYS stored (admin contact). Canonical auth identifier =
+  // the real email when supplied, else the synthesized {digits}@sydent.com.
+  // Migration 65 resolve_login_email() maps either entry → this canonical at login.
+  var email = hasEmail ? emailRaw.toLowerCase() : (digits + '@sydent.com');
+  var phoneForRow = digits;
 
   btn.disabled = true;
   btn.innerHTML = 'جارٍ الإنشاء<span class="spinner"></span>';
@@ -559,11 +576,14 @@ async function doRegister(e) {
     });
     if (trErr) {
       // The auth.users row was created but the trial_request insert failed.
-      // We can't roll back the auth.users from this client (no SERVICE_KEY here),
-      // but the trader can re-try and the existing auth.users will be re-found
-      // by admin. Log and show a friendly error.
+      // We can't roll back the auth.users from this client (no SERVICE_KEY here).
+      // Distinguish a duplicate-phone collision (Migration 65 unique index) from a
+      // generic failure so the trader gets a useful message.
       console.error('trial_requests insert failed:', trErr);
-      showMsg('⚠️ تم إنشاء الحساب لكن فشل تسجيل طلب التجربة. تواصل مع الدعم.', 'error');
+      var dup = (trErr.code === '23505') || /duplicate|unique/i.test(trErr.message || '');
+      showMsg(dup
+        ? '❌ هذا الرقم مسجّل مسبقاً. إذا سبق وسجّلت، استخدم تبويب "تسجيل دخول".'
+        : '⚠️ تم إنشاء الحساب لكن فشل تسجيل طلب التجربة. تواصل مع الدعم.', 'error');
       btn.disabled = false;
       btn.textContent = 'إنشاء حساب التجربة';
       return;
@@ -582,8 +602,8 @@ async function doRegister(e) {
   } catch (err) {
     let msg = err.message || 'فشل إنشاء الحساب';
     if (msg.toLowerCase().includes('already') || msg.toLowerCase().includes('registered')) {
-      msg = isEmail
-        ? 'هذا الإيميل مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".'
+      msg = hasEmail
+        ? 'هذا الرقم أو الإيميل مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".'
         : 'هذا الرقم مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".';
     }
     if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة جداً';
