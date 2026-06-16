@@ -238,10 +238,10 @@ body{
 <div id="forgotModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="forgotModalTitle">
   <div class="modal-card">
     <h3 id="forgotModalTitle">إعادة تعيين كلمة المرور</h3>
-    <p class="modal-hint">أدخل بريدك الإلكتروني وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.</p>
+    <p class="modal-hint">أدخل بريدك الإلكتروني أو رقم موبايلك، وسنرسل رابط إعادة التعيين على بريدك المسجَّل.</p>
     <div class="form-group">
-      <label for="forgotEmail">البريد الإلكتروني</label>
-      <input type="email" id="forgotEmail" placeholder="doctor@example.com" autocomplete="email">
+      <label for="forgotEmail">البريد الإلكتروني أو رقم الموبايل</label>
+      <input type="text" id="forgotEmail" placeholder="doctor@example.com أو 09xxxxxxxx" autocomplete="email">
     </div>
     <div id="forgotMsg" class="msg"></div>
     <div class="modal-actions">
@@ -322,12 +322,8 @@ function hideMsg() {
 function openForgotModal() {
   hideMsg();
   var loginEmail = document.getElementById('loginEmail').value.trim();
-  // Pre-fill from login field if it looks like an email (skip phone numbers)
-  if (loginEmail && loginEmail.indexOf('@') !== -1 && !/^[\d]+$/.test(loginEmail.replace(/\s/g,''))) {
-    document.getElementById('forgotEmail').value = loginEmail;
-  } else {
-    document.getElementById('forgotEmail').value = '';
-  }
+  // Pre-fill from the login field — email OR phone (both are accepted here now).
+  document.getElementById('forgotEmail').value = loginEmail || '';
   hideForgotMsg();
   // Reset button state in case modal was closed mid-flight
   var btn = document.getElementById('forgotBtn');
@@ -363,18 +359,17 @@ var _forgotHintTimer = null;
 async function sendResetEmail() {
   if (_forgotInFlight) return;
 
-  var email = (document.getElementById('forgotEmail').value || '').trim().toLowerCase();
-
-  // Basic email format validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    showForgotMsg('يرجى إدخال بريد إلكتروني صحيح.', 'error');
+  var raw = (document.getElementById('forgotEmail').value || '').trim();
+  if (!raw) {
+    showForgotMsg('يرجى إدخال بريدك الإلكتروني أو رقم موبايلك.', 'error');
     return;
   }
 
-  // Block phone-based accounts client-side (Risk 4 mitigation)
-  // @sydent.com is the internal phone→email transform (rule #62)
-  if (email.endsWith('@sydent.com')) {
-    showForgotMsg('هذا الحساب مسجَّل برقم هاتف. تواصل مع الدعم لاستعادة الحساب.', 'error');
+  // Accept EITHER an email or a phone. Phone-shaped = digits/separators, no '@'.
+  var isPhone = (raw.indexOf('@') === -1) && /^[\d\s+\-()]+$/.test(raw);
+  var emailLower = raw.toLowerCase();
+  if (!isPhone && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLower)) {
+    showForgotMsg('يرجى إدخال بريد إلكتروني صحيح أو رقم موبايل.', 'error');
     return;
   }
 
@@ -386,10 +381,33 @@ async function sendResetEmail() {
   cancelBtn.disabled = true;
   btn.innerHTML = 'جارٍ الإرسال<span class="spinner"></span>';
 
+  // Resolve the entered identifier → the account's canonical auth email (Migration
+  // 65). Phone-only accounts resolve to {digits}@sydent.com (no real inbox) → support
+  // hint. Email-identified accounts get a real reset link. Falls back to the typed
+  // email if the resolver is unavailable.
+  var target = emailLower;
+  try {
+    const { data: resolved, error: rErr } = await window.sb.rpc('resolve_login_email', { p_input: raw });
+    if (!rErr && resolved) target = String(resolved).toLowerCase();
+    else if (isPhone) target = '';
+  } catch (e) {
+    if (isPhone) target = '';   // no resolver → a phone can't map to a real inbox
+  }
+
+  // @sydent.com is the internal phone→email identifier (rule #62) — not a real inbox.
+  if (!target || target.endsWith('@sydent.com')) {
+    showForgotMsg('هذا الحساب مسجَّل برقم هاتف فقط. تواصل مع الدعم لاستعادة الحساب.', 'error');
+    btn.disabled = false;
+    cancelBtn.disabled = false;
+    btn.textContent = 'إرسال الرابط';
+    _forgotInFlight = false;
+    return;
+  }
+
   // Fire the reset request — but ALWAYS show same message regardless of outcome.
   // This prevents email enumeration (OWASP). Errors are logged to console only.
   try {
-    await window.sb.auth.resetPasswordForEmail(email, {
+    await window.sb.auth.resetPasswordForEmail(target, {
       redirectTo: window.location.origin + '/reset-password.html'
     });
   } catch (err) {
