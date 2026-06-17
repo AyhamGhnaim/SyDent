@@ -1496,6 +1496,13 @@ function populateProviderDropdown() {
 
   var html = '<option value="">— اختر الموظف —</option>';
   list.forEach(function(d){
+    // Owner is the payer, never a payee — exclude the clinic owner from the
+    // employee dropdown when recording a payout. Two signals are needed:
+    //   • is_owner===true   → clinic_doctors / Step-5 orphan rows
+    //   • _employeeRole==='owner' → clinic_employees Path-B rows, where
+    //     is_owner is hardcoded false. Checking both kills the duplicate the
+    //     Owner currently sees (one entry per path).
+    if (d.is_owner === true || d._employeeRole === 'owner') return;
     if (d.is_active === false && !showInactive) return;
     var inactive = (d.is_active === false) ? ' (معطل)' : '';
     var pt = providerTypeLabel(d.provider_type);
