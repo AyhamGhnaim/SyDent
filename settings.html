@@ -462,7 +462,7 @@ textarea::placeholder { color: var(--text2); }
       <form onsubmit="saveProfile(event)">
         <div class="form-group">
           <label>الاسم الكامل</label>
-          <input type="text" id="fName" placeholder="د. أيهم غنيم" required>
+          <input type="text" id="fName" placeholder="د. أحمد محمد" required>
         </div>
         <div class="form-group">
           <label>المسمى الوظيفي</label>
@@ -584,7 +584,7 @@ textarea::placeholder { color: var(--text2); }
       <div class="wa-row-2col">
         <div class="form-group">
           <label>اسم العيادة</label>
-          <input type="text" id="fClinicName" placeholder="عيادة د. أيهم لطب الأسنان">
+          <input type="text" id="fClinicName" placeholder="عيادة د. أحمد لطب الأسنان">
         </div>
         <div class="form-group">
           <label>رقم العيادة — واتساب WhatsApp (يظهر في الرسالة)</label>
@@ -1171,7 +1171,7 @@ function resetTemplate() {
 function buildSampleData() {
   const clinicName = document.getElementById('fClinicName').value.trim() || 'عيادتي';
   const meta = currentUser.user_metadata || {};
-  const doctorName = meta.full_name || meta.name || 'د. أيهم';
+  const doctorName = meta.full_name || meta.name || 'د. أحمد';
   const t = new Date(); t.setDate(t.getDate() + 1);
   const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
   const months = ['كانون الثاني','شباط','آذار','نيسان','أيار','حزيران','تموز','آب','أيلول','تشرين الأول','تشرين الثاني','كانون الأول'];
