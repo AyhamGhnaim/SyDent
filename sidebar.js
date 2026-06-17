@@ -212,7 +212,7 @@ const navItems = [
   { icon: '💉', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
   { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
   { icon: '👥', label: 'الموظفون',     href: 'employees.html', id: 'employees' },
-  { icon: '💳', label: 'رواتب موظفين', href: 'payouts.html',  id: 'payouts'   },
+  { icon: '💳', label: 'الرواتب والدفعات', href: 'payouts.html',  id: 'payouts'   },
   { icon: '💰', label: 'المصاريف',    href: 'expenses.html', id: 'expenses'  },
   { icon: '📦', label: 'المخزون',     href: 'inventory.html', id: 'inventory' },
   { icon: '🥽', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
