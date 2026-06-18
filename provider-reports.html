@@ -1095,7 +1095,7 @@ function render() {
         + '<div class="prov-actions">'
           + '<button class="btn-details" onclick="showDetails(\'' + d.id + '\')">📋 التفاصيل</button>'
           + '<button class="btn-print" onclick="printSlip(\'' + d.id + '\')">🖨️ طباعة كشف</button>'
-          + '<button class="btn-pay" onclick="openPayoutModal(\'' + d.id + '\')">💵 تسجيل دفعة</button>'
+          + (poIsOwner() ? '<button class="btn-pay" onclick="openPayoutModal(\'' + d.id + '\')">💵 تسجيل دفعة</button>' : '')
         + '</div>'
       + '</div>'
     + '</div>';
@@ -1297,7 +1297,16 @@ function printSlip(provId) {
 }
 
 // ─── Payout modal ───
+// Payout recording (paying a doctor their share/salary) is an owner-only
+// financial action. Non-owners (doctor/secretary device modes) must never
+// record, edit, or delete a payout. fail-open: if the lock system isn't
+// present at all, treat as owner (single-owner install).
+function poIsOwner() {
+  return !window.SyDentLock || window.SyDentLock.isOwner();
+}
+
 function openPayoutModal(provId) {
+  if (!poIsOwner()) { showToast('هذا الإجراء متاح للمالك فقط'); return; }
   var d = doctors.find(function(x){ return x.id === provId; });
   if (!d) return;
 
@@ -1346,6 +1355,7 @@ function renderPayoutHistory(provId) {
 }
 
 async function savePayout() {
+  if (!poIsOwner()) { showToast('هذا الإجراء متاح للمالك فقط'); return; }
   var provId = document.getElementById('payoutProviderId').value;
   var from   = document.getElementById('payoutFrom').value;
   var to     = document.getElementById('payoutTo').value;
@@ -1404,6 +1414,7 @@ async function savePayout() {
 }
 
 async function deletePayout(id) {
+  if (!poIsOwner()) { showToast('هذا الإجراء متاح للمالك فقط'); return; }
   if (!confirm('حذف هذه الدفعة؟')) return;
   // Snapshot for audit BEFORE delete
   var snapshot = payouts.find(function(po){ return po.id === id; });
