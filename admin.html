@@ -173,7 +173,14 @@ header{
   border-radius:14px;padding:16px;
   transition:border-color .2s;
 }
-.req-card.new{border-color:rgba(var(--green-rgb),0.25);}
+/* New signups stand out with a clear amber treatment that echoes the «جديد»
+   state badge color. The tint is layered OVER an opaque var(--bg2) base via a
+   flat gradient so the card stays solid (no see-through) and the border width
+   is unchanged (no layout shift). bk-selected uses outline, so both coexist. */
+.req-card.new{
+  border-color:var(--yellow);
+  background:linear-gradient(var(--yellow-dim),var(--yellow-dim)),var(--bg2);
+}
 .req-card.accepted{border-color:rgba(var(--green-rgb),0.15);opacity:.7;}
 .req-card.rejected{border-color:rgba(239,83,80,0.15);opacity:.6;}
 /* padding-right reserves the top-right corner for the absolutely-positioned
@@ -563,6 +570,42 @@ header{
   transition:background .15s;
 }
 .banner-close:hover{background:rgba(0,0,0,0.20);}
+
+/* New-signups notification banner — mirrors .alerts-banner shape but uses the
+   amber accent (matches the «جديد» state). Shown only when there is at least
+   one unreviewed signup AND the operator hasn't dismissed it this session. */
+.ns-banner{
+  display:none;
+  margin-bottom:16px;
+  padding:12px 14px;
+  background:var(--yellow-dim);
+  border:1px solid var(--yellow);
+  border-radius:10px;
+  align-items:center;justify-content:space-between;gap:10px;
+  cursor:pointer;
+  font-family:'Cairo',sans-serif;
+  transition:background .2s, border-color .2s;
+}
+.ns-banner.show{display:flex; animation:bannerFadeIn .2s ease-out;}
+.ns-banner:hover{background:linear-gradient(var(--yellow-dim),var(--yellow-dim)),var(--yellow-dim);}
+.ns-banner-text{
+  flex:1;font-size:13px;font-weight:700;color:var(--yellow);
+  display:flex;align-items:center;gap:8px;
+}
+.ns-banner-cta{
+  font-size:12px;font-weight:800;color:var(--yellow);
+  padding:4px 10px;border-radius:6px;
+  background:rgba(0,0,0,0.10);
+  white-space:nowrap;
+}
+.ns-banner-close{
+  background:transparent;border:none;
+  color:var(--yellow);font-size:16px;font-weight:800;
+  cursor:pointer;padding:2px 8px;
+  line-height:1;border-radius:6px;
+  transition:background .15s;
+}
+.ns-banner-close:hover{background:rgba(0,0,0,0.15);}
 @keyframes bannerFadeIn{
   from{opacity:0;transform:translateY(-4px);}
   to{opacity:1;transform:translateY(0);}
@@ -2344,6 +2387,14 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
       <button type="button" class="banner-close" id="alertsBannerClose" onclick="closeExpiringFilter(event)" aria-label="إلغاء الفلتر" style="display:none;">✕</button>
     </div>
 
+    <!-- New-signups notification banner: clicking jumps to the «جديد» filter.
+         Driven live by renderAll() + realtime INSERT events on trial_requests. -->
+    <div class="ns-banner" id="newSignupsBanner" onclick="onNewSignupsBannerClick(event)" onkeydown="onNewSignupsBannerKeydown(event)" role="button" tabindex="0">
+      <div class="ns-banner-text"><span aria-hidden="true">🔔</span> <span class="nsb-msg"></span></div>
+      <div class="ns-banner-cta">راجِع ›</div>
+      <button type="button" class="ns-banner-close" onclick="dismissNewSignupsBanner(event)" aria-label="إخفاء الإشعار">✕</button>
+    </div>
+
     <!-- Phase 7.6C-Step2: Export CSV (respects current filter + search) -->
     <!-- + filter-independent FULL backup (all accounts, all states) -->
     <div class="export-row">
@@ -2374,7 +2425,7 @@ button:focus-visible, .btn-accept:focus-visible, .btn-reject:focus-visible,
     <!-- Filter -->
     <div class="filter-tabs">
       <button class="tab active" onclick="setFilter('all',this)">الكل</button>
-      <button class="tab" onclick="setFilter('new',this)">جديد</button>
+      <button class="tab" id="tabNew" onclick="setFilter('new',this)">جديد <span id="newTabBadge" class="srq-badge" style="display:none;"></span></button>
       <button class="tab" onclick="setFilter('accepted',this)">مقبول</button>
       <button class="tab" onclick="setFilter('rejected',this)">مرفوض</button>
     </div>
@@ -3148,6 +3199,14 @@ async function callAdminFn(action, params) {
 
 var currentFilter = 'all';
 var allRequests = [];
+
+// New-signup notification state. ADMIN_BASE_TITLE is captured once so the
+// browser-tab title badge — e.g. "(2) SyDent — لوحة الإدارة" — can be applied
+// and cleared without hardcoding the title string (avoids drift if it changes).
+var ADMIN_BASE_TITLE = (typeof document !== 'undefined' && document.title) ? document.title : 'SyDent';
+var newBannerDismissed = false;          // set by the ✕ on the new-signups banner
+var _newSignupChannel = null;            // realtime channel handle (single subscription)
+var _newSignupRefreshTimer = null;       // debounce timer for INSERT-driven refreshes
 // owner_id (= trial_requests.user_id) → live clinic_settings.clinic_name.
 // Populated per load; lets the customer card show the clinic's current name
 // (the editable business name) above the signup/contact name. Empty when the
@@ -3799,6 +3858,8 @@ window.addEventListener('DOMContentLoaded', async function() {
   // Phase X12: load the tenant upgrade/renew request queue.
   loadSubRequests();
   loadAndRender();
+  // Live new-signup notifications without a manual refresh (Migration 69).
+  subscribeNewSignups();
 });
 
 async function loadAndRender() {
@@ -9289,6 +9350,18 @@ function renderAll() {
   document.getElementById('countAccepted').textContent = nAcc;
   document.getElementById('countRejected').textContent = nRej;
 
+  // New-signup notifications (all driven by the nNew already computed above):
+  //  1) count badge on the «جديد» filter tab (hidden at zero)
+  //  2) browser-tab title badge so an admin on another tab still notices
+  //  3) the top notification banner (respects this-session dismissal)
+  var _newTabBadge = document.getElementById('newTabBadge');
+  if (_newTabBadge) {
+    _newTabBadge.textContent = nNew;
+    _newTabBadge.style.display = nNew > 0 ? 'inline-block' : 'none';
+  }
+  document.title = (nNew > 0 ? '(' + nNew + ') ' : '') + ADMIN_BASE_TITLE;
+  renderNewSignupsBanner(nNew);
+
   // Phase X5: refresh customer health widgets (MRR, active, expiring,
   // conversion). Computed from allRequests in memory — zero DB queries.
   // Placed BEFORE the expiringFilterActive auto-disengage so the widget
@@ -9304,6 +9377,78 @@ function renderAll() {
   renderAlertsBanner();
 
   renderList();
+}
+
+// === New-signup notifications =============================================
+// Renders the top banner from the live nNew count. Hidden when there are no
+// unreviewed signups OR the operator dismissed it this session. Dismissal is
+// reset whenever a fresh signup arrives via realtime (subscribeNewSignups).
+function renderNewSignupsBanner(nNew) {
+  var b = document.getElementById('newSignupsBanner');
+  if (!b) return;
+  var msg = b.querySelector('.nsb-msg');
+  if (nNew > 0 && !newBannerDismissed) {
+    if (msg) {
+      msg.textContent = 'لديك ' + nNew + ' ' +
+        (nNew === 1 ? 'طلب تسجيل جديد' : 'طلبات تسجيل جديدة') + ' بانتظار المراجعة';
+    }
+    b.classList.add('show');
+  } else {
+    b.classList.remove('show');
+  }
+}
+
+// Clicking the banner (anywhere except the ✕) switches to the «جديد» tab and
+// scrolls the list into view. Reuses setFilter so there's one filter codepath.
+function onNewSignupsBannerClick(e) {
+  if (e && e.target && e.target.classList && e.target.classList.contains('ns-banner-close')) return;
+  var el = document.getElementById('tabNew');
+  if (el) { setFilter('new', el); }
+  else { currentFilter = 'new'; renderList(); }
+  var lst = document.getElementById('reqList');
+  if (lst && lst.scrollIntoView) lst.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function onNewSignupsBannerKeydown(e) {
+  if (!e) return;
+  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    onNewSignupsBannerClick(e);
+  }
+}
+
+// The ✕ hides the banner for this session without touching the filter.
+// stopPropagation prevents the banner's own click handler from also firing.
+function dismissNewSignupsBanner(e) {
+  if (e && e.stopPropagation) e.stopPropagation();
+  newBannerDismissed = true;
+  var b = document.getElementById('newSignupsBanner');
+  if (b) b.classList.remove('show');
+}
+
+// Realtime: listen for new rows in trial_requests (a fresh self-signup).
+// Requires Migration 69 (table added to the supabase_realtime publication);
+// without it subscribe() still succeeds but no events arrive — graceful.
+// RLS lets the platform admin receive every INSERT (is_platform_admin SELECT).
+function subscribeNewSignups() {
+  if (!window.sb || _newSignupChannel) return;
+  try {
+    _newSignupChannel = window.sb
+      .channel('admin-new-signups')
+      .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'trial_requests' },
+          function() {
+            // Un-dismiss so the banner re-appears, then refresh the list +
+            // counts. Debounced to coalesce a burst of inserts into one reload.
+            newBannerDismissed = false;
+            if (_newSignupRefreshTimer) clearTimeout(_newSignupRefreshTimer);
+            _newSignupRefreshTimer = setTimeout(function() {
+              _newSignupRefreshTimer = null;
+              if (typeof loadAndRender === 'function') loadAndRender();
+            }, 400);
+          })
+      .subscribe();
+  } catch (e) { /* realtime is optional — the page works fully without it */ }
 }
 
 // Phase 7.6E-Part 2: renderList — state-aware rendering.
