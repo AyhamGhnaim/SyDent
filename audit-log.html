@@ -168,6 +168,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   color:var(--blue);text-decoration:none;font-size:11px;
   display:block;margin-top:3px;
 }
+.log-desc .ld-alert-reason{
+  display:block;margin-top:4px;font-size:11px;font-weight:700;
+  color:var(--red);line-height:1.4;
+}
 .log-desc .ld-patient-link:hover{text-decoration:underline;}
 
 .log-actions{display:flex;gap:6px;justify-content:flex-end;}
@@ -752,6 +756,9 @@ function renderLogs() {
           '<span class="ld-text">' + escapeHtml(row.description || '—') + '</span>' +
           '<span class="ld-action">' + escapeHtml(actionTypeLabel(row.action_type)) + '</span>' +
           patientLink +
+          (row.is_alert && row.alert_reason
+            ? '<div class="ld-alert-reason">⚠ ' + escapeHtml(row.alert_reason) + '</div>'
+            : '') +
         '</div>' +
         '<div class="log-actions">' +
           (arch
