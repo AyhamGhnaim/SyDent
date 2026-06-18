@@ -174,12 +174,14 @@ header{
   transition:border-color .2s;
 }
 /* New signups stand out with a clear amber treatment that echoes the «جديد»
-   state badge color. The tint is layered OVER an opaque var(--bg2) base via a
-   flat gradient so the card stays solid (no see-through) and the border width
-   is unchanged (no layout shift). bk-selected uses outline, so both coexist. */
+   state badge color: a 5px leading-edge rail (inline-start = right in RTL) plus
+   a doubled --yellow-dim tint (~19%) layered over an opaque var(--bg2) base so
+   the card stays solid. Only the start border WIDTH grows (5px), which shifts
+   content a few px at most; bk-selected uses outline, so both coexist. */
 .req-card.new{
   border-color:var(--yellow);
-  background:linear-gradient(var(--yellow-dim),var(--yellow-dim)),var(--bg2);
+  border-inline-start-width:5px;
+  background:linear-gradient(var(--yellow-dim),var(--yellow-dim)),linear-gradient(var(--yellow-dim),var(--yellow-dim)),var(--bg2);
 }
 .req-card.accepted{border-color:rgba(var(--green-rgb),0.15);opacity:.7;}
 .req-card.rejected{border-color:rgba(239,83,80,0.15);opacity:.6;}
