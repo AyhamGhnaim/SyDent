@@ -32,7 +32,7 @@ const css = `
   .sb-logo-icon {
     width: 38px; height: 38px;
     color: var(--green);
-    background: #F2FAF7;
+    background: #d6f0e0;
     border: 1.5px solid rgba(var(--green-rgb),0.18);
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
