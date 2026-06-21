@@ -40,6 +40,10 @@ const css = `
   }
   .sb-logo-name { font-size: 18px; font-weight: 900; color: var(--text); font-family: 'Cairo', sans-serif; }
   .sb-logo-sub  { font-size: 10px; color: var(--text2); font-family: 'Cairo', sans-serif; }
+  :root[data-theme="light"] .sd-sy{background:linear-gradient(135deg,#3d8577 0%,#2f7d52 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#368a64;}
+  :root[data-theme="light"] .sd-dent{color:#16362c;}
+  :root[data-theme="dark"] .sd-sy{background:linear-gradient(135deg,#4fb89f 0%,#3ec77a 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#46b88c;}
+  :root[data-theme="dark"] .sd-dent{color:#e8f6f0;}
 
   .sb-nav { flex: 1; padding: 12px 0; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
   .sb-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
@@ -551,7 +555,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 19 81 18 159 -14z"/>
 </g></svg></div>
         <div>
-          <div class="sb-logo-name">SyDent</div>
+          <div class="sb-logo-name"><span class="sd-sy">Sy</span><span class="sd-dent">Dent</span></div>
           <div class="sb-logo-sub" id="sbLogoSub">نظام إدارة العيادة</div>
         </div>
       </a>
