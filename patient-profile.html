@@ -8496,10 +8496,26 @@ function recalcSplitTotals() {
   if (summaryEl) {
     var leftover = remaining > 0 ? remaining : 0;
     var over = remaining < 0 ? -remaining : 0;
+    // Of the leftover, how much will cover still-owed COMPLETED sessions vs is a
+    // true prepayment (surplus beyond all completed production). Mirrors the save
+    // logic so the preview is honest: money that pays for delivered work is NOT a
+    // prepayment, it stays earned and is auto-applied to the owed completed sessions.
+    var owedCompleted = 0;
+    for (var ci = 0; ci < _splitEditing.rows.length; ci++) {
+      var cr = _splitEditing.rows[ci];
+      if (cr.sessionStatus !== 'completed') continue;
+      var o = cr.sessionCost - cr.alreadyPaidByOthers - (cr.currentInput || 0);
+      if (o > 0) owedCompleted += o;
+    }
+    var coversCompleted = Math.min(leftover, owedCompleted);
+    var truePrepay = leftover - coversCompleted;
     summaryEl.innerHTML =
         '<div class="split-summary-row"><span class="lbl">📊 الإجمالي الموزّع:</span><span class="val green">' + fmt(allocated) + ' ل.س</span></div>'
-      + (leftover > 0
-          ? '<div class="split-summary-row"><span class="lbl">💳 سيُحفظ كرصيد مقدّم:</span><span class="val blue">' + fmt(leftover) + ' ل.س</span></div>'
+      + (coversCompleted > 0
+          ? '<div class="split-summary-row"><span class="lbl">💼 سيغطّي علاجاً منجَزاً:</span><span class="val green">' + fmt(coversCompleted) + ' ل.س</span></div>'
+          : '')
+      + (truePrepay > 0
+          ? '<div class="split-summary-row"><span class="lbl">💳 سيُحفظ كرصيد مقدّم:</span><span class="val blue">' + fmt(truePrepay) + ' ل.س</span></div>'
           : '')
       + (over > 0
           ? '<div class="split-summary-row"><span class="lbl">⚠️ تجاوز قيمة الدفعة:</span><span class="val red">' + fmt(over) + ' ل.س</span></div>'
@@ -8528,7 +8544,8 @@ function recalcSplitTotals() {
 /* Save the manual allocation. Steps:
      1. Delete existing splits for this payment.
      2. Insert new splits (skip 0-amount rows).
-     3. Insert one unearned split if there's leftover.
+     3. Apply any leftover to still-owed completed sessions (FIFO); only a true
+        surplus (beyond all completed production) is stored as an unearned credit.
      4. Mark payment.manual_allocation = true (graceful: skip if column missing).
      5. Reload + re-render. */
 async function saveManualSplits() {
@@ -8573,8 +8590,37 @@ async function saveManualSplits() {
       });
     }
 
-    // Leftover → one unearned split.
+    // Leftover → cover still-owed COMPLETED sessions first (FIFO, oldest-first),
+    // then any TRUE surplus (beyond all owed completed production) becomes an
+    // unearned prepayment. This honors the system-wide rule applied everywhere
+    // else (computeFinancials / splitIsEarned): a credit is "unearned" ONLY when
+    // every completed session is already covered — otherwise the money still pays
+    // for delivered work and must stay earned. _splitEditing.rows are pre-sorted
+    // completed-first then oldest-first, so a simple walk is correct FIFO order.
+    // Mirrors buildFifoSplits' completed-only eligibility; the auto-FIFO path
+    // already did this, the manual path previously did not (the bug being fixed).
     var leftover = total - allocated;
+    for (var ci = 0; ci < _splitEditing.rows.length && leftover > 0; ci++) {
+      var cr = _splitEditing.rows[ci];
+      if (cr.sessionStatus !== 'completed') continue;
+      var owed = cr.sessionCost - cr.alreadyPaidByOthers - (cr.currentInput || 0);
+      if (owed <= 0) continue;
+      var take = Math.min(leftover, owed);
+      if (take <= 0) continue;
+      var covSess = sessions.find(function(s){ return s.id === cr.sessionId; });
+      newSplits.push({
+        doctor_id:    p.doctor_id,
+        payment_id:   paymentId,
+        patient_id:   p.patient_id,
+        session_id:   cr.sessionId,
+        provider_id:  (covSess && covSess.provider_id) ? covSess.provider_id : null,
+        amount:       take,
+        is_unearned:  false,
+        payment_date: p.date || null
+      });
+      leftover -= take;
+    }
+    // True surplus (after every completed session is covered) → unearned prepayment.
     if (leftover > 0) {
       newSplits.push({
         doctor_id:    p.doctor_id,
@@ -8655,13 +8701,18 @@ async function saveManualSplits() {
     // Owner must be able to track who did it and when)
     if (window.logAudit) {
       var allocCount = newSplits.filter(function(s){ return !s.is_unearned; }).length;
+      // Compute the ACTUAL earned vs unearned from the final split set. After the
+      // leftover-coverage logic above, "total - allocated" is no longer the unearned
+      // amount (part of it now covers completed sessions), so derive both honestly.
+      var earnedTotal   = newSplits.reduce(function(sum, s){ return sum + (!s.is_unearned ? (s.amount || 0) : 0); }, 0);
+      var unearnedFinal = newSplits.reduce(function(sum, s){ return sum + (s.is_unearned  ? (s.amount || 0) : 0); }, 0);
       window.logAudit('payment.edit_splits', {
         entityId: paymentId,
         patientId: patientId,
         patientName: (patient && patient.name) || '',
-        description: 'تعديل توزيع دفعة يدوياً: ' + (p.amount || 0) + ' ل.س — ' + allocCount + ' جلسة، متبقّي ' + Math.max(0, total - allocated) + ' ل.س رصيد مقدّم',
+        description: 'تعديل توزيع دفعة يدوياً: ' + (p.amount || 0) + ' ل.س — ' + allocCount + ' جلسة، رصيد مقدّم ' + unearnedFinal + ' ل.س',
         oldValue: { payment_amount: p.amount, was_manual: !!p.manual_allocation },
-        newValue: { allocated_count: allocCount, total_allocated: allocated, unearned_leftover: Math.max(0, total - allocated), is_manual: true }
+        newValue: { allocated_count: allocCount, total_allocated: earnedTotal, unearned_leftover: unearnedFinal, is_manual: true }
       });
     }
     showToast('✅ تم حفظ التوزيع');
