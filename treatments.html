@@ -574,6 +574,9 @@ async function loadTreatments() {
     };
   });
 
+  // Brand-new account: auto-seed the default catalogue once, then re-fetch to show it.
+  if (await autoSeedDefaultsIfNeeded()) { return await loadTreatments(); }
+
   render();
 }
 
@@ -1120,49 +1123,81 @@ const EXTRA_TEMPLATES = [
 ];
 
 /* resetToDefaults (below) additively restores the default + template treatments. */
-async function resetToDefaults() {
-  if (!confirm('استعادة كل العلاجات الافتراضية والجاهزة الناقصة؟\nتُضاف الناقصة فقط — لن يُحذف أو يُعدّل أي علاج موجود (بما فيها المخصصة).')) return;
+function buildDefaultTreatmentRows() {
+  // Single source of truth for «استعادة الافتراضي» AND the brand-new-account auto-seed.
+  // All prices are 0 (the dentist sets their own); «يطبّق على» surfaces are teaching defaults.
   const DEFAULTS = [
-    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'var(--green)', stroke:'#1fba7e', price:50000,  builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
-    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:30000,  builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
-    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:200000, builtin:true,  needs_lab:true,  target_part:'whole', category:'prosthodontics', sort_order:3 },
-    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:150000, builtin:true,  needs_lab:false, target_part:'root',  category:'endodontics', sort_order:4 },
-    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:800000, builtin:true,  needs_lab:true,  target_part:'implant', category:'implantology', sort_order:5 },
-    { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:600000, builtin:true,  needs_lab:true,  target_part:'bridge', category:'prosthodontics', sort_order:6 },
-    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:25000,  builtin:false, needs_lab:false, target_part:'crown', category:'preventive', sort_order:6 },
-    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:80000,  builtin:false, needs_lab:false, target_part:'crown', category:'cosmetic', sort_order:7 },
-    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:15000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:8 },
-    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:10000,  builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:9 }
+    { treatment_key:'treated',    name:'حشوة',        label:'ح', fill:'var(--green)', stroke:'#1fba7e', price:0,      builtin:true,  needs_lab:false, target_part:'crown', category:'restorative', sort_order:1 },
+    { treatment_key:'extracted',  name:'قلع',         label:'✕', fill:'#ef5350', stroke:'#c62828', price:0,      builtin:true,  needs_lab:false, target_part:'extraction', category:'surgical', sort_order:2 },
+    { treatment_key:'crown',      name:'تلبيس (تاج)', label:'ت', fill:'#f5c842', stroke:'#c9962a', price:0,      builtin:true,  needs_lab:true,  target_part:'crown_full', category:'prosthodontics', sort_order:3 },
+    { treatment_key:'root-canal', name:'قناة جذر',    label:'ق', fill:'#a78bfa', stroke:'#7c5cbf', price:0,      builtin:true,  needs_lab:false, target_part:'root',  category:'endodontics', sort_order:4 },
+    { treatment_key:'implant',    name:'زراعة',       label:'ز', fill:'#63b3ed', stroke:'#2b7ab5', price:0,      builtin:true,  needs_lab:true,  target_part:'implant', category:'implantology', sort_order:5 },
+    { treatment_key:'bridge',     name:'جسر',         label:'ج', fill:'#dc2626', stroke:'#991b1b', price:0,      builtin:true,  needs_lab:true,  target_part:'bridge', category:'prosthodontics', sort_order:6 },
+    { treatment_key:'cleaning',   name:'تنظيف',       label:'ن', fill:'#06b6d4', stroke:'#0a809a', price:0,      builtin:false, needs_lab:false, target_part:'mouth', category:'preventive', sort_order:6 },
+    { treatment_key:'whitening',  name:'تبييض',       label:'ب', fill:'#84cc16', stroke:'#5a9410', price:0,      builtin:false, needs_lab:false, target_part:'mouth', category:'cosmetic', sort_order:7 },
+    { treatment_key:'xray',       name:'أشعة',        label:'أ', fill:'#a3a3a3', stroke:'#6b6b6b', price:0,      builtin:false, needs_lab:false, target_part:'whole', category:'diagnostic', sort_order:8 },
+    { treatment_key:'consult',    name:'استشارة',     label:'س', fill:'#fb923c', stroke:'#c2691f', price:0,      builtin:false, needs_lab:false, target_part:'mouth', category:'diagnostic', sort_order:9 }
   ];
-  // Additive: add only the default + template treatments the clinic is missing
-  // (matched by treatment_key OR name). NEVER deletes or edits anything — custom
-  // treatments (and any edits the dentist made to defaults) are fully preserved.
+  // Deletion-protected treatments (chart geometry) sort to the top; the rest keep relative order.
   var _all = DEFAULTS.concat(EXTRA_TEMPLATES);
-  // Restore ordering: deletion-protected treatments (special chart geometry — extraction, implant,
-  // bridge, ortho, space-maintainer) sort to the top; the rest keep their original relative order.
-  // Uses isProtectedTreatment as the single source of truth. Templates are never mutated — only the
-  // newly-inserted rows below receive the computed sort_order, so existing rows stay untouched.
   var _ordered = _all.slice().sort(function(a, b){
     var pa = isProtectedTreatment(a) ? 0 : 1, pb = isProtectedTreatment(b) ? 0 : 1;
     return pa !== pb ? pa - pb : (a.sort_order || 0) - (b.sort_order || 0);
   });
   var _orderOf = {};
   _ordered.forEach(function(t, i){ _orderOf[t.treatment_key] = i + 1; });
+  return _all.map(function(d){ return Object.assign({ doctor_id: currentDoctor.id, post_extraction: false }, d, { sort_order: _orderOf[d.treatment_key] }); });
+}
+
+// Inserts ONLY the default/template treatments the clinic is missing (matched by treatment_key OR
+// name). NEVER deletes or edits anything. Returns {added,error}; does NOT reload. post_extraction is
+// sent on every row; if the column is absent (pre-Migration 61) PostgREST returns 42703/PGRST204, so
+// we strip it and retry once (graceful, deploy-before-migrate safe — replaces the empty-list-unsafe
+// __m61T probe, which is always false on a brand-new account).
+async function insertMissingDefaults() {
+  var allRows = buildDefaultTreatmentRows();
   var _haveKey = {}, _haveName = {};
   for (var _i = 0; _i < treatments.length; _i++) { _haveKey[treatments[_i].treatment_key] = 1; _haveName[treatments[_i].name] = 1; }
-  var _toAdd = _all.filter(function(t){ return !_haveKey[t.treatment_key] && !_haveName[t.name]; });
-  if (!_toAdd.length) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
-  // post_extraction MUST be explicit on every row. PostgREST bulk-insert builds its column
-  // list from the UNION of keys across the array and writes NULL (not the column DEFAULT) for
-  // any row missing a key. Only the spacer/socket templates carry post_extraction, so omitting
-  // it on the rest sent NULL into a NOT-NULL column → 400. Seed false; the template overrides
-  // with true where needed. (Single-row saves elsewhere don't hit this — only bulk arrays do.)
-  const rows = _toAdd.map(d => Object.assign({ doctor_id: currentDoctor.id, post_extraction: false }, d, { sort_order: _orderOf[d.treatment_key] }));
-  if (!window.__m61T) rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 safety (column absent)
-  const { error } = await window.sb.from('treatments').insert(rows);
-  if (error) { showToast('⚠️ ' + error.message); return; }
+  var rows = allRows.filter(function(r){ return !_haveKey[r.treatment_key] && !_haveName[r.name]; });
+  if (!rows.length) return { added: 0, error: null };
+  var res = await window.sb.from('treatments').insert(rows);
+  if (res.error && /post_extraction|42703|PGRST204/i.test((res.error.code || '') + ' ' + (res.error.message || ''))) {
+    rows.forEach(function(r){ delete r.post_extraction; });  // pre-M61 fallback
+    res = await window.sb.from('treatments').insert(rows);
+  }
+  return { added: res.error ? 0 : rows.length, error: res.error || null };
+}
+
+async function resetToDefaults() {
+  if (!confirm('استعادة كل العلاجات الافتراضية والجاهزة الناقصة؟\nتُضاف الناقصة فقط — لن يُحذف أو يُعدّل أي علاج موجود (بما فيها المخصصة).')) return;
+  var r = await insertMissingDefaults();
+  if (r.error) { showToast('⚠️ ' + r.error.message); return; }
+  if (!r.added) { showToast('✅ كل العلاجات الافتراضية والجاهزة موجودة مسبقاً'); return; }
   await loadTreatments();
-  showToast('↺ أُضيف ' + _toAdd.length + ' علاجاً');
+  showToast('↺ أُضيف ' + r.added + ' علاجاً');
+}
+
+// One-time auto-seed for a brand-new clinic: empty list AND never seeded (clinic_settings
+// .treatments_seeded — Migration 70) → silently populate the default catalogue so the dentist sees a
+// ready guide without clicking «استعادة الافتراضي». Fires exactly once: deleting everything later does
+// NOT re-seed. Pre-Migration-70 (column absent) the flag read errors → returns false (graceful).
+var _autoSeedInFlight = false;
+async function autoSeedDefaultsIfNeeded() {
+  if (_autoSeedInFlight) return false;
+  if (treatments.length) return false;
+  if (!currentDoctor || !currentDoctor.id) return false;
+  _autoSeedInFlight = true;
+  try {
+    var fl = await window.sb.from('clinic_settings').select('treatments_seeded').eq('owner_id', currentDoctor.id).maybeSingle();
+    if (fl.error) return false;
+    if (fl.data && fl.data.treatments_seeded) return false;
+    var r = await insertMissingDefaults();
+    if (r.error || !r.added) return false;
+    try { await window.sb.from('clinic_settings').update({ treatments_seeded: true }).eq('owner_id', currentDoctor.id); } catch (e) { /* non-fatal */ }
+    return true;
+  } finally {
+    _autoSeedInFlight = false;
+  }
 }
 
 // Phase post-X10 B1 fix: module-level in-flight flag prevents double-
