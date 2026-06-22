@@ -1,0 +1,85 @@
+name: Supabase Backup
+
+# ─────────────────────────────────────────────────────────────────────────────
+# الهدف: نسخة احتياطية يومية تلقائية لقاعدة بيانات Supabase (الخطة المجانية بلا
+#   backups تلقائية — هذا بديلها المجاني، مبني على التوصية الرسمية من Supabase
+#   عبر Supabase CLI: supabase db dump).
+#
+# أين تُخزَّن النسخ؟ في ريبو خاص منفصل (AyhamGhnaim/SyDent-backups) — لا تُخزَّن
+#   أبداً في الريبو العام (بيانات مرضى = حسّاسة). التوثيق الرسمي يحذّر صراحةً من
+#   النسخ إلى ريبو عام.
+#
+# ⚠️ مقفول افتراضياً: الـ job لا يعمل إطلاقاً ما لم يكن متغيّر المستودع
+#   BACKUP_ENABLED = 'true'. هذا يسمح برفع الملف بأمان قبل اكتمال الإعداد، بلا
+#   أي تشغيل فاشل. لتفعيله بعد إتمام الخطوات: Settings → Secrets and variables
+#   → Actions → Variables → New variable → BACKUP_ENABLED = true.
+#
+# الأسرار المطلوبة (Settings → Secrets and variables → Actions → Secrets):
+#   • SUPABASE_DB_URL  — سلسلة اتصال الـ Session pooler (IPv4، لأن runners الـ
+#       GitHub بلا IPv6؛ الاتصال المباشر db.<ref>.supabase.co صار IPv6-only).
+#       الشكل: postgresql://postgres.<ref>:<PASSWORD>@aws-1-<region>.pooler.supabase.com:5432/postgres
+#   • BACKUP_PAT       — fine-grained PAT صلاحيته على ريبو SyDent-backups فقط،
+#       بصلاحية Contents: Read and write (للـ push).
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:        # تشغيل يدوي من تبويب Actions (للاختبار الأول)
+  schedule:
+    - cron: '0 2 * * *'     # كل يوم 02:00 UTC
+
+# لا نكتب على هذا الريبو إطلاقاً — الكتابة تذهب لريبو النسخ عبر BACKUP_PAT.
+permissions:
+  contents: read
+
+# منع تراكب التشغيلات
+concurrency:
+  group: supabase-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    # ⚠️ البوّابة: لا شيء يحدث ما لم يُضبط BACKUP_ENABLED='true' يدوياً.
+    if: ${{ vars.BACKUP_ENABLED == 'true' }}
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Checkout private backup repo
+        uses: actions/checkout@v5
+        with:
+          repository: AyhamGhnaim/SyDent-backups
+          token: ${{ secrets.BACKUP_PAT }}
+          path: backups-repo
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Create dump (roles + schema + data)
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%d_%H%M)"
+          DIR="backups-repo/${STAMP}"
+          mkdir -p "$DIR"
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$DIR/roles.sql"  --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$DIR/schema.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f "$DIR/data.sql"   --data-only --use-copy
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          echo "Backup written to $DIR"
+          ls -la "$DIR"
+
+      - name: Commit & push to backup repo
+        run: |
+          set -euo pipefail
+          cd backups-repo
+          git config user.name  "sydent-backup-bot"
+          git config user.email "drayhamghnaim@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit (empty diff)."
+          else
+            git commit -m "Supabase backup ${STAMP}"
+            git push
+            echo "Pushed backup ${STAMP} to SyDent-backups."
+          fi
