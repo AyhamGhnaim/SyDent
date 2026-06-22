@@ -3186,3 +3186,65 @@
     isImage: isImage, humanSize: humanSize
   };
 })();
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SyDent — Offline / connectivity banner (self-contained, additive).
+   Lets a clinic user tell "no internet" apart from "no data" by showing a
+   slim banner when the device goes offline, auto-hiding when it returns.
+   Touches no load/financial logic; pure navigator.onLine + online/offline.
+   Fully guarded + idempotent — cannot break page behaviour.
+   ───────────────────────────────────────────────────────────────────────── */
+(function () {
+  if (window.__sydentNetBanner) return;            // idempotent guard
+  window.__sydentNetBanner = true;
+
+  var BAR_ID = 'sydent-net-banner';
+  var STYLE_ID = 'sydent-net-banner-style';
+
+  function ensureStyle() {
+    if (document.getElementById(STYLE_ID)) return;
+    var st = document.createElement('style');
+    st.id = STYLE_ID;
+    st.textContent =
+      '#' + BAR_ID + '{position:fixed;top:0;left:0;right:0;z-index:2147483000;' +
+      'display:none;direction:rtl;font-family:inherit;font-size:14px;font-weight:600;' +
+      'line-height:1.4;text-align:center;padding:8px 14px;color:#fff;' +
+      'background:#c0392b;box-shadow:0 2px 8px rgba(0,0,0,.25);}';
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function ensureBar() {
+    var bar = document.getElementById(BAR_ID);
+    if (bar) return bar;
+    ensureStyle();
+    bar = document.createElement('div');
+    bar.id = BAR_ID;
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('aria-live', 'polite');
+    bar.textContent =
+      '\u26A0\uFE0F \u0644\u0627 \u064A\u0648\u062C\u062F \u0627\u062A\u0635\u0627\u0644 \u0628\u0627\u0644\u0625\u0646\u062A\u0631\u0646\u062A \u2014 ' +
+      '\u0628\u0639\u0636 \u0627\u0644\u0628\u064A\u0627\u0646\u0627\u062A \u0642\u062F \u0644\u0627 \u062A\u0638\u0647\u0631 \u062D\u062A\u0649 \u064A\u0639\u0648\u062F \u0627\u0644\u0627\u062A\u0635\u0627\u0644';
+    (document.body || document.documentElement).appendChild(bar);
+    return bar;
+  }
+
+  function show() { try { ensureBar().style.display = 'block'; } catch (e) {} }
+  function hide() { try { var b = document.getElementById(BAR_ID); if (b) b.style.display = 'none'; } catch (e) {} }
+  function sync() { try { if (navigator && navigator.onLine === false) show(); else hide(); } catch (e) {} }
+
+  function init() {
+    try {
+      window.addEventListener('online', hide);
+      window.addEventListener('offline', show);
+      sync();                                       // initial state on load
+    } catch (e) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  window.SyDentNet = { show: show, hide: hide, sync: sync };
+})();
