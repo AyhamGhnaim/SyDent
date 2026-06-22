@@ -467,6 +467,32 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn-whatsapp:hover { background: #1fb858; }
 .btn-whatsapp:disabled { opacity: .55; cursor: not-allowed; }
 
+/* WhatsApp Hub (مراسلة) — option list */
+.wa-hub-list { display:flex; flex-direction:column; gap:8px; }
+.wa-hub-item {
+  display:flex; align-items:center; gap:11px;
+  width:100%; text-align:right;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:11px; padding:12px 14px; cursor:pointer;
+  font-family:'Cairo', sans-serif; color:var(--text);
+  transition:border-color .15s, background .15s;
+}
+.wa-hub-item:hover { border-color:var(--green); }
+.wa-hub-hot { border-color:rgba(37,211,102,0.5); background:rgba(37,211,102,0.07); }
+.wa-hub-ic { font-size:20px; flex:0 0 auto; }
+.wa-hub-txt { display:flex; flex-direction:column; gap:2px; flex:1 1 auto; min-width:0; }
+.wa-hub-title { font-size:14px; font-weight:700; }
+.wa-hub-sub { font-size:11.5px; color:var(--text2); }
+.wa-hub-arrow { color:var(--text2); font-size:18px; flex:0 0 auto; }
+.wa-hub-pick { cursor:default; flex-wrap:wrap; }
+.wa-hub-select {
+  margin-top:6px; width:100%; padding:7px 9px;
+  border:1px solid var(--border); border-radius:8px;
+  background:var(--bg2); color:var(--text);
+  font-family:'Cairo', sans-serif; font-size:12.5px;
+}
+.wa-hub-send { flex:0 0 auto; padding:8px 14px; font-size:12.5px; }
+
 .wa-modal-message {
   background: var(--bg3);
   border: 1px solid var(--border);
@@ -709,7 +735,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="topbar-actions">
     <button class="btn btn-outline" onclick="openApptModal()" data-doctor-inactive-block>📅 موعد جديد</button>
     <button class="btn btn-outline" onclick="openSessionModal()" data-doctor-inactive-block>🦷 جلسة جديدة</button>
-    <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaReminderFromProfile()" style="display:none;">📱 تذكير WhatsApp</button>
+    <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaHub()" style="display:none;">📱 واتساب</button>
     <button class="btn btn-outline" onclick="openPrintChoice()" data-doctor-inactive-block>🖨️ طباعة / PDF</button>
     <button class="btn btn-primary" onclick="openPayModal()" data-doctor-inactive-block>💰 تسجيل دفعة</button>
   </div>
@@ -1427,6 +1453,59 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
+<!-- WhatsApp Hub Modal — مراسلة (reminder + prescription + instructions + free) -->
+<div class="modal-overlay" id="ppWaHubModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 style="color:#25D366;">📱 مراسلة عبر WhatsApp</h3>
+      <button class="modal-close" onclick="closeModal('ppWaHubModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="wa-info-row">
+        <span class="wa-info-label">المريض:</span>
+        <strong id="ppWaHubPatient">—</strong>
+        <span style="margin-right:auto;"></span>
+        <span class="wa-info-label">الهاتف:</span>
+        <strong id="ppWaHubPhone">—</strong>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin:2px 0 12px;">اختر ما تريد إرساله للمريض عبر WhatsApp.</div>
+      <div id="ppWaHubBody" class="wa-hub-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WhatsApp Compose Modal — روشتة / تعليمات / رسالة حرة (click-to-chat only, not logged) -->
+<div class="modal-overlay" id="ppWaComposeModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="ppWaComposeTitle" style="color:#25D366;">📱 إرسال عبر WhatsApp</h3>
+      <button class="modal-close" onclick="closeModal('ppWaComposeModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="wa-info-row">
+        <span class="wa-info-label">المريض:</span>
+        <strong id="ppWaComposePatient">—</strong>
+        <span style="margin-right:auto;"></span>
+        <span class="wa-info-label">الهاتف:</span>
+        <strong id="ppWaComposePhone">—</strong>
+      </div>
+      <div style="margin-top:6px;">
+        <label style="font-size:13px; font-weight:600; color:var(--text2); margin-bottom:6px; display:block;">
+          نص الرسالة (يمكن تعديله قبل الإرسال)
+        </label>
+        <textarea id="ppWaComposeMsg" class="wa-modal-message" placeholder="الرسالة..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel-m" onclick="closeModal('ppWaComposeModal')">إلغاء</button>
+      <button type="button" class="btn" onclick="ppWaComposeCopy()" style="font-size:13px;">📋 نسخ النص</button>
+      <button type="button" class="wa-send-btn" onclick="ppWaComposeSend()">
+        <span>📱</span> <span>فتح WhatsApp</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- File preview lightbox (Phase 9) -->
 <div class="modal-overlay" id="pfLightbox" onclick="if(event.target===this) closeModal('pfLightbox')">
   <div class="modal-box" style="max-width:760px;width:92%;">
@@ -1975,15 +2054,16 @@ function fmtTime12(t) {
 function ppUpdateWaButtonVisibility() {
   var btn = document.getElementById('ppWaBtn');
   if (!btn) return;
-  var enabled = CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminders_enabled;
-  var hasUpcoming = Array.isArray(upcomingAppts) && upcomingAppts.length > 0;
+  // Hub button: visible whenever the patient has a valid (sendable) phone.
+  // WhatsApp is now the channel for reminders, prescriptions, instructions
+  // and free messages, so the button is no longer tied to an upcoming appt.
   var hasPhone = patient && patient.phone && ppNormalizePhone(patient.phone);
-  if (enabled && hasUpcoming && hasPhone) {
+  btn.innerHTML = '📱 واتساب';
+  if (hasPhone) {
     btn.style.display = '';
-    var nearest = upcomingAppts[0];
+    var nearest = (Array.isArray(upcomingAppts) && upcomingAppts.length) ? upcomingAppts[0] : null;
     var hasLog = nearest && lastReminderLogByAppt[nearest.id];
-    btn.innerHTML = hasLog ? '📱 تذكير WhatsApp ✓' : '📱 تذكير WhatsApp';
-    btn.title = hasLog ? 'آخر تذكير: ' + new Date(lastReminderLogByAppt[nearest.id].sent_at).toLocaleString('ar') : 'إرسال تذكير لأقرب موعد قادم';
+    btn.title = hasLog ? 'آخر تذكير: ' + new Date(lastReminderLogByAppt[nearest.id].sent_at).toLocaleString('ar') : 'مراسلة المريض عبر WhatsApp';
   } else {
     btn.style.display = 'none';
   }
@@ -2072,6 +2152,211 @@ async function ppSendWaReminder() {
   } catch(e) { console.warn('ppSendWaReminder:', e); }
 
   closeModal('ppWaModal');
+}
+
+/* ============================================================
+   WhatsApp Hub (مراسلة) — patient profile
+   One header button (📱 واتساب) opens a hub:
+     ⏰ تذكير  → reuses the existing reminder modal + reminder_logs
+                 (only when reminders are enabled AND an upcoming appt
+                 exists) — that flow is NOT modified here.
+     💊 روشتة / 📋 تعليمات / ✍️ رسالة حرة → compose-only via wa.me
+                 click-to-chat. These are NOT logged (reminder_logs
+                 requires an appointment_id), matching the Syria-only
+                 click-to-chat model used across the app.
+   Reuses ppNormalizePhone + escapeHtml. Prescriptions/instructions are
+   tab-lazy-loaded, so openWaHub() loads them before rendering.
+   ============================================================ */
+var _ppWaHubBusy = false;
+
+// Plain WhatsApp text for one prescription ({head, items} from rxFetchFull).
+function rxShareText(rx) {
+  var c = rxClinicInfo();
+  var dr = rxProviderName((rx.head || {}).provider_id);
+  var pName = (patient && patient.name) ? patient.name : '';
+  var lines = [];
+  lines.push('💊 روشتة طبية — ' + c.clinic_name);
+  if (dr) lines.push('الطبيب: ' + dr);
+  lines.push('المريض: ' + pName);
+  lines.push('────────────');
+  (rx.items || []).forEach(function(it, idx){
+    var parts = [(idx + 1) + '. ' + it.drug_name];
+    var sub = [];
+    if (it.dosage)    sub.push(it.dosage);
+    if (it.frequency) sub.push(it.frequency);
+    if (it.duration)  sub.push(it.duration);
+    if (sub.length)        parts.push('   ' + sub.join(' • '));
+    if (it.instructions)   parts.push('   📌 ' + it.instructions);
+    lines.push(parts.join('\n'));
+  });
+  if ((rx.head || {}).notes) { lines.push('────────────'); lines.push('ملاحظات: ' + rx.head.notes); }
+  return lines.join('\n');
+}
+
+// Plain WhatsApp text for one post-op note.
+function postOpShareText(note) {
+  var c = (typeof rxClinicInfo === 'function') ? rxClinicInfo() : { clinic_name:'العيادة' };
+  var pName = (patient && patient.name) ? patient.name : '';
+  var tl = postOpTreatmentLabel(note.treatment_key);
+  var lines = [];
+  lines.push('📋 تعليمات بعد الجلسة — ' + c.clinic_name + (tl ? (' (' + tl + ')') : ''));
+  if (pName) lines.push('المريض: ' + pName);
+  lines.push('────────────');
+  lines.push(note.body || '');
+  return lines.join('\n');
+}
+
+async function openWaHub() {
+  if (_ppWaHubBusy) return;
+  if (!patient || !ppNormalizePhone(patient.phone)) {
+    showToast('⚠️ رقم غير صالح — للأرقام غير السورية أضف رمز الدولة (مثال +90…)');
+    return;
+  }
+  _ppWaHubBusy = true;
+  try {
+    if (!CLINIC_SETTINGS_WA) { try { await ppLoadClinicSettings(); } catch(e){} }
+    // Prescriptions/instructions are tab-lazy-loaded → ensure fresh before render.
+    try { await loadPrescriptions(); } catch(e){}
+    try { await loadPostOpNotes(); }  catch(e){}
+  } finally { _ppWaHubBusy = false; }
+  ppWaHubRender();
+  openModal('ppWaHubModal');
+}
+
+function ppWaHubRow(icon, title, sub, onclick, hot) {
+  return '<button type="button" class="wa-hub-item' + (hot ? ' wa-hub-hot' : '') + '" onclick="' + onclick + '">'
+    + '<span class="wa-hub-ic">' + icon + '</span>'
+    + '<span class="wa-hub-txt"><span class="wa-hub-title">' + escapeHtml(title) + '</span>'
+    + (sub ? '<span class="wa-hub-sub">' + escapeHtml(sub) + '</span>' : '')
+    + '</span><span class="wa-hub-arrow">‹</span></button>';
+}
+
+function ppWaHubPickerRow(icon, title, selectId, optionsHtml, onclick) {
+  return '<div class="wa-hub-item wa-hub-pick">'
+    + '<span class="wa-hub-ic">' + icon + '</span>'
+    + '<span class="wa-hub-txt"><span class="wa-hub-title">' + escapeHtml(title) + '</span>'
+    + '<select id="' + selectId + '" class="wa-hub-select">' + optionsHtml + '</select></span>'
+    + '<button type="button" class="wa-send-btn wa-hub-send" onclick="' + onclick + '">إرسال</button></div>';
+}
+
+function ppWaHubRender() {
+  var pInfo = document.getElementById('ppWaHubPatient');
+  if (pInfo) pInfo.textContent = (patient && patient.name) || '—';
+  var phInfo = document.getElementById('ppWaHubPhone');
+  if (phInfo) phInfo.textContent = (patient && patient.phone) || '⚠️ غير متوفر';
+
+  var body = document.getElementById('ppWaHubBody');
+  if (!body) return;
+  var rows = [];
+
+  // ⏰ Reminder — only when the reminder feature is enabled AND an upcoming appt exists.
+  var enabled = CLINIC_SETTINGS_WA && CLINIC_SETTINGS_WA.whatsapp_reminders_enabled;
+  if (enabled && Array.isArray(upcomingAppts) && upcomingAppts.length > 0) {
+    var ap = upcomingAppts[0];
+    var d = new Date((ap.date || '') + 'T12:00:00');
+    var dStr = isNaN(d.getTime()) ? (ap.date || '') : (PP_DAYS_AR[d.getDay()] + ' ' + ppFormatArabicDate(ap.date));
+    var sub = dStr + ' — ' + fmtTime12(ap.time) + (lastReminderLogByAppt[ap.id] ? ' • أُرسل ✓' : '');
+    rows.push(ppWaHubRow('⏰', 'تذكير بالموعد القادم', sub, 'openWaHubReminder()', true));
+  }
+
+  // 💊 Prescriptions
+  if (Array.isArray(PRESCRIPTIONS) && PRESCRIPTIONS.length) {
+    var itemsByRx = window._rxItemsByRx || {};
+    var rxOpts = PRESCRIPTIONS.map(function(p){
+      var items = itemsByRx[p.id] || [];
+      var dt = p.created_at ? new Date(p.created_at).toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'}) : '';
+      var drugs = items.map(function(it){ return it.drug_name; }).join('، ');
+      if (drugs.length > 40) drugs = drugs.slice(0, 40) + '…';
+      var lbl = dt + (drugs ? ' — ' + drugs : '');
+      return '<option value="' + escapeHtml(p.id) + '">' + escapeHtml(lbl) + '</option>';
+    }).join('');
+    rows.push(ppWaHubPickerRow('💊', 'إرسال روشتة', 'ppWaHubRxPick', rxOpts,
+      "ppWaHubRx(document.getElementById('ppWaHubRxPick').value)"));
+  }
+
+  // 📋 Post-op instructions
+  if (Array.isArray(POST_OP_NOTES) && POST_OP_NOTES.length) {
+    var poOpts = POST_OP_NOTES.map(function(n){
+      var dt = n.created_at ? new Date(n.created_at).toLocaleDateString('ar-SY',{year:'numeric',month:'short',day:'numeric'}) : '';
+      var tl = postOpTreatmentLabel(n.treatment_key);
+      var lbl = dt + (tl ? ' — ' + tl : '');
+      return '<option value="' + escapeHtml(n.id) + '">' + escapeHtml(lbl) + '</option>';
+    }).join('');
+    rows.push(ppWaHubPickerRow('📋', 'إرسال تعليمات', 'ppWaHubPoPick', poOpts,
+      "ppWaHubPostOp(document.getElementById('ppWaHubPoPick').value)"));
+  }
+
+  // ✍️ Free message
+  rows.push(ppWaHubRow('✍️', 'رسالة حرة', 'اكتب رسالة مخصّصة للمريض', 'ppWaHubFree()', false));
+
+  body.innerHTML = rows.join('');
+}
+
+// Reminder → hand off to the existing (unmodified, logged) reminder flow.
+function openWaHubReminder() {
+  closeModal('ppWaHubModal');
+  openWaReminderFromProfile();
+}
+
+async function ppWaHubRx(rxId) {
+  if (!rxId) return;
+  var rx = await rxFetchFull(rxId);
+  closeModal('ppWaHubModal');
+  ppWaComposeOpen('💊 إرسال روشتة', rxShareText(rx));
+}
+
+function ppWaHubPostOp(id) {
+  if (!id) return;
+  var note = postOpNoteGet(id);
+  if (!note) { showToast('❌ لم يُعثر على التعليمات'); return; }
+  closeModal('ppWaHubModal');
+  ppWaComposeOpen('📋 إرسال تعليمات', postOpShareText(note));
+}
+
+function ppWaHubFree() {
+  var pName = (patient && patient.name) ? patient.name : '';
+  closeModal('ppWaHubModal');
+  ppWaComposeOpen('✍️ رسالة حرة', 'مرحباً ' + pName + ' 👋\n\n');
+}
+
+// Compose modal (prescription / instructions / free) — click-to-chat, not logged.
+function ppWaComposeOpen(title, text) {
+  var t = document.getElementById('ppWaComposeTitle');
+  if (t) t.textContent = title;
+  var pn = document.getElementById('ppWaComposePatient');
+  if (pn) pn.textContent = (patient && patient.name) || '—';
+  var ph = document.getElementById('ppWaComposePhone');
+  if (ph) ph.textContent = (patient && patient.phone) || '⚠️ غير متوفر';
+  var ta = document.getElementById('ppWaComposeMsg');
+  if (ta) ta.value = text || '';
+  openModal('ppWaComposeModal');
+}
+
+function ppWaComposeSend() {
+  var phone = ppNormalizePhone(patient && patient.phone);
+  if (!phone) { showToast('⚠️ رقم غير صالح — للأرقام غير السورية أضف رمز الدولة (مثال +90…)'); return; }
+  var msg = (document.getElementById('ppWaComposeMsg').value || '').trim();
+  if (!msg) { showToast('⚠️ الرسالة فارغة'); return; }
+  var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+  showToast('✅ تم فتح WhatsApp');
+  closeModal('ppWaComposeModal');
+}
+
+async function ppWaComposeCopy() {
+  var text = (document.getElementById('ppWaComposeMsg').value || '');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('تم نسخ النص ✓');
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('تم نسخ النص ✓');
+    }
+  } catch (e) { console.warn('wa compose copy:', e); showToast('⚠️ تعذّر النسخ'); }
 }
 
 /* ── Payment Splits (OpenDental-style FIFO allocation) ──
