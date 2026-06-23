@@ -1213,9 +1213,10 @@ var PRM_RECALL_MONTHS = 6;     // يُحمّل من clinic_settings.recall_inter
 var PRM_COOLDOWN_DAYS = 30;    // لا تُعِد استدعاء من استُدعي خلال هذه المدة
 var PRM_CLINIC_NAME   = '';
 var PRM_CLINIC_PHONE  = '';
+var PRM_BOOKING_ENABLED = false;  // clinic_settings.booking_enabled — gates {booking_link}
 var PRM_RECALL_TPL    = '';    // من clinic_settings.whatsapp_recall_template
 var PRM_BDAY_TPL      = '';    // من clinic_settings.whatsapp_birthday_template
-var DEFAULT_RECALL_TPL = 'مرحباً {patient_first_name}،\nنذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+var DEFAULT_RECALL_TPL = 'مرحباً {patient_first_name}،\nنذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷\n\n📅 احجز موعدك مباشرة من هنا: {booking_link}';
 var DEFAULT_BDAY_TPL   = 'كل عام وأنت بخير {patient_first_name}! 🎉\nعائلة {clinic_name} تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
 var prmRecentRecalls  = {};    // patient_id → آخر recalled_at (ms)
 var prmActiveTab      = 'recall';
@@ -1263,6 +1264,7 @@ async function loadPrmMeta(){
       PRM_CLINIC_PHONE = cs.data.clinic_phone || '';
       PRM_RECALL_TPL   = cs.data.whatsapp_recall_template   || '';
       PRM_BDAY_TPL     = cs.data.whatsapp_birthday_template || '';
+      PRM_BOOKING_ENABLED = !!cs.data.booking_enabled;
     }
   } catch (e) { /* graceful */ }
   // 2) سجل الاستدعاءات الأخيرة (للتهدئة) — آخر ~120 يوم
@@ -1346,16 +1348,29 @@ function prmMsgData(p){
     patient_name: full || 'المريض',
     patient_first_name: (full.split(' ')[0]) || full || 'حضرتك',
     clinic_name: PRM_CLINIC_NAME || 'عيادتنا',
-    clinic_phone: PRM_CLINIC_PHONE || ''
+    clinic_phone: PRM_CLINIC_PHONE || '',
+    booking_link: prmBookingLink()
   };
+}
+// Self-booking URL for {booking_link} — empty when online booking is disabled.
+function prmBookingLink(){
+  if (!PRM_BOOKING_ENABLED || !currentUser) return '';
+  var base = (location.origin && /^https?:/.test(location.origin)) ? location.origin : 'https://sydent.app';
+  return base + '/book.html?c=' + currentUser.id;
+}
+// Drop any line containing {booking_link} when booking is off (avoids an orphan label).
+function prmStripBookingIfDisabled(tpl){
+  if (PRM_BOOKING_ENABLED) return tpl || '';
+  return (tpl || '').split('\n').filter(function(l){ return l.indexOf('{booking_link}') === -1; })
+                    .join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
 }
 function prmRecallMsg(p){
   var tpl = (PRM_RECALL_TPL && PRM_RECALL_TPL.trim()) ? PRM_RECALL_TPL : DEFAULT_RECALL_TPL;
-  return prmApplyPlaceholders(tpl, prmMsgData(p));
+  return prmApplyPlaceholders(prmStripBookingIfDisabled(tpl), prmMsgData(p));
 }
 function prmBdayMsg(p){
   var tpl = (PRM_BDAY_TPL && PRM_BDAY_TPL.trim()) ? PRM_BDAY_TPL : DEFAULT_BDAY_TPL;
-  return prmApplyPlaceholders(tpl, prmMsgData(p));
+  return prmApplyPlaceholders(prmStripBookingIfDisabled(tpl), prmMsgData(p));
 }
 
 function prmWa(phone, msg){

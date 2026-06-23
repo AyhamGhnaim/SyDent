@@ -625,7 +625,9 @@ textarea::placeholder { color: var(--text2); }
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{patient_name}')">{patient_name}</span>
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{clinic_name}')">{clinic_name}</span>
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{clinic_phone}')">{clinic_phone}</span>
+          <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{booking_link}')">{booking_link}</span>
         </div>
+        <div style="font-size:11.5px;color:var(--text2);margin:-2px 0 6px;">💡 {booking_link} رابط حجز ذاتي للمريض — يظهر فقط إذا فعّلت بوابة الحجز الإلكتروني بالأسفل، ويُحذف سطره تلقائياً إن كانت مُعطّلة.</div>
         <textarea id="fRecallTemplate" placeholder="رسالة استدعاء المريض للمراجعة الدورية..."></textarea>
       </div>
 
@@ -1050,7 +1052,8 @@ const DEFAULT_WA_TEMPLATE =
 // P6 — recall + birthday default templates (used if the clinic hasn't customized).
 const DEFAULT_RECALL_TEMPLATE =
 'مرحباً {patient_first_name}،\n' +
-'نذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷';
+'نذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷\n\n' +
+'📅 احجز موعدك مباشرة من هنا: {booking_link}';
 
 const DEFAULT_BIRTHDAY_TEMPLATE =
 'كل عام وأنت بخير {patient_first_name}! 🎉\n' +
