@@ -643,8 +643,8 @@ textarea::placeholder { color: var(--text2); }
 
       <div class="wa-actions-row">
         <button type="button" class="btn btn-primary" id="btnSaveWa" onclick="saveClinicSettings()">💾 حفظ الإعدادات</button>
-        <button type="button" class="btn-secondary" onclick="previewTemplate()">👁️ معاينة الرسالة</button>
-        <button type="button" class="btn-secondary" onclick="resetTemplate()">🔄 استعادة القالب الافتراضي</button>
+        <button type="button" class="btn-secondary" onclick="previewTemplate()">👁️ معاينة الرسائل</button>
+        <button type="button" class="btn-secondary" onclick="resetTemplate()">🔄 استعادة القوالب الافتراضية</button>
       </div>
     </div>
 
@@ -1163,9 +1163,11 @@ function insertPlaceholderInto(elId, ph) {
 }
 
 function resetTemplate() {
-  if (!confirm('استعادة القالب الافتراضي؟ ستفقد التعديلات الحالية على نص الرسالة.')) return;
+  if (!confirm('استعادة كل القوالب الافتراضية (التذكير + الاستدعاء الدوري + عيد الميلاد)؟ ستفقد أي تعديلات على القوالب الثلاثة.')) return;
   document.getElementById('fTemplate').value = DEFAULT_WA_TEMPLATE;
-  showToast('🔄 تم استعادة القالب الافتراضي (لم يُحفظ بعد)');
+  var r = document.getElementById('fRecallTemplate'); if (r) r.value = DEFAULT_RECALL_TEMPLATE;
+  var b = document.getElementById('fBdayTemplate');   if (b) b.value = DEFAULT_BIRTHDAY_TEMPLATE;
+  showToast('🔄 تم استعادة القوالب الافتراضية الثلاثة (لم تُحفظ بعد)');
 }
 
 // Build sample data for the live preview — mirrors the structure used by
@@ -1198,11 +1200,36 @@ function applyPlaceholders(template, data) {
   return out;
 }
 
+// Sample booking link for the preview — empty when the booking toggle is off.
+function previewBookingLink() {
+  var en = document.getElementById('bkEnabled') && document.getElementById('bkEnabled').checked;
+  if (!en) return '';
+  var link = (document.getElementById('bkLink') && document.getElementById('bkLink').value) || '';
+  if (link) return link;
+  var base = (location.origin && /^https?:/.test(location.origin)) ? location.origin : 'https://sydent.app';
+  return base + '/book.html?c=' + (currentUser ? currentUser.id : '');
+}
+// Mirror of patients.html prmStripBookingIfDisabled — drop the {booking_link} line when booking is off.
+function previewStripBooking(tpl) {
+  var en = document.getElementById('bkEnabled') && document.getElementById('bkEnabled').checked;
+  if (en) return tpl || '';
+  return (tpl || '').split('\n').filter(function(l){ return l.indexOf('{booking_link}') === -1; })
+                    .join('\n').replace(/\n{3,}/g, '\n\n').replace(/\s+$/, '');
+}
 function previewTemplate() {
-  const tpl = document.getElementById('fTemplate').value || DEFAULT_WA_TEMPLATE;
   const sample = buildSampleData();
-  const rendered = applyPlaceholders(tpl, sample);
-  document.getElementById('waPreviewBubble').textContent = rendered;
+  sample.booking_link = previewBookingLink();
+  const remTpl = document.getElementById('fTemplate').value || DEFAULT_WA_TEMPLATE;
+  const recTpl = (document.getElementById('fRecallTemplate') || {}).value || DEFAULT_RECALL_TEMPLATE;
+  const bdyTpl = (document.getElementById('fBdayTemplate')   || {}).value || DEFAULT_BIRTHDAY_TEMPLATE;
+  const rem = applyPlaceholders(remTpl, sample);
+  const rec = applyPlaceholders(previewStripBooking(recTpl), sample);
+  const bdy = applyPlaceholders(previewStripBooking(bdyTpl), sample);
+  const sep = '\n\n────────────\n\n';
+  const combined = '🔔 رسالة التذكير\n' + rem + sep
+                 + '🔁 رسالة الاستدعاء الدوري\n' + rec + sep
+                 + '🎂 رسالة عيد الميلاد\n' + bdy;
+  document.getElementById('waPreviewBubble').textContent = combined;
   const now = new Date();
   const tm = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   document.getElementById('waPreviewTime').textContent = tm + '  ✓✓';
