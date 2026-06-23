@@ -1219,6 +1219,7 @@ var PRM_BDAY_TPL      = '';    // من clinic_settings.whatsapp_birthday_templat
 var DEFAULT_RECALL_TPL = 'مرحباً {patient_first_name}،\nنذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷\n\n📅 احجز موعدك مباشرة من هنا: {booking_link}';
 var DEFAULT_BDAY_TPL   = 'كل عام وأنت بخير {patient_first_name}! 🎉\nعائلة {clinic_name} تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
 var prmRecentRecalls  = {};    // patient_id → آخر recalled_at (ms)
+var prmUpcomingApptPatients = {};  // patient_id → true (عنده موعد قادم محجوز → يُستثنى من الاستدعاء)
 var prmActiveTab      = 'recall';
 
 function prmEsc(s){
@@ -1279,6 +1280,19 @@ async function loadPrmMeta(){
       if (!prmRecentRecalls[r.patient_id] || t > prmRecentRecalls[r.patient_id]) prmRecentRecalls[r.patient_id] = t;
     });
   } catch (e) { /* graceful (جدول مفقود قبل Migration 56) */ }
+  // 3) مرضى عندهم موعد قادم محجوز (نشِط) — لاستثنائهم من قائمة الاستدعاء (RLS يحصر بصاحب العيادة)
+  try {
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var ap = await window.sb.from('appointments')
+      .select('patient_id')
+      .eq('doctor_id', currentUser.id)
+      .gte('date', todayStr)
+      .not('status', 'in', '(cancelled,broken,no_show,completed)');
+    prmUpcomingApptPatients = {};
+    if (ap && !ap.error && ap.data) ap.data.forEach(function(r){
+      if (r.patient_id) prmUpcomingApptPatients[r.patient_id] = true;
+    });
+  } catch (e) { /* graceful */ }
   updatePrmBadge();
 }
 
@@ -1299,6 +1313,7 @@ function prmRecallList(){
     if (String(lv) > th) return;     // زار خلال الفترة
     var rr = prmRecentRecalls[p.id];
     if (rr && (now - rr) < cooldownMs) return;  // استُدعي حديثاً
+    if (prmUpcomingApptPatients[p.id]) return;  // عنده موعد قادم محجوز → لا داعي للاستدعاء
     out.push({ p: p, lastVisit: lv });
   });
   out.sort(function(a,b){ return String(a.lastVisit).localeCompare(String(b.lastVisit)); }); // الأقدم أولاً
@@ -1414,7 +1429,7 @@ function renderPrmRecall(){
       + '<div style="margin-top:8px;font-size:14px;">لا مرضى متأخّرين عن المراجعة (أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر).</div></div>';
     return;
   }
-  el.innerHTML = '<div style="font-size:12px;color:var(--text2,#8da0bd);padding:0 2px 10px;">مرضى لم يزوروا منذ أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر — <b style="color:var(--text,#e8eefc);">' + list.length + '</b> للاستدعاء.</div>'
+  el.innerHTML = '<div style="font-size:12px;color:var(--text2,#8da0bd);padding:0 2px 10px;">مرضى لم يزوروا منذ أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر — <b style="color:var(--text,#e8eefc);">' + list.length + '</b> للاستدعاء. <span style="opacity:.75;">(يُستثنى من عنده موعد قادم محجوز)</span></div>'
     + list.map(function(r){
       var p = r.p;
       var sub = 'آخر زيارة: ' + prmEsc(formatDate(r.lastVisit));
