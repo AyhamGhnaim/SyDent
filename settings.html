@@ -615,7 +615,7 @@ textarea::placeholder { color: var(--text2); }
           <span class="wa-placeholder-pill" onclick="insertPlaceholder('{clinic_name}')">{clinic_name}</span>
           <span class="wa-placeholder-pill" onclick="insertPlaceholder('{clinic_phone}')">{clinic_phone}</span>
         </div>
-        <textarea id="fTemplate" placeholder="اكتب قالب الرسالة هنا..."></textarea>
+        <textarea id="fTemplate" oninput="autoSizeTextarea(this)" placeholder="اكتب قالب الرسالة هنا..."></textarea>
       </div>
 
       <div class="form-group">
@@ -628,7 +628,7 @@ textarea::placeholder { color: var(--text2); }
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fRecallTemplate','{booking_link}')">{booking_link}</span>
         </div>
         <div style="font-size:11.5px;color:var(--text2);margin:-2px 0 6px;">💡 {booking_link} رابط حجز ذاتي للمريض — يظهر فقط إذا فعّلت بوابة الحجز الإلكتروني بالأسفل، ويُحذف سطره تلقائياً إن كانت مُعطّلة.</div>
-        <textarea id="fRecallTemplate" placeholder="رسالة استدعاء المريض للمراجعة الدورية..."></textarea>
+        <textarea id="fRecallTemplate" oninput="autoSizeTextarea(this)" placeholder="رسالة استدعاء المريض للمراجعة الدورية..."></textarea>
       </div>
 
       <div class="form-group">
@@ -638,7 +638,7 @@ textarea::placeholder { color: var(--text2); }
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fBdayTemplate','{patient_name}')">{patient_name}</span>
           <span class="wa-placeholder-pill" onclick="insertPlaceholderInto('fBdayTemplate','{clinic_name}')">{clinic_name}</span>
         </div>
-        <textarea id="fBdayTemplate" placeholder="رسالة تهنئة بعيد الميلاد..."></textarea>
+        <textarea id="fBdayTemplate" oninput="autoSizeTextarea(this)" placeholder="رسالة تهنئة بعيد الميلاد..."></textarea>
       </div>
 
       <div class="wa-actions-row">
@@ -1133,6 +1133,7 @@ function applyWaSettingsToForm(s) {
   const sw = document.getElementById('waSwitch');
   if (safe.whatsapp_reminders_enabled) sw.classList.add('on');
   else sw.classList.remove('on');
+  autoSizeTemplates();
 }
 
 function toggleWaEnabled() {
@@ -1140,6 +1141,19 @@ function toggleWaEnabled() {
 }
 
 // Insert placeholder at cursor position in the template textarea.
+// Grow a template textarea to fit its full content (so long templates —
+// e.g. recall with the {booking_link} line — are fully visible, not cut off).
+function autoSizeTextarea(el){
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
+}
+function autoSizeTemplates(){
+  ['fTemplate','fRecallTemplate','fBdayTemplate'].forEach(function(id){
+    autoSizeTextarea(document.getElementById(id));
+  });
+}
+
 function insertPlaceholder(ph) {
   const ta = document.getElementById('fTemplate');
   const start = ta.selectionStart, end = ta.selectionEnd;
@@ -1149,6 +1163,7 @@ function insertPlaceholder(ph) {
   const pos = start + ph.length;
   ta.focus();
   ta.setSelectionRange(pos, pos);
+  autoSizeTextarea(ta);
 }
 
 // Generic placeholder insert for any template textarea (recall/birthday).
@@ -1160,6 +1175,7 @@ function insertPlaceholderInto(elId, ph) {
   const pos = start + ph.length;
   ta.focus();
   ta.setSelectionRange(pos, pos);
+  autoSizeTextarea(ta);
 }
 
 function resetTemplate() {
@@ -1167,6 +1183,7 @@ function resetTemplate() {
   document.getElementById('fTemplate').value = DEFAULT_WA_TEMPLATE;
   var r = document.getElementById('fRecallTemplate'); if (r) r.value = DEFAULT_RECALL_TEMPLATE;
   var b = document.getElementById('fBdayTemplate');   if (b) b.value = DEFAULT_BIRTHDAY_TEMPLATE;
+  autoSizeTemplates();
   showToast('🔄 تم استعادة القوالب الافتراضية الثلاثة (لم تُحفظ بعد)');
 }
 
