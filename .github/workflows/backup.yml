@@ -20,6 +20,15 @@ name: Supabase Backup
 #       الشكل: postgresql://postgres.<ref>:<PASSWORD>@aws-1-<region>.pooler.supabase.com:5432/postgres
 #   • BACKUP_PAT       — fine-grained PAT صلاحيته على ريبو SyDent-backups فقط،
 #       بصلاحية Contents: Read and write (للـ push).
+#
+#   ── أسرار نسخ ملفات الـ Storage (bucket: patient-files) إلى Cloudflare R2 ──
+#   • SUPABASE_S3_ACCESS_KEY_ID / SUPABASE_S3_SECRET_ACCESS_KEY
+#       مفتاحا S3 من: Supabase → Storage → Configuration → S3 → Access keys.
+#       (المصدر الذي ننسخ منه ملفات المرضى الفعلية.)
+#   • R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ACCOUNT_ID
+#       من: Cloudflare → R2 → Manage API Tokens (Object Read & Write على bucket
+#       sydent-backups فقط). R2_ACCOUNT_ID = الجزء قبل .r2.cloudflarestorage.com.
+#       (الوجهة التي ننسخ إليها — bucket R2 اسمه: sydent-backups.)
 # ─────────────────────────────────────────────────────────────────────────────
 
 on:
@@ -83,3 +92,50 @@ jobs:
             git push
             echo "Pushed backup ${STAMP} to SyDent-backups."
           fi
+
+      # ───────────────────────────────────────────────────────────────────────
+      # نسخ ملفات الـ Storage (أشعة/صور/PDF المرضى) إلى Cloudflare R2.
+      # هذه الملفات ليست داخل db dump (الـ dump يحوي صفوف الميتاداتا فقط، لا
+      # بايتات الملفات)، فهذه الخطوة تسدّ تلك الفجوة. تأتي بعد رفع نسخة قاعدة
+      # البيانات، فحتى لو فشلت هنا تكون نسخة DB قد حُفظت بالفعل.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Backup Storage files (patient-files) to Cloudflare R2
+        env:
+          # المصدر: Supabase Storage عبر نقطته المتوافقة مع S3
+          RCLONE_CONFIG_SUPABASE_TYPE: s3
+          RCLONE_CONFIG_SUPABASE_PROVIDER: Other
+          RCLONE_CONFIG_SUPABASE_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_SUPABASE_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_SUPABASE_ENDPOINT: https://rycqzpdhxabpqrdgtdzg.storage.supabase.co/storage/v1/s3
+          RCLONE_CONFIG_SUPABASE_REGION: eu-west-1
+          RCLONE_CONFIG_SUPABASE_NO_CHECK_BUCKET: "true"
+          # الوجهة: Cloudflare R2 (bucket: sydent-backups)
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          RCLONE_CONFIG_R2_REGION: auto
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+        run: |
+          set -euo pipefail
+          # rclone: الأداة الموصى بها رسمياً من Supabase لنسخ كائنات Storage بالجملة.
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          rclone version
+
+          SRC="supabase:patient-files"
+          DST="r2:sydent-backups/patient-files"
+
+          # copy (وليس sync): إضافي فقط — لا يحذف أبداً من R2 إن حُذف ملف من
+          #   المصدر. حماية ضد الحذف العرضي/الكيدي لملفات المرضى.
+          # --size-only: ملفات المرضى تُكتب مرة ولا تتغيّر، فمقارنة الحجم تكفي
+          #   وتتجنّب مشاكل ETag/modtime مع Supabase S3.
+          rclone copy "$SRC" "$DST" \
+            --size-only --transfers 4 --checkers 8 --fast-list --stats-one-line -v
+
+          # تحقّق: كل ملف بالمصدر موجود بالوجهة (one-way) — يفشل الـ job إن نقص شيء.
+          echo "Verifying every source object exists in R2…"
+          rclone check "$SRC" "$DST" --one-way --size-only --fast-list
+
+          echo "Storage backup to R2 complete:"
+          rclone size "$DST"
