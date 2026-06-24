@@ -589,6 +589,10 @@ function renderList() {
       ? '<button class="btn-default-on" onclick="unlinkFromUser(\'' + d.id + '\')" title="هذا هو معالجك الافتراضي — اضغط للإلغاء">⭐ المعالج الافتراضي</button>'
       : '<button class="btn-default-off" onclick="linkToUser(\'' + d.id + '\')" title="تعيين هذا الطبيب كمعالج افتراضي عند تسجيلك للجلسات">☆ تعيين كمعالج افتراضي</button>';
 
+    // Owner-doctor: no edit button. The owner's name/specialty is synced from
+    // the auth account (user_metadata.full_name) via read-time self-heal, so an
+    // in-card edit would be overwritten — hide it to avoid confusion.
+    var editBtn = d.is_owner ? '' : '<button class="btn-edit" onclick="goEditDoctor(\'' + d.id + '\')">✏️ تعديل</button>';
     html += '<div class="doc-card">'
       + '<div class="doc-color-bar" style="background:' + (d.color || 'var(--green)') + '"></div>'
       + '<div class="doc-body">'
@@ -601,7 +605,7 @@ function renderList() {
       + (metaItems ? '<div class="doc-meta">' + metaItems + '</div>' : '')
       + (d.notes ? '<div class="doc-meta" style="margin-top:6px;font-style:italic;">' + escapeHtml(d.notes) + '</div>' : '')
       + '<div class="doc-actions">'
-      + '<button class="btn-edit" onclick="goEditDoctor(\'' + d.id + '\')">✏️ تعديل</button>'
+      + editBtn
       + defaultBtn
       + '</div></div></div>';
   });

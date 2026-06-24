@@ -65,6 +65,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   font-size:14px;font-weight:800;color:var(--red);margin-bottom:8px;
   display:flex;align-items:center;gap:8px;
 }
+.alerts-close{
+  margin-inline-start:auto;background:transparent;border:none;cursor:pointer;
+  color:var(--red);font-size:15px;font-weight:800;line-height:1;
+  padding:2px 7px;border-radius:6px;opacity:0.65;
+  transition:opacity .15s,background .15s;
+}
+.alerts-close:hover{opacity:1;background:rgba(239,83,80,0.18);}
 .alerts-list{display:flex;flex-direction:column;gap:6px;}
 .alert-item{
   font-size:12px;color:var(--text);
@@ -304,6 +311,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="alerts-title">
       <span>🚨</span>
       <span id="alertsTitle">تنبيهات ذكية</span>
+      <button type="button" class="alerts-close" id="alertsClose" onclick="dismissAlerts()" aria-label="إخفاء التنبيهات" title="إخفاء حتى ظهور تنبيه جديد">✕</button>
     </div>
     <div class="alerts-list" id="alertsList"></div>
   </div>
@@ -602,6 +610,16 @@ async function loadStats() {
   $('statAlerts').textContent = stats.alerts;
 }
 
+var _latestAlertId = '';
+function dismissAlerts() {
+  try {
+    var _dk = 'sydent_alerts_dismissed_' + ((currentUser && currentUser.id) || 'x');
+    if (_latestAlertId) localStorage.setItem(_dk, _latestAlertId);
+  } catch (e) {}
+  var b = $('alertsBanner');
+  if (b) b.classList.remove('show');
+}
+
 async function loadAlerts() {
   // Show top 5 recent alerts in banner
   var res = await window.sb.from('audit_log')
@@ -621,6 +639,15 @@ async function loadAlerts() {
     banner.classList.remove('show');
     return;
   }
+  // Dismissal: remember latest alert id; stay hidden unless a NEWER alert appears
+  _latestAlertId = String(alerts[0].id);
+  try {
+    var _dk = 'sydent_alerts_dismissed_' + ((currentUser && currentUser.id) || 'x');
+    if (localStorage.getItem(_dk) === _latestAlertId) {
+      banner.classList.remove('show');
+      return;
+    }
+  } catch (e) {}
   $('alertsTitle').textContent = 'تنبيهات ذكية (' + stats.alerts + ' نشطة، آخر ' + alerts.length + ')';
   var html = '';
   alerts.forEach(function(a){

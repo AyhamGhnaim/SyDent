@@ -188,6 +188,18 @@ header{
   border-inline-start-width:5px;
   background:linear-gradient(var(--yellow-dim),var(--yellow-dim)),linear-gradient(var(--yellow-dim),var(--yellow-dim)),var(--bg2);
 }
+/* Light mode: the doubled --yellow-dim wash over white --bg2 reads as nearly
+   invisible. Override with a clearly visible orange so the «جديد» card stands
+   out the same way it does in dark mode. Scoped to admin.html (no shared-asset
+   change); higher specificity than the base rule, so it wins regardless of
+   source order vs theme.css. */
+:root[data-theme="light"] .req-card.new{
+  border-color:#ea580c;
+  background:rgba(249,115,22,0.16);
+}
+:root[data-theme="light"] .req-status.new{
+  background:rgba(249,115,22,0.18);color:#c2410c;
+}
 .req-card.accepted{border-color:rgba(var(--green-rgb),0.15);opacity:.7;}
 .req-card.rejected{border-color:rgba(239,83,80,0.15);opacity:.6;}
 /* padding-right reserves the top-right corner for the absolutely-positioned
