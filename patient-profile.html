@@ -16,7 +16,7 @@
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
 <script src="theme.js?v=20260622a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260622a"></script>
+<script src="supabase-init.js?v=20260624a"></script>
 <script src="sidebar.js?v=20260622a"></script>
 <script src="timepicker.js?v=20260622a"></script>
 <style>
@@ -11703,7 +11703,7 @@ async function savePrescription() {
     // audit (graceful — نفس نمط الصفحة)
     try {
       if (typeof logAudit === 'function') {
-        await logAudit('prescription_created', 'prescription', rxId, { items: items.length });
+        await logAudit('prescription.create', { entityType: 'prescription', entityId: rxId, patientId: patientId, patientName: (patient && patient.name) || null, newValue: { items: items.length } });
       }
     } catch (e) { /* graceful */ }
 
@@ -11727,7 +11727,7 @@ async function deletePrescription(rxId) {
     await window.sb.from('prescription_items').delete().eq('prescription_id', rxId).eq('owner_id', currentUser.id);
     var del = await window.sb.from('prescriptions').delete().eq('id', rxId).eq('owner_id', currentUser.id);
     if (del.error) throw del.error;
-    try { if (typeof logAudit === 'function') await logAudit('prescription_deleted', 'prescription', rxId, {}); } catch(e){}
+    try { if (typeof logAudit === 'function') await logAudit('prescription.delete', { entityType: 'prescription', entityId: rxId, patientId: patientId, patientName: (patient && patient.name) || null }); } catch(e){}
     showToast('تم الحذف');
     await loadPrescriptions();
   } catch (e) { console.error('deletePrescription:', e); showToast('⚠️ تعذّر الحذف'); }
@@ -12003,7 +12003,7 @@ async function savePostOpNote() {
         } catch (e) { console.warn('save postop template:', e); }
       }
     }
-    try { if (typeof logAudit === 'function') await logAudit('postop_note_created', 'post_op_note', '', { len: body.length }); } catch(e){}
+    try { if (typeof logAudit === 'function') await logAudit('postop_note.create', { entityType: 'post_op_note', patientId: patientId, patientName: (patient && patient.name) || null, newValue: { len: body.length } }); } catch(e){}
     closeModal('postOpModal');
     showToast('تم حفظ التعليمات ✓');
     await loadPostOpNotes();
@@ -12021,7 +12021,7 @@ async function deletePostOpNote(id) {
   try {
     var del = await window.sb.from('post_op_notes').delete().eq('id', id).eq('owner_id', currentUser.id);
     if (del.error) throw del.error;
-    try { if (typeof logAudit === 'function') await logAudit('postop_note_deleted', 'post_op_note', id, {}); } catch(e){}
+    try { if (typeof logAudit === 'function') await logAudit('postop_note.delete', { entityType: 'post_op_note', entityId: id, patientId: patientId, patientName: (patient && patient.name) || null }); } catch(e){}
     showToast('تم الحذف');
     await loadPostOpNotes();
   } catch (e) { console.error('deletePostOpNote:', e); showToast('⚠️ تعذّر الحذف'); }

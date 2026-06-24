@@ -1994,7 +1994,8 @@
     'patient.', 'appointment.', 'appointment_type.', 'session.', 'payment.',
     'lab.', 'doctor.', 'employee.', 'operatory.',
     'expense.', 'expense_category.', 'payout.',
-    'settings.', 'lock.', 'report.'
+    'settings.', 'lock.', 'report.',
+    'prescription.', 'postop_note.', 'adjustment.'
   ];
 
   async function logAudit(actionType, opts) {
