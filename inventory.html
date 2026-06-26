@@ -151,6 +151,29 @@ body {
   .sb-hamburger span { width:22px; height:2px; background:var(--text); border-radius:2px; }
   .data-table th:nth-child(4), .data-table td:nth-child(4) { display:none; }
 }
+
+/* ---------- دليل إدخال المواد ---------- */
+.mg-guide { background:var(--bg2); border:1px solid var(--border); border-radius:14px; margin-bottom:20px; overflow:hidden; }
+.mg-guide > summary { list-style:none; cursor:pointer; padding:16px 20px; font-size:15px; font-weight:700; color:var(--text); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.mg-guide > summary::-webkit-details-marker { display:none; }
+.mg-guide > summary::after { content:'\25BE'; color:var(--text2); transition:transform .2s; }
+.mg-guide[open] > summary::after { transform:rotate(180deg); }
+.mg-body { padding:0 20px 20px; }
+.mg-intro { font-size:13px; color:var(--text2); line-height:1.9; margin-bottom:16px; }
+.mg-sec { background:var(--bg3); border-radius:10px; padding:14px 16px; margin-bottom:12px; border-right:3px solid var(--border); }
+.mg-sec-1 { border-right-color:var(--green); }
+.mg-sec-2 { border-right-color:var(--amber); }
+.mg-sec-3 { border-right-color:var(--text2); }
+.mg-h { font-size:14px; font-weight:700; margin-bottom:6px; }
+.mg-p { font-size:13px; color:var(--text); line-height:1.9; margin-bottom:6px; }
+.mg-eg { font-size:12px; color:var(--text2); line-height:1.8; }
+.mg-row { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bg2); border:1px solid var(--border); border-radius:9px; padding:10px 12px; margin-top:8px; flex-wrap:wrap; }
+.mg-row-info { flex:1; min-width:160px; }
+.mg-row-name { font-size:13px; font-weight:700; color:var(--text); }
+.mg-row-meta { font-size:11.5px; color:var(--text2); margin-top:2px; line-height:1.7; }
+.mg-copy { border:1px solid var(--green); background:transparent; color:var(--green); border-radius:8px; padding:7px 12px; font-family:'Cairo',sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .2s; }
+.mg-copy:hover { background:var(--green); color:var(--bg); }
+.mg-tip { background:var(--bg3); border:1px dashed var(--border); border-radius:9px; padding:12px 14px; font-size:12.5px; color:var(--text2); line-height:1.85; margin-top:4px; }
 </style>
 <link rel="stylesheet" href="theme.css?v=20260622a">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -171,6 +194,71 @@ body {
   </div>
 
   <div class="content">
+
+    <!-- دليل إدخال المواد -->
+    <details class="mg-guide" id="mgGuide">
+      <summary>❓ كيف أُدخل المواد؟ — دليل سريع</summary>
+      <div class="mg-body">
+        <div class="mg-intro">
+          صنّف كل مادة لواحد من <b>3 أنواع</b> — النوع بيحدّد كيف تُدخلها. اضغط «نسخ مثال» جنب أي صنف ليتعبّى لك جاهزاً في نافذة الإضافة، راجِعه واحفظ.
+        </div>
+
+        <!-- النوع 1 -->
+        <div class="mg-sec mg-sec-1">
+          <div class="mg-h" style="color:var(--green);">🟢 النوع 1 — مواد معدودة (خصم تلقائي دقيق)</div>
+          <div class="mg-p">كل استخدام بياخد قطعة كاملة. عرّف الوحدة «قطعة» واربطها بالعلاج من زر «🧰 المواد». الكمية لكل استخدام = رقم صحيح.</div>
+          <div class="mg-eg">أمثلة: كبسولة بنج، إبرة، ماتريكس باند، إسفين، فايل، زرعة، بوست، قفازات، كمامات.</div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">كبسولة بنج</div><div class="mg-row-meta">الوحدة: كبسولة · يُربَط بالعلاج · كمية الاستخدام: 1</div></div>
+            <button class="mg-copy" onclick="mgFillExample('بنج موضعي','كبسولة',50,10,'كل استخدام كبسولة واحدة')">📋 نسخ مثال</button>
+          </div>
+        </div>
+
+        <!-- النوع 2 -->
+        <div class="mg-sec mg-sec-2">
+          <div class="mg-h" style="color:var(--amber);">🟡 النوع 2 — مواد سائبة ثمينة (الحيلة المهمة)</div>
+          <div class="mg-p">لا تعرّفها بوحدة العبوة، عرّفها بـ<b>وحدة الاستخدام الصغيرة</b> ليطلع الخصم منطقياً بلا كسور. اربطها بالعلاج بكمية 1 لكل استخدام.</div>
+          <div class="mg-eg" style="margin-bottom:4px;">⚠️ الأرقام تقريبية ابتدائية — عدّلها حسب ماركتك وأسلوبك.</div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">كمبوزيت (سيرنج 4g)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 20–30 حشوة · استخدام: 1 (كبيرة خلفية: 2)</div></div>
+            <button class="mg-copy" onclick="mgFillExample('كمبوزيت — تطبيق','تطبيق',25,5,'سيرنج 4g تقريباً 25 تطبيق')">📋 نسخ مثال</button>
+          </div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">كمبوزيت سائل Flow (2g)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 15–20 · استخدام: 1</div></div>
+            <button class="mg-copy" onclick="mgFillExample('كمبوزيت سائل — تطبيق','تطبيق',18,4,'سيرنج 2g تقريباً 18 تطبيق')">📋 نسخ مثال</button>
+          </div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">بوندينغ / أدهيزف (5ml)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 100 · استخدام: 1</div></div>
+            <button class="mg-copy" onclick="mgFillExample('بوندينغ — تطبيق','تطبيق',100,15,'عبوة 5ml تقريباً 100 تطبيق')">📋 نسخ مثال</button>
+          </div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">إتش / حمض (سيرنج 3ml)</div><div class="mg-row-meta">عرّفه «استخدام» · العبوة ≈ 30–40 · استخدام: 1</div></div>
+            <button class="mg-copy" onclick="mgFillExample('إتش — استخدام','استخدام',35,6,'سيرنج 3ml تقريباً 35 استخدام')">📋 نسخ مثال</button>
+          </div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">سمنت زجاجي GIC (بودرة)</div><div class="mg-row-meta">عرّفه «خلطة» · العبوة ≈ 30 خلطة · استخدام: 1</div></div>
+            <button class="mg-copy" onclick="mgFillExample('سمنت زجاجي — خلطة','خلطة',30,5,'سكوب بودرة + نقطة سائل لكل خلطة')">📋 نسخ مثال</button>
+          </div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">مادة طبعة ألجينات (كيس)</div><div class="mg-row-meta">عرّفها «طبعة» · الكيس ≈ 20–24 طبعة فك · استخدام: 1 (فكين: 2)</div></div>
+            <button class="mg-copy" onclick="mgFillExample('ألجينات — طبعة','طبعة',22,4,'كيس تقريباً 22 طبعة فك كامل')">📋 نسخ مثال</button>
+          </div>
+        </div>
+
+        <!-- النوع 3 -->
+        <div class="mg-sec mg-sec-3">
+          <div class="mg-h" style="color:var(--text2);">⚪ النوع 3 — مواد رخيصة عالية الاستهلاك (لا تُربط بعلاج)</div>
+          <div class="mg-p">ما تستاهل خصماً لكل حالة. خلّيها صنف عادي بحد إعادة طلب، و<b>آخر كل شهر</b> اعمل جرد فيزيائي وصحّح الكمية بحركة «تعديل».</div>
+          <div class="mg-eg">أمثلة: قطن (رول)، شاش، لعّابات، بيبية المريض، مناديل.</div>
+          <div class="mg-row">
+            <div class="mg-row-info"><div class="mg-row-name">قطن (رول)</div><div class="mg-row-meta">الوحدة: رول · لا يُربَط بعلاج · جرد شهري بحركة «تعديل»</div></div>
+            <button class="mg-copy" onclick="mgFillExample('قطن','رول',10,3,'جرد شهري وتصحيح بحركة تعديل')">📋 نسخ مثال</button>
+          </div>
+        </div>
+
+        <div class="mg-tip">💡 نصيحة: معظم هالمواد بتنتهي صلاحيتها — استخدم الأقدم أولاً (FIFO) لتجنّب الهدر.</div>
+      </div>
+    </details>
 
     <!-- ملخّص -->
     <div class="summary-row" id="summaryRow" style="display:none;">
@@ -430,6 +518,17 @@ function renderLowStock() {
           + '</tr>';
       }).join('')
     + '</tbody></table></div>';
+}
+
+/* ---------- دليل المواد: تعبئة مثال ---------- */
+function mgFillExample(name, unit, qty, reorder, note) {
+  try {
+    openItemModal();
+    var vals = { itemName:name, itemUnit:unit, itemQty:qty, itemReorder:reorder, itemNote:note||'' };
+    for (var id in vals) { var el = document.getElementById(id); if (el) el.value = vals[id]; }
+    var g = document.getElementById('mgGuide'); if (g) g.open = false;
+    showToast('✨ تم تعبئة مثال — راجِع واحفظ');
+  } catch(e) {}
 }
 
 /* ---------- صنف: إضافة/تعديل ---------- */
