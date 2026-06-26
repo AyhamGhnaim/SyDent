@@ -174,6 +174,9 @@ body {
 .mg-copy { border:1px solid var(--green); background:transparent; color:var(--green); border-radius:8px; padding:7px 12px; font-family:'Cairo',sans-serif; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .2s; }
 .mg-copy:hover { background:var(--green); color:var(--bg); }
 .mg-tip { background:var(--bg3); border:1px dashed var(--border); border-radius:9px; padding:12px 14px; font-size:12.5px; color:var(--text2); line-height:1.85; margin-top:4px; }
+.exp-badge { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px; margin-right:4px; white-space:nowrap; }
+.exp-bad  { background:rgba(229,72,77,0.15); color:var(--red); }
+.exp-soon { background:rgba(245,166,35,0.18); color:var(--amber); }
 </style>
 <link rel="stylesheet" href="theme.css?v=20260622a">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -256,7 +259,7 @@ body {
           </div>
         </div>
 
-        <div class="mg-tip">💡 نصيحة: معظم هالمواد بتنتهي صلاحيتها — استخدم الأقدم أولاً (FIFO) لتجنّب الهدر.</div>
+        <div class="mg-tip">💡 نصيحة (FIFO = الأقدم أولاً): عند إدخال أي صنف حدّد «تاريخ الصلاحية» — والبرنامج رح ينبّهك للأصناف يلي قاربت أو انتهت صلاحيتها، فتستعمل الأقدم أولاً وتتجنّب الهدر.</div>
       </div>
     </details>
 
@@ -270,6 +273,10 @@ body {
         <div class="num" style="color:var(--amber);" id="sumLow">0</div>
         <div class="lbl">أصناف تحت حد التنبيه</div>
       </div>
+      <div class="summary-box">
+        <div class="num" style="color:var(--amber);" id="sumExpiry">0</div>
+        <div class="lbl">قاربت/منتهية الصلاحية</div>
+      </div>
     </div>
 
     <!-- تنبيه إعادة الطلب -->
@@ -278,6 +285,14 @@ body {
         <span class="card-title" style="color:var(--amber);">⚠️ أصناف تحتاج إعادة طلب</span>
       </div>
       <div id="lowStockList"></div>
+    </div>
+
+    <!-- تنبيه الصلاحية -->
+    <div class="card" id="expiryCard" style="display:none;border-color:rgba(245,166,35,0.4);">
+      <div class="card-head">
+        <span class="card-title" style="color:var(--amber);">⏳ أصناف قاربت/منتهية الصلاحية</span>
+      </div>
+      <div id="expiryList"></div>
     </div>
 
     <!-- قائمة الأصناف -->
@@ -319,6 +334,10 @@ body {
           <label>سعر الشراء (ل.س)</label>
           <input type="number" id="itemPrice" placeholder="اختياري" min="0" inputmode="numeric">
         </div>
+      </div>
+      <div class="form-group">
+        <label>تاريخ الصلاحية <span style="color:var(--text2);font-weight:400;">(اختياري)</span></label>
+        <input type="date" id="itemExpiry">
       </div>
       <div class="form-group">
         <label>ملاحظة</label>
@@ -428,7 +447,7 @@ async function loadItems() {
   var el = document.getElementById('itemsList');
   try {
     var res = await window.sb.from('inventory_items')
-      .select('id, name, unit, quantity, reorder_level, purchase_price, note, is_active, created_at')
+      .select('*')
       .eq('owner_id', currentUser.id)
       .eq('is_active', true)
       .order('name', { ascending: true });
@@ -447,6 +466,44 @@ async function loadItems() {
   renderItems();
   renderSummary();
   renderLowStock();
+  renderExpiry();
+}
+
+function expiryInfo(it) {
+  if (!it || !it.expiry_date) return { state:'none' };
+  var d = new Date(it.expiry_date + 'T00:00:00');
+  if (isNaN(d.getTime())) return { state:'none' };
+  var today = new Date(); today.setHours(0,0,0,0);
+  var days = Math.round((d - today) / 86400000);
+  if (days < 0)   return { state:'expired', days:days };
+  if (days <= 30) return { state:'soon', days:days };
+  return { state:'ok', days:days };
+}
+function expiryBadge(it) {
+  var e = expiryInfo(it);
+  if (e.state === 'expired') return '<span class="exp-badge exp-bad">🔴 منتهية</span>';
+  if (e.state === 'soon')    return '<span class="exp-badge exp-soon">🟠 تنتهي خلال ' + e.days + ' يوم</span>';
+  return '';
+}
+function renderExpiry() {
+  var card = document.getElementById('expiryCard');
+  var list = document.getElementById('expiryList');
+  if (!card || !list) return;
+  var arr = ITEMS.filter(function(it){ var s = expiryInfo(it).state; return s === 'expired' || s === 'soon'; });
+  arr.sort(function(a,b){ return new Date(a.expiry_date) - new Date(b.expiry_date); }); // الأقدم صلاحية أولاً (FIFO)
+  if (!arr.length) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  list.innerHTML = '<div style="overflow-x:auto;"><table class="data-table">'
+    + '<thead><tr><th>الصنف</th><th>الصلاحية</th><th>الحالة</th></tr></thead><tbody>'
+    + arr.map(function(it){
+        return '<tr>'
+          + '<td><strong>' + escapeHtml(it.name) + '</strong>'
+            + (it.unit ? ' <span style="color:var(--text2);font-size:12px;">' + escapeHtml(it.unit) + '</span>' : '') + '</td>'
+          + '<td style="color:var(--text2);white-space:nowrap;">' + escapeHtml(it.expiry_date) + '</td>'
+          + '<td>' + expiryBadge(it) + '</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table></div>';
 }
 
 function itemQtyClass(it) {
@@ -469,7 +526,8 @@ function renderItems() {
     var low = (Number(it.reorder_level||0) > 0 && Number(it.quantity||0) <= Number(it.reorder_level||0))
       ? '<span class="low-badge">⚠️ أعد الطلب</span>' : '';
     return '<tr>'
-      + '<td><strong>' + escapeHtml(it.name) + '</strong>' + low
+      + '<td><strong>' + escapeHtml(it.name) + '</strong>' + low + ' ' + expiryBadge(it)
+        + (it.expiry_date ? '<div style="font-size:11px;color:var(--text2);margin-top:2px;">📅 ' + escapeHtml(it.expiry_date) + '</div>' : '')
         + (it.note ? '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + escapeHtml(it.note) + '</div>' : '')
         + '</td>'
       + '<td><span class="qty-pill ' + qCls + '">' + fmtNum(it.quantity) + '</span>'
@@ -497,6 +555,8 @@ function renderSummary() {
   }).length;
   document.getElementById('sumTotal').textContent = ITEMS.length;
   document.getElementById('sumLow').textContent = low;
+  var expN = ITEMS.filter(function(it){ var s = expiryInfo(it).state; return s === 'expired' || s === 'soon'; }).length;
+  var _se = document.getElementById('sumExpiry'); if (_se) _se.textContent = expN;
 }
 
 function renderLowStock() {
@@ -547,6 +607,7 @@ function openItemModal(itemId) {
     document.getElementById('itemReorder').value = it ? (it.reorder_level != null ? it.reorder_level : '') : '';
     document.getElementById('itemPrice').value   = it ? (it.purchase_price != null ? it.purchase_price : '') : '';
     document.getElementById('itemNote').value    = it ? (it.note || '') : '';
+    var _exE = document.getElementById('itemExpiry'); if (_exE) _exE.value = it ? (it.expiry_date || '') : '';
   } else {
     document.getElementById('itemModalTitle').textContent = '➕ صنف جديد';
     document.getElementById('itemName').value = '';
@@ -555,6 +616,7 @@ function openItemModal(itemId) {
     document.getElementById('itemReorder').value = '';
     document.getElementById('itemPrice').value = '';
     document.getElementById('itemNote').value = '';
+    var _exE = document.getElementById('itemExpiry'); if (_exE) _exE.value = '';
   }
   openModal('itemModal');
 }
@@ -568,6 +630,7 @@ async function saveItem() {
   var price = parseInt(document.getElementById('itemPrice').value, 10);
   var unit = (document.getElementById('itemUnit').value || '').trim() || null;
   var note = (document.getElementById('itemNote').value || '').trim() || null;
+  var expiry = (document.getElementById('itemExpiry') ? document.getElementById('itemExpiry').value : '') || null;
 
   _saveItemInFlight = true;
   var btn = document.getElementById('itemSaveBtn');
@@ -579,7 +642,8 @@ async function saveItem() {
       unit: unit,
       reorder_level: isNaN(reorder) ? 0 : reorder,
       purchase_price: isNaN(price) ? null : price,
-      note: note
+      note: note,
+      expiry_date: expiry
     };
     if (editingItemId) {
       // تعديل صنف: لا نلمس الكمية هنا (تتغيّر عبر الحركات فقط) إلا إذا غُيّرت يدوياً
