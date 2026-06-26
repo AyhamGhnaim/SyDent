@@ -177,6 +177,8 @@ body {
 .exp-badge { display:inline-block; font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px; margin-right:4px; white-space:nowrap; }
 .exp-bad  { background:rgba(229,72,77,0.15); color:var(--red); }
 .exp-soon { background:rgba(245,166,35,0.18); color:var(--amber); }
+.inv-note { display:flex; align-items:flex-start; gap:8px; background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:12.5px; color:var(--text2); line-height:1.85; margin-bottom:16px; }
+.inv-note-ic { flex-shrink:0; }
 </style>
 <link rel="stylesheet" href="theme.css?v=20260622a">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -197,6 +199,12 @@ body {
   </div>
 
   <div class="content">
+
+    <!-- تنويه: المخزون منفصل عن المحاسبة -->
+    <div class="inv-note">
+      <span class="inv-note-ic">ℹ️</span>
+      <span>معلومات صفحة المخزون مخصّصة للمتابعة والتنبيهات فقط، ولا تُحتسب ضمن أرباح أو مصاريف نظام المحاسبة.</span>
+    </div>
 
     <!-- دليل إدخال المواد -->
     <details class="mg-guide" id="mgGuide">
