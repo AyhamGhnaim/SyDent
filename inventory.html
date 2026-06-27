@@ -543,10 +543,24 @@ function renderExpiry() {
 }
 async function finishBatch(batchId) {
   if (!confirm('تعليم هذه الدفعة كمنتهية/مستهلكة؟ ستختفي من تنبيهات الصلاحية.')) return;
+  var b = null;
+  for (var i=0;i<BATCHES.length;i++) if (BATCHES[i].id === batchId) { b = BATCHES[i]; break; }
   try {
     var upd = await window.sb.from('inventory_batches')
       .update({ is_finished: true }).eq('id', batchId).eq('owner_id', currentUser.id);
     if (upd.error) throw upd.error;
+    // أثر بالسجل (إعلامي فقط: تغيير 0 — لا مساس بالكمية ولا المحاسبة) — best-effort
+    if (b && b.item_id) {
+      try {
+        var etxt = b.expiry_date ? ('صلاحية ' + b.expiry_date) : 'بلا تاريخ';
+        var qtxt = (b.quantity != null) ? ('، كمية مستلمة ' + fmtNum(b.quantity)) : '';
+        await window.sb.from('inventory_movements').insert({
+          owner_id: currentUser.id, item_id: b.item_id,
+          change: 0, reason: 'adjust',
+          note: '📦 دفعة منتهية/مستهلكة — ' + etxt + qtxt
+        });
+      } catch (le) { console.warn('finishBatch log:', le); }
+    }
     showToast('تم ✓');
     await loadItems();
   } catch (e) { console.error('finishBatch:', e); showToast('تعذّر التحديث', true); }
@@ -795,6 +809,11 @@ async function saveMovement() {
   if (!it) return;
   var reason = document.getElementById('moveReason').value;
   var note = (document.getElementById('moveNote').value || '').trim() || null;
+  var _mexp = document.getElementById('moveExpiry');
+  var expVal = (reason === 'purchase' && _mexp) ? (_mexp.value || null) : null;
+  // ملاحظة الحركة بالسجل: أضف الصلاحية عند الشراء
+  var movNote = note;
+  if (expVal) movNote = (note ? note + ' · ' : '') + 'صلاحية حتى ' + expVal;
   var cur = Number(it.quantity || 0);
   var change, newQty, q, to;
 
@@ -843,7 +862,7 @@ async function saveMovement() {
     // 1) سجّل الحركة
     var insMov = await window.sb.from('inventory_movements').insert({
       owner_id: currentUser.id, item_id: moveItemId,
-      change: change, reason: reason, note: note
+      change: change, reason: reason, note: movNote
     });
     if (insMov.error) throw insMov.error;
     // 2) حدّث الكمية على الصنف
@@ -851,17 +870,13 @@ async function saveMovement() {
       .update({ quantity: newQty }).eq('id', moveItemId).eq('owner_id', currentUser.id);
     if (upd.error) throw upd.error;
     // 3) دفعة الصلاحية (شراء فقط، وفقط لو أُدخل تاريخ) — best-effort: فشلها لا يكسر الحركة
-    if (reason === 'purchase') {
-      var _exp = document.getElementById('moveExpiry');
-      var expVal = _exp ? (_exp.value || null) : null;
-      if (expVal) {
-        try {
-          await window.sb.from('inventory_batches').insert({
-            owner_id: currentUser.id, item_id: moveItemId,
-            quantity: q, expiry_date: expVal, note: note
-          });
-        } catch (be) { console.warn('batch insert:', be); }
-      }
+    if (expVal) {
+      try {
+        await window.sb.from('inventory_batches').insert({
+          owner_id: currentUser.id, item_id: moveItemId,
+          quantity: q, expiry_date: expVal, note: note
+        });
+      } catch (be) { console.warn('batch insert:', be); }
     }
     closeModal('moveModal');
     showToast('تم تسجيل الحركة ✓');
