@@ -4863,6 +4863,29 @@ async function editAppt(id) {
   } else {
     updateNoShowFeeBtnVisibility(a);
   }
+
+  // P5+: in-edit patient resolution. If this appointment has no linked patient
+  // card (e.g. confirmed from a booking via "متابعة بدون بطاقة", or a legacy
+  // free-text appointment), show the same match-or-create box so the user can
+  // link/create later. The resolved id is applied on "حفظ التعديلات" via the
+  // same submitAppt path (apptData.patient_id). For appts that already have a
+  // card, keep the box hidden and leave ctx untouched (name lookup handles it).
+  var _brBoxEdit = document.getElementById('bookingResolveBox');
+  if (_brBoxEdit) {
+    if (a.patient_id) {
+      _brBoxEdit.style.display = 'none';
+      _brBoxEdit.innerHTML = '';
+    } else {
+      // Phone hint: prefer the number stored in the notes ("📞 <phone> — …").
+      var _phoneHint = '';
+      var _nt = a.notes || '';
+      var _mp = _nt.match(/📞\s*(\+?[0-9][0-9\-\s]+)/);
+      if (!_mp) _mp = _nt.match(/(\+?[0-9][0-9\-\s]{7,})/);
+      if (_mp) _phoneHint = String(_mp[1] || '').replace(/[^0-9+]/g, '');
+      window._bookingConfirmCtx = { id: null, name: a.patient_name || '', phone: _phoneHint, patientId: null };
+      bookingResolvePatient({ patient_name: a.patient_name || '', phone: _phoneHint });
+    }
+  }
 }
 
 /* Build the provider <select>. Visible only if >= 1 clinic doctor exists. */
