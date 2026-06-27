@@ -17,6 +17,42 @@
 <script src="theme.js?v=20260622a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260624a"></script>
+<!-- ── Cloudflare Turnstile (CAPTCHA) ── Axis 3 / Item 2. Helper defined BEFORE the API
+     script so window.onSyDentTurnstileLoad exists when the (async) script fires. -->
+<style>.cf-turnstile-box{margin:2px 0 14px;min-height:65px;display:flex;justify-content:center}</style>
+<script>
+(function(){
+  var SITEKEY = '0x4AAAAAADr7FjcBLQHJKhcS';   // public site key — safe in client by design
+  var widgets = {};   // name -> widgetId
+  var wanted  = {};   // name -> containerId (render intent recorded before API is ready)
+  var ready   = false;
+  function whenDomReady(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+  function render(name, containerId){
+    if (!ready || !window.turnstile) return;
+    if (widgets[name] !== undefined) return;            // already rendered — no double render
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    try { widgets[name] = window.turnstile.render(el, { sitekey: SITEKEY, theme: 'auto', action: name }); }
+    catch(e){ console.warn('[turnstile] render failed:', name, e); }
+  }
+  window.onSyDentTurnstileLoad = function(){
+    ready = true;
+    whenDomReady(function(){ Object.keys(wanted).forEach(function(n){ render(n, wanted[n]); }); });
+  };
+  window.requestTurnstile = function(name, containerId){ wanted[name] = containerId; render(name, containerId); };
+  window.getTurnstileToken = function(name){
+    try { var id = widgets[name]; return (id !== undefined && window.turnstile) ? (window.turnstile.getResponse(id) || '') : ''; }
+    catch(e){ return ''; }
+  };
+  window.resetTurnstile = function(name){
+    try { var id = widgets[name]; if (id !== undefined && window.turnstile) window.turnstile.reset(id); } catch(e){}
+  };
+})();
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onSyDentTurnstileLoad" async defer></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -864,6 +900,7 @@ textarea::placeholder { color: var(--text2); }
       <label>كلمة المرور الحالية</label>
       <input type="password" id="fDeletePass" placeholder="••••••••" autocomplete="current-password">
     </div>
+    <div id="ts-delete" class="cf-turnstile-box"></div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeDeleteModal()">إلغاء</button>
       <button type="button" class="btn btn-danger" id="btnConfirmDelete" onclick="confirmDelete()">حذف نهائياً</button>
@@ -1548,6 +1585,7 @@ function openDeleteModal() {
   document.getElementById('fDeleteConfirm').value = '';
   document.getElementById('fDeletePass').value = '';
   document.getElementById('deleteModal').classList.add('open');
+  try { requestTurnstile('delete', 'ts-delete'); } catch(e){}
 }
 function closeDeleteModal() {
   document.getElementById('deleteModal').classList.remove('open');
@@ -1571,11 +1609,13 @@ async function confirmDelete() {
 
   // 1. التحقق من كلمة المرور بإعادة تسجيل الدخول
   const { error: authError } = await window.sb.auth.signInWithPassword({
-    email: currentUser.email, password: pass
+    email: currentUser.email, password: pass, options: { captchaToken: getTurnstileToken('delete') }
   });
   if (authError) {
     btn.disabled = false; btn.textContent = 'حذف نهائياً';
-    showToast('❌ كلمة المرور غير صحيحة', true);
+    try { resetTurnstile('delete'); } catch(e){}   // token single-use → refresh for retry
+    var _capFail = /captcha/i.test(authError.message || '');
+    showToast(_capFail ? '❌ تعذّر التحقق من الحماية، أعد المحاولة' : '❌ كلمة المرور غير صحيحة', true);
     return;
   }
 

@@ -17,6 +17,46 @@
 <script src="theme.js?v=20260622a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-init.js?v=20260624a"></script>
+<!-- ── Cloudflare Turnstile (CAPTCHA) ── Axis 3 / Item 2. Helper is defined BEFORE the
+     API script so window.onSyDentTurnstileLoad exists when the (async) script fires. -->
+<style>.cf-turnstile-box{margin:2px 0 14px;min-height:65px;display:flex;justify-content:center}</style>
+<script>
+(function(){
+  var SITEKEY = '0x4AAAAAADr7FjcBLQHJKhcS';   // public site key — safe in client by design
+  var widgets = {};   // name -> widgetId
+  var wanted  = {};   // name -> containerId (render intent recorded before API is ready)
+  var ready   = false;
+  function whenDomReady(fn){
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+  function render(name, containerId){
+    if (!ready || !window.turnstile) return;
+    if (widgets[name] !== undefined) return;            // already rendered — no double render
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    try { widgets[name] = window.turnstile.render(el, { sitekey: SITEKEY, theme: 'auto', action: name }); }
+    catch(e){ console.warn('[turnstile] render failed:', name, e); }
+  }
+  // Invoked by the Turnstile API once loaded (onload param in the script URL below).
+  window.onSyDentTurnstileLoad = function(){
+    ready = true;
+    whenDomReady(function(){ Object.keys(wanted).forEach(function(n){ render(n, wanted[n]); }); });
+  };
+  // Page-facing helpers.
+  window.requestTurnstile = function(name, containerId){ wanted[name] = containerId; render(name, containerId); };
+  window.getTurnstileToken = function(name){
+    try { var id = widgets[name]; return (id !== undefined && window.turnstile) ? (window.turnstile.getResponse(id) || '') : ''; }
+    catch(e){ return ''; }
+  };
+  window.resetTurnstile = function(name){
+    try { var id = widgets[name]; if (id !== undefined && window.turnstile) window.turnstile.reset(id); } catch(e){}
+  };
+  // The login widget is visible at page load → seed its render intent now.
+  wanted['login'] = 'ts-login';
+})();
+</script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onSyDentTurnstileLoad" async defer></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -464,6 +504,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div style="margin:-4px 0 14px;text-align:left;">
       <button type="button" class="forgot-link" onclick="openForgotModal()">نسيت كلمة المرور؟</button>
     </div>
+    <div id="ts-login" class="cf-turnstile-box"></div>
     <button type="submit" class="btn-submit" id="loginBtn">دخول</button>
   </form>
 
@@ -500,6 +541,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
       <label>كلمة المرور (6 أحرف على الأقل)</label>
       <input type="password" id="regPass" placeholder="••••••••" autocomplete="new-password" minlength="6" required>
     </div>
+    <div id="ts-register" class="cf-turnstile-box"></div>
     <button type="submit" class="btn-submit" id="regBtn">إنشاء حساب التجربة</button>
   </form>
 </div>
@@ -514,6 +556,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
       <input type="text" id="forgotEmail" placeholder="doctor@example.com أو 09xxxxxxxx" autocomplete="email">
     </div>
     <div id="forgotMsg" class="msg"></div>
+    <div id="ts-forgot" class="cf-turnstile-box"></div>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="forgotCancelBtn" onclick="closeForgotModal()">إلغاء</button>
       <button type="button" class="btn-submit" id="forgotBtn" onclick="sendResetEmail()">إرسال الرابط</button>
@@ -569,6 +612,7 @@ function switchTab(which) {
   document.getElementById('tabRegister').classList.toggle('active', which === 'register');
   document.getElementById('loginForm').classList.toggle('hidden', which !== 'login');
   document.getElementById('registerForm').classList.toggle('hidden', which !== 'register');
+  if (which === 'register') { try { requestTurnstile('register', 'ts-register'); } catch(e){} }
   hideMsg();
 }
 
@@ -601,6 +645,7 @@ function openForgotModal() {
   btn.textContent = 'إرسال الرابط';
   document.getElementById('forgotCancelBtn').disabled = false;
   document.getElementById('forgotModalOverlay').classList.add('show');
+  try { requestTurnstile('forgot', 'ts-forgot'); } catch(e){}
   setTimeout(function(){
     try { document.getElementById('forgotEmail').focus(); } catch(e){}
   }, 60);
@@ -678,12 +723,15 @@ async function sendResetEmail() {
   // This prevents email enumeration (OWASP). Errors are logged to console only.
   try {
     await window.sb.auth.resetPasswordForEmail(target, {
-      redirectTo: window.location.origin + '/reset-password.html'
+      redirectTo: window.location.origin + '/reset-password.html',
+      captchaToken: getTurnstileToken('forgot')
     });
   } catch (err) {
     // Log silently — do NOT surface to user (would reveal email existence)
     console.warn('[forgot-password] request error:', err);
   }
+  // Turnstile token is single-use → refresh for any subsequent send.
+  try { resetTurnstile('forgot'); } catch(e){}
 
   // Anti-enumeration: same success message for every email (existent or not)
   showForgotMsg('✓ إذا كان البريد مسجَّلاً، فقد أرسلنا رابط إعادة التعيين. تحقّق من بريدك (وقد يكون في spam).', 'success');
@@ -752,7 +800,7 @@ async function doLogin(e) {
   btn.disabled = true;
   btn.innerHTML = 'جارٍ التحقق<span class="spinner"></span>';
   try {
-    const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await window.sb.auth.signInWithPassword({ email, password, options: { captchaToken: getTurnstileToken('login') } });
     if (error) throw error;
 
     // Phase 7.6F: check admin role first (admins bypass the trial_request gate).
@@ -795,10 +843,14 @@ async function doLogin(e) {
     setTimeout(() => { window.location.href = dest; }, 600);
   } catch (err) {
     let msg = err.message || 'فشل تسجيل الدخول';
-    if (msg.toLowerCase().includes('invalid')) msg = 'البريد أو كلمة المرور غير صحيحة';
+    if (msg.toLowerCase().includes('captcha')) msg = 'تعذّر التحقق من الحماية، يرجى إعادة المحاولة';
+    else if (msg.toLowerCase().includes('invalid')) msg = 'البريد أو كلمة المرور غير صحيحة';
     showMsg('❌ ' + msg, 'error');
     btn.disabled = false;
     btn.textContent = 'دخول';
+  } finally {
+    // Turnstile tokens are single-use → refresh for any subsequent attempt.
+    try { resetTurnstile('login'); } catch(e){}
   }
 }
 
@@ -845,7 +897,7 @@ async function doRegister(e) {
     const { data, error } = await window.sb.auth.signUp({
       email: email,
       password: password,
-      options: { data: { full_name: name, phone: phoneForRow || '' } }
+      options: { data: { full_name: name, phone: phoneForRow || '' }, captchaToken: getTurnstileToken('register') }
     });
     if (error) throw error;
     if (!data || !data.user) throw new Error('تعذّر إنشاء الحساب');
@@ -895,9 +947,12 @@ async function doRegister(e) {
         : 'هذا الرقم مسجّل مسبقاً. إذا كنت قد سجّلت من قبل، استخدم تبويب "تسجيل دخول".';
     }
     if (msg.toLowerCase().includes('password')) msg = 'كلمة المرور ضعيفة جداً';
+    if (msg.toLowerCase().includes('captcha')) msg = 'تعذّر التحقق من الحماية، يرجى إعادة المحاولة';
     showMsg('❌ ' + msg, 'error');
     btn.disabled = false;
     btn.textContent = 'إنشاء حساب التجربة';
+  } finally {
+    try { resetTurnstile('register'); } catch(e){}
   }
 }
 </script>
