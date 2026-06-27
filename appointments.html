@@ -1105,6 +1105,8 @@ textarea { resize: vertical; min-height: 72px; }
           <input type="text" id="fPatient" placeholder="ابحث أو اكتب الاسم…" list="patientsList" required oninput="onFPatientInput()" onchange="onFPatientInput()">
           <datalist id="patientsList"></datalist>
         </div>
+        <!-- P5+: booking-confirm patient resolution (match existing OR create new). Hidden by default; shown only during a booking-request confirmation. -->
+        <div class="form-group full" id="bookingResolveBox" style="display:none;"></div>
         <div class="form-group" id="fDateGroup">
           <label>التاريخ *</label>
           <input type="date" id="fDate">
@@ -4756,6 +4758,10 @@ async function openModal(prefillDate) {
   const names = await loadPatientNames();
   document.getElementById('patientsList').innerHTML = names.map(n => `<option value="${escapeHtml(n)}">`).join('');
 
+  // P5+: a fresh (non-booking) appointment must never show the resolution box.
+  var _brBox = document.getElementById('bookingResolveBox');
+  if (_brBox) { _brBox.style.display = 'none'; _brBox.innerHTML = ''; }
+
   document.getElementById('modalOverlay').classList.add('open');
 }
 
@@ -5888,7 +5894,7 @@ async function deleteApptFromModal() {
   await loadAppointments();
 }
 
-function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); window._bookingConfirmCtx = null; }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); window._bookingConfirmCtx = null; var _brBox = document.getElementById('bookingResolveBox'); if (_brBox) { _brBox.style.display = 'none'; _brBox.innerHTML = ''; } }
 document.getElementById('modalOverlay').addEventListener('click', function(e) {
   if (e.target===this) closeModal();
 });
@@ -5943,8 +5949,11 @@ async function submitAppt(e) {
 
   // Lookup patient_id from name (so newer features that rely on it work).
   // If not found, leave patient_id null — older flow still works.
-  var patientId = null;
-  if (patientName) {
+  // P5+: prefer an explicitly resolved patient id from the booking-confirm box
+  // (link-existing or create-new) — robust against duplicate names. Otherwise
+  // fall back to the legacy exact-name lookup so the normal flow is unchanged.
+  var patientId = (window._bookingConfirmCtx && window._bookingConfirmCtx.patientId) ? window._bookingConfirmCtx.patientId : null;
+  if (patientName && !patientId) {
     try {
       const { data: prow } = await window.sb.from('patients')
         .select('id').eq('doctor_id', currentUser.id).eq('name', patientName).maybeSingle();
@@ -6774,7 +6783,7 @@ async function confirmBookingRequest(id) {
     if (bookingRequests[i].id === id) { req = bookingRequests[i]; break; }
   }
   if (!req) return;
-  window._bookingConfirmCtx = { id: req.id };
+  window._bookingConfirmCtx = { id: req.id, phone: req.phone || '', name: req.patient_name || '', patientId: null };
   await openModal(req.requested_date);
   document.getElementById('fPatient').value = req.patient_name || '';
   document.getElementById('fTime').value = req.requested_time || '';
@@ -6793,6 +6802,155 @@ async function confirmBookingRequest(id) {
   if (req.note) noteParts.push(req.note);
   document.getElementById('fNotes').value = noteParts.join('\n');
   showToast('أكمل تفاصيل الموعد ثم احفظ لتأكيد الطلب');
+  // P5+: show the patient-resolution box (match existing OR create new) so the
+  // confirmed appointment ends up linked to a real patient card (phone → reminders).
+  bookingResolvePatient(req);
+}
+
+// ─── P5+: Booking-confirm patient resolution (match-or-create) ──────────────
+// When confirming an online booking request, let the user link the appointment
+// to an existing patient card (duplicate detection by phone, then exact name)
+// or create a new card from the request's name+phone. The resolved patient id
+// is stored on window._bookingConfirmCtx.patientId and consumed by submitAppt
+// (preferred over name lookup → robust against duplicate names). Falls back to
+// the legacy "no card" behaviour via "متابعة بدون بطاقة".
+function brBtnStyle()   { return 'display:block;width:100%;text-align:right;padding:8px 10px;margin-top:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-family:inherit;font-size:13px;'; }
+function brBtnPrimary() { return 'display:block;width:100%;text-align:center;padding:9px 10px;margin-top:6px;border:none;border-radius:8px;background:var(--green);color:#fff;cursor:pointer;font-family:inherit;font-weight:600;font-size:13px;'; }
+
+async function bookingResolvePatient(req) {
+  var box = document.getElementById('bookingResolveBox');
+  if (!box) return;
+  // Load patient list once (used for both match-detection and the search field).
+  var pats = [];
+  try {
+    const { data } = await window.sb.from('patients')
+      .select('id, name, phone, local_id').eq('doctor_id', currentUser.id);
+    pats = data || [];
+  } catch (e) { console.warn('[booking] patients load for resolve:', e); }
+  window._brPatients = pats;
+
+  // Duplicate detection: phone first (strongest), then exact name.
+  var reqPhoneNorm = (typeof normalizePhone === 'function') ? normalizePhone(req.phone) : null;
+  var matches = [];
+  if (reqPhoneNorm) {
+    matches = pats.filter(function (p) { return p.phone && normalizePhone(p.phone) === reqPhoneNorm; });
+  }
+  if (matches.length === 0 && req.patient_name) {
+    var nm = String(req.patient_name).trim();
+    matches = pats.filter(function (p) { return (p.name || '').trim() === nm; });
+  }
+  bookingRenderResolveBox(matches);
+  box.style.display = '';
+}
+
+function bookingRenderResolveBox(matches) {
+  var box = document.getElementById('bookingResolveBox');
+  if (!box) return;
+  var html = '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;">';
+  html += '<div style="font-weight:600;margin-bottom:4px;">🔗 ربط المريض ببطاقة</div>';
+  if (matches && matches.length > 0) {
+    html += '<div style="font-size:12px;color:var(--green-dim);margin-bottom:2px;">وجدنا بطاقة مطابقة (نفس الرقم/الاسم):</div>';
+    matches.slice(0, 5).forEach(function (p) {
+      html += '<button type="button" style="' + brBtnStyle() + '" onclick="bookingLinkExisting(\'' + p.id + '\')">🔗 اربط بـ ' + escapeHtml(p.name || '') + (p.local_id ? ' (' + escapeHtml(p.local_id) + ')' : '') + '</button>';
+    });
+  }
+  html += '<button type="button" style="' + brBtnPrimary() + '" onclick="bookingCreatePatientFromReq()">➕ إنشاء بطاقة مريض جديدة</button>';
+  html += '<div style="font-size:12px;color:var(--green-dim);margin-top:8px;">أو ابحث عن بطاقة موجودة:</div>';
+  html += '<input type="text" id="brSearchInput" placeholder="ابحث بالاسم أو الهاتف…" oninput="bookingSearchExisting()" onkeydown="if(event.key===\'Enter\'){event.preventDefault();}" style="width:100%;padding:8px 10px;margin-top:6px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;">';
+  html += '<div id="brSearchResults"></div>';
+  html += '<button type="button" style="' + brBtnStyle() + 'opacity:0.85;" onclick="bookingResolveSkip()">↪️ متابعة بدون بطاقة (يمكن الربط لاحقاً)</button>';
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function bookingSearchExisting() {
+  var inp = document.getElementById('brSearchInput');
+  var out = document.getElementById('brSearchResults');
+  if (!inp || !out) return;
+  var q = (inp.value || '').trim().toLowerCase();
+  if (!q) { out.innerHTML = ''; return; }
+  var pats = window._brPatients || [];
+  var res = pats.filter(function (p) {
+    return (p.name || '').toLowerCase().indexOf(q) >= 0 || (p.phone || '').indexOf(q) >= 0;
+  }).slice(0, 8);
+  if (res.length === 0) { out.innerHTML = '<div style="font-size:12px;color:var(--green-dim);margin-top:6px;">لا نتائج مطابقة</div>'; return; }
+  out.innerHTML = res.map(function (p) {
+    return '<button type="button" style="' + brBtnStyle() + '" onclick="bookingLinkExisting(\'' + p.id + '\')">' + escapeHtml(p.name || '') + ' · ' + escapeHtml(p.phone || '—') + '</button>';
+  }).join('');
+}
+
+function bookingLinkExisting(id) {
+  var pats = window._brPatients || [];
+  var p = null;
+  for (var i = 0; i < pats.length; i++) { if (pats[i].id === id) { p = pats[i]; break; } }
+  if (!p) { showToast('⚠️ تعذّر الربط — أعد المحاولة'); return; }
+  if (window._bookingConfirmCtx) window._bookingConfirmCtx.patientId = p.id;
+  var pf = document.getElementById('fPatient'); if (pf) pf.value = p.name || '';
+  bookingResolveConfirmedUI('🔗 سيُربط الموعد بالبطاقة: ' + (p.name || '') + (p.local_id ? ' (' + p.local_id + ')' : ''));
+}
+
+async function bookingCreatePatientFromReq() {
+  var ctx = window._bookingConfirmCtx;
+  if (!ctx) { showToast('⚠️ انتهت الجلسة — أعد فتح الطلب'); return; }
+  var name  = (ctx.name  || '').trim();
+  var phone = (ctx.phone || '').trim();
+  if (!name) { showToast('⚠️ لا يوجد اسم في الطلب'); return; }
+  // local_id generation — same non-atomic max-seq pattern as patients.html.
+  var maxSeq = 0;
+  try {
+    const { data } = await window.sb.from('patients').select('local_id').eq('doctor_id', currentUser.id);
+    (data || []).forEach(function (p) {
+      var n = parseInt((p.local_id || 'P000').slice(1));
+      if (!isNaN(n) && n > maxSeq) maxSeq = n;
+    });
+  } catch (e) { console.warn('[booking] local_id seq:', e); }
+  var local_id = 'P' + String(maxSeq + 1).padStart(3, '0');
+  var today = new Date().toISOString().slice(0, 10);
+  // INSERT shape mirrors patients.html exactly (safe against NOT NULL columns).
+  const { data: newPat, error } = await window.sb.from('patients').insert({
+    doctor_id: currentUser.id,
+    local_id: local_id, name: name, phone: phone,
+    dob: null, gender: '', payment: 'متبقي', status: 'جديد',
+    allergies: '', notes: '', last_visit: today
+  }).select().single();
+  if (error || !newPat) { showToast('❌ تعذّر إنشاء البطاقة'); console.warn('[booking] create patient:', error); return; }
+  if (window.logAudit) {
+    window.logAudit('patient.create', {
+      entityId: newPat.id, patientId: newPat.id, patientName: name,
+      description: 'إضافة مريض جديد من طلب حجز: ' + name + ' (' + local_id + ')',
+      newValue: { name: name, local_id: local_id, phone: phone }
+    });
+  }
+  // Keep the in-memory phone cache consistent so the WhatsApp reminder resolves
+  // immediately after save (belt-and-suspenders with submitAppt's refresh flag).
+  try {
+    patientsCache[newPat.id] = { name: name, phone: phone };
+    if (name) patientsCache['__name__' + name] = { id: newPat.id, name: name, phone: phone };
+  } catch (e) { /* ignore */ }
+  if (window._bookingConfirmCtx) window._bookingConfirmCtx.patientId = newPat.id;
+  var pf = document.getElementById('fPatient'); if (pf) pf.value = name;
+  bookingResolveConfirmedUI('✅ تم إنشاء البطاقة: ' + name + ' (' + local_id + ')');
+}
+
+function bookingResolveSkip() {
+  if (window._bookingConfirmCtx) window._bookingConfirmCtx.patientId = null;
+  bookingResolveConfirmedUI('↪️ سيُحفظ الموعد بدون بطاقة مريض (يمكنك الربط لاحقاً من بطاقة المريض).');
+}
+
+function bookingResolveConfirmedUI(msg) {
+  var box = document.getElementById('bookingResolveBox');
+  if (!box) return;
+  box.innerHTML = '<div style="border:1px solid var(--green);border-radius:var(--radius);padding:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+    + '<span style="font-size:13px;flex:1;min-width:0;">' + escapeHtml(msg) + '</span>'
+    + '<button type="button" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-family:inherit;font-size:12px;" onclick="bookingResolveReopen()">تغيير</button>'
+    + '</div>';
+}
+
+function bookingResolveReopen() {
+  var ctx = window._bookingConfirmCtx;
+  if (!ctx) return;
+  ctx.patientId = null;
+  bookingResolvePatient({ patient_name: ctx.name, phone: ctx.phone });
 }
 
 // Called synchronously from submitAppt's success path (before closeModal
