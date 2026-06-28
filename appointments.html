@@ -1706,7 +1706,7 @@ function getReminderBadgeHtml(appt) {
   if (!CLINIC_SETTINGS_WA || !CLINIC_SETTINGS_WA.whatsapp_reminders_enabled) return '';
   const c = classifyReminderForAppt(appt);
   if (!c) return '';
-  return '<span class="wa-badge ' + c.kind + '" title="' + c.title.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation(); openWaReminderModal(\'' + appt.id + '\')">' + c.label + '</span>';
+  return '<span class="wa-badge ' + c.kind + '" title="' + escapeHtml(c.title) + '" onclick="event.stopPropagation(); openWaReminderModal(\'' + escapeHtml(appt.id) + '\')">' + escapeHtml(c.label) + '</span>';
 }
 
 // ═══════════════════════════════════════════════════════════════
