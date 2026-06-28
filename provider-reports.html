@@ -505,6 +505,34 @@ function toDay(d) {
   return y + '-' + m + '-' + day;
 }
 
+// ─── TIMESTAMPTZ timezone safety (parity with accounting.html) ───
+// date_sent on lab_orders is TIMESTAMPTZ. PostgREST .gte/.lte compare the UTC
+// instant, so a Syria-local date typed by the user can be off by up to a day.
+// Pattern: widen the UTC query window by ±1 day, then trim precisely client-side
+// using the row's LOCAL calendar date.
+function widenStartUtc(isoDay) {
+  if (!isoDay) return isoDay;
+  var d = new Date(isoDay + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString();
+}
+function widenEndUtc(isoDay) {
+  if (!isoDay) return isoDay;
+  var d = new Date(isoDay + 'T23:59:59.999Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+function inLocalRange(timestamptz, from, to) {
+  if (!timestamptz) return false;
+  var d = new Date(timestamptz);
+  if (isNaN(d.getTime())) return false;
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  var localDay = y + '-' + m + '-' + day;
+  return localDay >= from && localDay <= to;
+}
+
 function openModal(id) { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 
@@ -678,13 +706,20 @@ async function loadFilteredData() {
   // below — excludes allocations sitting on planned/not-yet-done sessions).
   await loadSplitSessionStatuses();
 
-  // Load all lab_orders (we filter per session by patient+tooth)
-  // Use status filter: include only sent/received/checked/delivered (not rejected)
+  // Lab orders incurred in this window (cash-basis: the cost lands at date_sent).
+  // Attributed per-provider via the explicit provider_id column (Migration 73) —
+  // no more fragile session-anchored matching. date_sent is TIMESTAMPTZ, so use
+  // the widen-then-trim pattern. Rejected orders are excluded (never a real cost).
   try {
     var loRes = await window.sb.from('lab_orders')
-      .select('id,patient_id,tooth_num,cost,status,date_sent')
-      .eq('doctor_id', currentUser.id);
-    labOrders = (loRes.data) || [];
+      .select('id,patient_id,tooth_num,cost,status,date_sent,provider_id')
+      .eq('doctor_id', currentUser.id)
+      .neq('status', 'rejected')
+      .gte('date_sent', widenStartUtc(from))
+      .lte('date_sent', widenEndUtc(to));
+    labOrders = ((loRes.data) || []).filter(function(lo){
+      return inLocalRange(lo.date_sent, from, to);
+    });
   } catch(e) {
     labOrders = [];
   }
@@ -703,39 +738,21 @@ async function loadFilteredData() {
   render();
 }
 
-// ─── Lab matching helper (single source of truth) ───
-// Match lab_orders to a session by patient + tooth + date proximity (±90 days).
-// matchedSet is shared across calls to avoid double-counting one lab_order across
-// multiple sessions on the same tooth.
-function findMatchingLabOrders(session, matchedSet) {
-  if (!session.tooth_num) return [];
-  var sessionDate = session.date ? new Date(session.date) : null;
-  var windowDays = 90;
-  return labOrders.filter(function(lo){
-    if (lo.patient_id !== session.patient_id) return false;
-    if (lo.tooth_num === null || lo.tooth_num === undefined) return false;
-    if (String(lo.tooth_num) !== String(session.tooth_num)) return false;
-    if (lo.status === 'rejected') return false;
-    if (matchedSet && matchedSet[lo.id]) return false;
-    if (sessionDate && lo.date_sent) {
-      var loDate = new Date(lo.date_sent);
-      // Guard against invalid dates (NaN > 90 is false, which would incorrectly pass)
-      if (isNaN(sessionDate.getTime()) || isNaN(loDate.getTime())) return true;
-      var diffDays = Math.abs((sessionDate - loDate) / 86400000);
-      if (diffDays > windowDays) return false;
-    }
-    return true;
-  });
-}
-
-function sumSessionLabCost(session, matchedSet) {
-  var matches = findMatchingLabOrders(session, matchedSet);
-  var cost = 0;
-  matches.forEach(function(lo){
-    cost += Number(lo.cost) || 0;
-    if (matchedSet) matchedSet[lo.id] = true;
-  });
-  return cost;
+// ─── Lab cost attribution (Migration 73) ───
+// Lab cost is attributed to the treating provider via the explicit provider_id
+// column stored on each lab_order at write time — NO session matching. `labOrders`
+// is already filtered to the active window (by date_sent) at load time, so summing
+// here is window-correct and deterministic regardless of the filter. Matches
+// OpenDental (labcase.ProvNum stored on the lab). provId === '_unassigned'
+// aggregates orders with no provider_id, so they never silently fall onto the owner.
+function providerLabCost(provId) {
+  var sum = 0;
+  for (var i = 0; i < labOrders.length; i++) {
+    var lo = labOrders[i];
+    var match = (provId === '_unassigned') ? !lo.provider_id : lo.provider_id === provId;
+    if (match) sum += Number(lo.cost) || 0;
+  }
+  return sum;
 }
 
 // Populate splitSessionStatus for every distinct session_id referenced by the loaded
@@ -789,12 +806,11 @@ function splitIsEarned(sp) {
 }
 
 // ─── Compute provider stats ───
-// For a given provider, compute production/lab/net from sessions and
-// allocated collection from payments based on provider's share of patient production.
-// Optional sharedMatchedSet ensures one lab_order can only be attributed to one
-// provider (the first one that matches). When called from render(), pass a shared
-// set; when called standalone, pass nothing (uses per-call set).
-function computeProviderStats(provId, sharedMatchedSet) {
+// For a given provider, compute production/lab/net from sessions and allocated
+// collection from payments based on the provider's share of patient production.
+// Lab cost is attributed via the explicit provider_id column (Migration 73), so no
+// matchedSet is needed any more.
+function computeProviderStats(provId) {
   // 1. Sessions belonging to this provider
   var provSessions = sessions.filter(function(s){
     if (provId === '_unassigned') return !s.provider_id;
@@ -803,15 +819,10 @@ function computeProviderStats(provId, sharedMatchedSet) {
   var sessionCount = provSessions.length;
   var production = provSessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
 
-  // 2. Lab cost: per-procedure matching via helper.
-  // If sharedMatchedSet is provided, labs are deduped across providers (each lab
-  // can only be attributed once). If not, this provider gets its own set (used
-  // by details/print modals where we're focused on a single provider).
-  var labCost = 0;
-  var matchedLabIds = sharedMatchedSet || {};
-  provSessions.forEach(function(s){
-    labCost += sumSessionLabCost(s, matchedLabIds);
-  });
+  // 2. Lab cost: explicit per-provider attribution via provider_id (Migration 73).
+  // No matchedSet needed — each lab_order carries exactly one provider_id, so it is
+  // counted once by construction, regardless of the filter window.
+  var labCost = providerLabCost(provId);
 
   var net = production - labCost;
 
@@ -965,21 +976,20 @@ function render() {
   var totalProduction = sessions.reduce(function(sum, s){ return sum + (Number(s.cost) || 0); }, 0);
   var totalCollection = payments.reduce(function(sum, p){ return sum + (Number(p.amount) || 0); }, 0);
 
-  // Total lab cost across all matched (single global matchedSet)
+  // Total lab cost for the window = sum of all in-window lab_orders (labOrders is
+  // already filtered by date_sent at load time). This equals Σ per-provider labCost
+  // + the unassigned bucket, so the per-provider split now reconciles exactly.
   var totalLab = 0;
-  var globalMatchedSet = {};
-  sessions.forEach(function(s){
-    totalLab += sumSessionLabCost(s, globalMatchedSet);
-  });
+  for (var li = 0; li < labOrders.length; li++) {
+    totalLab += Number(labOrders[li].cost) || 0;
+  }
 
   // Total payouts across all visible doctors
-  // Use a shared matchedSet so labs are attributed to only one provider total
-  var payoutsMatchedSet = {};
   var totalPayouts = 0;
   // Cache provider stats to avoid duplicate work in cards loop below
   var providerStatsCache = {};
   visibleDoctors.forEach(function(d){
-    var stats = computeProviderStats(d.id, payoutsMatchedSet);
+    var stats = computeProviderStats(d.id);
     providerStatsCache[d.id] = stats;
     totalPayouts += computePayout(d, stats);
   });
@@ -1102,19 +1112,21 @@ function render() {
     + '</div>';
   });
 
-  // Add unassigned card if relevant and "all" is selected
-  // Use the same shared matchedSet to dedupe lab matches against named providers
-  if (hasUnassigned && providerFilter === 'all') {
-    var stats = computeProviderStats('_unassigned', payoutsMatchedSet);
-    if (stats.sessionCount > 0) {
+  // Add unassigned card if relevant and "all" is selected. Show it when there are
+  // unassigned sessions OR unassigned lab cost / collection, so an unassigned lab
+  // (provider_id NULL) never silently disappears from the per-provider view while
+  // still counting in the total.
+  if (providerFilter === 'all') {
+    var stats = computeProviderStats('_unassigned');
+    if (stats.sessionCount > 0 || stats.labCost > 0 || stats.collection > 0) {
       html += '<div class="prov-card">'
         + '<div class="color-bar" style="background:#8a9ab5;"></div>'
         + '<div class="prov-body">'
           + '<div class="prov-head">'
             + '<div class="prov-avatar" style="background:#8a9ab5;">?</div>'
             + '<div style="flex:1;">'
-              + '<div class="prov-name">جلسات بدون طبيب محدد</div>'
-              + '<div class="prov-role">قديمة أو أُدخلت قبل ميزة الأطباء المتعددين</div>'
+              + '<div class="prov-name">بنود بدون طبيب محدد</div>'
+              + '<div class="prov-role">جلسات/مخابر قديمة أو أُدخلت قبل تحديد الطبيب</div>'
             + '</div>'
           + '</div>'
           + '<div class="prov-rows">'
@@ -1122,7 +1134,7 @@ function render() {
             + '<div class="prov-row"><span class="k">الإنتاج</span><span class="v">' + fmtSY(stats.production) + '</span></div>'
             + '<div class="prov-row"><span class="k">تكلفة المخبر</span><span class="v">' + fmtSY(stats.labCost) + '</span></div>'
           + '</div>'
-          + '<div style="font-size:11px;color:var(--text2);font-style:italic;text-align:center;padding:8px;">💡 افتح كل جلسة منها وحدد لها طبيب من بطاقة المريض</div>'
+          + '<div style="font-size:11px;color:var(--text2);font-style:italic;text-align:center;padding:8px;">💡 افتح كل بند منها وحدّد له طبيباً من بطاقة المريض أو من صفحة المخابر</div>'
         + '</div>'
       + '</div>';
     }
@@ -1151,15 +1163,18 @@ function showDetails(provId) {
   // Resolve effective share% via helper (handles null/empty/owner fallback correctly)
   var sharePct = resolveSharePercent(d);
 
-  // Use a shared matchedSet so that across all rows of this provider,
-  // each lab_order is only counted once (matches stats display).
-  var detailsMatchedSet = {};
+  // Lab cost is attributed per-provider now (provider_id), not per-session. For this
+  // per-session breakdown we distribute the provider's total lab cost proportionally
+  // by each session's production share, so Σ sLabCost == the provider's labCost and
+  // Σ (net × share%) == the payout shown on the card. No session matching.
+  var dProvLabTotal = stats.labCost || 0;
+  var dProvProdTotal = stats.production || 0;
   var rows = stats.sessions.slice().sort(function(a,b){
     return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   }).map(function(s){
-    // Find matching lab_orders (per-procedure, with date window via helper)
-    var sLabCost = sumSessionLabCost(s, detailsMatchedSet);
-    var net = (Number(s.cost) || 0) - sLabCost;
+    var sCost = Number(s.cost) || 0;
+    var sLabCost = (dProvProdTotal > 0) ? (dProvLabTotal * sCost / dProvProdTotal) : 0;
+    var net = sCost - sLabCost;
     var sessionShare;
     if (basis === 'production') sessionShare = (Number(s.cost) || 0) * sharePct / 100;
     else if (basis === 'net')   sessionShare = net * sharePct / 100;
@@ -1205,12 +1220,16 @@ function printSlip(provId) {
   var sharePct = resolveSharePercent(d);
   var basisLabel = basis === 'production' ? 'الإنتاج' : (basis === 'net' ? 'الصافي بعد المخبر' : 'التحصيل');
 
-  // Build sessions table (using shared helper for consistency)
-  var printMatchedSet = {};
+  // Build sessions table. Lab cost is per-provider (provider_id); distribute it
+  // proportionally by production share for the per-session column so the total ties
+  // out to the provider's labCost. No session matching.
+  var pProvLabTotal = stats.labCost || 0;
+  var pProvProdTotal = stats.production || 0;
   var sessionsRows = stats.sessions.slice().sort(function(a,b){
     return (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   }).map(function(s){
-    var sLabCost = sumSessionLabCost(s, printMatchedSet);
+    var sCost = Number(s.cost) || 0;
+    var sLabCost = (pProvProdTotal > 0) ? (pProvLabTotal * sCost / pProvProdTotal) : 0;
     return '<tr>'
       + '<td>' + escapeHtml(s.date || '—') + '</td>'
       + '<td>' + escapeHtml(s.type || '—') + '</td>'

@@ -682,6 +682,13 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
         </select>
         <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
       </div>
+      <div class="form-group">
+        <label>الطبيب المعالج</label>
+        <select id="labOrderProvider">
+          <option value="">— غير مُحدّد —</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">يُعبّأ تلقائياً من الموعد. مطلوب لاحتساب تكلفة المخبر على الطبيب الصحيح في التقارير.</div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>رقم السن</label>
@@ -770,6 +777,7 @@ var allOrders   = [];
 var allPatients = [];
 var allLabs     = [];
 var allAppointments = []; // upcoming appointments (today onwards) — used to link lab orders
+var allDoctors  = []; // clinic_doctors — for explicit provider attribution on lab orders (Migration 73)
 var TREATMENTS  = [];
 var currentFilter = 'all';
 var searchQuery   = '';
@@ -951,6 +959,18 @@ async function loadAll() {
     else allLabs = ld || [];
   } catch(e) { console.warn(e); allLabs = []; }
 
+  // Clinic doctors — populates the "treating provider" picker on lab orders so
+  // each lab's cost is attributed to the right provider in reports (Migration 73).
+  try {
+    const { data: docs, error: docErr } = await window.sb.from('clinic_doctors')
+      .select('id, name, is_owner, is_active, created_at')
+      .eq('owner_id', currentUser.id)
+      .order('is_owner', { ascending: false })
+      .order('created_at', { ascending: true });
+    if (docErr) { console.warn('clinic_doctors:', docErr); allDoctors = []; }
+    else allDoctors = docs || [];
+  } catch(e) { console.warn(e); allDoctors = []; }
+
   try {
     const { data: lo, error } = await window.sb.from('lab_orders')
       .select('*')
@@ -978,7 +998,7 @@ async function loadAll() {
     lookback.setDate(lookback.getDate() - 60);
     var fromDate = dateStrLocal(lookback);
     const { data: ap, error: apErr } = await window.sb.from('appointments')
-      .select('id, patient_id, patient_name, date, time, type, status')
+      .select('id, patient_id, patient_name, date, time, type, status, provider_id')
       .eq('doctor_id', currentUser.id)
       .gte('date', fromDate)
       .neq('status', 'cancelled')
@@ -1283,7 +1303,25 @@ function onLabOrderPatientChange() {
   populateAppointmentSelect('', pid);
 }
 
-/* When appointment changes, auto-sync patient if needed. */
+/* Populate the treating-provider dropdown. Hides inactive doctors unless one is
+   the currently-selected provider (so editing an old order keeps its provider). */
+function populateProviderSelect(selectedId) {
+  var sel = document.getElementById('labOrderProvider');
+  if (!sel) return;
+  var html = '<option value="">— غير مُحدّد —</option>';
+  allDoctors.forEach(function(d){
+    if (d.is_active === false && d.id !== selectedId) return;
+    html += '<option value="' + d.id + '">' +
+      escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') +
+      (d.is_active === false ? ' (معطل)' : '') + '</option>';
+  });
+  sel.innerHTML = html;
+  sel.value = selectedId || '';
+}
+
+/* When appointment changes, auto-sync patient + default the provider from the
+   appointment (OpenDental behavior — provider defaults from the appt, but the
+   user can still override it). */
 function onLabOrderAppointmentChange() {
   var aid = document.getElementById('labOrderAppointment').value;
   if (!aid) return;
@@ -1292,6 +1330,14 @@ function onLabOrderAppointmentChange() {
   var patSel = document.getElementById('labOrderPatient');
   if (patSel && a.patient_id && patSel.value !== a.patient_id) {
     patSel.value = a.patient_id;
+  }
+  var provSel = document.getElementById('labOrderProvider');
+  if (provSel && a.provider_id) {
+    // Ensure the appt's provider is selectable even if inactive, then select it.
+    if (!Array.prototype.some.call(provSel.options, function(o){ return o.value === a.provider_id; })) {
+      populateProviderSelect(a.provider_id);
+    }
+    provSel.value = a.provider_id;
   }
 }
 
@@ -1303,6 +1349,7 @@ function openLabOrderModal() {
   populateWorkTypeSelect();
   populateLabSelect();
   populateAppointmentSelect('', '');
+  populateProviderSelect('');
   document.getElementById('labOrderTooth').value = '';
   document.getElementById('labOrderShade').value = '';
   document.getElementById('labOrderCost').value = '';
@@ -1323,7 +1370,7 @@ async function editLabOrder(id) {
   if (lo.appointment_id && !getAppointmentById(lo.appointment_id)) {
     try {
       const { data: ext, error: extErr } = await window.sb.from('appointments')
-        .select('id, patient_id, patient_name, date, time, type, status')
+        .select('id, patient_id, patient_name, date, time, type, status, provider_id')
         .eq('id', lo.appointment_id)
         .eq('doctor_id', currentUser.id)
         .maybeSingle();
@@ -1339,6 +1386,7 @@ async function editLabOrder(id) {
   populateWorkTypeSelect(lo.treatment_key);
   populateLabSelect(lo.lab_id);
   populateAppointmentSelect(lo.appointment_id || '', lo.patient_id || '');
+  populateProviderSelect(lo.provider_id || '');
 
   // Safety net: if the linked appointment couldn't be fetched, inject a
   // disabled placeholder option so the user sees the link exists and
@@ -1392,6 +1440,16 @@ async function saveLabOrder() {
 
   var apptId   = document.getElementById('labOrderAppointment').value || null;
 
+  // Treating provider: the explicit dropdown choice wins; if it's left empty but
+  // an appointment is linked, fall back to that appointment's provider. This is
+  // what populates lab_orders.provider_id (Migration 73) so reports attribute the
+  // lab's cost to the right doctor regardless of the filter window.
+  var providerId = document.getElementById('labOrderProvider').value || null;
+  if (!providerId && apptId) {
+    var apptForProv = getAppointmentById(apptId);
+    if (apptForProv && apptForProv.provider_id) providerId = apptForProv.provider_id;
+  }
+
   var shade    = document.getElementById('labOrderShade').value.trim();
   var cost     = parseFloat(document.getElementById('labOrderCost').value) || 0;
   var dateSent = document.getElementById('labOrderDateSent').value;
@@ -1420,6 +1478,7 @@ async function saveLabOrder() {
       doctor_id:      currentUser.id,
       patient_id:     patientId,
       appointment_id: apptId,
+      provider_id:    providerId,
       tooth_num:      toothRaw ? parseInt(toothRaw, 10) : null,
       treatment_key:  workKey,
       lab_id:         labId,
@@ -1433,24 +1492,25 @@ async function saveLabOrder() {
     };
 
     // Helper: detect "column doesn't exist" style errors from PostgREST/Postgres so we can
-    // gracefully fall back to a payload without appointment_id (pre-Migration-4 schema).
-    // Known signals:
+    // gracefully fall back to a payload without the optional columns (appointment_id from
+    // pre-Migration-4 schema, provider_id from pre-Migration-73 schema). Known signals:
     //   - Postgres error code 42703 (undefined_column)
     //   - PostgREST code PGRST204 (column not found in schema cache)
-    //   - Message text mentioning appointment_id + (column | schema cache | does not exist | not found)
+    //   - Message text mentioning appointment_id/provider_id + (column | schema cache | does not exist | not found)
     function isMissingApptColumn(err) {
       if (!err) return false;
+      var msg = (err.message || '').toLowerCase();
+      var pointsAtOptional = msg.indexOf('appointment_id') !== -1 || msg.indexOf('provider_id') !== -1;
       if (err.code === '42703' || err.code === 'PGRST204') {
-        // Only treat as our problem if the message points at appointment_id (avoid masking other missing columns).
-        var msg = (err.message || '').toLowerCase();
-        return msg.indexOf('appointment_id') !== -1;
+        // Only treat as our problem if it points at one of our optional columns
+        // (avoid masking other missing columns).
+        return pointsAtOptional;
       }
-      var m = (err.message || '').toLowerCase();
-      if (m.indexOf('appointment_id') === -1) return false;
-      return m.indexOf('column') !== -1
-          || m.indexOf('schema cache') !== -1
-          || m.indexOf('does not exist') !== -1
-          || m.indexOf('not found') !== -1;
+      if (!pointsAtOptional) return false;
+      return msg.indexOf('column') !== -1
+          || msg.indexOf('schema cache') !== -1
+          || msg.indexOf('does not exist') !== -1
+          || msg.indexOf('not found') !== -1;
     }
 
     if (id) {
@@ -1458,9 +1518,10 @@ async function saveLabOrder() {
       var res = await window.sb.from('lab_orders')
         .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
       if (res.error && isMissingApptColumn(res.error)) {
-        console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+        console.warn('lab_orders optional column missing (appointment_id/provider_id) — saving without them. Run Migrations 4 + 73 to enable.');
         var legacyPayload = Object.assign({}, payload);
         delete legacyPayload.appointment_id;
+        delete legacyPayload.provider_id;
         res = await window.sb.from('lab_orders')
           .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
       }
@@ -1487,9 +1548,10 @@ async function saveLabOrder() {
       var res2 = await window.sb.from('lab_orders')
         .insert(payload).select().single();
       if (res2.error && isMissingApptColumn(res2.error)) {
-        console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+        console.warn('lab_orders optional column missing (appointment_id/provider_id) — saving without them. Run Migrations 4 + 73 to enable.');
         var legacyPayload2 = Object.assign({}, payload);
         delete legacyPayload2.appointment_id;
+        delete legacyPayload2.provider_id;
         res2 = await window.sb.from('lab_orders')
           .insert(legacyPayload2).select().single();
       }

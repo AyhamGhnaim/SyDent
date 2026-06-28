@@ -1005,7 +1005,7 @@ async function loadLabOrders(from, to) {
   // as labs.html and provider-reports.html.
   var lo = widenStartUtc(from), hi = widenEndUtc(to);
   var res = await window.sb.from('lab_orders')
-    .select('id, patient_id, tooth_num, cost, status, date_sent')
+    .select('id, patient_id, tooth_num, cost, status, date_sent, provider_id')
     .eq('doctor_id', currentUser.id)
     .gte('date_sent', lo)
     .lte('date_sent', hi);
@@ -1186,7 +1186,6 @@ function computeExpenseBreakdown(totals) {
 // data). That's correct — we want full P&L visibility.
 function computeProviderPerformance() {
   var rows = [];
-  var sharedMatchedSet = {};
 
   // Lookup helpers
   var paymentIdsWithSplits = {};
@@ -1233,6 +1232,12 @@ function computeProviderPerformance() {
   paymentSplits.forEach(function(sp){
     if (splitIsEarned(sp) && sp.provider_id) providerIdsInData[sp.provider_id] = true;
   });
+  // Lab orders also anchor a provider (Migration 73): a doctor may have an in-window
+  // lab cost even with no in-window sessions/splits/payouts (e.g. lab sent this month
+  // for a session done last month). Including them here ensures that doctor's row is
+  // rendered and the lab cost is attributed, so the per-provider lab split reconciles
+  // exactly to labsTotal (Test E equality rather than a strict inequality).
+  labOrders.forEach(function(lo){ if (lo.provider_id) providerIdsInData[lo.provider_id] = true; });
 
   // Track which provider_ids are matched by a doctor row. Splits referencing
   // a provider_id with no current clinic_doctors row contribute to a special
@@ -1242,7 +1247,7 @@ function computeProviderPerformance() {
 
   doctors.forEach(function(doc){
     if (!providerIdsInData[doc.id]) return;
-    rows.push(computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
+    rows.push(computeOneProviderRow(doc, byPatientTotals,
                                      legacyPaymentsByPatient, paymentIdsWithSplits));
   });
 
@@ -1268,26 +1273,11 @@ function computeProviderPerformance() {
       if (s.provider_id !== pid) return;
       orphanProduction += Number(s.cost) || 0;
       orphanSessionCount++;
-      // Match labs for this orphan session (de-duped via sharedMatchedSet
-      // so a lab already attributed to a known doctor isn't double-counted).
-      if (!s.tooth_num) return;
-      var sessionDate = s.date ? new Date(s.date) : null;
-      var windowDays = 90;
-      labOrders.forEach(function(lo){
-        if (sharedMatchedSet[lo.id]) return;
-        if (lo.patient_id !== s.patient_id) return;
-        if (lo.tooth_num === null || lo.tooth_num === undefined) return;
-        if (String(lo.tooth_num) !== String(s.tooth_num)) return;
-        if (sessionDate && lo.date_sent) {
-          var loDate = new Date(lo.date_sent);
-          if (!isNaN(sessionDate.getTime()) && !isNaN(loDate.getTime())) {
-            var diffDays = Math.abs((sessionDate - loDate) / 86400000);
-            if (diffDays > windowDays) return;
-          }
-        }
-        sharedMatchedSet[lo.id] = true;
-        orphanLabCost += Number(lo.cost) || 0;
-      });
+    });
+    // Lab cost for this orphan (deleted) provider — explicit provider_id
+    // (Migration 73). Counted once by construction; no session matching.
+    labOrders.forEach(function(lo){
+      if (lo.provider_id === pid) orphanLabCost += Number(lo.cost) || 0;
     });
     // Splits — direct attribution to orphan provider_id (earned only).
     paymentSplits.forEach(function(sp){
@@ -1316,7 +1306,7 @@ function computeProviderPerformance() {
       if (p.provider_id === pid) orphanPaidOut += Number(p.amount) || 0;
     });
   });
-  if (orphanCollection > 0 || orphanProduction > 0 || orphanPaidOut > 0) {
+  if (orphanCollection > 0 || orphanProduction > 0 || orphanPaidOut > 0 || orphanLabCost > 0) {
     rows.push({
       id: '_deleted_doctors',
       name: 'أطباء محذوفون',
@@ -1337,15 +1327,18 @@ function computeProviderPerformance() {
   // _unassigned bucket — shown whenever there's something to report under it:
   //   - sessions without provider_id (orphan sessions), OR
   //   - splits with null provider_id (rare but possible after data edits), OR
+  //   - lab orders with null provider_id (Migration 73 — must be counted so the
+  //     per-provider lab split still reconciles to labsTotal / Test E), OR
   //   - orphan legacy payments (patient has no in-range sessions).
   var hasUnassignedSessions = sessions.some(function(s){ return !s.provider_id; });
   var hasUnassignedSplits = paymentSplits.some(function(sp){
     return splitIsEarned(sp) && !sp.provider_id;
   });
-  if (hasUnassignedSessions || hasUnassignedSplits || orphanLegacyRevenue > 0) {
+  var hasUnassignedLab = labOrders.some(function(lo){ return !lo.provider_id; });
+  if (hasUnassignedSessions || hasUnassignedSplits || hasUnassignedLab || orphanLegacyRevenue > 0) {
     var unassignedRow = computeOneProviderRow(
       { id: '_unassigned', name: 'غير محدد', color: '#5d748f', is_owner: false },
-      sharedMatchedSet, byPatientTotals, legacyPaymentsByPatient, paymentIdsWithSplits
+      byPatientTotals, legacyPaymentsByPatient, paymentIdsWithSplits
     );
     // Add orphan legacy revenue (patients with payments but no in-range sessions).
     unassignedRow.collection += orphanLegacyRevenue;
@@ -1355,7 +1348,7 @@ function computeProviderPerformance() {
   return rows;
 }
 
-function computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
+function computeOneProviderRow(doc, byPatientTotals,
                                 legacyPaymentsByPatient, paymentIdsWithSplits) {
   var provId = doc.id;
   var isUnassigned = (provId === '_unassigned');
@@ -1369,28 +1362,16 @@ function computeOneProviderRow(doc, sharedMatchedSet, byPatientTotals,
     production += Number(provSessions[i].cost) || 0;
   }
 
-  // Lab cost (de-duped via shared set)
+  // Lab cost: explicit per-provider attribution via provider_id (Migration 73).
+  // Each lab_order carries exactly one provider_id, so it is counted once by
+  // construction — no session matching, no shared dedup set needed. labOrders is
+  // already filtered to the window by date_sent at load time.
   var labCost = 0;
-  provSessions.forEach(function(s){
-    if (!s.tooth_num) return;
-    var sessionDate = s.date ? new Date(s.date) : null;
-    var windowDays = 90;
-    labOrders.forEach(function(lo){
-      if (sharedMatchedSet[lo.id]) return;
-      if (lo.patient_id !== s.patient_id) return;
-      if (lo.tooth_num === null || lo.tooth_num === undefined) return;
-      if (String(lo.tooth_num) !== String(s.tooth_num)) return;
-      if (sessionDate && lo.date_sent) {
-        var loDate = new Date(lo.date_sent);
-        if (!isNaN(sessionDate.getTime()) && !isNaN(loDate.getTime())) {
-          var diffDays = Math.abs((sessionDate - loDate) / 86400000);
-          if (diffDays > windowDays) return;
-        }
-      }
-      sharedMatchedSet[lo.id] = true;
-      labCost += Number(lo.cost) || 0;
-    });
-  });
+  for (var li = 0; li < labOrders.length; li++) {
+    var loRow = labOrders[li];
+    var matchLab = isUnassigned ? !loRow.provider_id : loRow.provider_id === provId;
+    if (matchLab) labCost += Number(loRow.cost) || 0;
+  }
 
   // Collection (exact via splits + proportional fallback for legacy)
   var collection = 0;
