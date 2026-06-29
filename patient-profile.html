@@ -1321,6 +1321,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
       </div>
       <div class="form-group">
+        <label>الطبيب المعالج</label>
+        <select id="labOrderProvider">
+          <option value="">— غير مُحدّد —</option>
+        </select>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px;">يُعبّأ تلقائياً من الجلسة أو الموعد. مطلوب لاحتساب تكلفة المخبر على الطبيب الصحيح في التقارير.</div>
+      </div>
+      <div class="form-group">
         <label>المخبر</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
           <select id="labOrderLabSelect" style="flex:1;"></select>
@@ -10236,9 +10243,37 @@ function populateLabAppointmentSelect(selectedApptId) {
 }
 
 /* Show/hide the inline "new appointment" date+time fields based on the dropdown choice. */
+// Populate the treating-provider dropdown from CLINIC_DOCTORS. Hides inactive
+// doctors unless one is the currently-selected provider (so editing an old order
+// keeps its provider).
+function populateLabProviderSelect(selectedId) {
+  var sel = document.getElementById('labOrderProvider');
+  if (!sel) return;
+  var html = '<option value="">— غير مُحدّد —</option>';
+  (CLINIC_DOCTORS || []).forEach(function(d){
+    if (d.is_active === false && d.id !== selectedId) return;
+    html += '<option value="' + d.id + '">' +
+      escapeHtml(d.name) + (d.is_owner ? ' ⭐' : '') +
+      (d.is_active === false ? ' (معطل)' : '') + '</option>';
+  });
+  sel.innerHTML = html;
+  sel.value = selectedId || '';
+}
+
 function onLabApptChange() {
   var sel = document.getElementById('labOrderAppointment');
   var box = document.getElementById('labNewApptBox');
+  // Default the treating provider from the chosen appointment (override allowed).
+  if (sel && sel.value && sel.value !== '__new__' && sel.value !== '__auto__') {
+    var appt = (upcomingAppts || []).find(function(a){ return a.id === sel.value; });
+    var provSel = document.getElementById('labOrderProvider');
+    if (appt && appt.provider_id && provSel) {
+      if (!Array.prototype.some.call(provSel.options, function(o){ return o.value === appt.provider_id; })) {
+        populateLabProviderSelect(appt.provider_id);
+      }
+      provSel.value = appt.provider_id;
+    }
+  }
   if (!sel || !box) return;
   if (sel.value === '__new__') {
     box.style.display = 'block';
@@ -10274,6 +10309,9 @@ async function openLabOrderModal(prefill) {
   document.getElementById('labOrderDateSent').value = toDay();
   document.getElementById('labOrderDateDue').value = '';
   document.getElementById('labOrderNotes').value = prefill.notes || '';
+  // Treating provider: prefer the value passed in from the treatment screen
+  // (pendingProviderId), else default empty; user can override.
+  populateLabProviderSelect(prefill.provider_id || '');
   openModal('labOrderModal');
 }
 
@@ -10290,7 +10328,7 @@ async function editLabOrder(id) {
     if (!inCache) {
       try {
         const { data: ext, error: extErr } = await window.sb.from('appointments')
-          .select('id, date, time, type, status')
+          .select('id, date, time, type, status, provider_id')
           .eq('id', lo.appointment_id)
           .eq('doctor_id', currentUser.id)
           .eq('patient_id', patientId)
@@ -10317,6 +10355,16 @@ async function editLabOrder(id) {
   document.getElementById('labOrderDateSent').value = lo.date_sent ? lo.date_sent.slice(0,10) : toDay();
   document.getElementById('labOrderDateDue').value = lo.date_due ? lo.date_due.slice(0,10) : '';
   document.getElementById('labOrderNotes').value = lo.notes || '';
+  // Treating provider: prefer the stored value; if absent but the order is linked
+  // to an appointment, default from that appointment's provider (override allowed).
+  if (lo.provider_id) {
+    populateLabProviderSelect(lo.provider_id);
+  } else if (lo.appointment_id) {
+    var laProv = (upcomingAppts || []).find(function(a){ return a.id === lo.appointment_id; });
+    populateLabProviderSelect((laProv && laProv.provider_id) ? laProv.provider_id : '');
+  } else {
+    populateLabProviderSelect('');
+  }
   openModal('labOrderModal');
 }
 
@@ -10474,10 +10522,21 @@ async function _saveLabOrderInner() {
     showToast('📅 تم إنشاء موعد التركيب');
   }
 
+  // Treating provider (Migration 73): the explicit dropdown choice wins; if empty
+  // but the order is linked to an appointment, fall back to that appointment's
+  // provider. This populates lab_orders.provider_id so reports attribute the lab's
+  // cost to the right doctor regardless of the filter window.
+  var providerId = document.getElementById('labOrderProvider').value || null;
+  if (!providerId && apptId) {
+    var apptForProv = (upcomingAppts || []).find(function(a){ return a.id === apptId; });
+    if (apptForProv && apptForProv.provider_id) providerId = apptForProv.provider_id;
+  }
+
   var payload = {
     doctor_id: currentUser.id,
     patient_id: patientId,
     appointment_id: apptId,
+    provider_id: providerId,
     tooth_num: toothRaw ? parseInt(toothRaw, 10) : null,
     treatment_key: workKey,
     lab_id: labId,
@@ -10490,28 +10549,30 @@ async function _saveLabOrderInner() {
     date_due: dateDue || null
   };
 
-  // Detect "column doesn't exist" so the page keeps working before Migration 4 SQL is run.
+  // Detect "column doesn't exist" so the page keeps working before the SQL
+  // migrations are run (appointment_id from Migration 4, provider_id from Migration 73).
   function isMissingApptColumn(err) {
     if (!err) return false;
+    var msg = (err.message || '').toLowerCase();
+    var pointsAtOptional = msg.indexOf('appointment_id') !== -1 || msg.indexOf('provider_id') !== -1;
     if (err.code === '42703' || err.code === 'PGRST204') {
-      var msg = (err.message || '').toLowerCase();
-      return msg.indexOf('appointment_id') !== -1;
+      return pointsAtOptional;
     }
-    var m = (err.message || '').toLowerCase();
-    if (m.indexOf('appointment_id') === -1) return false;
-    return m.indexOf('column') !== -1
-        || m.indexOf('schema cache') !== -1
-        || m.indexOf('does not exist') !== -1
-        || m.indexOf('not found') !== -1;
+    if (!pointsAtOptional) return false;
+    return msg.indexOf('column') !== -1
+        || msg.indexOf('schema cache') !== -1
+        || msg.indexOf('does not exist') !== -1
+        || msg.indexOf('not found') !== -1;
   }
 
   if (id) {
     var res = await window.sb.from('lab_orders')
       .update(payload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
     if (res.error && isMissingApptColumn(res.error)) {
-      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      console.warn('lab_orders optional column missing (appointment_id/provider_id) — saving without them. Run Migrations 4 + 73 to enable.');
       var legacyPayload = Object.assign({}, payload);
       delete legacyPayload.appointment_id;
+      delete legacyPayload.provider_id;
       res = await window.sb.from('lab_orders')
         .update(legacyPayload).eq('id', id).eq('doctor_id', currentUser.id).select().single();
     }
@@ -10526,9 +10587,10 @@ async function _saveLabOrderInner() {
     var res2 = await window.sb.from('lab_orders')
       .insert(payload).select().single();
     if (res2.error && isMissingApptColumn(res2.error)) {
-      console.warn('lab_orders.appointment_id missing — saving without it. Run Migration 4 to enable.');
+      console.warn('lab_orders optional column missing (appointment_id/provider_id) — saving without them. Run Migrations 4 + 73 to enable.');
       var legacyPayload2 = Object.assign({}, payload);
       delete legacyPayload2.appointment_id;
+      delete legacyPayload2.provider_id;
       res2 = await window.sb.from('lab_orders')
         .insert(legacyPayload2).select().single();
     }
@@ -10721,7 +10783,8 @@ async function saveToothAndOpenLab() {
   openLabOrderModal({
     tooth_num: toothNum,
     treatment_key: treatmentKey,
-    notes: sessionNotes
+    notes: sessionNotes,
+    provider_id: pendingProviderId || null
   });
 
   showToast('✅ تم حفظ الجلسة — أكمل بيانات المخبر');
