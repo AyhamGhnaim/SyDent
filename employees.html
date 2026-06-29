@@ -2104,17 +2104,24 @@ async function deleteEmployee(id) {
             'تنبيه: السجلات التاريخية لهذا الموظف ستبقى في سجل النشاطات مع اسمه، لكن لن يقدر يدخل البرنامج بعد الحذف.';
   if (!confirm(msg)) return;
 
-  // Phase 6 P: If this employee is a doctor linked to an active clinic_doctors
-  // card, ask the Owner whether to deactivate the card too. We never hard-delete
-  // the card — past sessions/appointments still FK to it.
+  // Phase 6 P / Orphan-card fix: If this employee is linked to an active,
+  // CLINICAL clinic_doctors card, ask the Owner whether to deactivate the
+  // card too. Previously this only triggered for emp.role === 'doctor', which
+  // left clinical assistants/hygienists (e.g. a salary+share assistant that
+  // gets an auto-created clinic_doctors row) with an active, orphaned card
+  // after the employee was deleted — its name lingered in the payouts filter.
+  // We now use the same clinical-card criterion as the role-switch path
+  // (providerTypeTakesAppointments), so any clinical linked card is handled.
+  // We never hard-delete the card — past sessions/appointments/payouts FK to it.
   var alsoDeactivateDoctorId = null;
-  if (emp.role === 'doctor' && emp.doctor_id) {
+  if (emp.doctor_id) {
     var doctorCard = doctors.find(function(d){ return d.id === emp.doctor_id; });
     var cardActive = doctorCard ? (doctorCard.is_active !== false) : false;
-    if (cardActive) {
+    var cardIsClinical = doctorCard ? providerTypeTakesAppointments(doctorCard.provider_type || 'doctor') : false;
+    if (cardActive && cardIsClinical) {
       var docMsg =
-        '🩺 د. ' + emp.name + ' مرتبط ببطاقة طبيب نشطة في صفحة الأطباء.\n\n' +
-        'هل تريد إلغاء تنشيط بطاقة الطبيب أيضاً؟\n\n' +
+        '🔗 "' + emp.name + '" مرتبط ببطاقة نشطة في صفحة الأطباء.\n\n' +
+        'هل تريد إلغاء تنشيط هذه البطاقة أيضاً؟\n\n' +
         '• السجلات التاريخية (جلسات/مواعيد/دفعات) ستبقى محفوظة\n' +
         '• البطاقة لن تختفي — ستصبح فقط غير نشطة في القوائم الجديدة\n' +
         '• يمكن إعادة تفعيلها لاحقاً من صفحة الأطباء';
