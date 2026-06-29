@@ -1386,7 +1386,17 @@ async function editLabOrder(id) {
   populateWorkTypeSelect(lo.treatment_key);
   populateLabSelect(lo.lab_id);
   populateAppointmentSelect(lo.appointment_id || '', lo.patient_id || '');
-  populateProviderSelect(lo.provider_id || '');
+  // Treating provider: prefer the stored value; if absent but the order is linked
+  // to an appointment, default from that appointment's provider (override allowed).
+  // Keeps parity with patient-profile.html's edit path.
+  if (lo.provider_id) {
+    populateProviderSelect(lo.provider_id);
+  } else if (lo.appointment_id) {
+    var laProv = getAppointmentById(lo.appointment_id);
+    populateProviderSelect((laProv && laProv.provider_id) ? laProv.provider_id : '');
+  } else {
+    populateProviderSelect('');
+  }
 
   // Safety net: if the linked appointment couldn't be fetched, inject a
   // disabled placeholder option so the user sees the link exists and
