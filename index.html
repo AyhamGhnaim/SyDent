@@ -616,6 +616,8 @@
 /* Pulse status colors as vars: light = base, dark = stronger/clearer (legend + pills stay in sync). */
 :root{--dp-done:#94a3b8;--dp-conf:#3b82f6;--dp-wait:#d97706;--dp-live:var(--green)}
 :root[data-theme="dark"]{--dp-done:#aab6c9;--dp-conf:#5b9dff;--dp-wait:#f59e0b}
+/* Dark: track was same color as the card (both --bg3 #132840) → invisible well. Recess it. */
+:root[data-theme="dark"] #dpCard .dp-track{background:#0c1d33;border-color:rgba(46,232,158,0.30);box-shadow:inset 0 1px 4px rgba(0,0,0,0.4)}
 .dp-x{background:var(--bg2);color:var(--text3);text-decoration:line-through;border:1px dashed var(--border2);box-shadow:none}
 .dp-now{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:3}
 .dp-now::after{content:'';position:absolute;top:-1px;right:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
