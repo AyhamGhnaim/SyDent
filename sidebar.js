@@ -30,8 +30,10 @@ const css = `
     text-decoration: none;
   }
   .sb-logo-icon {
-    width: 44px; height: 44px;
+    width: 46px; height: 46px;
     color: var(--green);
+    border: 1.5px solid rgba(var(--green-rgb),0.28);
+    border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
@@ -282,7 +284,7 @@ function buildHTML(activeId) {
     <div class="sb-overlay" id="sbOverlay"></div>
     <aside class="sb-sidebar" id="sbSidebar">
       <a href="index.html" class="sb-logo">
-        <div class="sb-logo-icon"><svg viewBox="0 0 1279 1400" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:40px;height:40px"><g transform="translate(0.000000,1400.000000) scale(0.100000,-0.100000)"
+        <div class="sb-logo-icon"><svg viewBox="0 0 1279 1400" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="width:34px;height:34px"><g transform="translate(0.000000,1400.000000) scale(0.100000,-0.100000)"
 fill="#1ed99a" stroke="none">
 <path d="M8460 13985 c-102 -19 -306 -72 -389 -101 -91 -32 -282 -119 -368
 -167 -34 -20 -72 -39 -85 -43 -12 -4 -34 -15 -48 -24 -41 -29 -104 -32 -153
