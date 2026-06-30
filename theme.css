@@ -666,3 +666,12 @@ html, body, body * {
   font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, -apple-system, sans-serif !important;
 }
 pre, code, kbd, samp { font-family: ui-monospace, 'SF Mono', Consolas, monospace !important; }
+
+/* ════════ Date/time picker icon + native popup match theme (30 Jun 2026) ════════ */
+/* color-scheme drives the browser's calendar-picker-indicator + native popup. */
+:root[data-theme="dark"]  input[type="date"],
+:root[data-theme="dark"]  input[type="datetime-local"],
+:root[data-theme="dark"]  input[type="time"]  { color-scheme: dark; }
+:root[data-theme="light"] input[type="date"],
+:root[data-theme="light"] input[type="datetime-local"],
+:root[data-theme="light"] input[type="time"]  { color-scheme: light; }

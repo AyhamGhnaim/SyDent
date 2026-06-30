@@ -78,7 +78,6 @@ body { min-height: 100vh; }
   background: var(--bg3); border: 1px solid var(--border);
   color: var(--text); padding: 7px 10px; border-radius: 8px;
   font-family: 'Cairo', sans-serif; font-size: 13px;
-  color-scheme: dark;
 }
 .field input:focus { outline: 1px solid var(--green); }
 
@@ -313,7 +312,7 @@ table.providers tr:hover td { background: rgba(255,255,255,0.02); }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260622a">
+<link rel="stylesheet" href="theme.css?v=20260630a">
 <!-- CRITICAL: Supabase CDN MUST load BEFORE supabase-init.js. The init
      script accesses window.supabase synchronously to expose sbGetUser and
      window.sb on the global. If the CDN loads later (e.g. at end of body),
