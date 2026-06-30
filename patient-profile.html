@@ -123,6 +123,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .jaw-wrap{overflow-x:auto;overflow-y:visible;padding:80px 0 6px;scrollbar-width:none;-ms-overflow-style:none;}
 .jaw-wrap::-webkit-scrollbar{display:none;width:0;height:0;}
+/* On mouse/trackpad devices (NOT touch — pointer:fine + hover:hover excludes
+   phones/tablets, so mobile's hidden-scrollbar swipe behavior is untouched),
+   reveal a slim scrollbar ONLY when the chart actually overflows. This makes
+   the existing .jaw-wrap horizontal scroll (already there for tooth 18/48 on
+   narrow laptop viewports) discoverable for mouse users, without touching
+   cellWidth/buildTooth geometry or mobile behavior at all. */
+@media (hover:hover) and (pointer:fine){
+  .jaw-wrap{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+  .jaw-wrap::-webkit-scrollbar{display:block;width:auto;height:7px;}
+  .jaw-wrap::-webkit-scrollbar-track{background:transparent;}
+  .jaw-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+  .jaw-wrap::-webkit-scrollbar-thumb:hover{background:var(--text2);}
+}
 /* ── Primary / mixed dentition ── */
 .jaw-wrap[data-dent="primary"] .jaw-row{gap:11px;}
 .jaw-wrap[data-dent="mixed"] .jaw-row{gap:7px;}
