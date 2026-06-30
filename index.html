@@ -611,8 +611,11 @@
 .dp-hours span:first-child{border-inline-start:none}
 .dp-pill{position:absolute;height:26px;border-radius:13px;font-size:11px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 2px rgba(16,42,67,.18)}
 .dp-pill:hover{filter:brightness(1.08)}
-.dp-done{background:#94a3b8}.dp-live{background:var(--green);box-shadow:0 0 0 3px rgba(var(--green-rgb),.25)}
-.dp-conf{background:#3b82f6}.dp-wait{background:#d97706}
+.dp-done{background:var(--dp-done)}.dp-live{background:var(--dp-live);box-shadow:0 0 0 3px rgba(var(--green-rgb),.25)}
+.dp-conf{background:var(--dp-conf)}.dp-wait{background:var(--dp-wait)}
+/* Pulse status colors as vars: light = base, dark = stronger/clearer (legend + pills stay in sync). */
+:root{--dp-done:#94a3b8;--dp-conf:#3b82f6;--dp-wait:#d97706;--dp-live:var(--green)}
+:root[data-theme="dark"]{--dp-done:#aab6c9;--dp-conf:#5b9dff;--dp-wait:#f59e0b}
 .dp-x{background:var(--bg2);color:var(--text3);text-decoration:line-through;border:1px dashed var(--border2);box-shadow:none}
 .dp-now{position:absolute;top:0;bottom:0;width:2px;background:#ef4444;z-index:3}
 .dp-now::after{content:'';position:absolute;top:-1px;right:-3px;width:8px;height:8px;border-radius:50%;background:#ef4444}
@@ -918,10 +921,10 @@
     </div>
     <div class="dp-track" id="dpTrack"></div>
     <div class="dp-legend">
-      <span><i style="background:#94a3b8"></i>مكتمل</span>
-      <span><i style="background:var(--green)"></i>جاري الآن</span>
-      <span><i style="background:#3b82f6"></i>مؤكد</span>
-      <span><i style="background:#d97706"></i>بانتظار</span>
+      <span><i style="background:var(--dp-done)"></i>مكتمل</span>
+      <span><i style="background:var(--dp-live)"></i>جاري الآن</span>
+      <span><i style="background:var(--dp-conf)"></i>مؤكد</span>
+      <span><i style="background:var(--dp-wait)"></i>بانتظار</span>
     </div>
   </div>
 
@@ -2196,7 +2199,8 @@ obInit();
         var st=String(a.status||'');
         var cls = (st==='cancelled'||st==='no_show'||st==='broken') ? 'dp-x'
                 : (a.dismissed_at||st==='completed') ? 'dp-done'
-                : (a.seated_at||a.arrived_at) ? 'dp-live'
+                : (a.seated_at) ? 'dp-live'
+                : (a.arrived_at) ? 'dp-wait'
                 : (st==='confirmed') ? 'dp-conf' : 'dp-wait';
         return {s:s,e:s+d,cls:cls,name:dpEsc(String(a.patient_name||a.name||'').split(' ')[0]||'موعد'),pid:a.patient_id||''};
       }).filter(function(x){ return x.e>x.s; }).sort(function(a,b){ return a.s-b.s; });
