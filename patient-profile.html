@@ -1596,6 +1596,14 @@ body.exam-on .jaw-wrap .crown-surface, body.exam-on .jaw-wrap .root-part{cursor:
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;" onclick="doPrintRecord(true)">
         أرشيف داخلي <span style="opacity:.8;font-weight:400;font-size:12px;">(مع الأسعار والمدفوعات)</span>
       </button>
+      <!-- C: patient-facing phased treatment plan (planned sessions only) -->
+      <div style="border-top:1px solid var(--border);margin:14px 0 10px;"></div>
+      <button class="btn btn-outline" style="width:100%;justify-content:center;padding:13px;border-color:var(--green);color:var(--green);" onclick="printTreatmentPlan()">
+        🦷 خطة العلاج <span style="color:var(--text2);font-weight:400;font-size:12px;">(المخطّط فقط — مجمّع بمراحل، بأسماء مبسّطة)</span>
+      </button>
+      <button class="btn btn-outline btn-sm" style="width:100%;justify-content:center;margin-top:8px;padding:9px;font-size:12.5px;" onclick="copyTreatmentPlan()">
+        📋 نسخ الخطة نصياً (واتساب)
+      </button>
     </div>
   </div>
 </div>
@@ -8435,6 +8443,21 @@ function renderSessions() {
     var stLbl = STATUS_LABELS[st] || st;
     var stColor = STATUS_COLORS[st] || '#3b82f6';
     var stBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:' + stColor + ';margin-right:4px;">' + stLbl + '</span>';
+    // C: plan-phase chips — planned sessions only. Display-only field (phase
+    // never enters FIFO / balances). Instant write via setSessionPhase.
+    var phaseChips = '';
+    if (st === 'planned') {
+      var _PH = [[1, '١'], [2, '٢'], [3, '٣'], [null, '—']];
+      phaseChips = ' <span style="display:inline-flex;gap:2px;margin-right:4px;vertical-align:middle;" title="مرحلة خطة العلاج">'
+        + _PH.map(function(ph){
+            var _sel = ((s.phase >= 1 && s.phase <= 3) ? s.phase : null) === ph[0];
+            return '<button type="button" onclick="setSessionPhase(\'' + s.id + '\',' + (ph[0] === null ? 'null' : ph[0]) + ')" '
+              + 'style="min-width:20px;height:20px;padding:0 4px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;font-family:Cairo,sans-serif;line-height:1;'
+              + 'border:1.5px solid ' + (_sel ? 'var(--green)' : 'var(--border)') + ';'
+              + 'color:' + (_sel ? 'var(--green)' : 'var(--text2)') + ';background:transparent;">' + ph[1] + '</button>';
+          }).join('')
+        + '</span>';
+    }
     var apptBadge = '';
     if (s.appointment_id) {
       apptBadge = '<span class="cbadge" style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;--bc:var(--green);margin-right:4px;" title="مرتبط بموعد">📅 موعد</span>';
@@ -8469,7 +8492,7 @@ function renderSessions() {
     var costStyle = 'text-align:left;color:' + costColor + ';font-weight:700;';
     rows += '<tr>'
       + '<td' + dtHoverAttrs(s.created_at) + '>' + fmtD(s.date) + '</td>'
-      + '<td>' + typeBadge + toothBadge + regionalBadge + ' ' + stBadge + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
+      + '<td>' + typeBadge + toothBadge + regionalBadge + ' ' + stBadge + phaseChips + ' ' + apptBadge + ' ' + provBadge + ' ' + paidBadge + '</td>'
       + '<td style="color:var(--text2)">' + escapeHtml(s.description||'—') + '</td>'
       + '<td style="color:var(--text2)">' + escapeHtml(s.notes||'—') + '</td>'
       + '<td style="' + costStyle + '">' + fmt(s.cost) + ' ل.س</td>'
@@ -12447,6 +12470,192 @@ async function copyPrescription(rxId) {
     }
   } catch (e) { console.warn('copy:', e); showToast('⚠️ تعذّر النسخ'); }
 }
+
+/* ═══════════════ C: خطة العلاج المرحلية ═══════════════
+   phase (M75) is a presentation-only smallint on ledger_sessions — it never
+   touches FIFO / splitIsEarned / balances. The plan document uses
+   getDisplayName(t, true) — the layman helper finally serving its purpose. */
+async function setSessionPhase(sid, phase) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تعديل الجلسات'); return;
+  }
+  var s = null;
+  for (var i = 0; i < sessions.length; i++) { if (sessions[i].id === sid) { s = sessions[i]; break; } }
+  if (!s) return;
+  var prev = (s.phase >= 1 && s.phase <= 3) ? s.phase : null;
+  if (prev === phase) return;
+  var u = await window.sb.from('ledger_sessions').update({ phase: phase })
+    .eq('id', sid).eq('doctor_id', currentUser.id);
+  if (u.error) {
+    if (u.error.code === '42703' || String(u.error.message || '').indexOf('phase') !== -1) {
+      showToast('⚠️ يلزم تطبيق Migration 75 (عمود phase)');
+    } else {
+      showToast('⚠️ ' + u.error.message);
+    }
+    return;
+  }
+  s.phase = phase;
+  if (window.logAudit) {
+    window.logAudit('session.update', {
+      entityId: sid,
+      patientId: patientId,
+      patientName: (patient && patient.name) || '',
+      description: 'مرحلة خطة العلاج: ' + (phase ? 'المرحلة ' + phase : 'بلا') + ' — ' + (s.type || ''),
+      oldValue: { phase: prev },
+      newValue: { phase: phase }
+    });
+  }
+  renderSessions();
+}
+
+function planPlannedSessions() {
+  var list = (sessions || []).filter(function(s){ return (s.status || 'completed') === 'planned'; });
+  list.sort(function(a, b){
+    var d = String(a.date || '').localeCompare(String(b.date || ''));
+    return d !== 0 ? d : String(a.created_at || '').localeCompare(String(b.created_at || ''));
+  });
+  return list;
+}
+function planTreatmentFor(s) {
+  return (Array.isArray(TREATMENTS) ? TREATMENTS : []).find(function(t){ return t.name === s.type; }) || null;
+}
+function planGroups() {
+  var g = { 1: [], 2: [], 3: [], 0: [] };
+  planPlannedSessions().forEach(function(s){
+    g[(s.phase >= 1 && s.phase <= 3) ? s.phase : 0].push(s);
+  });
+  return g;
+}
+var PLAN_PHASE_LABELS = { 1: 'المرحلة الأولى', 2: 'المرحلة الثانية', 3: 'المرحلة الثالثة', 0: 'غير مصنّفة' };
+
+function buildPlanHtml() {
+  var c = rxClinicInfo();
+  var g = planGroups();
+  var hasPhases = g[1].length > 0 || g[2].length > 0 || g[3].length > 0;
+  var dateStr = new Date().toLocaleDateString('ar-SY', { year: 'numeric', month: 'long', day: 'numeric' });
+  var pName = (patient && patient.name) ? patient.name : '';
+  var pAge = (patient && patient.dob) ? calcAge(patient.dob) : '';
+  var pGender = (patient && patient.gender) ? patient.gender : '';
+
+  var h = '<div dir="rtl" style="font-family:Cairo,\'IBM Plex Sans Arabic\',Tahoma,sans-serif;color:#111;background:#fff;max-width:820px;margin:0 auto;padding:6px 4px;">';
+  // Header — mirrors the prescription header
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--green);padding-bottom:14px;margin-bottom:10px;">';
+  h += '<div><div style="font-size:24px;font-weight:800;color:#111;">' + escapeHtml(c.clinic_name) + '</div>';
+  if (c.license_no) h += '<div style="font-size:12px;color:#666;margin-top:2px;">رقم النقابة: ' + escapeHtml(c.license_no) + '</div>';
+  h += '</div>';
+  h += '<div style="text-align:left;font-size:13px;color:#444;">';
+  if (c.clinic_phone) h += '<div>📞 ' + escapeHtml(c.clinic_phone) + '</div>';
+  h += '<div style="margin-top:4px;">' + escapeHtml(dateStr) + '</div>';
+  h += '</div></div>';
+
+  h += '<div style="font-size:20px;font-weight:800;color:var(--green);margin:6px 0 10px;">🦷 خطة العلاج المقترحة</div>';
+
+  h += '<div style="background:#f6f6f6;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;color:#222;">';
+  h += '<strong>المريض:</strong> ' + escapeHtml(pName);
+  if (pGender) h += ' &nbsp;•&nbsp; ' + escapeHtml(pGender);
+  if (pAge) h += ' &nbsp;•&nbsp; العمر: ' + escapeHtml(String(pAge));
+  h += '</div>';
+
+  var th = 'padding:7px 10px;border:1px solid #ccc;background:#eee;text-align:right;font-size:12.5px;';
+  var td = 'padding:7px 10px;border:1px solid #ddd;font-size:13px;vertical-align:top;';
+  var grand = 0;
+
+  [1, 2, 3, 0].forEach(function(ph){
+    var items = g[ph];
+    if (!items.length) return;
+    if (hasPhases) {
+      h += '<div style="font-size:15px;font-weight:800;color:#111;margin:14px 0 6px;">📌 ' + PLAN_PHASE_LABELS[ph] + '</div>';
+    }
+    h += '<table style="width:100%;border-collapse:collapse;margin-bottom:4px;">';
+    h += '<tr><th style="' + th + 'width:40%;">العلاج</th><th style="' + th + '">الموضع</th><th style="' + th + 'width:120px;">التكلفة</th></tr>';
+    var sub = 0;
+    items.forEach(function(s){
+      var t = planTreatmentFor(s);
+      var disp = t ? getDisplayName(t, true) : (s.type || '—');
+      var cell = '<div style="font-weight:700;">' + escapeHtml(disp) + '</div>';
+      if (t && disp !== t.name) cell += '<div style="font-size:11px;color:#888;margin-top:2px;">' + escapeHtml(t.name) + '</div>';
+      var cost = Number(s.cost || 0); sub += cost;
+      h += '<tr><td style="' + td + '">' + cell + '</td>'
+         + '<td style="' + td + 'color:#444;">' + escapeHtml(s.description || '—') + '</td>'
+         + '<td style="' + td + 'font-weight:700;white-space:nowrap;">' + fmt(cost) + ' ل.س</td></tr>';
+    });
+    grand += sub;
+    if (hasPhases) {
+      h += '<tr><td colspan="2" style="' + td + 'background:#f6f6f6;font-weight:700;text-align:left;">مجموع ' + PLAN_PHASE_LABELS[ph] + '</td>'
+         + '<td style="' + td + 'background:#f6f6f6;font-weight:800;white-space:nowrap;">' + fmt(sub) + ' ل.س</td></tr>';
+    }
+    h += '</table>';
+  });
+
+  h += '<div style="display:flex;justify-content:flex-start;margin-top:12px;">'
+     + '<div style="border-top:3px solid var(--green);padding:10px 4px 0;font-size:16px;font-weight:800;">'
+     + '💰 الإجمالي التقديري: ' + fmt(grand) + ' ل.س</div></div>';
+  h += '<div style="font-size:11.5px;color:#777;margin-top:14px;">الأسعار تقديرية وقد تتغيّر وفق المعاينة السريرية. نرحّب باستفساراتكم.</div>';
+  h += '</div>';
+  return h;
+}
+
+function printTreatmentPlan() {
+  if (!planPlannedSessions().length) { showToast('لا توجد علاجات مخطّطة بعد'); return; }
+  closeModal('printChoiceModal');
+  var root = document.getElementById('printRoot');
+  if (!root) return;
+  root.innerHTML = buildPlanHtml();
+  document.body.classList.add('printing');
+  var cleanup = function(){
+    document.body.classList.remove('printing');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  window.print();   // sync inside the click gesture (iOS Safari) — same as printPrescription
+  setTimeout(cleanup, 60000);
+}
+
+async function copyTreatmentPlan() {
+  var list = planPlannedSessions();
+  if (!list.length) { showToast('لا توجد علاجات مخطّطة بعد'); return; }
+  closeModal('printChoiceModal');
+  var c = rxClinicInfo();
+  var g = planGroups();
+  var hasPhases = g[1].length > 0 || g[2].length > 0 || g[3].length > 0;
+  var lines = [];
+  lines.push('🦷 خطة العلاج — ' + c.clinic_name);
+  lines.push('المريض: ' + ((patient && patient.name) || ''));
+  lines.push('────────────');
+  var grand = 0, idx = 0;
+  [1, 2, 3, 0].forEach(function(ph){
+    var items = g[ph];
+    if (!items.length) return;
+    if (hasPhases) lines.push('📌 ' + PLAN_PHASE_LABELS[ph] + ':');
+    var sub = 0;
+    items.forEach(function(s){
+      idx++;
+      var t = planTreatmentFor(s);
+      var disp = t ? getDisplayName(t, true) : (s.type || '—');
+      var cost = Number(s.cost || 0); sub += cost;
+      lines.push(idx + '. ' + disp + ' — ' + (s.description || '') + ' — ' + fmt(cost) + ' ل.س');
+    });
+    grand += sub;
+    if (hasPhases) lines.push('   مجموع المرحلة: ' + fmt(sub) + ' ل.س');
+  });
+  lines.push('────────────');
+  lines.push('💰 الإجمالي التقديري: ' + fmt(grand) + ' ل.س');
+  if (c.clinic_phone) lines.push('📞 ' + c.clinic_phone);
+  var text = lines.join('\n');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      showToast('تم نسخ خطة العلاج ✓');
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      showToast('تم نسخ خطة العلاج ✓');
+    }
+  } catch (e) { console.warn('copy plan:', e); showToast('⚠️ تعذّر النسخ'); }
+}
+/* ═══════════════ end C ═══════════════ */
 
 /* ===== تعليمات بعد الجلسة (P6) ===== */
 /* ============================================================
