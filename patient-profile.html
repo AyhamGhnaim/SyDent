@@ -316,6 +316,23 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .status-existing{background:#9ca3af;opacity:.7;}           /* legacy fallback (pre-migration) */
 .status-referred{background:#f59e0b;}
 .status-condition{background:#6b7280;opacity:.70;}         /* Cn — clinical watch only, no charge */
+/* ── B: Initial-exam stamp mode ─────────────────────────────────────────── */
+.exam-bar{display:none;position:sticky;top:8px;z-index:40;margin:0 2px 10px;padding:10px 12px;border:1.5px solid var(--green);border-radius:12px;background:var(--bg2);box-shadow:0 4px 18px rgba(0,0,0,.18);}
+body.exam-on .exam-bar{display:block;}
+.exam-bar-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.exam-bar-title{font-weight:800;color:var(--green);font-size:13.5px;}
+.exam-count{font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:3px 10px;}
+.exam-bar-head .spacer{flex:1;}
+.exam-btn{padding:5px 12px;border-radius:8px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text2);}
+.exam-btn.exit{border-color:#ef5350;color:#ef5350;}
+.exam-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.exam-chip{padding:5px 11px;border-radius:8px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--text2);}
+.exam-chip.selected{border-color:var(--green);color:var(--green);background:color-mix(in srgb, var(--green) 12%, transparent);}
+.exam-palette{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
+.exam-tx{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--text);white-space:nowrap;}
+.exam-tx .lbl{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border-radius:6px;font-size:11px;padding:0 4px;}
+.exam-tx.selected{outline:2px solid var(--green);outline-offset:1px;}
+body.exam-on .jaw-wrap .crown-surface, body.exam-on .jaw-wrap .root-part{cursor:crosshair;}
 .topt{padding:14px 12px;border-radius:10px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:center;transition:all .2s;}
 .topt:hover{background:rgba(var(--green-rgb),.08);}
 
@@ -839,6 +856,20 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button data-sfilter="planned">مخطّط</button>
         <button data-sfilter="completed">منجز</button>
         <button data-sfilter="hide_existing">إخفاء الموجود مسبقاً</button>
+      </div>
+      <!-- B: initial-exam stamp mode — entry button + sticky toolbar -->
+      <button type="button" id="examToggleBtn" onclick="toggleExamMode()" style="margin:0 auto 8px;width:max-content;display:block;padding:6px 16px;background:transparent;border:1.5px solid var(--green);border-radius:10px;color:var(--green);font-size:12.5px;font-weight:800;font-family:'Cairo',sans-serif;cursor:pointer;">🩺 فحص أولي</button>
+      <div class="exam-bar" id="examBar">
+        <div class="exam-bar-head">
+          <span class="exam-bar-title">🩺 وضع الفحص الأولي — انقر السطح لوسمه، ونقرة ثانية لإزالته</span>
+          <span class="exam-count">وُسم: <b id="examCountEl">0</b></span>
+          <span class="spacer"></span>
+          <button type="button" class="exam-btn" onclick="examUndo()">↩️ تراجع</button>
+          <button type="button" class="exam-btn exit" onclick="toggleExamMode()">✕ إنهاء</button>
+        </div>
+        <div class="exam-chips" id="examStatusChips"></div>
+        <div class="exam-chips" id="examMonthsRow" style="display:none;"></div>
+        <div class="exam-palette" id="examPalette"></div>
       </div>
       <div class="ortho-banner" id="orthoBanner" style="display:none;"></div>
       <div id="watchDueBanner" style="display:none;margin:6px 2px 4px;padding:8px 12px;border:1px solid #6b7280;border-radius:10px;background:rgba(107,114,128,.12);color:var(--text);font-size:12.5px;line-height:1.7;"></div>
@@ -6425,6 +6456,281 @@ function attachSurfaceClicks() {
   }
 }
 
+/* ═══════════════ B: Initial-exam stamp mode ═══════════════
+   One-tap charting for a new patient's pre-existing history. Statuses are
+   restricted to the NON-BILLABLE set (existing_other / existing_current /
+   condition) — completed/planned create ledger sessions and MUST go through
+   the normal modal (financial red line). Writes go through
+   upsertTeethStatusWithFallback (inherits the M74 review_at fallback).
+   Bridge/implant stamps reuse persistSpecialTreatment (Rule #18 — one unit
+   logic). No ledger rows are ever created from this mode. */
+window.__examMode = false;
+var examStatus = 'existing_other';
+var examReviewMonths = 3;
+var examSelectedKey = null;
+var examCount = 0;
+var examUndoStack = [];
+var EXAM_STATUSES = [
+  { v: 'existing_other',   l: 'موجود — من عيادة أخرى' },
+  { v: 'existing_current', l: 'موجود — من عيادتنا' },
+  { v: 'condition',        l: 'مراقبة' }
+];
+
+async function toggleExamMode() {
+  if (!window.__examMode) {
+    if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+      showToast('🔒 حسابك غير نشط — لا يمكن تسجيل حالات'); return;
+    }
+    await loadTreatmentsFromSupabase();
+    window.__examMode = true;
+    examStatus = 'existing_other';
+    examReviewMonths = 3;
+    examSelectedKey = null;
+    examCount = 0;
+    examUndoStack = [];
+    // Provider: same OpenDental-style default resolver as the modal (silent).
+    var _pool = (CLINIC_DOCTORS || []).filter(function(d){ return d.is_active !== false; });
+    if (!_pool.length) _pool = CLINIC_DOCTORS || [];
+    pendingProviderId = _pool.length ? getDefaultProviderId(_pool) : null;
+    document.body.classList.add('exam-on');
+    var tb = document.getElementById('examToggleBtn'); if (tb) tb.style.display = 'none';
+    renderExamBar();
+    showToast('🩺 وضع الفحص الأولي — اختر علاجاً ثم انقر الأسنان');
+  } else {
+    window.__examMode = false;
+    document.body.classList.remove('exam-on');
+    var tb2 = document.getElementById('examToggleBtn'); if (tb2) tb2.style.display = 'block';
+    showToast('✅ انتهى الفحص الأولي — وُسم ' + examCount + ' موضعاً');
+  }
+}
+
+function renderExamBar() {
+  // Status chips
+  var sc = document.getElementById('examStatusChips');
+  if (sc) {
+    sc.innerHTML = EXAM_STATUSES.map(function(s){
+      return '<button type="button" class="exam-chip' + (examStatus === s.v ? ' selected' : '') + '" '
+           + 'onclick="examSetStatus(\'' + s.v + '\')">' + s.l + '</button>';
+    }).join('');
+  }
+  // Review-months chips (condition only) — same semantics as Feature A
+  var mr = document.getElementById('examMonthsRow');
+  if (mr) {
+    if (examStatus === 'condition') {
+      var opts = [[3, '3 أشهر'], [6, '6 أشهر'], [12, 'سنة'], [null, 'بلا']];
+      mr.innerHTML = '<span style="font-size:12px;color:var(--text2);align-self:center;">⏰ المراجعة:</span>'
+        + opts.map(function(o){
+            var sel = (examReviewMonths === o[0]);
+            return '<button type="button" class="exam-chip' + (sel ? ' selected' : '') + '" '
+                 + 'onclick="examSetMonths(' + (o[0] === null ? 'null' : o[0]) + ')">' + o[1] + '</button>';
+          }).join('');
+      mr.style.display = 'flex';
+    } else {
+      mr.style.display = 'none'; mr.innerHTML = '';
+    }
+  }
+  // Treatment palette: favorites first, then the rest; tooth-based only.
+  var pal = document.getElementById('examPalette');
+  if (pal) {
+    var list = [];
+    for (var i = 0; i < TREATMENTS.length; i++) {
+      var t = TREATMENTS[i];
+      if (t.is_active === false) continue;
+      var tp = t.target_part || 'crown';
+      if (tp === 'quadrant' || tp === 'arch' || tp === 'mouth') continue;   // regional → normal flow
+      if (typeof isSpacerTreatment === 'function' && isSpacerTreatment(t)) continue; // gap-unit flow → normal
+      list.push(t);
+    }
+    list.sort(function(a, b){ return (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0); });
+    pal.innerHTML = list.map(function(t){
+      var tc = isLightColor(t.fill) ? '#0a1628' : '#fff';
+      return '<button type="button" class="exam-tx' + (examSelectedKey === t.treatment_key ? ' selected' : '') + '" '
+           + 'style="border-color:' + t.fill + ';" '
+           + 'onclick="examPick(\'' + t.treatment_key + '\')">'
+           + '<span class="lbl" style="background:' + t.fill + ';color:' + tc + ';">' + t.label + '</span>'
+           + '<span>' + escapeHtml(t.name) + '</span></button>';
+    }).join('');
+  }
+  var ce = document.getElementById('examCountEl'); if (ce) ce.textContent = examCount;
+}
+function examSetStatus(s) { examStatus = s; renderExamBar(); }
+function examSetMonths(m) { examReviewMonths = m; renderExamBar(); }
+function examPick(key) { examSelectedKey = key; renderExamBar(); }
+function examReviewAt() {
+  if (examStatus !== 'condition' || !examReviewMonths) return null;
+  var d = new Date(); d.setMonth(d.getMonth() + examReviewMonths);
+  return d.toISOString().slice(0, 10);
+}
+/* Mirror of the modal's isAllowed state rules (minus M61 socket/spacer, which
+   stay in the normal flow). */
+function examAllowed(n, t) {
+  var tp = t.target_part || 'crown';
+  if (isImplant(n)) return { ok: false, msg: '🔩 سن مزروع — أزل الزراعة من الوضع العادي' };
+  var smN = teethMap[String(n)] || {};
+  if (isExtracted(n) && isBridgeKey(smN.PONTIC)) return { ok: false, msg: '🔗 دعامة جسر (فجوة) — أزل الجسر من الوضع العادي' };
+  if (isBridgeAbut(n)) {
+    if (tp === 'implant' || tp === 'extraction' || tp === 'bridge')
+      return { ok: false, msg: '🔗 السن دعامة جسر — أزل الجسر أولاً من الوضع العادي' };
+    return { ok: true };
+  }
+  if (isExtracted(n)) {
+    if (isPrimaryTooth(n)) return { ok: false, msg: '🦷 سن لبني مقلوع — لا جسر/زراعة عليه' };
+    if (tp === 'bridge' || tp === 'implant') return { ok: true };
+    return { ok: false, msg: '🕳️ سن مقلوع — يقبل جسراً أو زراعة فقط هنا' };
+  }
+  return { ok: true };
+}
+function examRouteSurface(n, clicked, tp) {
+  if (tp === 'implant' || tp === 'extraction' || tp === 'whole' || tp === 'bridge') return 'WHOLE';
+  if (tp === 'crown_full') return 'CROWN_FULL';
+  if (tp === 'root') return /^R[123]$/.test(clicked) ? clicked : 'R1';
+  // crown / both / default
+  if (/^R[123]$/.test(clicked) || clicked === 'WHOLE' || clicked === 'CROWN_FULL' || !clicked)
+    return centerSurface(n);
+  return clicked;
+}
+
+async function examStamp(n, clickedSurface) {
+  if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
+    showToast('🔒 حسابك غير نشط — لا يمكن تسجيل حالات'); return;
+  }
+  if (!examSelectedKey) { showToast('👆 اختر علاجاً من شريط الفحص أولاً'); return; }
+  var t = getTreatment(examSelectedKey);
+  if (!t) { showToast('⚠️ العلاج المختار غير موجود'); return; }
+  var tp = t.target_part || 'crown';
+  var s = examRouteSurface(n, clickedSurface, tp);
+  var tn = String(n);
+  var sm = teethMap[tn] || {};
+
+  // ── Toggle-off: same treatment already on the routed surface → remove it ──
+  // Excluded: bridges (multi-row unit — normal-mode remove button handles the
+  // whole unit) and extractions carrying a spacer (orphan-wire hazard).
+  if (sm[s] === examSelectedKey && !isBridgeKey(examSelectedKey) && tp !== 'bridge') {
+    if (tp === 'extraction' && typeof toothHasSpacer === 'function' && toothHasSpacer(n)) {
+      showToast('🧷 على السن حافظ مسافة — ألغِ القلع من الوضع العادي'); return;
+    }
+    var prevStX = (sm.__status || {})[s] || null;
+    var prevRvX = (sm.__review || {})[s] || null;
+    var dr = await window.sb.from('teeth_status').delete()
+      .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+      .eq('tooth_num', tn).eq('surface', s);
+    if (dr.error) { showToast('⚠️ ' + dr.error.message); return; }
+    delete teethMap[tn][s];
+    if (teethMap[tn].__status) delete teethMap[tn].__status[s];
+    if (teethMap[tn].__review) delete teethMap[tn].__review[s];
+    var _rk = Object.keys(teethMap[tn]).filter(function(k){ return k !== '__status' && k !== '__review'; });
+    if (_rk.length === 0) delete teethMap[tn];
+    examUndoStack.push({ type: 'unstamp', n: tn, s: s, key: examSelectedKey, st: prevStX, rv: prevRvX });
+    examCount = Math.max(0, examCount - 1);
+    renderTeeth(); renderStats();
+    var ce1 = document.getElementById('examCountEl'); if (ce1) ce1.textContent = examCount;
+    return;
+  }
+
+  // ── State guards (mirror of modal isAllowed) ──
+  var ok = examAllowed(n, t);
+  if (!ok.ok) { showToast(ok.msg); return; }
+
+  // ── Specials: bridge / implant via the shared unit helper (Rule #18) ──
+  var implantWiped = false;
+  if (tp === 'bridge' || tp === 'implant') {
+    currentTooth = n; currentSurface = 'WHOLE';
+    pendingToothStatus = examSelectedKey; pendingToothLabel = t.name;
+    pendingTreatStatus = examStatus; pendingReviewMonths = examReviewMonths;
+    var sp = await persistSpecialTreatment();
+    bridgeUnitForLedger = null; spacerUnitForLedger = null;   // defensive: never leak into a later normal save
+    if (sp.blocked) return;
+    if (sp.handled) {   // bridge unit fully written (no ledger — status is non-billable)
+      examCount++;
+      renderTeeth(); renderStats();
+      var ce2 = document.getElementById('examCountEl'); if (ce2) ce2.textContent = examCount;
+      showToast('✓ جسر — للتراجع عنه استخدم الوضع العادي');
+      return;
+    }
+    implantWiped = !!sp.implantWiped;   // implant falls through to the plain write
+  }
+
+  // ── Plain write ──
+  var prevKey = (teethMap[tn] || {})[s] || null;
+  var prevSt  = ((teethMap[tn] || {}).__status || {})[s] || null;
+  var prevRv  = ((teethMap[tn] || {}).__review || {})[s] || null;
+  var rW = await upsertTeethStatusWithFallback({
+    doctor_id: currentUser.id, patient_id: patientId,
+    tooth_num: tn, surface: s, treatment_key: examSelectedKey,
+    status: examStatus, provider_id: pendingProviderId,
+    review_at: examReviewAt()
+  }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+  if (rW.error) { showToast('⚠️ خطأ الحفظ: ' + rW.error.message); return; }
+  if (!teethMap[tn]) teethMap[tn] = {};
+  teethMap[tn][s] = examSelectedKey;
+  if (!teethMap[tn].__status) teethMap[tn].__status = {};
+  teethMap[tn].__status[s] = examStatus;
+  var _rv = examReviewAt();
+  if (_rv) { if (!teethMap[tn].__review) teethMap[tn].__review = {}; teethMap[tn].__review[s] = _rv; }
+  else if (teethMap[tn].__review) delete teethMap[tn].__review[s];
+  if (!implantWiped) examUndoStack.push({ type: 'stamp', n: tn, s: s, prevKey: prevKey, prevSt: prevSt, prevRv: prevRv });
+  else showToast('✓ زراعة — للتراجع عنها استخدم الوضع العادي');
+  examCount++;
+  renderTeeth(); renderStats();
+  var ce3 = document.getElementById('examCountEl'); if (ce3) ce3.textContent = examCount;
+}
+
+async function examUndo() {
+  var a = examUndoStack.pop();
+  if (!a) { showToast('لا شيء للتراجع عنه'); return; }
+  if (a.type === 'stamp') {
+    if (a.prevKey) {   // restore the overwritten row
+      var rR = await upsertTeethStatusWithFallback({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: a.n, surface: a.s, treatment_key: a.prevKey,
+        status: a.prevSt || 'completed', provider_id: pendingProviderId,
+        review_at: a.prevRv || null
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (rR.error) { showToast('⚠️ ' + rR.error.message); examUndoStack.push(a); return; }
+      teethMap[a.n] = teethMap[a.n] || {};
+      teethMap[a.n][a.s] = a.prevKey;
+      teethMap[a.n].__status = teethMap[a.n].__status || {};
+      teethMap[a.n].__status[a.s] = a.prevSt || 'completed';
+      if (a.prevRv) { teethMap[a.n].__review = teethMap[a.n].__review || {}; teethMap[a.n].__review[a.s] = a.prevRv; }
+      else if (teethMap[a.n].__review) delete teethMap[a.n].__review[a.s];
+    } else {           // the surface was clean before → delete the stamp
+      var dU = await window.sb.from('teeth_status').delete()
+        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+        .eq('tooth_num', a.n).eq('surface', a.s);
+      if (dU.error) { showToast('⚠️ ' + dU.error.message); examUndoStack.push(a); return; }
+      if (teethMap[a.n]) {
+        delete teethMap[a.n][a.s];
+        if (teethMap[a.n].__status) delete teethMap[a.n].__status[a.s];
+        if (teethMap[a.n].__review) delete teethMap[a.n].__review[a.s];
+        var _k2 = Object.keys(teethMap[a.n]).filter(function(k){ return k !== '__status' && k !== '__review'; });
+        if (_k2.length === 0) delete teethMap[a.n];
+      }
+    }
+    examCount = Math.max(0, examCount - 1);
+  } else {             // 'unstamp' → put the removed row back
+    var rB = await upsertTeethStatusWithFallback({
+      doctor_id: currentUser.id, patient_id: patientId,
+      tooth_num: a.n, surface: a.s, treatment_key: a.key,
+      status: a.st || examStatus, provider_id: pendingProviderId,
+      review_at: a.rv || null
+    }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+    if (rB.error) { showToast('⚠️ ' + rB.error.message); examUndoStack.push(a); return; }
+    teethMap[a.n] = teethMap[a.n] || {};
+    teethMap[a.n][a.s] = a.key;
+    teethMap[a.n].__status = teethMap[a.n].__status || {};
+    teethMap[a.n].__status[a.s] = a.st || examStatus;
+    if (a.rv) { teethMap[a.n].__review = teethMap[a.n].__review || {}; teethMap[a.n].__review[a.s] = a.rv; }
+    examCount++;
+  }
+  renderTeeth(); renderStats();
+  var ce = document.getElementById('examCountEl'); if (ce) ce.textContent = examCount;
+}
+/* ESC exits exam mode */
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && window.__examMode) toggleExamMode();
+});
+/* ═══════════════ end exam mode ═══════════════ */
+
 /* ── Tooth Modal ── */
 var currentTooth = null;
 var currentSurface = null;
@@ -6737,6 +7043,9 @@ function renderTxTabs(){
   renderTxPalette();
 }
 async function openToothModal(n, surface) {
+  // B: exam stamp mode intercepts every tooth/surface click (all entry paths
+  // funnel here: buc/occ surfaces, roots, WHOLE areas, extracted ghosts).
+  if (window.__examMode && n !== null && n !== undefined) { examStamp(n, surface); return; }
   await loadTreatmentsFromSupabase();
   var _ttClear = document.getElementById('txTabs'); if (_ttClear) _ttClear.innerHTML = '';   // reset tabs (regional path leaves it empty → collapses)
   // Phase 3 Feature G: 'regional mode' — opened via "+ علاج جماعي" button. No specific tooth.
@@ -7419,6 +7728,7 @@ function proceedToRegionalStep2(status, label) {
 // Entry point: user clicks the "+ علاج جماعي" button. Opens Step 1 of toothModal
 // filtered to show only regional treatments (target_part in quadrant/arch/mouth).
 function openRegionalTreatmentPicker() {
+  if (window.__examMode) { showToast('🩺 أنهِ وضع الفحص الأولي أولاً'); return; }
   // Reset tooth context — user picked "regional" mode, no specific tooth in mind
   currentTooth = null;
   currentSurface = null;
