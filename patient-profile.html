@@ -5641,12 +5641,12 @@ function buildTooth(num, surfaceMap, isUpper) {
     var cft = getTreatment(crownFullT);
     var cfLabel = isBridgeAbutment ? 'دعامة جسر' : 'التاج كامل';
     var cfBadge = tipStatusBadge(sm, 'CROWN_FULL');
-    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + crownFullColor + '"></span><b>' + cfLabel + ':</b> ' + (cft ? cft.name : crownFullT) + cfBadge + '</div>';
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(crownFullColor) + '"></span><b>' + cfLabel + ':</b> ' + escapeHtml(cft ? cft.name : crownFullT) + cfBadge + '</div>';
   }
   if (hasWhole) {
     var wt = getTreatment(wholeT);
     var wBadge = tipStatusBadge(sm, 'WHOLE');
-    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + wholeColor + '"></span><b>السن كاملاً:</b> ' + (wt ? wt.name : wholeT) + wBadge + '</div>';
+    tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(wholeColor) + '"></span><b>السن كاملاً:</b> ' + escapeHtml(wt ? wt.name : wholeT) + wBadge + '</div>';
   }
   // ALWAYS list surface + lingual + root treatments — even under a whole/crown_full —
   // so the doctor sees every treatment on the tooth, not just the full-coverage one.
@@ -5657,7 +5657,7 @@ function buildTooth(num, surfaceMap, isUpper) {
       if (!isCompositeSurfaceCode(compK) || !sm[compK]) continue;
       var cTk = sm[compK];
       var cObj = getTreatment(cTk);
-      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + (T_FILL[cTk] || '#888') + '"></span><b>' + surfLabelFor(compK, num) + ':</b> ' + (cObj ? cObj.name : cTk) + tipStatusBadge(sm, compK) + '</div>';
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(T_FILL[cTk] || '#888') + '"></span><b>' + surfLabelFor(compK, num) + ':</b> ' + escapeHtml(cObj ? cObj.name : cTk) + tipStatusBadge(sm, compK) + '</div>';
     }
     var crownKeys = surfacesFor(num);
     for (var ki = 0; ki < crownKeys.length; ki++) {
@@ -5668,7 +5668,7 @@ function buildTooth(num, surfaceMap, isUpper) {
         var tname = tobj ? tobj.name : tk;
         var tcolor = T_FILL[tk] || '#888';
         var skBadge = tipStatusBadge(sm, sk);
-        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + tcolor + '"></span><b>' + surfLabelFor(sk, num) + ':</b> ' + tname + skBadge + '</div>';
+        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(tcolor) + '"></span><b>' + surfLabelFor(sk, num) + ':</b> ' + escapeHtml(tname) + skBadge + '</div>';
       }
     }
     // Lingual (L) is recorded only from the occlusal view; surfacesFor() (facial) omits it,
@@ -5677,7 +5677,7 @@ function buildTooth(num, surfaceMap, isUpper) {
       var ltobj = getTreatment(sm['L']);
       var ltname = ltobj ? ltobj.name : sm['L'];
       var ltcolor = T_FILL[sm['L']] || '#888';
-      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + ltcolor + '"></span><b>' + surfLabelFor('L', num) + ':</b> ' + ltname + tipStatusBadge(sm, 'L') + '</div>';
+      tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(ltcolor) + '"></span><b>' + surfLabelFor('L', num) + ':</b> ' + escapeHtml(ltname) + tipStatusBadge(sm, 'L') + '</div>';
     }
     for (var rj = 0; rj < anat.roots.length; rj++) {
       var rk = anat.roots[rj].key;
@@ -5687,7 +5687,7 @@ function buildTooth(num, surfaceMap, isUpper) {
         var rtname = rtobj ? rtobj.name : rtk;
         var rtcolor = T_FILL[rtk] || '#888';
         var rkBadge = tipStatusBadge(sm, rk);
-        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + rtcolor + '"></span><b>' + SURFACE_LABELS[rk] + ':</b> ' + rtname + rkBadge + '</div>';
+        tipRows += '<div class="tip-row"><span class="tip-dot" style="background:' + escapeHtml(rtcolor) + '"></span><b>' + SURFACE_LABELS[rk] + ':</b> ' + escapeHtml(rtname) + rkBadge + '</div>';
       }
     }
   }
@@ -5813,7 +5813,7 @@ function renderLegend() {
   for (var i=0; i<TREATMENTS.length; i++) {
     var t = TREATMENTS[i];
     if (t.is_active === false) continue;
-    html += '<div class="leg"><div class="leg-dot" style="background:' + t.fill + '"></div>' + t.name + '</div>';
+    html += '<div class="leg"><div class="leg-dot" style="background:' + escapeHtml(t.fill) + '"></div>' + escapeHtml(t.name) + '</div>'; // Rule #195
   }
   // Status legend (small separator)
   html += '<div class="leg-sep" style="width:1px;height:14px;background:var(--border);margin:0 6px;"></div>';
@@ -6093,7 +6093,7 @@ function occTipRows(num, sm){
     var lbl=STATUS_LABELS[st]||st, col=STATUS_COLORS[st]||'#888';
     return ' <span style="display:inline-block;padding:0 5px;border-radius:6px;background:'+col+'33;color:'+col+';font-size:10px;font-weight:700;margin-right:4px;">'+lbl+'</span>';
   }
-  function row(color,label,name,b){ return '<div class="tip-row"><span class="tip-dot" style="background:'+color+'"></span><b>'+label+':</b> '+name+b+'</div>'; }
+  function row(color,label,name,b){ return '<div class="tip-row"><span class="tip-dot" style="background:'+escapeHtml(color)+'"></span><b>'+label+':</b> '+escapeHtml(name)+b+'</div>'; } // Rule #195: name/fill are clinic-entered data
   var rows='', whole=sm.WHOLE, cf=sm.CROWN_FULL;
   var wt=whole?getTreatment(whole):null, wtp=wt?(wt.target_part||'whole'):null, isBr=isBridgeKey(whole);
   var cfKey=cf||((wtp==='crown_full')?whole:null)||(isBr?whole:null);
@@ -6940,8 +6940,21 @@ async function undoExtraction(num) {
     var idx = arch.indexOf(num);
     if (idx >= 0) {
       var s = idx, e = idx;
-      while (s > 0 && (isBridgeTooth(arch[s-1]) || isExtracted(arch[s-1]))) s--;
-      while (e < arch.length-1 && (isBridgeTooth(arch[e+1]) || isExtracted(arch[e+1]))) e++;
+      // Adjacent-bridges boundary (audit fix #2): two touching NON-extracted
+      // bridge teeth are abutments of two DIFFERENT units — a single unit always
+      // has ≥1 pontic between its abutments. Stop expansion there so removing
+      // one bridge never wipes its neighbor.
+      function _abutPair(a, b){
+        return isBridgeAbut(a) && !isExtracted(a) && isBridgeAbut(b) && !isExtracted(b);
+      }
+      while (s > 0 && (isBridgeTooth(arch[s-1]) || isExtracted(arch[s-1]))) {
+        if (_abutPair(arch[s], arch[s-1])) break;
+        s--;
+      }
+      while (e < arch.length-1 && (isBridgeTooth(arch[e+1]) || isExtracted(arch[e+1]))) {
+        if (_abutPair(arch[e], arch[e+1])) break;
+        e++;
+      }
       unitToClear = arch.slice(s, e+1);
     }
   }
@@ -7448,6 +7461,150 @@ function backToStep1() {
   document.getElementById('toothFoot').style.display  = 'none';
 }
 
+/* ── Shared special-treatment persistence (Rule #197 write-path parity) ──
+   BRIDGE / SPACE-MAINTAINER / IMPLANT need multi-row or pre-wipe writes. This
+   single helper is called by BOTH save paths (saveToothTreatment and
+   saveToothAndOpenLab) so the unit logic can never diverge again — the lab
+   path previously wrote one plain row, which for a bridge overwrote
+   WHOLE='extracted' on the missing tooth and skipped the abutments entirely.
+   Reads the same module-level pending* / currentTooth state as the callers.
+   Returns:
+     { blocked:true }                        → clinical guard rejected; caller returns
+     { handled:true, bridgeUnit|spacerUnit } → unit fully persisted; caller skips
+                                               its plain single-row write
+     { handled:false, implantWiped? }        → caller proceeds with its normal write */
+async function persistSpecialTreatment() {
+  var pendingTr = getTreatment(pendingToothStatus);
+  var pendingTp = pendingTr ? (pendingTr.target_part || 'crown') : 'crown';
+  var isBridgeTreatment = (pendingTp === 'bridge') || (pendingToothStatus === 'bridge');
+  // ── Clinical guard (primary teeth) ──
+  // Implants are never charted on a deciduous tooth number: fixtures are placed
+  // after growth completion, at which point the site belongs to the permanent
+  // tooth. Explicit message instead of charting a clinically-invalid record.
+  if (pendingTp === 'implant' && isPrimaryTooth(currentTooth)) {
+    showToast('🦷 الزراعة لا تُسجَّل على سن لبني — حوّل الموضع للسن الدائم ثم خطّطها');
+    return { blocked: true };
+  }
+  if (isBridgeTreatment) {
+    // ── Clinical guard (audit fix #4) ──
+    // A bridge is charted by clicking the MISSING tooth (the gap); abutments are
+    // derived automatically. Applying it from a PRESENT tooth would silently turn
+    // that healthy tooth into a DB pontic with no extraction record (inconsistent
+    // ghost after reload). Same pattern as the space-maintainer guard.
+    if (!isExtracted(currentTooth)) {
+      showToast('🌉 الجسر يُطبَّق بالنقر على السن المفقود (المقلوع) — الدعامات تُحدَّد تلقائياً');
+      return { blocked: true };
+    }
+    var abuts = findBridgeAbutments(currentTooth);
+    // ── Clinical guard (primary teeth) ──
+    // Conventional bridges are never made on deciduous teeth: their roots resorb &
+    // exfoliate, and a fixed prosthesis would block the permanent successor's
+    // eruption (standard of care: a space maintainer). This also fixes a silent
+    // no-op: the unit math below maps abutments against the PERMANENT arch
+    // (UPPER_T/LOWER_T), so primary numbers returned indexOf=-1 → empty unit →
+    // nothing was saved, with no error and no message.
+    var _brProbe = [currentTooth, abuts.mesial, abuts.distal].concat(abuts.gap || []);
+    for (var _bp = 0; _bp < _brProbe.length; _bp++) {
+      if (_brProbe[_bp] != null && isPrimaryTooth(_brProbe[_bp])) {
+        showToast('🦷 الجسر التقليدي لا يُطبَّق على الأسنان اللبنية — البديل السريري: «حافظ مسافة»');
+        return { blocked: true };
+      }
+    }
+    if (!abuts.mesial || !abuts.distal) {
+      showToast('⚠️ يحتاج الجسر سن سليم على كلا الجانبين');
+      return { blocked: true };
+    }
+    var arch = (UPPER_T.indexOf(currentTooth) >= 0) ? UPPER_T : LOWER_T;
+    var mIdx = arch.indexOf(abuts.mesial);
+    var dIdx = arch.indexOf(abuts.distal);
+    var lo = Math.min(mIdx, dIdx), hi = Math.max(mIdx, dIdx);
+    var unit = arch.slice(lo, hi+1);
+    bridgeUnitForLedger = unit;
+    var bridgeKey = pendingToothStatus;  // Could be 'bridge' or a custom key like 'custom_xxx'
+    for (var u=0; u<unit.length; u++) {
+      var un = String(unit[u]);
+      var isAbut = (unit[u] === abuts.mesial || unit[u] === abuts.distal);
+      if (isAbut) {
+        var rA = await upsertTeethStatusWithFallback({
+          doctor_id: currentUser.id, patient_id: patientId,
+          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
+        }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+        if (rA.error) {
+          console.error('bridge abutment save error:', rA.error);
+          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rA.error.message);
+        }
+        if (!teethMap[un]) teethMap[un] = {};
+        teethMap[un]['WHOLE'] = bridgeKey;
+        if (!teethMap[un].__status) teethMap[un].__status = {};
+        teethMap[un].__status.WHOLE = pendingTreatStatus;
+      } else {
+        // Pontic: save at PONTIC surface (DB constraint accepts it)
+        var rP = await upsertTeethStatusWithFallback({
+          doctor_id: currentUser.id, patient_id: patientId,
+          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
+        }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+        if (rP.error) {
+          console.error('bridge pontic save error:', rP.error);
+          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rP.error.message);
+        } else {
+          if (!teethMap[un]) teethMap[un] = {};
+          teethMap[un]['PONTIC'] = bridgeKey;
+          if (!teethMap[un].__status) teethMap[un].__status = {};
+          teethMap[un].__status.PONTIC = pendingTreatStatus;
+          if (!isExtractionKey(teethMap[un]['WHOLE'])) teethMap[un]['WHOLE'] = 'extracted';
+        }
+      }
+    }
+    return { handled: true, bridgeUnit: unit };
+  }
+  if (window.__m61 === true && isSpacerTreatment(pendingTr) && isExtracted(currentTooth)) {
+    // ── حافظ مسافة: unit save (mirror of the bridge unit) ──
+    // findBridgeAbutments walks the ACTIVE arch (dentition-aware), so this works
+    // on primary/mixed charts — where space maintainers actually live.
+    var sAb = findBridgeAbutments(currentTooth);
+    if (!sAb.mesial || !sAb.distal) {
+      showToast('⚠️ حافظ المسافة يحتاج سنّين موجودَين على جانبي الفجوة');
+      return { blocked: true };
+    }
+    // Band & loop: rows ONLY on the gap teeth + the DISTAL (band) abutment.
+    // The mesial tooth gets NOTHING — the loop merely rests against it.
+    var sArch = archOf(currentTooth);
+    var sBand = spacerBandToothOf(currentTooth, sAb.mesial, sAb.distal);
+    spacerUnitForLedger = (sAb.gap || [currentTooth]).slice();
+    if (spacerUnitForLedger.indexOf(sBand) < 0) spacerUnitForLedger.push(sBand);
+    spacerUnitForLedger.sort(function(a, b){ return sArch.indexOf(a) - sArch.indexOf(b); });
+    for (var su = 0; su < spacerUnitForLedger.length; su++) {
+      var sun = String(spacerUnitForLedger[su]);
+      var rS = await upsertTeethStatusWithFallback({
+        doctor_id: currentUser.id, patient_id: patientId,
+        tooth_num: sun, surface: 'SPACER', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
+      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
+      if (rS.error) {
+        console.error('spacer save error:', rS.error);
+        showToast('⚠️ خطأ حفظ السن ' + sun + ': ' + rS.error.message);
+      } else {
+        if (!teethMap[sun]) teethMap[sun] = {};
+        teethMap[sun]['SPACER'] = pendingToothStatus;
+        if (!teethMap[sun].__status) teethMap[sun].__status = {};
+        teethMap[sun].__status.SPACER = pendingTreatStatus;
+      }
+    }
+    return { handled: true, spacerUnit: spacerUnitForLedger };
+  }
+  // For IMPLANT (built-in or any custom variant like 'زراعة سويسرية'):
+  // wipe ALL existing surfaces for this tooth first
+  // (so old root canals, fillings, etc. don't survive — an implant replaces the natural tooth completely)
+  if (pendingTp === 'implant') {
+      var dAll = await window.sb.from('teeth_status').delete()
+        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
+        .eq('tooth_num', String(currentTooth));
+      if (dAll.error) console.error('clear surfaces before implant error:', dAll.error);
+      teethMap[String(currentTooth)] = {};
+      return { handled: false, implantWiped: true };
+    }
+  return { handled: false };
+}
+
 async function saveToothTreatment() {
   // Phase 4.1: defense-in-depth — block if locked doctor is inactive
   if (window.SyDentLock && window.SyDentLock.isDoctorAccountInactive && window.SyDentLock.isDoctorAccountInactive()) {
@@ -7568,130 +7725,15 @@ async function saveToothTreatment() {
   // End Feature G regional path — normal tooth-based flow below
   // ============================================================
 
-  // Special handling: bridge marks abutments + pontics as a single unit.
-  // - Abutments (the existing teeth on each side): treatment_key='bridge' at surface='WHOLE'
-  // - Pontics (the extracted teeth in between): keep 'extracted' at WHOLE,
-  //   AND add 'bridge' at a separate surface='PONTIC' so they're flagged as part of the bridge
-  // Bridge save: detect by target_part (so custom variants like "جسر زركون" work too).
-  // We store the ACTUAL treatment_key (not always 'bridge') so the right color renders.
+  // Special handling (bridge / spacer / implant) is shared with saveToothAndOpenLab
+  // via persistSpecialTreatment() — Rule #197 write-path parity (audit fix #1).
   var pendingTr = getTreatment(pendingToothStatus);
   var pendingTp = pendingTr ? (pendingTr.target_part || 'crown') : 'crown';
-  var isBridgeTreatment = (pendingTp === 'bridge') || (pendingToothStatus === 'bridge');
-  // ── Clinical guard (primary teeth) ──
-  // Implants are never charted on a deciduous tooth number: fixtures are placed
-  // after growth completion, at which point the site belongs to the permanent
-  // tooth. Explicit message instead of charting a clinically-invalid record.
-  if (pendingTp === 'implant' && isPrimaryTooth(currentTooth)) {
-    showToast('🦷 الزراعة لا تُسجَّل على سن لبني — حوّل الموضع للسن الدائم ثم خطّطها');
-    return;
-  }
-  // Track the bridge unit for ledger description (null if not a bridge save)
-  var bridgeUnitForLedger = null;
-  var spacerUnitForLedger = null;
-  if (isBridgeTreatment) {
-    var abuts = findBridgeAbutments(currentTooth);
-    // ── Clinical guard (primary teeth) ──
-    // Conventional bridges are never made on deciduous teeth: their roots resorb &
-    // exfoliate, and a fixed prosthesis would block the permanent successor's
-    // eruption (standard of care: a space maintainer). This also fixes a silent
-    // no-op: the unit math below maps abutments against the PERMANENT arch
-    // (UPPER_T/LOWER_T), so primary numbers returned indexOf=-1 → empty unit →
-    // nothing was saved, with no error and no message.
-    var _brProbe = [currentTooth, abuts.mesial, abuts.distal].concat(abuts.gap || []);
-    for (var _bp = 0; _bp < _brProbe.length; _bp++) {
-      if (_brProbe[_bp] != null && isPrimaryTooth(_brProbe[_bp])) {
-        showToast('🦷 الجسر التقليدي لا يُطبَّق على الأسنان اللبنية — البديل السريري: «حافظ مسافة»');
-        return;
-      }
-    }
-    if (!abuts.mesial || !abuts.distal) {
-      showToast('⚠️ يحتاج الجسر سن سليم على كلا الجانبين');
-      return;
-    }
-    var arch = (UPPER_T.indexOf(currentTooth) >= 0) ? UPPER_T : LOWER_T;
-    var mIdx = arch.indexOf(abuts.mesial);
-    var dIdx = arch.indexOf(abuts.distal);
-    var lo = Math.min(mIdx, dIdx), hi = Math.max(mIdx, dIdx);
-    var unit = arch.slice(lo, hi+1);
-    bridgeUnitForLedger = unit;
-    var bridgeKey = pendingToothStatus;  // Could be 'bridge' or a custom key like 'custom_xxx'
-    for (var u=0; u<unit.length; u++) {
-      var un = String(unit[u]);
-      var isAbut = (unit[u] === abuts.mesial || unit[u] === abuts.distal);
-      if (isAbut) {
-        var rA = await upsertTeethStatusWithFallback({
-          doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'WHOLE', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
-        }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-        if (rA.error) {
-          console.error('bridge abutment save error:', rA.error);
-          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rA.error.message);
-        }
-        if (!teethMap[un]) teethMap[un] = {};
-        teethMap[un]['WHOLE'] = bridgeKey;
-        if (!teethMap[un].__status) teethMap[un].__status = {};
-        teethMap[un].__status.WHOLE = pendingTreatStatus;
-      } else {
-        // Pontic: save at PONTIC surface (DB constraint accepts it)
-        var rP = await upsertTeethStatusWithFallback({
-          doctor_id: currentUser.id, patient_id: patientId,
-          tooth_num: un, surface: 'PONTIC', treatment_key: bridgeKey, status: pendingTreatStatus, provider_id: pendingProviderId
-        }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-        if (rP.error) {
-          console.error('bridge pontic save error:', rP.error);
-          showToast('⚠️ خطأ حفظ السن ' + un + ': ' + rP.error.message);
-        } else {
-          if (!teethMap[un]) teethMap[un] = {};
-          teethMap[un]['PONTIC'] = bridgeKey;
-          if (!teethMap[un].__status) teethMap[un].__status = {};
-          teethMap[un].__status.PONTIC = pendingTreatStatus;
-          if (teethMap[un]['WHOLE'] !== 'extracted') teethMap[un]['WHOLE'] = 'extracted';
-        }
-      }
-    }
-  } else if (window.__m61 === true && isSpacerTreatment(pendingTr) && isExtracted(currentTooth)) {
-    // ── حافظ مسافة: unit save (mirror of the bridge unit) ──
-    // findBridgeAbutments walks the ACTIVE arch (dentition-aware), so this works
-    // on primary/mixed charts — where space maintainers actually live.
-    var sAb = findBridgeAbutments(currentTooth);
-    if (!sAb.mesial || !sAb.distal) {
-      showToast('⚠️ حافظ المسافة يحتاج سنّين موجودَين على جانبي الفجوة');
-      return;
-    }
-    // Band & loop: rows ONLY on the gap teeth + the DISTAL (band) abutment.
-    // The mesial tooth gets NOTHING — the loop merely rests against it.
-    var sArch = archOf(currentTooth);
-    var sBand = spacerBandToothOf(currentTooth, sAb.mesial, sAb.distal);
-    spacerUnitForLedger = (sAb.gap || [currentTooth]).slice();
-    if (spacerUnitForLedger.indexOf(sBand) < 0) spacerUnitForLedger.push(sBand);
-    spacerUnitForLedger.sort(function(a, b){ return sArch.indexOf(a) - sArch.indexOf(b); });
-    for (var su = 0; su < spacerUnitForLedger.length; su++) {
-      var sun = String(spacerUnitForLedger[su]);
-      var rS = await upsertTeethStatusWithFallback({
-        doctor_id: currentUser.id, patient_id: patientId,
-        tooth_num: sun, surface: 'SPACER', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
-      }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
-      if (rS.error) {
-        console.error('spacer save error:', rS.error);
-        showToast('⚠️ خطأ حفظ السن ' + sun + ': ' + rS.error.message);
-      } else {
-        if (!teethMap[sun]) teethMap[sun] = {};
-        teethMap[sun]['SPACER'] = pendingToothStatus;
-        if (!teethMap[sun].__status) teethMap[sun].__status = {};
-        teethMap[sun].__status.SPACER = pendingTreatStatus;
-      }
-    }
-  } else {
-    // For IMPLANT (built-in or any custom variant like 'زراعة سويسرية'):
-    // wipe ALL existing surfaces for this tooth first
-    // (so old root canals, fillings, etc. don't survive — an implant replaces the natural tooth completely)
-    if (pendingTp === 'implant') {
-      var dAll = await window.sb.from('teeth_status').delete()
-        .eq('doctor_id', currentUser.id).eq('patient_id', patientId)
-        .eq('tooth_num', String(currentTooth));
-      if (dAll.error) console.error('clear surfaces before implant error:', dAll.error);
-      teethMap[String(currentTooth)] = {};
-    }
+  var _sp = await persistSpecialTreatment();
+  if (_sp.blocked) return;
+  var bridgeUnitForLedger = _sp.bridgeUnit || null;
+  var spacerUnitForLedger = _sp.spacerUnit || null;
+  if (!_sp.handled) {
     // Composite restoration (e.g. MOD): it physically occupies all its component
     // surfaces. Clear any existing crown-surface rows on this tooth whose letters are
     // a SUBSET of the new composite (single 'M' / 'MO' subsumed by 'MOD'), so they
@@ -7872,6 +7914,18 @@ async function clearToothStatus() {
     showToast('السن ' + currentTooth + ' سليم بالفعل');
     closeModal('toothModal');
     return;
+  }
+
+  // Bridge-aware routing (audit fix #5): clearing a bridge key per-tooth would
+  // orphan the rest of the unit (the other abutment + the pontics). Hand off to
+  // the unit-aware remover, which deletes ONLY the bridge rows across the whole
+  // unit and keeps extractions and any other treatments intact.
+  for (var _bk in sm) {
+    if (_bk !== '__status' && isBridgeKey(sm[_bk])) {
+      closeModal('toothModal');
+      undoExtraction(currentTooth);
+      return;
+    }
   }
 
   // If the clicked surface itself has a treatment, prefer clearing that (+ WHOLE/CROWN_FULL if they cover the area)
@@ -10728,6 +10782,14 @@ async function saveToothAndOpenLab() {
   var notes = document.getElementById('toothNotes').value.trim();
   if (!date) { showToast('⚠️ اختر التاريخ'); return; }
 
+  // Rule #197 write-path parity (audit fix #1): bridge / spacer / implant persist
+  // their UNIT/special rows through the SAME helper as saveToothTreatment.
+  // Previously this path wrote one plain row — for a bridge that overwrote
+  // WHOLE='extracted' on the missing tooth and skipped the abutments entirely.
+  var _sp = await persistSpecialTreatment();
+  if (_sp.blocked) return;
+
+  if (!_sp.handled) {
   // 1. Save tooth status (surface + treatment_key + clinical status + treating provider)
   var rTs = await upsertTeethStatusWithFallback({
     doctor_id: currentUser.id, patient_id: patientId,
@@ -10745,10 +10807,13 @@ async function saveToothAndOpenLab() {
   teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
   if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
   teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
+  }
 
   // Build description that reflects the area type
   var areaForLabDesc;
-  if (currentSurface === 'WHOLE') areaForLabDesc = 'السن كاملاً';
+  if (_sp.bridgeUnit) areaForLabDesc = 'جسر يشمل الأسنان ' + _sp.bridgeUnit.join('، ');
+  else if (_sp.spacerUnit) areaForLabDesc = 'حافظ مسافة يشمل الأسنان ' + _sp.spacerUnit.join('، ');
+  else if (currentSurface === 'WHOLE') areaForLabDesc = 'السن كاملاً';
   else if (currentSurface === 'CROWN_FULL') areaForLabDesc = 'التاج كامل';
   else if (/^R[123]$/.test(currentSurface)) areaForLabDesc = 'الجذر ' + currentSurface.replace('R','');
   else areaForLabDesc = 'السطح ' + surfLabelFor(currentSurface, currentTooth);
