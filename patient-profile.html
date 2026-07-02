@@ -13,11 +13,11 @@
 <link rel="manifest" href="manifest.json">
 <title>ملف المريض — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702b"></script>
+<script src="theme.js?v=20260702c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702b"></script>
-<script src="sidebar.js?v=20260702b"></script>
-<script src="timepicker.js?v=20260702b"></script>
+<script src="supabase-init.js?v=20260702c"></script>
+<script src="sidebar.js?v=20260702c"></script>
+<script src="timepicker.js?v=20260702c"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -39,7 +39,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .back-btn{
   display:flex;align-items:center;gap:6px;
   background:transparent;border:1px solid var(--border);
-  color:var(--text2);padding:8px 16px;border-radius:9px;
+  color:var(--text2);padding:8px 16px;border-radius:10px;
   font-family:'Cairo',sans-serif;font-size:13px;
   cursor:pointer;text-decoration:none;transition:all .2s;
 }
@@ -47,7 +47,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .topbar-actions{display:flex;gap:8px;}
 .btn{
   display:inline-flex;align-items:center;gap:6px;
-  padding:9px 18px;border-radius:9px;
+  padding:9px 18px;border-radius:10px;
   font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
   cursor:pointer;border:none;transition:all .2s;
 }
@@ -94,7 +94,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 /* ── Tabs ── */
 .tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:5px;max-width:100%;}
 .tabs::-webkit-scrollbar{display:none;width:0;height:0;}
-.tab{padding:9px 20px;border:none;border-radius:9px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.tab{padding:9px 20px;border:none;border-radius:10px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s;white-space:nowrap;flex-shrink:0;}
 .tab.active{background:var(--green);color:var(--bg);}
 .panel{display:none;}
 .panel.active{display:block;}
@@ -140,7 +140,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .jaw-wrap[data-dent="mixed"] .jaw-row{gap:7px;}
 .jaw-wrap[data-dent="mixed"] .tooth-num{cursor:pointer;text-decoration:underline dotted rgba(148,163,184,.55);text-underline-offset:2px;}
 .jaw-wrap[data-dent="mixed"] [data-tooth-cell]:hover .tooth-num,.jaw-wrap[data-dent="mixed"] [data-occ-cell]:hover .tooth-num{color:var(--green);text-decoration-color:var(--green);}
-.mix-hint{display:none;max-width:560px;margin:8px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(var(--green-rgb),.06);border:1px solid rgba(var(--green-rgb),.22);border-radius:9px;padding:8px 12px;}
+.mix-hint{display:none;max-width:560px;margin:8px auto 0;text-align:center;font-size:12px;line-height:1.6;color:var(--text2);background:rgba(var(--green-rgb),.06);border:1px solid rgba(var(--green-rgb),.22);border-radius:10px;padding:8px 12px;}
 .mix-hint b{color:var(--green);}
 .chart-hint{font-size:12px;color:var(--text2);}
 .jaw-row{display:flex;justify-content:center;gap:4px;align-items:flex-end;width:max-content;margin:0 auto;min-width:100%;padding:0 12px;}
@@ -246,7 +246,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .split-editor-list{display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto;padding-left:4px;scrollbar-width:thin;}
 .split-editor-list::-webkit-scrollbar{width:6px;}
 .split-editor-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-.split-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;transition:border-color .15s;}
+.split-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;transition:border-color .15s;}
 .split-row:hover{border-color:var(--green);}
 .split-row.is-full{opacity:.65;}
 .split-info{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -254,7 +254,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .split-meta{font-size:11px;color:var(--text2);}
 .split-meta .remain{color:var(--yellow);font-weight:700;}
 .split-meta .paid-full{color:var(--green);font-weight:700;}
-.split-amount-input{background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;text-align:left;direction:ltr;outline:none;transition:border-color .15s;width:100%;}
+.split-amount-input{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;text-align:left;direction:ltr;outline:none;transition:border-color .15s;width:100%;}
 .split-amount-input:focus{border-color:var(--green);}
 .split-amount-input.over{border-color:var(--red);color:var(--red);}
 .split-summary{margin-top:14px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;gap:6px;font-size:13px;}
@@ -267,7 +267,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .split-summary-row .val.muted{color:var(--text2);}
 .split-warn{margin-top:8px;padding:9px 12px;background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.3);border-radius:8px;color:var(--red);font-size:12px;display:none;}
 .split-warn.show{display:block;}
-.btn-revert-fifo{padding:8px 14px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin-right:auto;}
+.btn-revert-fifo{padding:8px 14px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:10px;font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;margin-right:auto;}
 .btn-revert-fifo:hover{background:rgba(245,200,66,.1);border-color:var(--yellow);color:var(--yellow);}
 .manual-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:rgba(99,179,237,.15);color:var(--blue);border:1px solid rgba(99,179,237,.3);margin-right:4px;}
 
@@ -284,13 +284,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .no-scrollbar::-webkit-scrollbar{display:none;width:0;height:0;}
 .form-group{margin-bottom:15px;}
 .form-group label{display:block;font-size:12px;color:var(--text2);font-weight:600;margin-bottom:5px;}
-.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 13px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;outline:none;transition:border-color .2s;direction:rtl;}
+.form-group input,.form-group select,.form-group textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;outline:none;transition:border-color .2s;direction:rtl;}
 .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--green);}
 .form-group textarea{resize:vertical;min-height:65px;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .modal-foot{display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);justify-content:flex-end;}
-.btn-cancel-m{padding:9px 22px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
-.btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;}
+.btn-cancel-m{padding:9px 22px;background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:10px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-save-m{padding:9px 26px;background:var(--green);border:none;color:var(--bg);border-radius:10px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;}
 .btn-save-m:hover{background:var(--green2);}
 .tooth-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .tx-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);}
@@ -299,7 +299,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .tx-tab:hover{border-color:var(--green);color:var(--text);}
 .tx-tab-active{background:var(--green);color:#0a1628;border-color:var(--green);}
 .status-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
-.status-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:9px;transition:all .15s;text-align:right;}
+.status-opt{display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--border);background:transparent;color:var(--text);font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border-radius:10px;transition:all .15s;text-align:right;}
 .status-opt:hover{background:rgba(var(--green-rgb),.08);border-color:var(--green);}
 .status-opt.selected{background:rgba(var(--green-rgb),.12);border-color:var(--green);}
 .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;flex-shrink:0;}
@@ -325,14 +325,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .lab-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
 .lab-icon-btn{background:transparent;border:none;color:var(--text2);cursor:pointer;font-size:14px;padding:4px 6px;border-radius:6px;transition:all .15s;margin-left:4px;}
 .lab-icon-btn:hover{color:#63b3ed;background:rgba(99,179,237,.1);}
-.lab-action-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;margin-left:3px;}
+.lab-action-btn{padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;margin-left:3px;}
 .lab-action-btn:hover{border-color:var(--green);color:var(--green);}
 .lab-action-btn.next{border-color:rgba(var(--green-rgb),.4);color:var(--green);}
 .lab-action-btn.reject{border-color:rgba(239,83,80,.3);color:var(--red);}
 .lab-action-btn.reject:hover{background:rgba(239,83,80,.1);}
 .lab-action-btn.redo{border-color:rgba(245,158,11,.4);color:#f59e0b;}
 .lab-action-btn.redo:hover{background:rgba(245,158,11,.1);}
-.btn-lab{padding:9px 18px;background:transparent;border:1px solid #63b3ed;color:#63b3ed;border-radius:9px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-lab{padding:9px 18px;background:transparent;border:1px solid #63b3ed;color:#63b3ed;border-radius:10px;font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;}
 .btn-lab:hover{background:rgba(99,179,237,.12);}
 
 /* ─── Gap 7: Planned Appointments (in patient profile) ─── */
@@ -343,13 +343,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .planned-pp-title{font-size:13px;font-weight:700;color:var(--text);}
 .planned-pp-reason{font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .planned-pp-actions{display:flex;gap:6px;flex-shrink:0;}
-.planned-pp-actions button{padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
+.planned-pp-actions button{padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'Cairo',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
 .planned-pp-actions .btn-schedule-pp{background:var(--green);color:#0a1628;border-color:var(--green);}
 .planned-pp-actions .btn-schedule-pp:hover{opacity:.88;}
 .planned-pp-actions .btn-delete-pp:hover{border-color:var(--red);color:var(--red);}
 
 /* Toggle inside the appointment modal — same visual language as appointments.html */
-.planned-toggle-pp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:9px;cursor:pointer;transition:all .15s;}
+.planned-toggle-pp{display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:12px;background:rgba(99,179,237,0.08);border:1px solid rgba(99,179,237,0.25);border-radius:10px;cursor:pointer;transition:all .15s;}
 .planned-toggle-pp:hover{background:rgba(99,179,237,0.12);border-color:rgba(99,179,237,0.4);}
 /* Custom checkbox — see appointments.html for full rationale. accent-color is
    unreliable on dark themes / Safari; we paint our own ✓ for reliable visual
@@ -368,7 +368,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .planned-toggle-pp .ptpp-text{flex:1;}
 .planned-toggle-pp .ptpp-title{font-size:12px;font-weight:700;color:#63b3ed;}
 .planned-toggle-pp .ptpp-hint{font-size:10px;color:var(--text2);margin-top:1px;}
-.planned-note-pp{padding:8px 11px;background:rgba(99,179,237,0.06);border:1px dashed rgba(99,179,237,0.3);border-radius:7px;font-size:11px;color:var(--text2);margin-bottom:12px;}
+.planned-note-pp{padding:8px 11px;background:rgba(99,179,237,0.06);border:1px dashed rgba(99,179,237,0.3);border-radius:8px;font-size:11px;color:var(--text2);margin-bottom:12px;}
 
 .toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -509,7 +509,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .wa-modal-message {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 11px 14px;
   color: var(--text);
   font-family: 'Cairo', sans-serif; font-size: 13.5px;
@@ -525,7 +525,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   display: flex; align-items: center; gap: 8px;
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 10px;
   font-size: 13px;
@@ -538,7 +538,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   background: rgba(245,200,66,0.10);
   border: 1px solid rgba(245,200,66,0.35);
   color: var(--yellow);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 12px;
   font-size: 12.5px;
@@ -549,7 +549,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   background: #25D366;
   color: #fff;
   padding: 9px 18px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: none;
   font-family: 'Cairo', sans-serif;
   font-size: 13px; font-weight: 700;
@@ -630,7 +630,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   background:rgba(0,0,0,0.18);
   border:1px solid var(--border);
   border-right:3px solid var(--blue);
-  border-radius:9px;
+  border-radius:10px;
   transition:background .15s;
 }
 .tl-row:hover{ background:rgba(255,255,255,0.025); }
@@ -695,7 +695,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   background:rgba(var(--green-rgb),0.1);
   color:var(--green);
   border:1px solid rgba(var(--green-rgb),0.3);
-  border-radius:9px;
+  border-radius:10px;
   cursor:pointer;
   transition:background .15s;
 }
@@ -726,7 +726,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702b">
+<link rel="stylesheet" href="theme.css?v=20260702c">
 </head>
 <body>
 <script>
@@ -940,14 +940,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="card">
       <div class="card-head">
         <span class="card-title">📎 ملفات المريض</span>
-        <select id="pfUploadCategory" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+        <select id="pfUploadCategory" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
           <option value="xray">🦷 أشعة</option>
           <option value="clinical_photo">📷 صورة سريرية</option>
           <option value="document" selected>📄 مستند</option>
           <option value="receipt">🧾 إيصال</option>
           <option value="other">📎 أخرى</option>
         </select>
-        <select id="pfUploadTooth" title="ربط الملف بسنّ محدد (اختياري)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-inline-start:8px;">
+        <select id="pfUploadTooth" title="ربط الملف بسنّ محدد (اختياري)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-inline-start:8px;">
           <option value="">— عام (بلا سن) —</option>
         </select>
       </div>
@@ -962,7 +962,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="pfUploadStatus" style="display:none;font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;"></div>
       <div id="pfFilterBar" style="display:none;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <span style="font-size:12px;color:var(--text2);">🦷 فلترة حسب السن:</span>
-        <select id="pfToothFilter" onchange="pfApplyToothFilter(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:6px 11px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
+        <select id="pfToothFilter" onchange="pfApplyToothFilter(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 11px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
           <option value="">الكل</option>
         </select>
       </div>
@@ -1317,7 +1317,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </select>
         <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
         <!-- Inline new-appointment fields (shown when "تحديد موعد التركيب" is chosen) -->
-        <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.3);border-radius:9px;">
+        <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.3);border-radius:10px;">
           <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;">📅 موعد التركيب الجديد</div>
           <div class="form-row" style="margin:0;">
             <div class="form-group" style="margin:0;">
@@ -1343,7 +1343,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <label>المخبر</label>
         <div style="display:flex;gap:8px;align-items:stretch;">
           <select id="labOrderLabSelect" style="flex:1;"></select>
-          <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(var(--green-rgb),0.12);border:1px solid var(--green);color:var(--green);border-radius:9px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
+          <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(var(--green-rgb),0.12);border:1px solid var(--green);color:var(--green);border-radius:10px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
         </div>
         <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:var(--yellow);padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
           ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
@@ -1417,7 +1417,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="modal-close" onclick="closeModal('splitEditModal')">✕</button>
     </div>
     <div class="modal-body">
-      <div id="splitEditorHeader" style="margin-bottom:14px;padding:10px 13px;background:var(--bg3);border-radius:9px;border:1px solid var(--border);">
+      <div id="splitEditorHeader" style="margin-bottom:14px;padding:10px 13px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
         <!-- filled by openSplitEditor() -->
       </div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">📋 وزّع المبلغ على الجلسات:</div>
@@ -1536,7 +1536,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-body" style="text-align:center;">
       <img id="pfLightboxImg" alt="" style="max-width:100%;max-height:70vh;border-radius:10px;display:none;">
       <a id="pfLightboxDownload" href="#" target="_blank" rel="noopener" download
-         style="display:inline-block;margin-top:14px;background:var(--green);color:var(--bg);text-decoration:none;border-radius:9px;padding:9px 18px;font-weight:700;font-size:13px;">⬇️ تنزيل</a>
+         style="display:inline-block;margin-top:14px;background:var(--green);color:var(--bg);text-decoration:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:13px;">⬇️ تنزيل</a>
     </div>
   </div>
 </div>
@@ -11128,8 +11128,8 @@ function renderPatientFiles(){
         '<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHtml(f.file_name) + '">' + escapeHtml(f.file_name) + '</div>' +
         '<div style="font-size:10px;color:var(--text2);">' + escapeHtml(d) + ' · ' + escapeHtml(window.SyDentFiles.humanSize(f.size_bytes)) + '</div>' +
         '<div style="display:flex;gap:6px;margin-top:4px;">' +
-          '<button onclick="pfOpenFile(\'' + f.id + '\')" title="عرض / تنزيل" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px;cursor:pointer;font-size:13px;">👁️</button>' +
-          '<button onclick="pfDeleteFile(\'' + f.id + '\')" title="حذف" style="flex:1;background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:var(--red);border-radius:7px;padding:5px;cursor:pointer;font-size:13px;">🗑️</button>' +
+          '<button onclick="pfOpenFile(\'' + f.id + '\')" title="عرض / تنزيل" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:5px;cursor:pointer;font-size:13px;">👁️</button>' +
+          '<button onclick="pfDeleteFile(\'' + f.id + '\')" title="حذف" style="flex:1;background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:var(--red);border-radius:8px;padding:5px;cursor:pointer;font-size:13px;">🗑️</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -11360,7 +11360,7 @@ async function loadPatientAuditLog() {
       var bd = r.is_alert ? 'rgba(239,83,80,0.35)' : 'var(--border)';
 
       html +=
-        '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:9px;padding:10px 13px;display:flex;gap:10px;align-items:start;">' +
+        '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:10px;padding:10px 13px;display:flex;gap:10px;align-items:start;">' +
           '<div style="font-size:11px;color:var(--text2);min-width:110px;direction:ltr;text-align:left;">' + escapeHtml(dateStr) + '</div>' +
           '<div style="flex:1;min-width:0;">' +
             '<div style="font-size:13px;color:var(--text);margin-bottom:3px;">' +

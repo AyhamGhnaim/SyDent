@@ -79,7 +79,7 @@ const css = `
     color: #ffffff;
     font-size: 10px; font-weight: 800;
     min-width: 18px; height: 18px;
-    border-radius: 9px;
+    border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     padding: 0 5px;
   }

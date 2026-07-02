@@ -13,9 +13,9 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — الإعدادات</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702b"></script>
+<script src="theme.js?v=20260702c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702b"></script>
+<script src="supabase-init.js?v=20260702c"></script>
 <!-- ── Cloudflare Turnstile (CAPTCHA) ── Axis 3 / Item 2. Helper defined BEFORE the API
      script so window.onSyDentTurnstileLoad exists when the (async) script fires. -->
 <style>.cf-turnstile-box{margin:2px 0 14px;min-height:65px;display:flex;justify-content:center}</style>
@@ -152,7 +152,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); }
 input {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 11px 14px;
   color: var(--text);
   font-family: 'Cairo', sans-serif; font-size: 14px;
@@ -165,7 +165,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn {
   padding: 10px 22px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: none;
   font-family: 'Cairo', sans-serif;
   font-size: 14px; font-weight: 700;
@@ -291,7 +291,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
   margin-top: 18px;
 }
 .btn-cancel {
-  padding: 10px 22px; border-radius: 9px;
+  padding: 10px 22px; border-radius: 10px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 600;
@@ -313,7 +313,7 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 textarea {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 11px 14px;
   color: var(--text);
   font-family: 'Cairo', sans-serif; font-size: 14px;
@@ -330,7 +330,7 @@ textarea::placeholder { color: var(--text2); }
   display: flex; align-items: center; justify-content: space-between;
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 12px 14px;
   margin-bottom: 14px;
   gap: 12px;
@@ -386,7 +386,7 @@ textarea::placeholder { color: var(--text2); }
   margin-top: 6px;
 }
 .btn-secondary {
-  padding: 10px 18px; border-radius: 9px;
+  padding: 10px 18px; border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg3); color: var(--text);
   font-family: 'Cairo', sans-serif;
@@ -453,8 +453,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702b">
-<script src="sidebar.js?v=20260702b"></script>
+<link rel="stylesheet" href="theme.css?v=20260702c">
+<script src="sidebar.js?v=20260702c"></script>
 </head>
 <body>
 

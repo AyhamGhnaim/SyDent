@@ -17,7 +17,7 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — المواعيد</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702b"></script>
+<script src="theme.js?v=20260702c"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -496,7 +496,7 @@ body {
 }
 .list-actions { display: flex; gap: 6px; }
 .list-action-btn {
-  width: 32px; height: 32px; border-radius: 7px;
+  width: 32px; height: 32px; border-radius: 8px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-size: 14px; cursor: pointer;
@@ -731,7 +731,7 @@ body {
 }
 .modal-title  { font-size: 17px; font-weight: 700; }
 .modal-close  {
-  width: 30px; height: 30px; border-radius: 7px;
+  width: 30px; height: 30px; border-radius: 8px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-size: 16px; cursor: pointer;
@@ -747,7 +747,7 @@ label { font-size: 12px; font-weight: 700; color: var(--text2); }
 input, select, textarea {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 13px;
   color: var(--text);
   font-family: 'Cairo', sans-serif; font-size: 14px;
@@ -782,7 +782,7 @@ textarea { resize: vertical; min-height: 72px; }
   margin-top: 20px;
 }
 .btn-cancel {
-  padding: 10px 20px; border-radius: 9px;
+  padding: 10px 20px; border-radius: 10px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 600;
@@ -790,7 +790,7 @@ textarea { resize: vertical; min-height: 72px; }
 }
 .btn-cancel:hover { border-color: var(--text2); color: var(--text); }
 .btn-save {
-  padding: 10px 22px; border-radius: 9px; border: none;
+  padding: 10px 22px; border-radius: 10px; border: none;
   background: var(--green); color: #0a1628;
   font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700;
   cursor: pointer; transition: all .2s;
@@ -904,7 +904,7 @@ textarea { resize: vertical; min-height: 72px; }
   display: flex; align-items: center; gap: 8px;
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 12px;
   font-size: 13px;
@@ -917,7 +917,7 @@ textarea { resize: vertical; min-height: 72px; }
   background: rgba(245,200,66,0.10);
   border: 1px solid rgba(245,200,66,0.35);
   color: var(--yellow);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 12px;
   font-size: 12.5px;
@@ -928,7 +928,7 @@ textarea { resize: vertical; min-height: 72px; }
   background: #25D366;
   color: #fff;
   padding: 10px 22px;
-  border-radius: 9px;
+  border-radius: 10px;
   border: none;
   font-family: 'Cairo', sans-serif;
   font-size: 14px; font-weight: 700;
@@ -940,11 +940,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702b">
+<link rel="stylesheet" href="theme.css?v=20260702c">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702b"></script>
-<script src="sidebar.js?v=20260702b"></script>
-<script src="timepicker.js?v=20260702b"></script>
+<script src="supabase-init.js?v=20260702c"></script>
+<script src="sidebar.js?v=20260702c"></script>
+<script src="timepicker.js?v=20260702c"></script>
 </head>
 <body>
 <script>
@@ -1212,7 +1212,7 @@ textarea { resize: vertical; min-height: 72px; }
           </select>
         </div>
         <div id="apptFileDrop" onclick="document.getElementById('apptFileInput').click()"
-             style="border:2px dashed rgba(167,139,250,0.4);border-radius:9px;padding:14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;margin-bottom:10px;">
+             style="border:2px dashed rgba(167,139,250,0.4);border-radius:10px;padding:14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;margin-bottom:10px;">
           📎 انقر أو اسحب لرفع صورة أشعة / مستند لهذا الموعد
         </div>
         <input type="file" id="apptFileInput" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
@@ -6571,15 +6571,15 @@ function paintApptFiles(){
     var url   = _apptFileUrls[f.storage_path] || '';
     var cat   = window.SyDentFiles.CAT_LABELS[f.category] || window.SyDentFiles.CAT_LABELS.other;
     var thumb = (isImg && url)
-      ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:7px;flex-shrink:0;">'
-      : '<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,0.05);border-radius:7px;flex-shrink:0;">📄</div>';
-    return '<div style="display:flex;align-items:center;gap:9px;padding:7px 9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;">' +
+      ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:8px;flex-shrink:0;">'
+      : '<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,0.05);border-radius:8px;flex-shrink:0;">📄</div>';
+    return '<div style="display:flex;align-items:center;gap:9px;padding:7px 9px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;">' +
       thumb +
       '<div style="flex:1;min-width:0;cursor:pointer;" onclick="apptOpenFile(\'' + f.id + '\')">' +
         '<div style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(f.file_name) + '</div>' +
         '<div style="font-size:10px;color:var(--text2);">' + cat + ' · ' + escapeHtml(window.SyDentFiles.humanSize(f.size_bytes)) + '</div>' +
       '</div>' +
-      '<button type="button" onclick="apptDeleteFile(\'' + f.id + '\')" title="حذف" style="background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:#ef5350;border-radius:7px;padding:5px 9px;cursor:pointer;font-size:12px;flex-shrink:0;">🗑️</button>' +
+      '<button type="button" onclick="apptDeleteFile(\'' + f.id + '\')" title="حذف" style="background:rgba(239,83,80,0.12);border:1px solid rgba(239,83,80,0.4);color:#ef5350;border-radius:8px;padding:5px 9px;cursor:pointer;font-size:12px;flex-shrink:0;">🗑️</button>' +
     '</div>';
   }).join('');
 }

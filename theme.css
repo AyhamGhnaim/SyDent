@@ -697,3 +697,44 @@ pre, code, kbd, samp { font-family: ui-monospace, 'SF Mono', Consolas, monospace
 :root[data-theme="light"] input[type="date"],
 :root[data-theme="light"] input[type="datetime-local"],
 :root[data-theme="light"] input[type="time"]  { color-scheme: light; }
+
+/* ════════ Phase 3 — Global polish (2 Jul 2026) ════════ */
+
+/* Radius design tokens (new code should use these) */
+:root { --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px; }
+
+/* Themed scrollbars — BOTH modes. Pages with element-scoped custom
+   scrollbar rules keep them (higher specificity); this covers the
+   remaining 14 pages + the document scrollbar itself. */
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text3);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Keyboard focus ring — buttons/links/selects. Text inputs keep their
+   existing page-level :focus border styling. */
+button:focus-visible, a:focus-visible, select:focus-visible,
+[role="button"]:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* Respect the reduced-motion system preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -13,10 +13,10 @@
 <link rel="manifest" href="manifest.json">
 <title>تقارير الأطباء — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702b"></script>
+<script src="theme.js?v=20260702c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702b"></script>
-<script src="sidebar.js?v=20260702b"></script>
+<script src="supabase-init.js?v=20260702c"></script>
+<script src="sidebar.js?v=20260702c"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -39,7 +39,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 .btn{
   display:inline-flex;align-items:center;gap:6px;
-  padding:9px 18px;border-radius:9px;
+  padding:9px 18px;border-radius:10px;
   font-family:'Cairo',sans-serif;font-size:13px;font-weight:700;
   cursor:pointer;border:none;transition:all .2s;
 }
@@ -89,7 +89,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .basis-btn{
   flex:1;padding:10px 12px;background:transparent;border:none;
   color:var(--text2);font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;
-  border-radius:7px;cursor:pointer;transition:all .15s;
+  border-radius:8px;cursor:pointer;transition:all .15s;
 }
 .basis-btn:hover{color:var(--text);}
 .basis-btn.active{background:var(--green);color:var(--bg);}
@@ -162,7 +162,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .prov-actions button{
   flex:1;min-width:calc(50% - 3px);padding:7px;font-size:11px;font-weight:700;
-  border-radius:7px;cursor:pointer;font-family:'Cairo',sans-serif;
+  border-radius:8px;cursor:pointer;font-family:'Cairo',sans-serif;
   border:1px solid var(--border);background:transparent;color:var(--text2);
   transition:all .15s;
 }
@@ -194,6 +194,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 .modal-close:hover{background:var(--bg3);color:var(--red);}
 .modal-body{padding:20px;overflow-y:auto;}
+#detailsBody { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .modal-foot{
   padding:14px 20px;background:var(--bg3);
   border-top:1px solid var(--border);
@@ -273,7 +274,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702b">
+<link rel="stylesheet" href="theme.css?v=20260702c">
 </head>
 <body>
 <div class="main" id="sbMainContent">

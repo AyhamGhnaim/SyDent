@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — المرضى</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702b"></script>
+<script src="theme.js?v=20260702c"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -222,7 +222,7 @@ td {
 
 .action-btns { display: flex; gap: 8px; align-items: center; position: relative; }
 .btn-sm {
-  padding: 6px 12px; border-radius: 7px; border: none;
+  padding: 6px 12px; border-radius: 8px; border: none;
   font-family: 'Cairo', sans-serif; font-size: 12px; font-weight: 600;
   cursor: pointer; transition: all .2s;
 }
@@ -236,7 +236,7 @@ td {
 .btn-sm.pay:hover { background: rgba(var(--green-rgb),0.22); }
 .dots-btn {
   background: transparent; border: 1px solid var(--border);
-  color: var(--text2); border-radius: 7px;
+  color: var(--text2); border-radius: 8px;
   width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
   cursor: pointer; font-size: 18px; line-height: 1; transition: all .2s;
   font-family: 'Cairo', sans-serif; padding: 0;
@@ -283,7 +283,7 @@ tbody tr.row-done:hover td { background: rgba(46, 232, 158, 0.10) !important; }
 }
 .page-btns { display: flex; gap: 6px; }
 .page-btn {
-  width: 32px; height: 32px; border-radius: 7px;
+  width: 32px; height: 32px; border-radius: 8px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-family: 'Cairo', sans-serif; font-size: 13px;
@@ -342,7 +342,7 @@ label { font-size: 13px; font-weight: 600; color: var(--text2); }
 input, select, textarea {
   background: var(--bg3);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
   padding: 10px 14px;
   color: var(--text);
   font-family: 'Cairo', sans-serif; font-size: 14px;
@@ -367,7 +367,7 @@ textarea { resize: vertical; min-height: 80px; }
   margin-top: 24px;
 }
 .btn-cancel {
-  padding: 10px 22px; border-radius: 9px;
+  padding: 10px 22px; border-radius: 10px;
   border: 1px solid var(--border);
   background: transparent; color: var(--text2);
   font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 600;
@@ -375,7 +375,7 @@ textarea { resize: vertical; min-height: 80px; }
 }
 .btn-cancel:hover { border-color: var(--text2); color: var(--text); }
 .btn-save {
-  padding: 10px 24px; border-radius: 9px;
+  padding: 10px 24px; border-radius: 10px;
   border: none;
   background: var(--green); color: #0a1628;
   font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700;
@@ -480,10 +480,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702b">
+<link rel="stylesheet" href="theme.css?v=20260702c">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702b"></script>
-<script src="sidebar.js?v=20260702b"></script>
+<script src="supabase-init.js?v=20260702c"></script>
+<script src="sidebar.js?v=20260702c"></script>
 </head>
 <body>
 <script>
@@ -1435,11 +1435,11 @@ function renderPrmRecall(){
       var sub = 'آخر زيارة: ' + prmEsc(formatDate(r.lastVisit));
       var phone = p.phone || '';
       var waBtn = phone
-        ? '<button class="btn-sm" onclick="prmDoWaRecall(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
+        ? '<button class="btn-sm" onclick="prmDoWaRecall(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
         : '';
       var actions = waBtn
-        + '<button class="btn-sm" onclick="prmDoCopyRecall(\'' + p.id + '\')" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>'
-        + '<button class="btn-sm" onclick="prmMarkRecalled(\'' + p.id + '\')" title="إخفاؤه من القائمة لمدة ' + (PRM_COOLDOWN_DAYS||30) + ' يوم" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--green,var(--green));">✓ تم</button>';
+        + '<button class="btn-sm" onclick="prmDoCopyRecall(\'' + p.id + '\')" style="padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>'
+        + '<button class="btn-sm" onclick="prmMarkRecalled(\'' + p.id + '\')" title="إخفاؤه من القائمة لمدة ' + (PRM_COOLDOWN_DAYS||30) + ' يوم" style="padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--green,var(--green));">✓ تم</button>';
       return prmRowHtml(p.name || '—', phone, sub, actions);
     }).join('');
 }
@@ -1461,10 +1461,10 @@ function renderPrmBday(){
     var sub = 'عيد الميلاد: ' + when;
     var phone = p.phone || '';
     var waBtn = phone
-      ? '<button class="btn-sm" onclick="prmDoWaBday(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
+      ? '<button class="btn-sm" onclick="prmDoWaBday(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'
       : '';
     var actions = waBtn
-      + '<button class="btn-sm" onclick="prmDoCopyBday(\'' + p.id + '\')" style="padding:5px 11px;border-radius:7px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>';
+      + '<button class="btn-sm" onclick="prmDoCopyBday(\'' + p.id + '\')" style="padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;border:1px solid var(--border,#1e3556);background:transparent;color:var(--text2,#8da0bd);">📋 نسخ</button>';
     return prmRowHtml(p.name || '—', phone, sub, actions);
   }).join('');
 }
