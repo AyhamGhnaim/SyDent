@@ -13,11 +13,11 @@
 <link rel="manifest" href="manifest.json">
 <title>ملف المريض — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702c"></script>
+<script src="theme.js?v=20260702d"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702c"></script>
-<script src="sidebar.js?v=20260702c"></script>
-<script src="timepicker.js?v=20260702c"></script>
+<script src="supabase-init.js?v=20260702d"></script>
+<script src="sidebar.js?v=20260702d"></script>
+<script src="timepicker.js?v=20260702d"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -120,7 +120,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .chart-card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
 .chart-card-title{font-size:14px;font-weight:700;color:var(--green);}
 
-.jaw-wrap{overflow-x:auto;overflow-y:visible;padding:16px 0 16px;scrollbar-width:none;-ms-overflow-style:none;}
+.jaw-wrap{overflow-x:auto;overflow-y:visible;padding:24px 0;margin:-8px 0;scrollbar-width:none;-ms-overflow-style:none;}/* 24px paint room: hover scale(1.12) + badges at ±7px no longer clip (overflow-x forces computed overflow-y:auto); -8px margin keeps net layout identical to the old 16px */
 .jaw-wrap::-webkit-scrollbar{display:none;width:0;height:0;}
 /* On mouse/trackpad devices (NOT touch — pointer:fine + hover:hover excludes
    phones/tablets, so mobile's hidden-scrollbar swipe behavior is untouched),
@@ -726,7 +726,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702c">
+<link rel="stylesheet" href="theme.css?v=20260702d">
 </head>
 <body>
 <script>
