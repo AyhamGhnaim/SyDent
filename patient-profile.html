@@ -6544,9 +6544,11 @@ function renderExamBar() {
     list.sort(function(a, b){ return (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0); });
     pal.innerHTML = list.map(function(t){
       var tc = isLightColor(t.fill) ? '#0a1628' : '#fff';
-      return '<button type="button" class="exam-tx' + (examSelectedKey === t.treatment_key ? ' selected' : '') + '" '
+      // NB: in-memory TREATMENTS use .id (= treatment_key string) — same identifier
+      // txButtonHtml passes to pickToothTreatment. There is NO .treatment_key prop here.
+      return '<button type="button" class="exam-tx' + (examSelectedKey === t.id ? ' selected' : '') + '" '
            + 'style="border-color:' + t.fill + ';" '
-           + 'onclick="examPick(\'' + t.treatment_key + '\')">'
+           + 'onclick="examPick(\'' + t.id + '\')">'
            + '<span class="lbl" style="background:' + t.fill + ';color:' + tc + ';">' + t.label + '</span>'
            + '<span>' + escapeHtml(t.name) + '</span></button>';
     }).join('');
