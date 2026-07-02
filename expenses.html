@@ -18,7 +18,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>SyDent — المصاريف</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -502,24 +502,6 @@ tbody td {
 }
 
 /* Toast */
-.toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(120px);
-  background: var(--green);
-  color: var(--on-accent);
-  padding: 12px 22px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 13px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  z-index: 2000;
-  transition: transform .3s cubic-bezier(.25,.46,.45,.94);
-  pointer-events: none;
-}
-.toast.show { transform: translateX(-50%) translateY(0); }
-.toast.err { background: var(--red); color: #fff; }
 
 @media (max-width: 720px) {
   .main { margin-right: 0; }
@@ -557,10 +539,10 @@ tbody td {
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 </head>
 <body>
 
@@ -782,8 +764,6 @@ tbody td {
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
 <script>
 // ─── State ─────────────────────────────────────────────────────────────────
 var currentUser = null;
@@ -825,12 +805,6 @@ var ICON_OPTIONS = [
 // ─── DOM utility ───────────────────────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
 
-function showToast(msg, isError) {
-  var t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (isError ? ' err' : '');
-  setTimeout(function(){ t.className = 'toast'; }, 2500);
-}
 
 function showMsg(id, txt, isError) {
   var el = $(id);

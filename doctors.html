@@ -20,10 +20,10 @@
 <link rel="manifest" href="manifest.json">
 <title>أطباء العيادة — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -172,16 +172,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
    via a single swatch button — same UX on iOS, Windows, and Android. */
 
 /* Toast */
-.toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-  background:var(--bg2);border:1px solid var(--green);
-  border-radius:8px;padding:12px 20px;font-size:13px;font-weight:600;
-  color:var(--text);z-index:200;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);
-  opacity:0;transition:opacity .25s;
-  pointer-events:none;
-}
-.toast.show{opacity:1;}
 
 @media (max-width:768px){
   .form-row{grid-template-columns:1fr;}
@@ -190,7 +180,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -290,8 +280,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
 <script>
 var currentUser = null;
 var doctorOwner = null;  // The clinic-owner doctor record
@@ -334,12 +322,6 @@ function openDocColorPicker() {
 // Back-compat alias: legacy code that called pickColor(c) keeps working.
 function pickColor(c) { _setDocColor(c); }
 
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(function(){ t.classList.remove('show'); }, 2200);
-}
 
 function escapeHtml(s) {
   if (!s) return '';

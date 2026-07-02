@@ -13,10 +13,10 @@
 <link rel="manifest" href="manifest.json">
 <title>قائمة العلاجات — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -173,8 +173,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .preview-text{font-size:12px;color:var(--text2);}
 
 /* toast */
-.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:11px 24px;border-radius:30px;font-size:13px;font-weight:600;z-index:999;opacity:0;transition:all .3s;white-space:nowrap;}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
 /* Lab toggle switch */
 .lab-toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg);border:1px solid var(--border);border-radius:24px;transition:.25s;}
@@ -195,7 +193,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -519,8 +517,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
   </div>
 </div>
-
-<div class="toast" id="toast"></div>
 
 <script>
 // ── Supabase-backed treatments ──
@@ -1424,13 +1420,6 @@ document.getElementById('treatModal').addEventListener('click', function(e){
   if (e.target === this) closeModal();
 });
 
-var toastT;
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastT);
-  toastT = setTimeout(function(){ t.classList.remove('show'); }, 2800);
-}
 
 // ============================================================
 // === Print Legend ===

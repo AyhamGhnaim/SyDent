@@ -964,3 +964,28 @@ window.doLogout = async function() {
   // Hard redirect (replace prevents back button)
   window.location.replace('auth.html?logged_out=1');
 };
+
+/* ─── Unified toast (2 Jul 2026) — replaces the 14 per-page copies ───
+   Signature-compatible with every previous local version:
+   showToast(msg) and showToast(msg, isErr). Theme-reactive via vars. */
+(function () {
+  var st = document.createElement('style');
+  st.textContent =
+    '#syToast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);' +
+    'background:var(--bg3);color:var(--text);border:1px solid var(--green);border-right:3px solid var(--green);' +
+    'padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:var(--shadow-modal);' +
+    'z-index:99999;opacity:0;pointer-events:none;transition:transform .25s ease,opacity .25s ease;' +
+    'max-width:min(92vw,480px);text-align:center;}' +
+    '#syToast.show{transform:translateX(-50%) translateY(0);opacity:1;}' +
+    '#syToast.err{border-color:var(--red);border-right-color:var(--red);}';
+  document.head.appendChild(st);
+  window.showToast = function (msg, isErr) {
+    var t = document.getElementById('syToast');
+    if (!t) { t = document.createElement('div'); t.id = 'syToast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    clearTimeout(t._tm);
+    t._tm = setTimeout(function () { t.classList.remove('show'); }, 2600);
+  };
+})();

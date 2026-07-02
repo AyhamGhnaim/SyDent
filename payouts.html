@@ -16,7 +16,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <title>SyDent — الرواتب والدفعات</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -383,21 +383,6 @@ body {
 .inactive-toggle input { width: auto; }
 
 /* ─── Toast ────────────────────────────────────────────────────────────── */
-#toast {
-  position: fixed; bottom: 24px; right: 24px;
-  background: var(--bg2);
-  color: var(--text);
-  border: 1px solid var(--green);
-  padding: 12px 18px;
-  border-radius: 10px;
-  font-size: 13px; font-weight: 600;
-  opacity: 0; transform: translateY(8px);
-  transition: opacity 0.2s, transform 0.2s;
-  z-index: 300;
-  max-width: 380px;
-}
-#toast.show { opacity: 1; transform: translateY(0); }
-#toast.err { border-color: var(--red); color: var(--red); }
 
 /* ─── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 980px) {
@@ -425,10 +410,10 @@ body {
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 </head>
 <body>
 
@@ -610,8 +595,6 @@ body {
   </div>
 </div>
 
-<div id="toast"></div>
-
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 // Phase 7.2 — Payouts page
@@ -659,12 +642,6 @@ function todayISO() {
   return d.getFullYear() + '-' +
          String(d.getMonth()+1).padStart(2,'0') + '-' +
          String(d.getDate()).padStart(2,'0');
-}
-function showToast(msg, isErr) {
-  var t = $('toast');
-  t.textContent = msg;
-  t.className = 'show' + (isErr ? ' err' : '');
-  setTimeout(function(){ t.className = isErr ? 'err' : ''; }, 2400);
 }
 
 // Detect migration-missing errors (قاعدة #2)

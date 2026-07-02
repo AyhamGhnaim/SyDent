@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — المرضى</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -384,17 +384,6 @@ textarea { resize: vertical; min-height: 80px; }
 .btn-save:hover { opacity: .88; }
 
 /* ─── Toast ─── */
-.toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-  background: var(--bg3);
-  border: 1px solid var(--green);
-  border-radius: 10px; padding: 12px 22px;
-  font-size: 14px; font-weight: 600; color: var(--green);
-  z-index: 300;
-  transition: transform .35s cubic-bezier(.175,.885,.32,1.275);
-  white-space: nowrap;
-}
-.toast.show { transform: translateX(-50%) translateY(0); }
 
 
 
@@ -480,10 +469,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 </head>
 <body>
 <script>
@@ -685,7 +674,6 @@ textarea { resize: vertical; min-height: 80px; }
 
 
 <!-- Toast -->
-<div class="toast" id="toast"></div>
 
 <script>
 // ─── State ───
@@ -1101,12 +1089,6 @@ async function deletePatient(id) {
 }
 
 // ─── Toast ───
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3000);
-}
 
 /* ============================================================
    Phase 9.2 — Export patient list to CSV (Excel-ready)

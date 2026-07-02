@@ -13,9 +13,9 @@
 <link rel="manifest" href="manifest.json">
 <title>SyDent — الإعدادات</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
 <!-- ── Cloudflare Turnstile (CAPTCHA) ── Axis 3 / Item 2. Helper defined BEFORE the API
      script so window.onSyDentTurnstileLoad exists when the (async) script fires. -->
 <style>.cf-turnstile-box{margin:2px 0 14px;min-height:65px;display:flex;justify-content:center}</style>
@@ -199,20 +199,6 @@ input:disabled { opacity: 0.6; cursor: not-allowed; }
 .maint-progress-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--green2));width:0%;transition:width .3s;}
 .maint-progress-text{text-align:center;font-size:12px;color:var(--text2);margin-top:6px;font-weight:600;}
 
-.toast {
-  position: fixed; bottom: 24px; left: 50%;
-  transform: translateX(-50%) translateY(80px);
-  background: var(--bg3);
-  border: 1px solid var(--green);
-  border-radius: 10px; padding: 12px 22px;
-  font-size: 14px; font-weight: 600; color: var(--green);
-  z-index: 300;
-  transition: transform .35s cubic-bezier(.175,.885,.32,1.275);
-  white-space: nowrap;
-  max-width: 90vw;
-}
-.toast.show { transform: translateX(-50%) translateY(0); }
-.toast.error { border-color: var(--red); color: var(--red); }
 
 /* Modal — تأكيد حذف الحساب */
 .modal-overlay {
@@ -453,8 +439,8 @@ textarea::placeholder { color: var(--text2); }
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
-<script src="sidebar.js?v=20260702d"></script>
+<link rel="stylesheet" href="theme.css?v=20260702e">
+<script src="sidebar.js?v=20260702e"></script>
 </head>
 <body>
 
@@ -922,19 +908,10 @@ textarea::placeholder { color: var(--text2); }
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
 <script>
 let currentUser = null;
 
 // ─── Toast ───
-function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.toggle('error', isError);
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3500);
-}
 
 // ─── Init ───
 // ═══ P5: Online booking settings (إعدادات بوابة الحجز الإلكتروني) ═══

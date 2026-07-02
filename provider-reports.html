@@ -13,10 +13,10 @@
 <link rel="manifest" href="manifest.json">
 <title>تقارير الأطباء — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -250,15 +250,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .empty-state .ttl{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
 
 /* Toast */
-.toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-  background:var(--bg2);border:1px solid var(--green);
-  border-radius:8px;padding:12px 20px;font-size:13px;font-weight:600;
-  color:var(--text);z-index:200;
-  box-shadow:0 8px 24px rgba(0,0,0,.5);
-  opacity:0;transition:opacity .25s;pointer-events:none;
-}
-.toast.show{opacity:1;}
 
 /* Print-only styling for payout slip */
 @media print {
@@ -274,7 +265,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -430,8 +421,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Print Area (hidden, used for print only) -->
 <div id="printArea" style="display:none;"></div>
 
-<div class="toast" id="toast"></div>
-
 <script>
 'use strict';
 
@@ -447,12 +436,6 @@ var payouts = [];           // provider_payouts for history
 var basis = 'production';   // 'production' | 'net' | 'collection'
 
 // ─── Helpers ───
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(function(){ t.classList.remove('show'); }, 2200);
-}
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';

@@ -17,10 +17,10 @@
 <link rel="manifest" href="manifest.json">
 <title>الموظفون — SyDent</title>
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260702d"></script>
+<script src="theme.js?v=20260702e"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260702d"></script>
-<script src="sidebar.js?v=20260702d"></script>
+<script src="supabase-init.js?v=20260702e"></script>
+<script src="sidebar.js?v=20260702e"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -228,17 +228,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .empty .em-text{font-size:13px;color:var(--text2);}
 
 /* Toast */
-#toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-  background:var(--bg2);border:1px solid var(--green);
-  color:var(--text);padding:12px 22px;border-radius:10px;
-  font-size:13px;font-weight:700;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);
-  opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
-  z-index:2000;
-}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
-#toast.err{border-color:var(--red);color:var(--red);}
 
 /* Mobile */
 @media (max-width: 768px) {
@@ -263,7 +252,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .pwd-toggle svg{display:block;width:20px;height:20px;flex-shrink:0;}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260702d">
+<link rel="stylesheet" href="theme.css?v=20260702e">
 </head>
 <body>
 <div class="main" id="sbMainContent">
@@ -526,8 +515,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 </div>
 
-<div id="toast"></div>
-
 <script>
 'use strict';
 
@@ -543,12 +530,6 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-function showToast(msg, isErr) {
-  var t = $('toast');
-  t.textContent = msg;
-  t.className = 'show' + (isErr ? ' err' : '');
-  setTimeout(function(){ t.className = isErr ? 'err' : ''; }, 2400);
 }
 function showMsg(box, msg, isErr) {
   var m = $(box);
