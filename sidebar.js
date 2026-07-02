@@ -71,7 +71,8 @@ const css = `
     background: var(--green-dim, rgba(var(--green-rgb),0.12));
     border-right-color: var(--green);
   }
-  .sb-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sb-icon { width: 20px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .sb-icon svg { width: 17px; height: 17px; }
   .sb-badge {
     margin-right: auto;
     background: var(--green);
@@ -208,25 +209,25 @@ const css = `
 // ─── HTML ───
 const navItems = [
   { section: 'الرئيسية' },
-  { icon: '📊', label: 'لوحة التحكم', href: 'index.html',    id: 'dashboard' },
-  { icon: '👥', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
-  { icon: '📅', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>', label: 'لوحة التحكم', href: 'index.html',    id: 'dashboard' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><path d="M16 3.128a4 4 0 0 1 0 7.744" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /></svg>', label: 'المرضى',      href: 'patients.html', id: 'patients'  },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /><path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" /><path d="M8 18h.01" /><path d="M12 18h.01" /><path d="M16 18h.01" /></svg>', label: 'المواعيد',    href: 'appointments.html', id: 'appointments' },
   { section: 'الإدارة' },
-  { icon: '💉', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
-  { icon: '👨‍⚕️', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
-  { icon: '👥', label: 'الموظفون',     href: 'employees.html', id: 'employees' },
-  { icon: '💳', label: 'الرواتب والدفعات', href: 'payouts.html',  id: 'payouts'   },
-  { icon: '💰', label: 'المصاريف',    href: 'expenses.html', id: 'expenses'  },
-  { icon: '📦', label: 'المخزون',     href: 'inventory.html', id: 'inventory' },
-  { icon: '🥽', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m18 2 4 4" /><path d="m17 7 3-3" /><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5" /><path d="m9 11 4 4" /><path d="m5 19-3 3" /><path d="m14 4 6 6" /></svg>', label: 'قائمة العلاجات', href: 'treatments.html', id: 'treatments' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M11 2v2" /><path d="M5 2v2" /><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1" /><path d="M8 15a6 6 0 0 0 12 0v-3" /><circle cx="20" cy="10" r="2" /></svg>', label: 'أطباء العيادة', href: 'doctors.html', id: 'doctors' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M16 10h2" /><path d="M16 14h2" /><path d="M6.17 15a3 3 0 0 1 5.66 0" /><circle cx="9" cy="11" r="2" /><rect x="2" y="5" width="20" height="14" rx="2" /></svg>', label: 'الموظفون',     href: 'employees.html', id: 'employees' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></svg>', label: 'الرواتب والدفعات', href: 'payouts.html',  id: 'payouts'   },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 17V7" /><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8" /><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z" /></svg>', label: 'المصاريف',    href: 'expenses.html', id: 'expenses'  },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" /></svg>', label: 'المخزون',     href: 'inventory.html', id: 'inventory' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2" /><path d="M6.453 15h11.094" /><path d="M8.5 2h7" /></svg>', label: 'المخابر',     href: 'labs.html',     id: 'labs'      },
   { section: 'تحليل' },
-  { icon: '📊', label: 'المحاسبة',       href: 'accounting.html', id: 'accounting' },
-  { icon: '📊', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
-  { icon: '📋', label: 'سجل النشاطات', href: 'audit-log.html', id: 'audit-log' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><rect width="16" height="20" x="4" y="2" rx="2" /><line x1="8" x2="16" y1="6" y2="6" /><line x1="16" x2="16" y1="14" y2="18" /><path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" /><path d="M12 14h.01" /><path d="M8 14h.01" /><path d="M12 18h.01" /><path d="M8 18h.01" /></svg>', label: 'المحاسبة',       href: 'accounting.html', id: 'accounting' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>', label: 'تقارير الأطباء', href: 'provider-reports.html', id: 'provider-reports' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></svg>', label: 'سجل النشاطات', href: 'audit-log.html', id: 'audit-log' },
   { section: 'النظام' },
-  { icon: '💎', label: 'الاشتراك',   href: 'subscription.html', id: 'subscription' },
-  { icon: '⚙️', label: 'الإعدادات',  href: 'settings.html', id: 'settings'  },
-  { icon: '🚪', label: 'تسجيل خروج', href: '#',             id: 'logout', onClick: 'doLogout' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M10.5 3 8 9l4 13 4-13-2.5-6" /><path d="M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z" /><path d="M2 9h20" /></svg>', label: 'الاشتراك',   href: 'subscription.html', id: 'subscription' },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></svg>', label: 'الإعدادات',  href: 'settings.html', id: 'settings'  },
+  { icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /></svg>', label: 'تسجيل خروج', href: '#',             id: 'logout', onClick: 'doLogout' },
 ];
 
 function buildHTML(activeId) {
@@ -603,12 +604,12 @@ async function refreshSidebarDynamic() {
 
     document.body.innerHTML = `
       <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg3);padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
-        <div style="font-size:60px;margin-bottom:16px;">🚫</div>
+        <div style="margin-bottom:16px;color:var(--red);"><svg width="56" height="56" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><circle cx="12" cy="12" r="10" /><path d="M4.929 4.929 19.07 19.071" /></svg></div>
         <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">تم إيقاف حسابك</div>
         <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">للاستفسار أو تجديد الاشتراك، تواصل معنا عبر واتساب.</div>
         <a href="https://wa.me/${sbSupportPhone}?text=${encodeURIComponent('مرحباً، حسابي في SyDent موقوف وأريد الاستفسار')}" target="_blank"
           style="padding:14px 28px;background:#25d366;border-radius:12px;color:#fff;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
-          💬 تواصل معنا عبر واتساب
+          <svg width="15" height="15" style="vertical-align:-2px;margin-left:6px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /></svg> تواصل معنا عبر واتساب
         </a>
         <button onclick="window.doLogout()"
           style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">

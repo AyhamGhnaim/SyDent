@@ -685,6 +685,7 @@
 /* Universal typeface — overrides 147 inline 'Cairo' declarations. */
 html, body, body * {
   font-family: 'IBM Plex Sans Arabic', 'Cairo', system-ui, -apple-system, sans-serif !important;
+  font-synthesis-weight: none; /* weights 800/900 render as true 700 — no blurry faux-bold Arabic */
 }
 pre, code, kbd, samp { font-family: ui-monospace, 'SF Mono', Consolas, monospace !important; }
 
