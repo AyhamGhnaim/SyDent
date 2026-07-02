@@ -1198,6 +1198,7 @@ var PRM_CLINIC_PHONE  = '';
 var PRM_BOOKING_ENABLED = false;  // clinic_settings.booking_enabled — gates {booking_link}
 var PRM_RECALL_TPL    = '';    // من clinic_settings.whatsapp_recall_template
 var PRM_BDAY_TPL      = '';    // من clinic_settings.whatsapp_birthday_template
+var prmDueWatches = {};        // A: مراقبات أسنان مستحقة { patient_id: [{tooth_num, treatment_key, review_at}] } — من teeth_status.review_at (M74)
 var DEFAULT_RECALL_TPL = 'مرحباً {patient_first_name}،\nنذكّرك بموعد المراجعة الدورية في {clinic_name} للاطمئنان على صحة أسنانك. يسعدنا تحديد موعد مناسب لك في أقرب وقت. 🦷\n\n📅 احجز موعدك مباشرة من هنا: {booking_link}';
 var DEFAULT_BDAY_TPL   = 'كل عام وأنت بخير {patient_first_name}! 🎉\nعائلة {clinic_name} تتمنى لك عيد ميلاد سعيداً وابتسامة مشرقة دائماً. 🎂🦷';
 var prmRecentRecalls  = {};    // patient_id → آخر recalled_at (ms)
@@ -1275,6 +1276,21 @@ async function loadPrmMeta(){
       if (r.patient_id) prmUpcomingApptPatients[r.patient_id] = true;
     });
   } catch (e) { /* graceful */ }
+  // 4) A: مراقبات أسنان حان موعد مراجعتها (status='condition' + review_at <= اليوم) — graceful قبل M74
+  try {
+    var _wToday = new Date().toISOString().slice(0, 10);
+    var tw = await window.sb.from('teeth_status')
+      .select('patient_id, tooth_num, treatment_key, review_at')
+      .eq('doctor_id', currentUser.id)
+      .eq('status', 'condition')
+      .not('review_at', 'is', null)
+      .lte('review_at', _wToday);
+    prmDueWatches = {};
+    if (tw && !tw.error && tw.data) tw.data.forEach(function(r){
+      if (!prmDueWatches[r.patient_id]) prmDueWatches[r.patient_id] = [];
+      prmDueWatches[r.patient_id].push(r);
+    });
+  } catch (e) { prmDueWatches = {}; /* graceful (عمود مفقود قبل Migration 74) */ }
   updatePrmBadge();
 }
 
@@ -1297,6 +1313,17 @@ function prmRecallList(){
     if (rr && (now - rr) < cooldownMs) return;  // استُدعي حديثاً
     if (prmUpcomingApptPatients[p.id]) return;  // عنده موعد قادم محجوز → لا داعي للاستدعاء
     out.push({ p: p, lastVisit: lv });
+  });
+  // A: دمج المرضى أصحاب المراقبات المستحقة — نفس قواعد التهدئة واستثناء الموعد القادم
+  Object.keys(prmDueWatches || {}).forEach(function(pid){
+    var existing = null;
+    for (var i = 0; i < out.length; i++) { if (out[i].p.id === pid) { existing = out[i]; break; } }
+    if (existing) { existing.watch = prmDueWatches[pid]; return; }
+    var p = _prmFind(pid); if (!p) return;
+    var rr2 = prmRecentRecalls[pid];
+    if (rr2 && (now - rr2) < cooldownMs) return;
+    if (prmUpcomingApptPatients[pid]) return;
+    out.push({ p: p, lastVisit: lastVisitMap[pid] || '', watch: prmDueWatches[pid] });
   });
   out.sort(function(a,b){ return String(a.lastVisit).localeCompare(String(b.lastVisit)); }); // الأقدم أولاً
   return out;
@@ -1411,10 +1438,14 @@ function renderPrmRecall(){
       + '<div style="margin-top:8px;font-size:14px;">لا مرضى متأخّرين عن المراجعة (أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر).</div></div>';
     return;
   }
-  el.innerHTML = '<div style="font-size:12px;color:var(--text2,#8da0bd);padding:0 2px 10px;">مرضى لم يزوروا منذ أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر — <b style="color:var(--text,#e8eefc);">' + list.length + '</b> للاستدعاء. <span style="opacity:.75;">(يُستثنى من عنده موعد قادم محجوز)</span></div>'
+  el.innerHTML = '<div style="font-size:12px;color:var(--text2,#8da0bd);padding:0 2px 10px;">مرضى لم يزوروا منذ أكثر من ' + (PRM_RECALL_MONTHS||6) + ' أشهر، ومراقبات أسنان مستحقّة — <b style="color:var(--text,#e8eefc);">' + list.length + '</b> للاستدعاء. <span style="opacity:.75;">(يُستثنى من عنده موعد قادم محجوز)</span></div>'
     + list.map(function(r){
       var p = r.p;
-      var sub = 'آخر زيارة: ' + prmEsc(formatDate(r.lastVisit));
+      var sub = r.lastVisit ? ('آخر زيارة: ' + prmEsc(formatDate(r.lastVisit))) : 'لا زيارات مكتملة بعد';
+      if (r.watch && r.watch.length) {
+        var _wt = r.watch.map(function(w){ return 'سن ' + prmEsc(String(w.tooth_num)); }).join('، ');
+        sub = '🦷 <b style="color:#f59e0b;">مراقبة مستحقّة:</b> ' + _wt + ' — ' + sub;
+      }
       var phone = p.phone || '';
       var waBtn = phone
         ? '<button class="btn-sm" onclick="prmDoWaRecall(\'' + p.id + '\')" style="background:#25d366;color:#fff;border:none;padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;font-family:Cairo,sans-serif;">📱 واتساب</button>'

@@ -841,6 +841,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <button data-sfilter="hide_existing">إخفاء الموجود مسبقاً</button>
       </div>
       <div class="ortho-banner" id="orthoBanner" style="display:none;"></div>
+      <div id="watchDueBanner" style="display:none;margin:6px 2px 4px;padding:8px 12px;border:1px solid #6b7280;border-radius:10px;background:rgba(107,114,128,.12);color:var(--text);font-size:12.5px;line-height:1.7;"></div>
       <div class="jaw-wrap" id="jawWrap" data-occview="all" data-dent="permanent">
         <div class="jaw-row row-buc" id="upperJaw"></div>
         <div class="jaw-row row-occ" id="upperOcc"></div>
@@ -1255,6 +1256,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <button type="button" class="status-opt" data-status="condition" onclick="pickStatus('condition')">
               <span class="status-dot" style="background:#6b7280;"></span>مراقبة
             </button>
+          </div>
+        </div>
+        <!-- A: مراقبة → موعد مراجعة (يظهر فقط عند اختيار حالة "مراقبة"، ويُخزَّن في teeth_status.review_at — M74) -->
+        <div class="form-group" id="condReviewBox" style="display:none;">
+          <label>⏰ موعد المراجعة</label>
+          <div class="status-picker" id="condReviewPicker">
+            <button type="button" class="status-opt selected" data-rev="3"  onclick="pickReviewMonths(3)">3 أشهر</button>
+            <button type="button" class="status-opt" data-rev="6"  onclick="pickReviewMonths(6)">6 أشهر</button>
+            <button type="button" class="status-opt" data-rev="12" onclick="pickReviewMonths(12)">سنة</button>
+            <button type="button" class="status-opt" data-rev=""   onclick="pickReviewMonths(null)">بلا</button>
           </div>
         </div>
         <div class="form-group" id="providerPickerGroup" style="display:none;">
@@ -3667,6 +3678,11 @@ async function loadAll() {
     // Store treatment status alongside (default 'completed' for legacy data with no status column)
     if (!teethMap[n].__status) teethMap[n].__status = {};
     teethMap[n].__status[s] = t.status || 'completed';
+    // A (M74): scheduled review date for 'condition' watches (select('*') → flows automatically)
+    if (t.review_at) {
+      if (!teethMap[n].__review) teethMap[n].__review = {};
+      teethMap[n].__review[s] = t.review_at;
+    }
   });
 
   // Phase B: per-tooth photo counts for the chart badges. Seeds _toothPhotoCounts
@@ -6278,6 +6294,36 @@ function renderTeeth() {
   addPhotoBadges();   // P2 Phase B: photo-count badges, after status badges so both coexist
   addLabBadges();     // open lab-order badges (bottom-left) — status ↗, photos ↖, lab ↙
   if (typeof renderOrthoOverlay === 'function') renderOrthoOverlay();
+  renderWatchBanner();   // A: surface due 'مراقبة' reviews above the chart
+}
+
+/* A: due-watch banner — lists 'condition' rows whose review_at has arrived.
+   Data comes from teethMap.__review (loaded with the chart), so it stays in
+   sync with every renderTeeth() (save / clear / treat all refresh it). */
+function renderWatchBanner() {
+  var el = document.getElementById('watchDueBanner');
+  if (!el) return;
+  var today = new Date().toISOString().slice(0, 10);
+  var due = [];
+  Object.keys(teethMap || {}).forEach(function(n){
+    var rev = teethMap[n].__review, st = teethMap[n].__status;
+    if (!rev || !st) return;
+    Object.keys(rev).forEach(function(s){
+      if (st[s] !== 'condition') return;         // treated/overwritten → watch resolved
+      if (String(rev[s]) > today) return;        // not due yet
+      var days = Math.floor((new Date(today) - new Date(rev[s])) / 86400000);
+      var tr = getTreatment(teethMap[n][s]);
+      due.push({ n: n, name: (tr && tr.name) || teethMap[n][s] || '', days: days });
+    });
+  });
+  if (!due.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  due.sort(function(a, b){ return b.days - a.days; });   // most overdue first
+  var parts = due.map(function(d){
+    var when = d.days === 0 ? 'اليوم' : ('منذ ' + d.days + (d.days === 1 ? ' يوم' : ' أيام'));
+    return 'سن ' + escapeHtml(String(d.n)) + ' — ' + escapeHtml(d.name) + ' (' + when + ')';
+  });
+  el.innerHTML = '<b>⏰ مراقبات مستحقّة للمراجعة:</b> ' + parts.join(' · ');
+  el.style.display = '';
 }
 
 /* Add a small color dot on each tooth indicating its dominant treatment status.
@@ -6389,6 +6435,34 @@ var currentSurfaces = [];
 var pendingToothStatus = null;
 var pendingToothLabel  = null;
 var pendingTreatStatus = 'completed';  // 'planned' / 'completed' / 'existing_current' / 'existing_other' / 'referred' / 'condition'
+var pendingReviewMonths = 3;  // A: مراقبة → مراجعة بعد N أشهر (3|6|12|null). يُقرأ فقط عند status='condition'.
+/* A: chip selection for the review interval (condition status only). */
+function pickReviewMonths(m) {
+  pendingReviewMonths = m;
+  document.querySelectorAll('#condReviewPicker .status-opt').forEach(function(b){
+    var v = b.getAttribute('data-rev');
+    b.classList.toggle('selected', (m === null && v === '') || String(m) === v);
+  });
+}
+/* A: resolve the review interval to a concrete date (yyyy-mm-dd) or null. */
+function reviewDateFromMonths() {
+  if (!pendingReviewMonths) return null;
+  var d = new Date(); d.setMonth(d.getMonth() + pendingReviewMonths);
+  return d.toISOString().slice(0, 10);
+}
+/* A: value for teeth_status.review_at on every user-status save — a real date only
+   for 'condition'; explicit null otherwise so treating a tooth clears a stale watch. */
+function _reviewAtVal() {
+  return pendingTreatStatus === 'condition' ? reviewDateFromMonths() : null;
+}
+/* A: mirror the just-saved review_at into the in-memory teethMap so the banner
+   stays accurate without a reload (e.g. re-saving a due watch as 'بلا'). */
+function _syncReviewCache(n, s) {
+  var v = _reviewAtVal(); n = String(n);
+  if (!teethMap[n]) teethMap[n] = {};
+  if (v) { if (!teethMap[n].__review) teethMap[n].__review = {}; teethMap[n].__review[s] = v; }
+  else if (teethMap[n].__review) { delete teethMap[n].__review[s]; }
+}
 var pendingProviderId = null;  // Selected clinic doctor for this treatment
 var CLINIC_DOCTORS = [];
 var BUNDLE_ITEMS = [];
@@ -6479,6 +6553,14 @@ async function upsertTeethStatusWithFallback(row, opts) {
       "  CHECK (status IN ('planned','completed','existing_current','existing_other','referred','condition'));"
     );
   }
+  // A (M74): if the DB pre-dates the review_at column, retry once without it so the
+  // clinical save itself never fails — only the scheduled-review metadata is dropped.
+  if (first.error && Object.prototype.hasOwnProperty.call(row, 'review_at')
+      && (first.error.code === '42703' || String(first.error.message || '').indexOf('review_at') !== -1)) {
+    console.warn("Migration 74 (teeth_status.review_at) not applied yet — saving without review date.");
+    var noReviewRow = Object.assign({}, row); delete noReviewRow.review_at;
+    return await window.sb.from('teeth_status').upsert(noReviewRow, opts);
+  }
   return first;
 }
 
@@ -6494,6 +6576,14 @@ function pickStatus(s) {
   // so the doctor can't accidentally type a charge for something we don't bill for.
   // Restore editability when switching back to any other status.
   var costEl = document.getElementById('toothCost');
+  // A: review-date chips are meaningful only for a tooth-based 'condition' save
+  // (regional condition is a no-op by design — keep the box hidden there).
+  var _crb = document.getElementById('condReviewBox');
+  if (_crb) {
+    var _showRev = (s === 'condition') && !pendingRegionalType;
+    _crb.style.display = _showRev ? '' : 'none';
+    if (_showRev) pickReviewMonths(3);   // fresh default each time مراقبة is picked
+  }
   if (costEl) {
     if (s === 'condition') {
       costEl.value = '0';
@@ -7434,6 +7524,10 @@ function pickToothTreatment(status, label) {
   });
   // Phase 3 Feature F: defensively reset cost field's readonly state in case the
   // previous modal session set it to readonly (e.g. user picked 'مراقبة' last time).
+  // A: also hide the review-date box + reset its default (status resets to 'completed').
+  var _crbR = document.getElementById('condReviewBox');
+  if (_crbR) _crbR.style.display = 'none';
+  pendingReviewMonths = 3;
   var costEl2 = document.getElementById('toothCost');
   if (costEl2) {
     costEl2.readOnly = false;
@@ -7772,7 +7866,8 @@ async function saveToothTreatment() {
       // `status` (never `surface`), so the WHOLE='extracted' row can never be clobbered.
       var rSk = await upsertTeethStatusWithFallback({
         doctor_id: currentUser.id, patient_id: patientId,
-        tooth_num: String(currentTooth), surface: 'SOCKET', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
+        tooth_num: String(currentTooth), surface: 'SOCKET', treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId,
+        review_at: _reviewAtVal()
       }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
       if (rSk.error) {
         console.error('socket save error:', rSk.error);
@@ -7782,12 +7877,14 @@ async function saveToothTreatment() {
         teethMap[String(currentTooth)].SOCKET = pendingToothStatus;
         if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
         teethMap[String(currentTooth)].__status.SOCKET = pendingTreatStatus;
+        _syncReviewCache(currentTooth, 'SOCKET');   // A
       }
     } else {
     // Normal save — DB constraint now accepts all valid surface values
     var rN = await upsertTeethStatusWithFallback({
       doctor_id: currentUser.id, patient_id: patientId,
-      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId
+      tooth_num: String(currentTooth), surface: currentSurface, treatment_key: pendingToothStatus, status: pendingTreatStatus, provider_id: pendingProviderId,
+      review_at: _reviewAtVal()
     }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
     if (rN.error) {
       console.error('teeth_status save error:', rN.error);
@@ -7797,6 +7894,7 @@ async function saveToothTreatment() {
       teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
       if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
       teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
+      _syncReviewCache(currentTooth, currentSurface);   // A
     }
     }
   }
@@ -10796,7 +10894,8 @@ async function saveToothAndOpenLab() {
     tooth_num: String(currentTooth), surface: currentSurface,
     treatment_key: pendingToothStatus,
     status: pendingTreatStatus,
-    provider_id: pendingProviderId
+    provider_id: pendingProviderId,
+    review_at: _reviewAtVal()
   }, { onConflict: 'doctor_id,patient_id,tooth_num,surface' });
   if (rTs.error) {
     console.error('tooth+lab teeth_status save error:', rTs.error);
@@ -10807,6 +10906,7 @@ async function saveToothAndOpenLab() {
   teethMap[String(currentTooth)][currentSurface] = pendingToothStatus;
   if (!teethMap[String(currentTooth)].__status) teethMap[String(currentTooth)].__status = {};
   teethMap[String(currentTooth)].__status[currentSurface] = pendingTreatStatus;
+  _syncReviewCache(currentTooth, currentSurface);   // A
   }
 
   // Build description that reflects the area type
