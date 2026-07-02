@@ -5962,6 +5962,17 @@ function buildOcclusalTooth(num, sm, isUpper){
   var occSz=cellWidth(num);
   var svg='<svg class="tooth-shape" viewBox="16.67 16.67 66.67 66.67" width="'+occSz+'" height="'+occSz+'" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">'+defs;
   if(isExtract){
+    // Pontic occlusal (adjacent to Fix #1): a bridged extraction shows the
+    // occlusal silhouette FILLED in the bridge colour, matching the facial
+    // pontic — instead of the empty dashed extraction placeholder.
+    if (typeof chartPonticSet !== 'undefined' && chartPonticSet[num]) {
+      var rawP = teethMap[String(num)] || {};
+      var pKey = isBridgeKey(rawP.PONTIC) ? rawP.PONTIC : (isBridgeKey(rawP.WHOLE) ? rawP.WHOLE : 'bridge');
+      var pFill = (T_FILL && T_FILL[pKey]) || '#dc2626';
+      var pStroke = (T_STROKE && T_STROKE[pKey]) || '#991b1b';
+      svg += '<path d="'+outline+'" fill="'+pFill+'" fill-opacity="0.92" stroke="'+pStroke+'" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+      return svg;
+    }
     // موقع القلع (M63): tint the occlusal silhouette in the treatment colour under the dashes
     if(typeof toothHasSocket==='function' && toothHasSocket(num)){ svg+='<path d="'+outline+'" fill="'+(socketColorFor(num)||'#f97316')+'" fill-opacity="0.32" stroke="none"/>'; }
     svg+='<path d="'+outline+'" fill="none" stroke="#9aa3b0" stroke-width="2" stroke-dasharray="4 3"/></svg>'; return svg;
@@ -6097,6 +6108,7 @@ function occTipRows(num, sm){
   return rows || '<div class="tip-row" style="color:#7a8a9a">سليم — اضغط أي منطقة</div>';
 }
 
+var chartPonticSet = {};   // filled by renderTeeth's findPontics; read by buildOcclusalTooth
 function renderOcclusal(){
   var rows=[['upperOcc',activeUpper(),true],['lowerOcc',activeLower(),false]];
   rows.forEach(function(R){
@@ -6198,7 +6210,8 @@ function renderTeeth() {
   if (!upperEl || !lowerEl) return;
   var uHtml = '', lHtml = '';
   // Determine which extracted teeth are part of a bridge unit (between 2 bridge abutments)
-  var ponticSet = {};
+  chartPonticSet = {};              // module-level (declared above renderOcclusal) so the
+  var ponticSet = chartPonticSet;   // occlusal view can tell pontics from plain extractions
   function findPontics(arch) {
     // A tooth is a pontic when:
     //  (a) extracted AND flagged with PONTIC='bridge', OR
@@ -6217,11 +6230,18 @@ function renderTeeth() {
         var smL = teethMap[String(arch[L])] || {};
         if (isBridgeKey(smL.WHOLE)) { hasLeftBr = true; break; }
         if (!isExtractionKey(smL.WHOLE)) break;
+        // Case (c) guard (adjacent-bridges fix): the candidate is a REAL
+        // (non-extracted) bridge-marked tooth — a real tooth next to a gap is
+        // that gap's ABUTMENT, so never scan across the gap looking for flanks.
+        // Only case (b) (the candidate itself extracted) may cross extractions
+        // (multi-tooth gaps under one bridge).
+        if (!isExt) break;
       }
       for (var R=i+1; R<arch.length; R++) {
         var smR = teethMap[String(arch[R])] || {};
         if (isBridgeKey(smR.WHOLE)) { hasRightBr = true; break; }
         if (!isExtractionKey(smR.WHOLE)) break;
+        if (!isExt) break; // case (c) guard — same as the distal scan above
       }
       // Only mark as pontic if it's in the MIDDLE of a bridge unit (flanked on both sides)
       if (hasLeftBr && hasRightBr) ponticSet[arch[i]] = true;
