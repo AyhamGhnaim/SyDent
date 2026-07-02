@@ -259,7 +259,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="topbar">
   <div>
-    <div class="tb-title">👥 الموظفون</div>
+    <div class="tb-title">الموظفون</div>
     <div class="tb-sub">إدارة هويات الموظفين وأرقام السر</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -321,11 +321,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              Renaming the DB value would invalidate Migration 13 data without
              benefit. -->
         <select id="eRole" onchange="onRoleChange()">
-          <option value="doctor:doctor">🦷 طبيب أسنان</option>
-          <option value="doctor:hygienist">🩺 متدرب/مساعد</option>
-          <option value="doctor:assistant">🤝 مساعدة كرسي</option>
-          <option value="secretary:secretary">👩‍💼 سكرتيرة</option>
-          <option value="secretary:other">👥 أخر (محاسب/عامل/إلخ)</option>
+          <option value="doctor:doctor">طبيب أسنان</option>
+          <option value="doctor:hygienist">متدرب/مساعد</option>
+          <option value="doctor:assistant">مساعدة كرسي</option>
+          <option value="secretary:secretary">سكرتيرة</option>
+          <option value="secretary:other">أخر (محاسب/عامل/إلخ)</option>
         </select>
         <div class="hint">المالك (Owner) لا يمكن إضافته يدوياً — حساب الـ Owner محفوظ تلقائياً.</div>
       </div>
@@ -455,7 +455,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group" style="background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.25);border-radius:10px;padding:12px 14px;margin-top:6px;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
           <input type="checkbox" id="eHasSystemAccess" onchange="onSystemAccessChange()" style="width:18px;height:18px;cursor:pointer;accent-color:var(--blue);">
-          <span style="font-weight:700;color:var(--text);">🔐 هذا الموظف يحتاج وصولاً للبرنامج</span>
+          <span style="font-weight:700;color:var(--text);">هذا الموظف يحتاج وصولاً للبرنامج</span>
         </label>
         <div class="hint" style="margin-top:6px;font-size:11px;color:var(--text2);line-height:1.6;">
           • <b style="color:var(--text);">مفعّل:</b> الموظف يحصل على رقم سر ويظهر في شاشة القفل (سكرتيرة، طبيب يستخدم النظام).<br>
@@ -493,7 +493,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="ownerPinModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>🔐 تغيير رقم سرّك (كمالك)</h3>
+      <h3>تغيير رقم سرّك (كمالك)</h3>
       <button class="modal-close" onclick="closeOwnerModal()">×</button>
     </div>
     <div class="modal-body">
@@ -509,7 +509,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-footer">
       <button type="button" class="btn btn-outline" onclick="closeOwnerModal()">إلغاء</button>
-      <button type="button" class="btn" id="removeLockBtn" onclick="removeAllLockPins()" style="background:transparent;border:1px solid rgba(239,83,80,0.45);color:#ef5350;display:none;">🗑 تعطيل قفل العيادة</button>
+      <button type="button" class="btn" id="removeLockBtn" onclick="removeAllLockPins()" style="background:transparent;border:1px solid rgba(239,83,80,0.45);color:#ef5350;display:none;">تعطيل قفل العيادة</button>
       <button type="button" class="btn btn-primary" id="saveOwnerBtn" onclick="saveOwnerPin()">حفظ</button>
     </div>
   </div>

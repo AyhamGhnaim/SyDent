@@ -742,13 +742,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="main" id="sbMainContent">
 
 <div class="topbar">
-  <a href="patients.html" class="back-btn">← العودة للقائمة</a>
+  <a href="patients.html" class="back-btn">العودة للقائمة</a>
   <div class="topbar-actions">
-    <button class="btn btn-outline" onclick="openApptModal()" data-doctor-inactive-block>📅 موعد جديد</button>
-    <button class="btn btn-outline" onclick="openSessionModal()" data-doctor-inactive-block>🦷 جلسة جديدة</button>
-    <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaHub()" style="display:none;">📱 واتساب</button>
-    <button class="btn btn-outline" onclick="openPrintChoice()" data-doctor-inactive-block>🖨️ طباعة / PDF</button>
-    <button class="btn btn-primary" onclick="openPayModal()" data-doctor-inactive-block>💰 تسجيل دفعة</button>
+    <button class="btn btn-outline" onclick="openApptModal()" data-doctor-inactive-block>موعد جديد</button>
+    <button class="btn btn-outline" onclick="openSessionModal()" data-doctor-inactive-block>جلسة جديدة</button>
+    <button class="btn btn-whatsapp" id="ppWaBtn" onclick="openWaHub()" style="display:none;">واتساب</button>
+    <button class="btn btn-outline" onclick="openPrintChoice()" data-doctor-inactive-block>طباعة / PDF</button>
+    <button class="btn btn-primary" onclick="openPayModal()" data-doctor-inactive-block>تسجيل دفعة</button>
   </div>
 </div>
 
@@ -768,15 +768,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   </div>
 
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('file',this)">📋 الملف</button>
-    <button class="tab" onclick="switchTab('timeline',this)">🕐 السجل الكامل</button>
-    <button class="tab" onclick="switchTab('sessions',this)">🦷 الجلسات</button>
-    <button class="tab" onclick="switchTab('payments',this)">💰 المدفوعات</button>
-    <button class="tab" onclick="switchTab('labs',this)">🥽 المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
-    <button class="tab" onclick="switchTab('files',this); loadPatientFiles();">📎 الملفات <span id="filesBadge" class="lab-badge" style="display:none">0</span></button>
-    <button class="tab" onclick="switchTab('rx',this); loadPrescriptions();">💊 الروشتات <span id="rxBadge" class="lab-badge" style="display:none">0</span></button>
-    <button class="tab" onclick="switchTab('postop',this); loadPostOpNotes();">📋 تعليمات <span id="postopBadge" class="lab-badge" style="display:none">0</span></button>
-    <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">📋 سجل النشاطات</button>
+    <button class="tab active" onclick="switchTab('file',this)">الملف</button>
+    <button class="tab" onclick="switchTab('timeline',this)">السجل الكامل</button>
+    <button class="tab" onclick="switchTab('sessions',this)">الجلسات</button>
+    <button class="tab" onclick="switchTab('payments',this)">المدفوعات</button>
+    <button class="tab" onclick="switchTab('labs',this)">المخابر <span id="labsBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('files',this); loadPatientFiles();">الملفات <span id="filesBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('rx',this); loadPrescriptions();">الروشتات <span id="rxBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" onclick="switchTab('postop',this); loadPostOpNotes();">تعليمات <span id="postopBadge" class="lab-badge" style="display:none">0</span></button>
+    <button class="tab" id="tabBtnAudit" onclick="switchTab('audit',this); loadPatientAuditLog();" style="display:none;">سجل النشاطات</button>
   </div>
 
   <!-- Tab: الملف -->
@@ -784,8 +784,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="two-col">
       <div class="card">
         <div class="card-head">
-          <span class="card-title">👤 معلومات المريض</span>
-          <button class="btn btn-outline btn-sm" onclick="openEditModal()">✏️ تعديل</button>
+          <span class="card-title">معلومات المريض</span>
+          <button class="btn btn-outline btn-sm" onclick="openEditModal()">تعديل</button>
         </div>
         <div class="irow"><span class="ikey">الاسم الكامل</span><span class="ival" id="iName">—</span></div>
         <div class="irow"><span class="ikey">الجنس</span><span class="ival" id="iGender">—</span></div>
@@ -800,7 +800,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="card">
         <div class="card-head">
-          <span class="card-title">🦷 آخر الجلسات</span>
+          <span class="card-title">آخر الجلسات</span>
           <a href="javascript:void(0)" onclick="switchTabByName('sessions')" style="font-size:12px;color:var(--green);text-decoration:none;font-weight:600;">عرض الكل ←</a>
         </div>
         <div id="recentSessionsList"></div>
@@ -810,7 +810,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <!-- Gap 7: Planned Appointments card (hidden when patient has none) -->
     <div class="card" id="plannedApptsCard" style="display:none;">
       <div class="card-head">
-        <span class="card-title">📋 مواعيد مخطّطة <span id="plannedApptsCount" style="font-size:11px;color:var(--text2);font-weight:500;">(0)</span></span>
+        <span class="card-title">مواعيد مخطّطة <span id="plannedApptsCount" style="font-size:11px;color:var(--text2);font-weight:500;">(0)</span></span>
         <button class="btn btn-outline btn-sm" onclick="openPlannedApptModal()">＋ موعد مخطّط جديد</button>
       </div>
       <div id="plannedApptsList"></div>
@@ -818,16 +818,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
     <div class="chart-card">
       <div class="chart-card-head">
-        <span class="chart-card-title">🦷 مخطط الأسنان</span>
+        <span class="chart-card-title">مخطط الأسنان</span>
         <span class="chart-hint">اضغط على المنطقة المحددة من السن لتسجيل العلاج</span>
-        <button class="btn btn-outline btn-sm" onclick="printChart()" title="طباعة مخطط الأسنان بترويسة العيادة">🖨️ طباعة</button>
+        <button class="btn btn-outline btn-sm" onclick="printChart()" title="طباعة مخطط الأسنان بترويسة العيادة">طباعة</button>
       </div>
       <div class="seg" id="dentSeg" style="margin:0 auto 8px;width:max-content;">
         <button data-dent="permanent" class="active">دائمة</button>
         <button data-dent="mixed">مختلطة</button>
         <button data-dent="primary">لبنية</button>
       </div>
-      <button type="button" id="dentSegShow" onclick="showDentSeg()" title="إظهار خيارات الأسنان اللبنية/المختلطة (لحالة نادرة كسنّ لبني محتجَز عند بالغ)" style="margin:0 auto 8px;width:max-content;display:none;padding:5px 14px;background:transparent;border:1px dashed var(--border,#33415566);border-radius:8px;color:var(--text2);font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;">⚙️ خيارات الإطباق (لبنية / مختلطة)</button>
+      <button type="button" id="dentSegShow" onclick="showDentSeg()" title="إظهار خيارات الأسنان اللبنية/المختلطة (لحالة نادرة كسنّ لبني محتجَز عند بالغ)" style="margin:0 auto 8px;width:max-content;display:none;padding:5px 14px;background:transparent;border:1px dashed var(--border,#33415566);border-radius:8px;color:var(--text2);font-size:12px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;">خيارات الإطباق (لبنية / مختلطة)</button>
       <div class="seg" id="occViewSeg" style="margin:0 auto 8px;width:max-content;">
         <button data-view="all" class="active">الكل</button>
         <button data-view="buc">دهليزي</button>
@@ -857,19 +857,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-timeline">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">🕐 السجل الكامل للمريض</span>
+        <span class="card-title">السجل الكامل للمريض</span>
         <span style="font-size:11px;color:var(--text2);">كل الأحداث مرتّبة من الأحدث للأقدم</span>
       </div>
       <div class="tl-filters">
         <div class="tl-filters-row">
           <span class="tl-filter-label">النوع:</span>
           <span class="tl-chip active" data-tl-type="all" onclick="onTlTypeChip('all')">الكل</span>
-          <span class="tl-chip active" data-tl-type="session" onclick="onTlTypeChip('session')">🦷 جلسات</span>
-          <span class="tl-chip active" data-tl-type="payment" onclick="onTlTypeChip('payment')">💰 دفعات</span>
-          <span class="tl-chip active" data-tl-type="appointment" onclick="onTlTypeChip('appointment')">📅 مواعيد</span>
-          <span class="tl-chip active" data-tl-type="lab" onclick="onTlTypeChip('lab')">🥽 مخابر</span>
-          <span class="tl-chip active" data-tl-type="unearned" onclick="onTlTypeChip('unearned')">💵 رصيد مقدّم</span>
-          <span class="tl-chip active" data-tl-type="reminder" onclick="onTlTypeChip('reminder')">📱 تذكيرات</span>
+          <span class="tl-chip active" data-tl-type="session" onclick="onTlTypeChip('session')">جلسات</span>
+          <span class="tl-chip active" data-tl-type="payment" onclick="onTlTypeChip('payment')">دفعات</span>
+          <span class="tl-chip active" data-tl-type="appointment" onclick="onTlTypeChip('appointment')">مواعيد</span>
+          <span class="tl-chip active" data-tl-type="lab" onclick="onTlTypeChip('lab')">مخابر</span>
+          <span class="tl-chip active" data-tl-type="unearned" onclick="onTlTypeChip('unearned')">رصيد مقدّم</span>
+          <span class="tl-chip active" data-tl-type="reminder" onclick="onTlTypeChip('reminder')">تذكيرات</span>
         </div>
         <div class="tl-filters-row">
           <span class="tl-filter-label">التاريخ:</span>
@@ -896,7 +896,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-sessions">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">🦷 سجل الجلسات والعلاجات</span>
+        <span class="card-title">سجل الجلسات والعلاجات</span>
         <button class="btn btn-primary btn-sm" onclick="openSessionModal()" data-doctor-inactive-block>＋ إضافة جلسة</button>
       </div>
       <div id="sessionsContent"></div>
@@ -907,7 +907,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-payments">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">💰 كشف المدفوعات</span>
+        <span class="card-title">كشف المدفوعات</span>
         <button class="btn btn-primary btn-sm" onclick="openPayModal()">＋ تسجيل دفعة</button>
       </div>
       <div id="paymentsContent"></div>
@@ -915,7 +915,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="card" id="adjustmentsCard">
       <div class="card-head">
-        <span class="card-title">🧾 التسويات</span>
+        <span class="card-title">التسويات</span>
         <button class="btn btn-sm" onclick="openAdjustmentModal()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);">＋ خصم / إعدام / استرداد</button>
       </div>
       <div id="adjustmentsContent"></div>
@@ -926,7 +926,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-labs">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">🥽 طلبات المخابر</span>
+        <span class="card-title">طلبات المخابر</span>
         <button class="btn btn-primary btn-sm" onclick="openLabOrderModal()">＋ طلب جديد</button>
       </div>
       <div id="labOrdersContent"></div>
@@ -937,13 +937,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-files">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">📎 ملفات المريض</span>
+        <span class="card-title">ملفات المريض</span>
         <select id="pfUploadCategory" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
-          <option value="xray">🦷 أشعة</option>
-          <option value="clinical_photo">📷 صورة سريرية</option>
-          <option value="document" selected>📄 مستند</option>
-          <option value="receipt">🧾 إيصال</option>
-          <option value="other">📎 أخرى</option>
+          <option value="xray">أشعة</option>
+          <option value="clinical_photo">صورة سريرية</option>
+          <option value="document" selected>مستند</option>
+          <option value="receipt">إيصال</option>
+          <option value="other">أخرى</option>
         </select>
         <select id="pfUploadTooth" title="ربط الملف بسنّ محدد (اختياري)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:7px 12px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-inline-start:8px;">
           <option value="">— عام (بلا سن) —</option>
@@ -959,7 +959,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              style="display:none;" onchange="pfOnFilesPicked(this.files); this.value='';">
       <div id="pfUploadStatus" style="display:none;font-size:13px;color:var(--green);margin-bottom:12px;text-align:center;"></div>
       <div id="pfFilterBar" style="display:none;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <span style="font-size:12px;color:var(--text2);">🦷 فلترة حسب السن:</span>
+        <span style="font-size:12px;color:var(--text2);">فلترة حسب السن:</span>
         <select id="pfToothFilter" onchange="pfApplyToothFilter(this.value)" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:6px 11px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;">
           <option value="">الكل</option>
         </select>
@@ -972,8 +972,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-rx">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">💊 الروشتات الطبية</span>
-        <button class="btn btn-primary" onclick="openRxModal()" style="font-size:13px;padding:8px 16px;">➕ روشتة جديدة</button>
+        <span class="card-title">الروشتات الطبية</span>
+        <button class="btn btn-primary" onclick="openRxModal()" style="font-size:13px;padding:8px 16px;">روشتة جديدة</button>
       </div>
       <div id="rxList"></div>
     </div>
@@ -983,8 +983,8 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-postop">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">📋 تعليمات بعد الجلسة</span>
-        <button class="btn btn-primary" onclick="openPostOpModal()" style="font-size:13px;padding:8px 16px;">➕ تعليمات جديدة</button>
+        <span class="card-title">تعليمات بعد الجلسة</span>
+        <button class="btn btn-primary" onclick="openPostOpModal()" style="font-size:13px;padding:8px 16px;">تعليمات جديدة</button>
       </div>
       <div style="font-size:12px;color:var(--text2);margin:-4px 0 12px;">تعليمات هذا المريض. يمكنك التعبئة من قالب جاهز أو حفظ ما تكتبه كقالب لإعادة استخدامه مع مرضى آخرين.</div>
       <div id="postopList"></div>
@@ -995,7 +995,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
   <div class="panel" id="tab-audit">
     <div class="card">
       <div class="card-head">
-        <span class="card-title">📋 سجل النشاطات على هذا المريض</span>
+        <span class="card-title">سجل النشاطات على هذا المريض</span>
         <span style="font-size:11px;color:var(--text2);">آخر 100 عملية</span>
       </div>
       <div id="patientAuditContent">
@@ -1010,7 +1010,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: دفعة -->
 <div class="modal-overlay" id="payModal">
   <div class="modal-box">
-    <div class="modal-head"><h3>💰 تسجيل دفعة جديدة</h3><button class="modal-close" onclick="closeModal('payModal')">✕</button></div>
+    <div class="modal-head"><h3>تسجيل دفعة جديدة</h3><button class="modal-close" onclick="closeModal('payModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>المبلغ (ل.س)</label><input type="number" id="payAmount" placeholder="مثال: 50000" min="0" inputmode="numeric"></div>
@@ -1026,7 +1026,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: تسوية (خصم / إعدام / استرداد) — Migration 45 -->
 <div class="modal-overlay" id="adjModal">
   <div class="modal-box">
-    <div class="modal-head"><h3>🧾 تسوية حساب</h3><button class="modal-close" onclick="closeModal('adjModal')">✕</button></div>
+    <div class="modal-head"><h3>تسوية حساب</h3><button class="modal-close" onclick="closeModal('adjModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>النوع</label>
@@ -1049,7 +1049,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: جلسة -->
 <div class="modal-overlay" id="sessionModal">
   <div class="modal-box">
-    <div class="modal-head"><h3>🦷 إضافة جلسة / علاج</h3><button class="modal-close" onclick="closeModal('sessionModal')">✕</button></div>
+    <div class="modal-head"><h3>إضافة جلسة / علاج</h3><button class="modal-close" onclick="closeModal('sessionModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>نوع العلاج</label><select id="sType"><option value="">— اختر —</option><option>حشوة</option><option>قلع</option><option>تنظيف</option><option>تلبيس (تاج)</option><option>قناة جذر</option><option>تركيب طقم</option><option>تبييض</option><option>زراعة</option><option>أشعة</option><option>استشارة</option><option>أخرى</option></select></div>
@@ -1074,13 +1074,13 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: موعد -->
 <div class="modal-overlay" id="apptModal">
   <div class="modal-box">
-    <div class="modal-head"><h3 id="apptModalTitle">📅 موعد جديد</h3><button class="modal-close" onclick="closeModal('apptModal')">✕</button></div>
+    <div class="modal-head"><h3 id="apptModalTitle">موعد جديد</h3><button class="modal-close" onclick="closeModal('apptModal')">✕</button></div>
     <div class="modal-body">
       <!-- Gap 7: Planned-appointment toggle -->
       <label class="planned-toggle-pp" for="aIsPlanned">
         <input type="checkbox" id="aIsPlanned" onchange="onApptPlannedToggle()">
         <div class="ptpp-text">
-          <div class="ptpp-title">📋 موعد مخطّط (بدون تاريخ محدّد)</div>
+          <div class="ptpp-title">موعد مخطّط (بدون تاريخ محدّد)</div>
           <div class="ptpp-hint">يُحفظ للمتابعة، يُجدول لاحقاً عند تأكيد المريض.</div>
         </div>
       </label>
@@ -1135,7 +1135,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
            / quickSchedulePlannedFromProfile explicitly pick a mode. -->
       <div id="appProcSectionPP" style="display:none;margin-top:18px;padding:14px;background:rgba(var(--green-rgb),0.06);border:1px solid rgba(var(--green-rgb),0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
+          <div style="font-weight:700;color:var(--text);">علاجات هذا الموعد</div>
           <div id="appProcStatsPP" style="font-size:12px;color:var(--text2);"></div>
         </div>
         <!-- Mode-specific hint. Different copy for 'create' vs 'active'. -->
@@ -1147,7 +1147,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
              routes to the correct path via the section's current mode. -->
         <div id="appProcControlsPP" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="appAddPlannedSelectPP" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
-          <button type="button" id="appAddPlannedBtnPP" onclick="onAddPlannedClickPP()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
+          <button type="button" id="appAddPlannedBtnPP" onclick="onAddPlannedClickPP()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">إضافة</button>
         </div>
       </div>
     </div>
@@ -1158,7 +1158,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: تعديل بيانات المريض -->
 <div class="modal-overlay" id="editModal">
   <div class="modal-box" style="max-width:540px;">
-    <div class="modal-head"><h3>✏️ تعديل بيانات المريض</h3><button class="modal-close" onclick="closeModal('editModal')">✕</button></div>
+    <div class="modal-head"><h3>تعديل بيانات المريض</h3><button class="modal-close" onclick="closeModal('editModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>الاسم الكامل</label><input type="text" id="eName" placeholder="الاسم الكامل"></div>
@@ -1214,9 +1214,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div id="toothStep1">
         <!-- Phase 8B: planned-session shortcut banner (populated when this tooth+surface has a planned session) -->
         <div id="toothPlannedBanner" style="display:none;margin-bottom:12px;padding:10px 12px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.35);border-radius:8px;">
-          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">⚠️ يوجد علاج مخطّط على هذا السن:</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:6px;">يوجد علاج مخطّط على هذا السن:</div>
           <div id="toothPlannedInfo" style="font-size:13px;color:var(--text);font-weight:600;margin-bottom:8px;"></div>
-          <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:var(--green);color:var(--on-accent);border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✅ تم إنجاز العلاج المخطّط</button>
+          <button type="button" id="toothPlannedCompleteBtn" onclick="completeToothPlannedFromModal()" style="width:100%;padding:8px 12px;background:var(--green);color:var(--on-accent);border:none;border-radius:6px;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;cursor:pointer;">تم إنجاز العلاج المخطّط</button>
         </div>
         <!-- Composite surfaces: multi-select chips (crown-surface clicks only). Lets the
              dentist mark one restoration spanning several surfaces, e.g. MOD. -->
@@ -1226,7 +1226,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         </div>
         <div style="font-size:13px;color:var(--text2);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
           <span>اختر نوع العلاج:</span>
-          <a href="treatments.html" data-role-block="doctor secretary" style="font-size:11px;color:var(--green);text-decoration:none;">⚙️ إدارة العلاجات</a>
+          <a href="treatments.html" data-role-block="doctor secretary" style="font-size:11px;color:var(--green);text-decoration:none;">إدارة العلاجات</a>
         </div>
         <div class="tx-tabs" id="txTabs"></div>
         <div class="tooth-opts" id="toothOptsContainer"></div>
@@ -1282,7 +1282,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot" id="toothFoot" style="display:none;">
       <button class="btn-cancel-m" onclick="backToStep1()">رجوع</button>
-      <button class="btn-lab" id="toothLabBtn" onclick="saveToothAndOpenLab()" style="display:none;">🥽 حفظ + إرسال لمخبر</button>
+      <button class="btn-lab" id="toothLabBtn" onclick="saveToothAndOpenLab()" style="display:none;">حفظ + إرسال لمخبر</button>
       <button class="btn-save-m" onclick="saveToothTreatment()">حفظ كجلسة</button>
     </div>
   </div>
@@ -1292,7 +1292,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="labOrderModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3 id="labOrderTitle">🥽 طلب مخبر جديد</h3>
+      <h3 id="labOrderTitle">طلب مخبر جديد</h3>
       <button class="modal-close" onclick="closeModal('labOrderModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1316,7 +1316,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div style="font-size:11px;color:var(--text2);margin-top:4px;">عند الربط، التنبيهات تُوجَّه لهذا الموعد بدلاً من جميع مواعيد المريض.</div>
         <!-- Inline new-appointment fields (shown when "تحديد موعد التركيب" is chosen) -->
         <div id="labNewApptBox" style="display:none;margin-top:10px;padding:10px;background:rgba(var(--green-rgb),0.08);border:1px solid rgba(var(--green-rgb),0.3);border-radius:10px;">
-          <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;">📅 موعد التركيب الجديد</div>
+          <div style="font-size:12px;color:var(--green);font-weight:600;margin-bottom:8px;">موعد التركيب الجديد</div>
           <div class="form-row" style="margin:0;">
             <div class="form-group" style="margin:0;">
               <label>التاريخ</label>
@@ -1344,7 +1344,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <button type="button" onclick="ppOpenLabModal()" title="إضافة مخبر جديد" style="background:rgba(var(--green-rgb),0.12);border:1px solid var(--green);color:var(--green);border-radius:10px;padding:0 14px;font-family:'Cairo',sans-serif;font-size:18px;font-weight:700;cursor:pointer;white-space:nowrap;">＋</button>
         </div>
         <div id="labOrderEmptyHint" style="display:none;background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.3);color:var(--yellow);padding:8px 12px;border-radius:8px;font-size:11px;margin-top:8px;">
-          ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
+          لم تُسجَّل أي مخابر بعد. اضغط على ＋ لإضافة أول مخبر.
         </div>
       </div>
       <div class="form-row">
@@ -1383,7 +1383,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="ppLabModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>🏭 مخبر جديد</h3>
+      <h3>مخبر جديد</h3>
       <button class="modal-close" onclick="closeModal('ppLabModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1411,14 +1411,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="splitEditModal">
   <div class="modal-box" style="max-width:560px;">
     <div class="modal-head">
-      <h3>✏️ توزيع الدفعة على الجلسات</h3>
+      <h3>توزيع الدفعة على الجلسات</h3>
       <button class="modal-close" onclick="closeModal('splitEditModal')">✕</button>
     </div>
     <div class="modal-body">
       <div id="splitEditorHeader" style="margin-bottom:14px;padding:10px 13px;background:var(--bg3);border-radius:10px;border:1px solid var(--border);">
         <!-- filled by openSplitEditor() -->
       </div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">📋 وزّع المبلغ على الجلسات:</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;font-weight:600;">وزّع المبلغ على الجلسات:</div>
       <div class="split-editor-list" id="splitEditorList">
         <!-- filled by openSplitEditor() -->
       </div>
@@ -1428,9 +1428,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="split-warn" id="splitEditorWarn"></div>
     </div>
     <div class="modal-foot">
-      <button class="btn-revert-fifo" id="splitRevertBtn" onclick="revertToFifo()" title="حذف التوزيع اليدوي وإعادة التوزيع تلقائياً بنظام FIFO">🔄 رجوع لـ FIFO تلقائي</button>
+      <button class="btn-revert-fifo" id="splitRevertBtn" onclick="revertToFifo()" title="حذف التوزيع اليدوي وإعادة التوزيع تلقائياً بنظام FIFO">رجوع لـ FIFO تلقائي</button>
       <button class="btn-cancel-m" onclick="closeModal('splitEditModal')">إلغاء</button>
-      <button class="btn-save-m" id="splitSaveBtn" onclick="saveManualSplits()">💾 حفظ التوزيع</button>
+      <button class="btn-save-m" id="splitSaveBtn" onclick="saveManualSplits()">حفظ التوزيع</button>
     </div>
   </div>
 </div>
@@ -1439,7 +1439,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="ppWaModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3 style="color:#25D366;">📱 إرسال تذكير عبر WhatsApp</h3>
+      <h3 style="color:#25D366;">إرسال تذكير عبر WhatsApp</h3>
       <button class="modal-close" onclick="closeModal('ppWaModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1475,7 +1475,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="ppWaHubModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3 style="color:#25D366;">📱 مراسلة عبر WhatsApp</h3>
+      <h3 style="color:#25D366;">مراسلة عبر WhatsApp</h3>
       <button class="modal-close" onclick="closeModal('ppWaHubModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1496,7 +1496,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="ppWaComposeModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3 id="ppWaComposeTitle" style="color:#25D366;">📱 إرسال عبر WhatsApp</h3>
+      <h3 id="ppWaComposeTitle" style="color:#25D366;">إرسال عبر WhatsApp</h3>
       <button class="modal-close" onclick="closeModal('ppWaComposeModal')">✕</button>
     </div>
     <div class="modal-body">
@@ -1516,7 +1516,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeModal('ppWaComposeModal')">إلغاء</button>
-      <button type="button" class="btn" onclick="ppWaComposeCopy()" style="font-size:13px;">📋 نسخ النص</button>
+      <button type="button" class="btn" onclick="ppWaComposeCopy()" style="font-size:13px;">نسخ النص</button>
       <button type="button" class="wa-send-btn" onclick="ppWaComposeSend()">
         <span>📱</span> <span>فتح WhatsApp</span>
       </button>
@@ -1534,7 +1534,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="modal-body" style="text-align:center;">
       <img id="pfLightboxImg" alt="" style="max-width:100%;max-height:70vh;border-radius:10px;display:none;">
       <a id="pfLightboxDownload" href="#" target="_blank" rel="noopener" download
-         style="display:inline-block;margin-top:14px;background:var(--green);color:var(--bg);text-decoration:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:13px;">⬇️ تنزيل</a>
+         style="display:inline-block;margin-top:14px;background:var(--green);color:var(--bg);text-decoration:none;border-radius:10px;padding:9px 18px;font-weight:700;font-size:13px;">تنزيل</a>
     </div>
   </div>
 </div>
@@ -1543,16 +1543,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="printChoiceModal" onclick="if(event.target===this) closeModal('printChoiceModal')">
   <div class="modal-box" style="max-width:440px;">
     <div class="modal-head">
-      <h3>🖨️ طباعة سجل المريض</h3>
+      <h3>طباعة سجل المريض</h3>
       <button class="modal-close" onclick="closeModal('printChoiceModal')">✕</button>
     </div>
     <div class="modal-body">
       <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">اختر نوع النسخة. بعد فتح حوار الطباعة يمكنك اختيار «حفظ كـ PDF».</div>
       <button class="btn btn-outline" style="width:100%;justify-content:center;margin-bottom:10px;padding:13px;" onclick="doPrintRecord(false)">
-        🧑‍⚕️ نسخة للمريض <span style="color:var(--text2);font-weight:400;font-size:12px;">(بدون أسعار)</span>
+        نسخة للمريض <span style="color:var(--text2);font-weight:400;font-size:12px;">(بدون أسعار)</span>
       </button>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px;" onclick="doPrintRecord(true)">
-        🗄️ أرشيف داخلي <span style="opacity:.8;font-weight:400;font-size:12px;">(مع الأسعار والمدفوعات)</span>
+        أرشيف داخلي <span style="opacity:.8;font-weight:400;font-size:12px;">(مع الأسعار والمدفوعات)</span>
       </button>
     </div>
   </div>
@@ -1561,7 +1561,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: روشتة جديدة -->
 <div class="modal-overlay" id="rxModal">
   <div class="modal-box" style="max-width:680px;">
-    <div class="modal-head"><h3>💊 روشتة جديدة</h3><button class="modal-close" onclick="closeModal('rxModal')">✕</button></div>
+    <div class="modal-head"><h3>روشتة جديدة</h3><button class="modal-close" onclick="closeModal('rxModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group" id="rxProviderGroup" style="display:none;">
@@ -1574,7 +1574,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
             <select id="rxTemplatePick" onchange="rxApplyTemplate(this.value)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
               <option value="">— بلا قالب —</option>
             </select>
-            <button type="button" class="btn" onclick="openRxTemplatesModal()" title="إدارة القوالب" style="padding:10px 14px;font-size:14px;white-space:nowrap;">⚙️ القوالب</button>
+            <button type="button" class="btn" onclick="openRxTemplatesModal()" title="إدارة القوالب" style="padding:10px 14px;font-size:14px;white-space:nowrap;">القوالب</button>
           </div>
         </div>
       </div>
@@ -1585,7 +1585,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <label style="display:block;font-weight:700;margin:14px 0 8px;color:var(--text);">الأدوية</label>
       <div id="rxItemsWrap"></div>
-      <button class="btn" onclick="rxAddItemRow()" style="font-size:13px;padding:7px 14px;margin-top:6px;">➕ دواء آخر</button>
+      <button class="btn" onclick="rxAddItemRow()" style="font-size:13px;padding:7px 14px;margin-top:6px;">دواء آخر</button>
 
       <div class="form-group" style="margin-top:14px;"><label>ملاحظات عامة (اختياري)</label><textarea id="rxNotes" placeholder="مثال: مراجعة بعد أسبوع، الامتناع عن المشروبات الساخنة…"></textarea></div>
 
@@ -1609,7 +1609,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: إدارة قوالب الروشتات -->
 <div class="modal-overlay" id="rxTemplatesModal">
   <div class="modal-box" style="max-width:560px;">
-    <div class="modal-head"><h3>⚙️ إدارة قوالب الروشتات</h3><button class="modal-close" onclick="closeModal('rxTemplatesModal')">✕</button></div>
+    <div class="modal-head"><h3>إدارة قوالب الروشتات</h3><button class="modal-close" onclick="closeModal('rxTemplatesModal')">✕</button></div>
     <div class="modal-body">
       <div id="rxTemplatesList"></div>
     </div>
@@ -1622,7 +1622,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: تعليمات جديدة لهذا المريض (P6 — نظير مودال الروشتة) -->
 <div class="modal-overlay" id="postOpModal">
   <div class="modal-box" style="max-width:600px;">
-    <div class="modal-head"><h3>📋 تعليمات جديدة</h3><button class="modal-close" onclick="closeModal('postOpModal')">✕</button></div>
+    <div class="modal-head"><h3>تعليمات جديدة</h3><button class="modal-close" onclick="closeModal('postOpModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-group">
         <label>تعبئة من قالب</label>
@@ -1630,7 +1630,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
           <select id="postOpTemplatePick" onchange="postOpApplyTemplate(this.value)" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:Cairo,sans-serif;font-size:14px;">
             <option value="">— بلا قالب —</option>
           </select>
-          <button type="button" class="btn" onclick="openPostOpTemplatesModal()" title="إدارة القوالب" style="padding:10px 14px;font-size:14px;white-space:nowrap;">⚙️ القوالب</button>
+          <button type="button" class="btn" onclick="openPostOpTemplatesModal()" title="إدارة القوالب" style="padding:10px 14px;font-size:14px;white-space:nowrap;">القوالب</button>
         </div>
       </div>
       <div class="form-group"><label>مرتبط بنوع علاج (اختياري)</label>
@@ -1665,9 +1665,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: إدارة قوالب التعليمات (P6 — نظير مودال قوالب الروشتات) -->
 <div class="modal-overlay" id="postOpTemplatesModal">
   <div class="modal-box" style="max-width:560px;">
-    <div class="modal-head"><h3>⚙️ إدارة قوالب التعليمات</h3><button class="modal-close" onclick="closeModal('postOpTemplatesModal')">✕</button></div>
+    <div class="modal-head"><h3>إدارة قوالب التعليمات</h3><button class="modal-close" onclick="closeModal('postOpTemplatesModal')">✕</button></div>
     <div class="modal-body">
-      <button class="btn btn-primary" onclick="openPostOpTemplateEdit()" style="font-size:13px;padding:8px 16px;margin-bottom:12px;">➕ قالب جديد</button>
+      <button class="btn btn-primary" onclick="openPostOpTemplateEdit()" style="font-size:13px;padding:8px 16px;margin-bottom:12px;">قالب جديد</button>
       <div id="postOpTemplatesList"></div>
     </div>
     <div class="modal-foot">
@@ -1679,7 +1679,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: إنشاء/تعديل قالب تعليمات (P6) -->
 <div class="modal-overlay" id="postOpTemplateEditModal">
   <div class="modal-box" style="max-width:560px;">
-    <div class="modal-head"><h3 id="postOpTplTitle">📋 قالب تعليمات جديد</h3><button class="modal-close" onclick="closeModal('postOpTemplateEditModal')">✕</button></div>
+    <div class="modal-head"><h3 id="postOpTplTitle">قالب تعليمات جديد</h3><button class="modal-close" onclick="closeModal('postOpTemplateEditModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-group"><label>اسم القالب *</label>
         <input type="text" id="postOpTplName" placeholder="مثال: تعليمات بعد قلع السن">
@@ -1703,7 +1703,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <!-- Modal: تأكيد خصم المواد من المخزون (P3-B) -->
 <div class="modal-overlay" id="matDeductModal">
   <div class="modal-box" style="max-width:480px;">
-    <div class="modal-head"><h3>🧰 خصم مواد من المخزون</h3><button class="modal-close" onclick="closeModal('matDeductModal')">✕</button></div>
+    <div class="modal-head"><h3>خصم مواد من المخزون</h3><button class="modal-close" onclick="closeModal('matDeductModal')">✕</button></div>
     <div class="modal-body">
       <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">
         هذا العلاج يستهلك المواد التالية. راجع الكميات (يمكن تعديلها) ثم أكّد الخصم، أو تخطَّ.

@@ -503,11 +503,11 @@ textarea { resize: vertical; min-height: 80px; }
     </button>
     <button class="btn-add" onclick="exportPatientsCsv()" title="تصدير قائمة المرضى إلى ملف CSV (Excel)"
             style="background:transparent;border:1px solid var(--border, #1e3556);color:var(--text2, #8da0bd);">
-      ⬇️ تصدير CSV
+      تصدير CSV
     </button>
     <button class="btn-add" onclick="openPrmModal()" title="متابعة المرضى: الاستدعاء الدوري وأعياد الميلاد"
             style="background:transparent;border:1px solid var(--border, #1e3556);color:var(--text2, #8da0bd);">
-      🔔 متابعة <span id="prmBadge" style="display:none;background:#e5484d;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:4px;">0</span>
+      متابعة <span id="prmBadge" style="display:none;background:#e5484d;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:4px;">0</span>
     </button>
   </div>
 
@@ -660,12 +660,12 @@ textarea { resize: vertical; min-height: 80px; }
 <div class="modal-overlay" id="prmModal" onclick="if(event.target===this)prmClose()">
   <div class="modal" id="prmBox" style="max-width:640px;">
     <div class="modal-header">
-      <div class="modal-title">🔔 متابعة المرضى</div>
+      <div class="modal-title">متابعة المرضى</div>
       <button class="modal-close" onclick="prmClose()">✕</button>
     </div>
     <div style="display:flex;gap:8px;padding:4px 0 12px;border-bottom:1px solid var(--border,#1e3556);margin-bottom:6px;">
-      <button id="prmTabRecall" onclick="prmSwitchTab('recall')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--green,var(--green));color:#06371f;font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🔁 الاستدعاء الدوري <span id="prmRecallCount" style="opacity:.8;">0</span></button>
-      <button id="prmTabBday" onclick="prmSwitchTab('bday')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">🎂 أعياد الميلاد <span id="prmBdayCount" style="opacity:.8;">0</span></button>
+      <button id="prmTabRecall" onclick="prmSwitchTab('recall')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:var(--green,var(--green));color:#06371f;font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">الاستدعاء الدوري <span id="prmRecallCount" style="opacity:.8;">0</span></button>
+      <button id="prmTabBday" onclick="prmSwitchTab('bday')" style="flex:1;padding:9px;border:1px solid var(--border,#1e3556);border-radius:8px;background:transparent;color:var(--text2,#8da0bd);font-family:Cairo,sans-serif;font-weight:700;font-size:13px;cursor:pointer;">أعياد الميلاد <span id="prmBdayCount" style="opacity:.8;">0</span></button>
     </div>
     <div id="prmRecallView" style="max-height:58vh;overflow:auto;"></div>
     <div id="prmBdayView" style="display:none;max-height:58vh;overflow:auto;"></div>

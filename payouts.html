@@ -425,7 +425,7 @@ body {
       💳 <span>الرواتب والدفعات</span>
     </div>
     <button class="btn-add" onclick="openModal()">
-      ✚ دفعة جديدة
+      دفعة جديدة
     </button>
   </div>
 
@@ -434,22 +434,22 @@ body {
     <!-- Stats strip -->
     <div class="stats-strip">
       <div class="stat-card">
-        <div class="stat-label">📅 هذا الشهر</div>
+        <div class="stat-label">هذا الشهر</div>
         <div class="stat-value" id="statMonth">0 ل.س</div>
         <div class="stat-sub" id="statMonthCount">0 دفعة</div>
       </div>
       <div class="stat-card alt">
-        <div class="stat-label">📊 هذه السنة</div>
+        <div class="stat-label">هذه السنة</div>
         <div class="stat-value" id="statYear">0 ل.س</div>
         <div class="stat-sub" id="statYearCount">0 دفعة</div>
       </div>
       <div class="stat-card alt2">
-        <div class="stat-label">💰 الإجمالي</div>
+        <div class="stat-label">الإجمالي</div>
         <div class="stat-value" id="statTotal">0 ل.س</div>
         <div class="stat-sub" id="statTotalCount">0 دفعة</div>
       </div>
       <div class="stat-card alt3">
-        <div class="stat-label">👥 الموظفون النشطون</div>
+        <div class="stat-label">الموظفون النشطون</div>
         <div class="stat-value" id="statEmployees">0</div>
         <div class="stat-sub">يستلمون دفعات</div>
       </div>
@@ -465,10 +465,10 @@ body {
         <span class="filter-label">الطريقة:</span>
         <div class="chips" id="methodFilters">
           <div class="chip active" data-method="all" onclick="setMethodFilter('all')">الكل</div>
-          <div class="chip" data-method="cash" onclick="setMethodFilter('cash')">💵 نقد</div>
-          <div class="chip" data-method="bank" onclick="setMethodFilter('bank')">🏦 بنك</div>
-          <div class="chip" data-method="check" onclick="setMethodFilter('check')">📋 شيك</div>
-          <div class="chip" data-method="other" onclick="setMethodFilter('other')">📌 أخر</div>
+          <div class="chip" data-method="cash" onclick="setMethodFilter('cash')">نقد</div>
+          <div class="chip" data-method="bank" onclick="setMethodFilter('bank')">بنك</div>
+          <div class="chip" data-method="check" onclick="setMethodFilter('check')">شيك</div>
+          <div class="chip" data-method="other" onclick="setMethodFilter('other')">أخر</div>
         </div>
       </div>
       <div class="filter-row">
@@ -546,17 +546,17 @@ body {
       <div class="field">
         <label>طريقة الدفع</label>
         <div class="method-chips" id="methodChipsModal">
-          <div class="method-chip" data-method="cash" onclick="setModalMethod('cash')">💵 نقد</div>
-          <div class="method-chip" data-method="bank" onclick="setModalMethod('bank')">🏦 بنك</div>
-          <div class="method-chip" data-method="check" onclick="setModalMethod('check')">📋 شيك</div>
-          <div class="method-chip" data-method="other" onclick="setModalMethod('other')">📌 أخر</div>
+          <div class="method-chip" data-method="cash" onclick="setModalMethod('cash')">نقد</div>
+          <div class="method-chip" data-method="bank" onclick="setModalMethod('bank')">بنك</div>
+          <div class="method-chip" data-method="check" onclick="setModalMethod('check')">شيك</div>
+          <div class="method-chip" data-method="other" onclick="setModalMethod('other')">أخر</div>
         </div>
       </div>
 
       <!-- Breakdown (collapsible) -->
       <div class="breakdown-section" id="breakdownSection">
         <div class="breakdown-toggle" onclick="toggleBreakdown()">
-          <span>📊 تفصيل الدفعة (اختياري)</span>
+          <span>تفصيل الدفعة (اختياري)</span>
           <span class="arrow">▼</span>
         </div>
         <div class="breakdown-body">
@@ -588,9 +588,9 @@ body {
 
     </div>
     <div class="modal-footer">
-      <button class="btn danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none;">🗑️ حذف</button>
+      <button class="btn danger" id="deleteBtn" onclick="deleteCurrent()" style="display:none;">حذف</button>
       <button class="btn" onclick="closeModal()">إلغاء</button>
-      <button class="btn primary" onclick="savePayout()">💾 حفظ</button>
+      <button class="btn primary" onclick="savePayout()">حفظ</button>
     </div>
   </div>
 </div>

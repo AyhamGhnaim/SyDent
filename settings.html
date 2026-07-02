@@ -476,10 +476,10 @@ textarea::placeholder { color: var(--text2); }
       </a>
     </div>
 
-    <h2 class="settings-group-title first-group" id="grp-account">👤 الحساب</h2>
+    <h2 class="settings-group-title first-group" id="grp-account">الحساب</h2>
     <!-- 1. المعلومات الشخصية -->
     <div class="section">
-      <div class="section-title">👤 المعلومات الشخصية</div>
+      <div class="section-title">المعلومات الشخصية</div>
       <div class="section-sub">سيظهر اسمك في الشريط الجانبي ولوحة التحكم</div>
       <form onsubmit="saveProfile(event)">
         <div class="form-group">
@@ -501,18 +501,18 @@ textarea::placeholder { color: var(--text2); }
 
     <!-- 1.5 معلومات الروشتة -->
     <div class="section">
-      <div class="section-title">💊 معلومات الروشتة</div>
+      <div class="section-title">معلومات الروشتة</div>
       <div class="section-sub">تظهر على رأس الروشتة الطبية المطبوعة</div>
       <div class="form-group">
         <label>رقم النقابة</label>
         <input type="text" id="fLicenseNo" placeholder="مثال: 12345" style="max-width:300px;">
       </div>
-      <button type="button" class="btn btn-primary" id="btnSaveLicense" onclick="saveLicenseNo()">💾 حفظ</button>
+      <button type="button" class="btn btn-primary" id="btnSaveLicense" onclick="saveLicenseNo()">حفظ</button>
     </div>
 
     <!-- 2. تغيير البريد -->
     <div class="section">
-      <div class="section-title">📧 تغيير البريد الإلكتروني</div>
+      <div class="section-title">تغيير البريد الإلكتروني</div>
       <div class="section-sub">بعد التغيير، ستحتاج إلى التحقق من بريدك الجديد</div>
       <form onsubmit="changeEmail(event)">
         <div class="form-group">
@@ -529,7 +529,7 @@ textarea::placeholder { color: var(--text2); }
 
     <!-- 3. تغيير كلمة المرور -->
     <div class="section">
-      <div class="section-title">🔒 تغيير كلمة المرور</div>
+      <div class="section-title">تغيير كلمة المرور</div>
       <div class="section-sub">يجب أن تكون كلمة المرور 6 أحرف على الأقل</div>
       <form onsubmit="changePassword(event)">
         <div class="form-group">
@@ -544,16 +544,16 @@ textarea::placeholder { color: var(--text2); }
       </form>
     </div>
 
-    <h2 class="settings-group-title" id="grp-clinic">🏥 العيادة</h2>
+    <h2 class="settings-group-title" id="grp-clinic">العيادة</h2>
     <!-- 1.5 إعدادات المواعيد — Gap 5 -->
     <div class="section">
-      <div class="section-title">🗓️ إعدادات المواعيد</div>
+      <div class="section-title">إعدادات المواعيد</div>
       <div class="section-sub">رسم اختياري يُطبَّق على المريض الذي لا يحضر موعده (بدون تواصل أو بإلغاء متأخر).</div>
       <form onsubmit="saveAppointmentSettings(event)">
 
         <!-- No-show fee — renamed to "رسم عدم الحضور" for clarity -->
         <div style="background:rgba(239,83,80,0.08);border:1px solid rgba(239,83,80,0.25);border-radius:10px;padding:14px;margin-bottom:14px;">
-          <div style="font-weight:700;color:#ef5350;margin-bottom:10px;font-size:14px;">💸 رسم عدم الحضور</div>
+          <div style="font-weight:700;color:#ef5350;margin-bottom:10px;font-size:14px;">رسم عدم الحضور</div>
           <div class="form-group">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text);">
               <input type="checkbox" id="fNoShowFeeEnabled" style="width:auto;margin:0;">
@@ -572,7 +572,7 @@ textarea::placeholder { color: var(--text2); }
 
     <!-- 1.6 قوالب المواعيد — Gap 8 -->
     <div class="section" id="apptTypes">
-      <div class="section-title">🎨 قوالب المواعيد</div>
+      <div class="section-title">قوالب المواعيد</div>
       <div class="section-sub">قوالب جاهزة لتسريع حجز المواعيد الشائعة (تنظيف، علاج عصب، إلخ). كل قالب يحدد المدة الافتراضية والعلاج المرتبط.</div>
       <button type="button" class="btn btn-primary" onclick="openApptTypeModal()" id="btnNewApptType">+ إضافة قالب جديد</button>
       <div id="apptTypesList" style="margin-top:18px;"></div>
@@ -584,7 +584,7 @@ textarea::placeholder { color: var(--text2); }
          dropdown in the appointment form stays hidden until at least one
          active operatory exists (Soft mode — قاعدة #15). -->
     <div class="section">
-      <div class="section-title">🏥 الغرف (الكراسي)</div>
+      <div class="section-title">الغرف (الكراسي)</div>
       <div class="section-sub">عرّف غرف/كراسي العيادة لتوزيع المواعيد عليها. اختيارية — إذا عيادتك بكرسي واحد، تجاهل هذا القسم. كل غرفة ممكن تكون لها لون مميّز وطبيب افتراضي.</div>
       <button type="button" class="btn btn-primary" onclick="openOperatoryModal()" id="btnNewOperatory">+ إضافة غرفة جديدة</button>
       <div id="operatoriesList" style="margin-top:18px;"></div>
@@ -592,7 +592,7 @@ textarea::placeholder { color: var(--text2); }
 
     <!-- Phase 2A: WhatsApp Reminders -->
     <div class="section" style="border-color: rgba(var(--green-rgb),0.25);">
-      <div class="section-title">🔔 تذكيرات WhatsApp للمواعيد</div>
+      <div class="section-title">تذكيرات WhatsApp للمواعيد</div>
       <div class="section-sub">أرسل تذكيرات للمرضى عبر WhatsApp قبل مواعيدهم بنقرة واحدة. <strong style="color:var(--green)">مجاني تماماً</strong> — يفتح WhatsApp Web/Mobile مع الرسالة جاهزة.</div>
 
       <div class="wa-toggle-row">
@@ -664,17 +664,17 @@ textarea::placeholder { color: var(--text2); }
       </div>
 
       <div class="wa-actions-row">
-        <button type="button" class="btn btn-primary" id="btnSaveWa" onclick="saveClinicSettings()">💾 حفظ الإعدادات</button>
-        <button type="button" class="btn-secondary" onclick="previewTemplate()">👁️ معاينة الرسائل</button>
-        <button type="button" class="btn-secondary" onclick="resetTemplate()">🔄 استعادة القوالب الافتراضية</button>
+        <button type="button" class="btn btn-primary" id="btnSaveWa" onclick="saveClinicSettings()">حفظ الإعدادات</button>
+        <button type="button" class="btn-secondary" onclick="previewTemplate()">معاينة الرسائل</button>
+        <button type="button" class="btn-secondary" onclick="resetTemplate()">استعادة القوالب الافتراضية</button>
       </div>
     </div>
 
     <!-- ═══ P5: Online Booking Portal (بوابة الحجز الإلكتروني) ═══ -->
     <div class="section" style="border-color: rgba(var(--green-rgb),0.25);" id="bookingSection">
-      <div class="section-title">🌐 الحجز الإلكتروني</div>
+      <div class="section-title">الحجز الإلكتروني</div>
       <div class="section-sub">بوابة عامة يحجز منها مرضاك بأنفسهم — يصلك الطلب في تبويب «طلبات الحجز» بصفحة المواعيد وتؤكّده بنقرة. <strong style="color:var(--green)">بلا تسجيل وبلا تطبيقات للمريض.</strong></div>
-      <div id="bookingMigNotice" style="display:none;padding:10px 12px;border-radius:10px;background:rgba(232,93,93,0.1);border:1px solid rgba(232,93,93,0.35);font-size:13px;margin-bottom:12px;">⚠️ يلزم تطبيق <b>Migration 59</b> على قاعدة البيانات لتفعيل هذا القسم.</div>
+      <div id="bookingMigNotice" style="display:none;padding:10px 12px;border-radius:10px;background:rgba(232,93,93,0.1);border:1px solid rgba(232,93,93,0.35);font-size:13px;margin-bottom:12px;">يلزم تطبيق <b>Migration 59</b> على قاعدة البيانات لتفعيل هذا القسم.</div>
 
       <div class="form-group" style="display:flex;align-items:center;gap:10px;">
         <input type="checkbox" id="bkEnabled" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer;">
@@ -729,25 +729,25 @@ textarea::placeholder { color: var(--text2); }
         <label>رابط بوابة الحجز — شاركه على واتساب وفيسبوك العيادة</label>
         <div style="display:flex;gap:8px;">
           <input type="text" id="bkLink" readonly style="flex:1;direction:ltr;text-align:left;font-size:12.5px;">
-          <button type="button" class="btn btn-primary" style="flex:0 0 auto;" onclick="copyBookingLink()">📋 نسخ</button>
+          <button type="button" class="btn btn-primary" style="flex:0 0 auto;" onclick="copyBookingLink()">نسخ</button>
         </div>
       </div>
 
-      <button type="button" class="btn btn-primary" id="btnSaveBooking" onclick="saveBookingSettings()">💾 حفظ إعدادات الحجز</button>
+      <button type="button" class="btn btn-primary" id="btnSaveBooking" onclick="saveBookingSettings()">حفظ إعدادات الحجز</button>
     </div>
 
-    <h2 class="settings-group-title" id="grp-advanced">🛠️ متقدّم</h2>
+    <h2 class="settings-group-title" id="grp-advanced">متقدّم</h2>
     <!-- Bug #2: Backfill orphaned payment splits -->
     <div class="section">
-      <div class="section-title">🛠️ صيانة البيانات</div>
+      <div class="section-title">صيانة البيانات</div>
       <div class="section-sub">أدوات لمعالجة بيانات قديمة قد تحتاج إعادة معالجة.</div>
 
       <div class="maint-card" id="backfillCard">
         <div class="maint-head">
           <div>
-            <div class="maint-title">📦 توزيع الدفعات القديمة</div>
+            <div class="maint-title">توزيع الدفعات القديمة</div>
           </div>
-          <button type="button" class="btn-maint-refresh" onclick="scanOrphanedPayments()" title="فحص الدفعات بدون توزيع">🔍 فحص</button>
+          <button type="button" class="btn-maint-refresh" onclick="scanOrphanedPayments()" title="فحص الدفعات بدون توزيع">فحص</button>
         </div>
         <div class="maint-status" id="backfillStatus">
           <div class="maint-row"><span class="maint-lbl">الحالة:</span><span class="maint-val muted">لم يتم الفحص بعد</span></div>
@@ -756,14 +756,14 @@ textarea::placeholder { color: var(--text2); }
           <div class="maint-progress-bar"><div class="maint-progress-fill" id="backfillProgressFill"></div></div>
           <div class="maint-progress-text" id="backfillProgressText">0 / 0</div>
         </div>
-        <button type="button" class="btn btn-primary" id="btnBackfillRun" onclick="runBackfill()" disabled style="margin-top:12px;">🔧 توزيع الدفعات تلقائياً</button>
+        <button type="button" class="btn btn-primary" id="btnBackfillRun" onclick="runBackfill()" disabled style="margin-top:12px;">توزيع الدفعات تلقائياً</button>
       </div>
     </div>
 
-    <h2 class="settings-group-title danger" id="grp-danger">⚠️ منطقة الخطر</h2>
+    <h2 class="settings-group-title danger" id="grp-danger">منطقة الخطر</h2>
     <!-- 4. حذف الحساب -->
     <div class="section danger danger-section">
-      <div class="section-title danger">⚠️ حذف الحساب</div>
+      <div class="section-title danger">حذف الحساب</div>
       <div class="section-sub">حذف الحساب نهائي — لا يمكن استرجاع البيانات بعد الحذف</div>
       <button type="button" class="btn btn-danger" onclick="openDeleteModal()">حذف حسابي نهائياً</button>
     </div>
@@ -791,7 +791,7 @@ textarea::placeholder { color: var(--text2); }
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يستخدم لتحديد اللون والسعر تلقائياً</div>
     </div>
     <div class="form-group" id="fAtProviderWrap">
-      <label>👨‍⚕️ الطبيب الافتراضي</label>
+      <label>الطبيب الافتراضي</label>
       <select id="fAtProvider"></select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار القالب</div>
     </div>
@@ -799,20 +799,20 @@ textarea::placeholder { color: var(--text2); }
          when the clinic has no active operatories (Soft mode — قاعدة #15)
          so single-chair clinics never see clutter. -->
     <div class="form-group" id="fAtOperatoryWrap" style="display:none;">
-      <label>🏥 الغرفة الافتراضية</label>
+      <label>الغرفة الافتراضية</label>
       <select id="fAtOperatory">
         <option value="">— بدون غرفة —</option>
       </select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — للعيادات متعددة الكراسي/الغرف</div>
     </div>
     <div class="form-group" id="fAtNotesWrap">
-      <label>📝 ملاحظات افتراضية</label>
+      <label>ملاحظات افتراضية</label>
       <textarea id="fAtNotes" maxlength="500" rows="3" placeholder="مثال: تأكد من جاهزية المخبر قبل الموعد بيومين" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — تُضاف تلقائياً إلى حقل ملاحظات الموعد عند اختيار هذا القالب (500 حرف كحد أقصى)</div>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeApptTypeModal()">إلغاء</button>
-      <button type="button" class="btn btn-primary" id="btnSaveApptType" onclick="saveApptType()">💾 حفظ</button>
+      <button type="button" class="btn btn-primary" id="btnSaveApptType" onclick="saveApptType()">حفظ</button>
     </div>
   </div>
 </div>
@@ -845,7 +845,7 @@ textarea::placeholder { color: var(--text2); }
       </div>
     </div>
     <div class="form-group" id="fOpDefaultProviderWrap">
-      <label>👨‍⚕️ الطبيب الافتراضي</label>
+      <label>الطبيب الافتراضي</label>
       <select id="fOpDefaultProvider"></select>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">اختياري — يحدد الطبيب تلقائياً عند اختيار الغرفة (إذا لم يُحدِّده القالب)</div>
     </div>
@@ -858,7 +858,7 @@ textarea::placeholder { color: var(--text2); }
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="closeOperatoryModal()">إلغاء</button>
-      <button type="button" class="btn btn-primary" id="btnSaveOperatory" onclick="saveOperatory()">💾 حفظ</button>
+      <button type="button" class="btn btn-primary" id="btnSaveOperatory" onclick="saveOperatory()">حفظ</button>
     </div>
   </div>
 </div>
@@ -866,7 +866,7 @@ textarea::placeholder { color: var(--text2); }
 <!-- Modal تأكيد الحذف -->
 <div class="modal-overlay" id="deleteModal" onclick="if(event.target===this) closeDeleteModal()">
   <div class="modal">
-    <div class="modal-title">⚠️ تأكيد حذف الحساب</div>
+    <div class="modal-title">تأكيد حذف الحساب</div>
     <div class="modal-warning">
       هذا الإجراء <strong>نهائي ولا يمكن التراجع عنه</strong>. سيتم حذف:
       <ul>
@@ -896,7 +896,7 @@ textarea::placeholder { color: var(--text2); }
 <!-- Modal معاينة قالب WhatsApp -->
 <div class="modal-overlay" id="waPreviewModal" onclick="if(event.target===this) closeWaPreview()">
   <div class="modal wa-preview">
-    <div class="modal-title">👁️ معاينة الرسالة</div>
+    <div class="modal-title">معاينة الرسالة</div>
     <div style="font-size:13px; color:var(--text2); margin-bottom:6px;">هذه معاينة برسالة عيّنة (بيانات تجريبية)</div>
     <div class="wa-preview-box">
       <div class="wa-preview-bubble" id="waPreviewBubble"></div>

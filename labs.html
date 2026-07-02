@@ -587,7 +587,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
     <!-- Labs Management -->
     <div class="section">
       <div class="section-head">
-        <div class="section-title">🏭 المخابر المسجّلة <span class="count-badge" id="labsCount">0</span></div>
+        <div class="section-title">المخابر المسجّلة <span class="count-badge" id="labsCount">0</span></div>
         <button class="btn-sm-add" onclick="openLabModal()">＋ مخبر جديد</button>
       </div>
       <div id="labsList"></div>
@@ -596,17 +596,17 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
     <!-- Filters -->
     <div class="filters">
       <button class="filter-btn active" data-filter="all" onclick="applyFilter('all', this)">الكل</button>
-      <button class="filter-btn" data-filter="sent" onclick="applyFilter('sent', this)">🔵 تم التسليم للمخبر</button>
-      <button class="filter-btn" data-filter="received" onclick="applyFilter('received', this)">🟡 تم الاستلام من المخبر</button>
-      <button class="filter-btn" data-filter="checked" onclick="applyFilter('checked', this)">🟢 تم الفحص</button>
-      <button class="filter-btn" data-filter="delivered" onclick="applyFilter('delivered', this)">⚫ تم التركيب</button>
-      <button class="filter-btn" data-filter="redo" onclick="applyFilter('redo', this)">🔄 إعادة</button>
+      <button class="filter-btn" data-filter="sent" onclick="applyFilter('sent', this)">تم التسليم للمخبر</button>
+      <button class="filter-btn" data-filter="received" onclick="applyFilter('received', this)">تم الاستلام من المخبر</button>
+      <button class="filter-btn" data-filter="checked" onclick="applyFilter('checked', this)">تم الفحص</button>
+      <button class="filter-btn" data-filter="delivered" onclick="applyFilter('delivered', this)">تم التركيب</button>
+      <button class="filter-btn" data-filter="redo" onclick="applyFilter('redo', this)">إعادة</button>
     </div>
 
     <!-- Orders -->
     <div class="section">
       <div class="section-head">
-        <div class="section-title">📋 طلبات المخابر <span class="count-badge" id="resultCount">0</span></div>
+        <div class="section-title">طلبات المخابر <span class="count-badge" id="resultCount">0</span></div>
       </div>
       <div class="table-scroll">
         <table id="ordersTable">
@@ -647,13 +647,13 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
 <div class="modal-overlay" id="labOrderModal">
   <div class="modal">
     <div class="modal-head">
-      <h3 id="labOrderTitle">🥽 طلب مخبر جديد</h3>
+      <h3 id="labOrderTitle">طلب مخبر جديد</h3>
       <button class="modal-close" onclick="closeModal('labOrderModal')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="labOrderId">
       <div id="labOrderEmptyHint" class="empty-hint" style="display:none;">
-        ⚠️ لم تُسجَّل أي مخابر بعد. اضغط على ＋ بجانب حقل المخبر لإضافة أول مخبر.
+        لم تُسجَّل أي مخابر بعد. اضغط على ＋ بجانب حقل المخبر لإضافة أول مخبر.
       </div>
       <div class="form-group">
         <label>المريض</label>
@@ -726,7 +726,7 @@ a.appt-badge:hover { background: rgba(99,179,237,0.28) !important; }
 <div class="modal-overlay" id="labModal">
   <div class="modal">
     <div class="modal-head">
-      <h3 id="labModalTitle">🏭 مخبر جديد</h3>
+      <h3 id="labModalTitle">مخبر جديد</h3>
       <button class="modal-close" onclick="closeLabModal()">✕</button>
     </div>
     <div class="modal-body">

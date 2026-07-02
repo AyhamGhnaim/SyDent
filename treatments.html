@@ -200,12 +200,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="topbar">
   <div>
-    <div class="tb-title">🦷 قائمة العلاجات</div>
+    <div class="tb-title">قائمة العلاجات</div>
     <div class="tb-sub">إدارة الأنواع والأسعار والألوان</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-outline" onclick="printLegend()" title="طباعة دليل العلاجات والألوان">🖨️ طباعة الدليل</button>
-    <button class="btn btn-outline" onclick="resetToDefaults()">↺ استعادة الافتراضي</button>
+    <button class="btn btn-outline" onclick="printLegend()" title="طباعة دليل العلاجات والألوان">طباعة الدليل</button>
+    <button class="btn btn-outline" onclick="resetToDefaults()">استعادة الافتراضي</button>
     <button class="btn btn-primary" onclick="openAddModal()">＋ علاج جديد</button>
   </div>
 </div>
@@ -220,20 +220,20 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
       <select id="catFilter" onchange="applyCatFilter()" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">
-        <option value="all">📂 جميع التصنيفات</option>
-        <option value="diagnostic">🔍 تشخيصي</option>
-        <option value="preventive">🛡️ وقائي</option>
-        <option value="restorative">🦷 ترميمي</option>
-        <option value="endodontics">🌱 لب وجذر</option>
-        <option value="surgical">🔪 جراحي</option>
-        <option value="prosthodontics">🔗 تعويضي</option>
-        <option value="implantology">🔩 زراعة</option>
-        <option value="cosmetic">✨ تجميلي</option>
-        <option value="prosth_cosmetic">💎 تعويض تجميلي</option>
-        <option value="orthodontics">⚓ تقويم</option>
-        <option value="periodontics">🌿 لثوي</option>
-        <option value="pediatric">🧒 أطفال</option>
-        <option value="other">📋 أخرى</option>
+        <option value="all">جميع التصنيفات</option>
+        <option value="diagnostic">تشخيصي</option>
+        <option value="preventive">وقائي</option>
+        <option value="restorative">ترميمي</option>
+        <option value="endodontics">لب وجذر</option>
+        <option value="surgical">جراحي</option>
+        <option value="prosthodontics">تعويضي</option>
+        <option value="implantology">زراعة</option>
+        <option value="cosmetic">تجميلي</option>
+        <option value="prosth_cosmetic">تعويض تجميلي</option>
+        <option value="orthodontics">تقويم</option>
+        <option value="periodontics">لثوي</option>
+        <option value="pediatric">أطفال</option>
+        <option value="other">أخرى</option>
       </select>
     </div>
     <div class="filter-chips" id="filterChips">
@@ -248,7 +248,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <button class="chip" data-filter="quadrant">ربع</button>
       <button class="chip" data-filter="arch">فك</button>
       <button class="chip" data-filter="mouth">فم كامل</button>
-      <button class="chip" data-filter="lab">🥽 مخبر</button>
+      <button class="chip" data-filter="lab">مخبر</button>
       <button class="chip" data-filter="custom">مخصصة</button>
       <button class="chip" data-filter="inactive">⏸️ معطّلة</button>
     </div>
@@ -323,19 +323,19 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group">
         <label>التصنيف</label>
         <select id="tCategory" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-family:'Cairo',sans-serif;font-size:14px;">
-          <option value="diagnostic">🔍 تشخيصي (أشعة، استشارة)</option>
-          <option value="preventive">🛡️ وقائي (تنظيف، فلوريد)</option>
-          <option value="restorative" selected>🦷 ترميمي (حشوات)</option>
-          <option value="endodontics">🌱 لب وجذر (قناة جذر)</option>
-          <option value="surgical">🔪 جراحي (قلع، جراحة)</option>
-          <option value="prosthodontics">🔗 تعويضي (تاج، جسر، طقم)</option>
-          <option value="implantology">🔩 زراعة</option>
-          <option value="cosmetic">✨ تجميلي (تبييض)</option>
-          <option value="prosth_cosmetic">💎 تعويض تجميلي (فينير، زركون)</option>
-          <option value="orthodontics">⚓ تقويم</option>
-          <option value="periodontics">🌿 لثوي (تقليح، معالجة لثة)</option>
-          <option value="pediatric">🧒 أطفال (لبني، حافظ مسافة)</option>
-          <option value="other">📋 أخرى</option>
+          <option value="diagnostic">تشخيصي (أشعة، استشارة)</option>
+          <option value="preventive">وقائي (تنظيف، فلوريد)</option>
+          <option value="restorative" selected>ترميمي (حشوات)</option>
+          <option value="endodontics">لب وجذر (قناة جذر)</option>
+          <option value="surgical">جراحي (قلع، جراحة)</option>
+          <option value="prosthodontics">تعويضي (تاج، جسر، طقم)</option>
+          <option value="implantology">زراعة</option>
+          <option value="cosmetic">تجميلي (تبييض)</option>
+          <option value="prosth_cosmetic">تعويض تجميلي (فينير، زركون)</option>
+          <option value="orthodontics">تقويم</option>
+          <option value="periodontics">لثوي (تقليح، معالجة لثة)</option>
+          <option value="pediatric">أطفال (لبني، حافظ مسافة)</option>
+          <option value="other">أخرى</option>
         </select>
       </div>
 
@@ -347,7 +347,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
       <div class="form-group">
         <label style="display:block;margin-bottom:8px;font-weight:600;color:var(--text);font-size:14px;">
-          🦷 يطبَّق على
+          يطبَّق على
         </label>
         <div id="targetPartPicker" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
           <div class="target-opt selected" data-target="crown">
@@ -490,7 +490,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="materialsModal">
   <div class="modal-box" style="max-width:560px;">
     <div class="modal-head">
-      <h3 id="matModalTitle">🧰 المواد المستهلكة</h3>
+      <h3 id="matModalTitle">المواد المستهلكة</h3>
       <button class="modal-close" onclick="closeMaterialsModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -500,7 +500,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         (مثال: إن كانت وحدة الكفوف «زوج»، اكتب 1 = زوج واحد لكل جلسة).
       </div>
       <div id="matNoInventory" style="display:none;background:rgba(245,166,35,0.1);border:1px solid rgba(245,166,35,0.4);border-radius:10px;padding:14px;font-size:13px;color:var(--text);margin-bottom:14px;">
-        ⚠️ لا توجد أصناف في المخزون بعد. أضف أصنافاً من صفحة <strong>📦 المخزون</strong> أولاً.
+        لا توجد أصناف في المخزون بعد. أضف أصنافاً من صفحة <strong>المخزون</strong> أولاً.
       </div>
       <div id="matColHeaders" style="display:none;gap:8px;align-items:center;margin-bottom:6px;font-size:11px;color:var(--text2);font-weight:700;">
         <span style="flex:1;">الصنف</span>
@@ -509,7 +509,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <span style="width:38px;"></span>
       </div>
       <div id="matRowsWrap"></div>
-      <button class="btn btn-outline" id="matAddBtn" onclick="matAddRow()" style="margin-top:8px;font-size:13px;padding:8px 16px;">➕ إضافة مادة</button>
+      <button class="btn btn-outline" id="matAddBtn" onclick="matAddRow()" style="margin-top:8px;font-size:13px;padding:8px 16px;">إضافة مادة</button>
     </div>
     <div class="modal-foot">
       <button class="btn-cancel-m" onclick="closeMaterialsModal()">إلغاء</button>

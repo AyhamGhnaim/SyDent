@@ -272,11 +272,11 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="topbar">
   <div>
-    <div class="tb-title">📊 تقارير إنتاج الأطباء</div>
+    <div class="tb-title">تقارير إنتاج الأطباء</div>
     <div class="tb-sub">إنتاج وتحصيلات ومستحقات كل طبيب في العيادة</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-outline btn-sm" onclick="refresh()">🔄 تحديث</button>
+    <button class="btn btn-outline btn-sm" onclick="refresh()">تحديث</button>
   </div>
 </div>
 
@@ -318,12 +318,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <div class="filter-group">
       <label>نوع المزوّد</label>
       <select id="providerTypeFilter" onchange="onFilterChange()">
-        <option value="all">📊 شامل</option>
-        <option value="doctor">🦷 أطباء فقط</option>
-        <option value="hygienist">🩺 متدربين/مساعدين فقط</option>
-        <option value="assistant">🤝 مساعدات كرسي فقط</option>
-        <option value="secretary">👩‍💼 سكرتيرات فقط</option>
-        <option value="other">👥 موظفون آخرون فقط</option>
+        <option value="all">شامل</option>
+        <option value="doctor">أطباء فقط</option>
+        <option value="hygienist">متدربين/مساعدين فقط</option>
+        <option value="assistant">مساعدات كرسي فقط</option>
+        <option value="secretary">سكرتيرات فقط</option>
+        <option value="other">موظفون آخرون فقط</option>
       </select>
     </div>
     <div class="filter-group">
@@ -344,9 +344,9 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
   <!-- Calculation basis toggle -->
   <div class="basis-toggle">
-    <button class="basis-btn active" data-basis="production" onclick="setBasis('production')">💰 الإنتاج</button>
-    <button class="basis-btn" data-basis="net" onclick="setBasis('net')">📉 الصافي (بعد المخبر)</button>
-    <button class="basis-btn" data-basis="collection" onclick="setBasis('collection')">💵 التحصيل</button>
+    <button class="basis-btn active" data-basis="production" onclick="setBasis('production')">الإنتاج</button>
+    <button class="basis-btn" data-basis="net" onclick="setBasis('net')">الصافي (بعد المخبر)</button>
+    <button class="basis-btn" data-basis="collection" onclick="setBasis('collection')">التحصيل</button>
   </div>
   <div class="basis-help" id="basisHelp">الإنتاج: نسبة الطبيب تُحسب من إجمالي ما سُجّل، بغض النظر عن المخبر أو التحصيل.</div>
 
@@ -377,7 +377,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="payoutModal">
   <div class="modal-box small">
     <div class="modal-head">
-      <h3 id="payoutTitle">💵 تسجيل دفعة للطبيب</h3>
+      <h3 id="payoutTitle">تسجيل دفعة للطبيب</h3>
       <button class="modal-close" onclick="closeModal('payoutModal')">×</button>
     </div>
     <div class="modal-body">
@@ -406,14 +406,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
 
       <div style="margin-top:18px;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">📜 سجل الدفعات السابقة</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">سجل الدفعات السابقة</div>
         <div id="payoutHistoryList"></div>
       </div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-outline" onclick="goToFullPayoutsPage()" style="margin-left:auto;">📋 الصفحة الكاملة</button>
+      <button class="btn btn-outline" onclick="goToFullPayoutsPage()" style="margin-left:auto;">الصفحة الكاملة</button>
       <button class="btn btn-outline" onclick="closeModal('payoutModal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="savePayout()">💾 حفظ الدفعة</button>
+      <button class="btn btn-primary" onclick="savePayout()">حفظ الدفعة</button>
     </div>
   </div>
 </div>

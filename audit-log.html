@@ -283,12 +283,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 
 <div class="topbar">
   <div>
-    <div class="tb-title">📋 سجل النشاطات</div>
+    <div class="tb-title">سجل النشاطات</div>
     <div class="tb-sub">كل العمليات الحساسة في النظام مع تنبيهات ذكية</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-outline" onclick="openArchiveModal()">📦 أرشفة قديمة</button>
-    <button class="btn btn-outline" onclick="exportCSV()">📥 تصدير CSV</button>
+    <button class="btn btn-outline" onclick="openArchiveModal()">أرشفة قديمة</button>
+    <button class="btn btn-outline" onclick="exportCSV()">تصدير CSV</button>
   </div>
 </div>
 
@@ -362,18 +362,18 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <label>تنبيهات فقط</label>
       <select id="filterAlerts">
         <option value="all">كل السجلات</option>
-        <option value="only">⚠ تنبيهات فقط</option>
+        <option value="only">تنبيهات فقط</option>
       </select>
     </div>
     <div class="filter-group">
       <label>العرض</label>
       <select id="filterArchive">
         <option value="active" selected>النشطة</option>
-        <option value="archived">📂 المؤرشفة</option>
+        <option value="archived">المؤرشفة</option>
       </select>
     </div>
     <div class="filter-group filter-apply" style="display:flex;align-items:flex-end;">
-      <button class="btn btn-primary btn-sm" onclick="applyFilters()" style="width:100%;">🔍 تطبيق</button>
+      <button class="btn btn-primary btn-sm" onclick="applyFilters()" style="width:100%;">تطبيق</button>
     </div>
   </div>
 
@@ -391,7 +391,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 <div class="modal-overlay" id="archiveModal">
   <div class="modal-box">
     <div class="modal-head">
-      <h3>📦 أرشفة السجلات القديمة</h3>
+      <h3>أرشفة السجلات القديمة</h3>
       <button class="modal-close" onclick="closeArchiveModal()">×</button>
     </div>
     <div class="modal-body">
@@ -407,7 +407,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeArchiveModal()">إلغاء</button>
-      <button class="btn btn-warning" id="archiveBtn" onclick="doArchive()">📦 أرشفة</button>
+      <button class="btn btn-warning" id="archiveBtn" onclick="doArchive()">أرشفة</button>
     </div>
   </div>
 </div>

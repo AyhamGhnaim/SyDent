@@ -956,11 +956,11 @@ textarea { resize: vertical; min-height: 72px; }
   <div class="topbar">
     <div class="topbar-title">إدارة <span>المواعيد</span></div>
     <div class="view-toggle">
-      <button class="view-btn active" id="btnMonth" onclick="setView('month')">📅 شهري</button>
-      <button class="view-btn" id="btnDay"   onclick="setView('day')">🕐 يومي</button>
-      <button class="view-btn" id="btnList"  onclick="setView('list')">☰ قائمة</button>
-      <button class="view-btn" id="btnCalls" onclick="setView('calls')">📞 اتصالات</button>
-      <button class="view-btn" id="btnBooking" onclick="setView('booking')">🌐 طلبات الحجز<span id="bookingBadge" style="display:none;background:var(--red,#e85d5d);color:#fff;border-radius:10px;padding:0 7px;margin-inline-start:6px;font-size:0.72rem;font-weight:800;"></span></button>
+      <button class="view-btn active" id="btnMonth" onclick="setView('month')">شهري</button>
+      <button class="view-btn" id="btnDay"   onclick="setView('day')">يومي</button>
+      <button class="view-btn" id="btnList"  onclick="setView('list')">قائمة</button>
+      <button class="view-btn" id="btnCalls" onclick="setView('calls')">اتصالات</button>
+      <button class="view-btn" id="btnBooking" onclick="setView('booking')">طلبات الحجز<span id="bookingBadge" style="display:none;background:var(--red,#e85d5d);color:#fff;border-radius:10px;padding:0 7px;margin-inline-start:6px;font-size:0.72rem;font-weight:800;"></span></button>
     </div>
     <button class="btn btn-primary" onclick="openModal()" data-doctor-inactive-block>＋ موعد جديد</button>
   </div>
@@ -971,10 +971,10 @@ textarea { resize: vertical; min-height: 72px; }
     <!-- Gap 7: Main tabs (Schedule | Planned) -->
     <div class="main-tabs">
       <button class="main-tab active" id="mainTabSchedule" onclick="setMainTab('schedule')">
-        📅 جدول المواعيد
+        جدول المواعيد
       </button>
       <button class="main-tab" id="mainTabPlanned" onclick="setMainTab('planned')">
-        📋 مواعيد مخطّطة
+        مواعيد مخطّطة
         <span class="count-badge" id="plannedCountBadge">0</span>
       </button>
     </div>
@@ -1022,8 +1022,8 @@ textarea { resize: vertical; min-height: 72px; }
              exists (chair view is meaningless then) or on mobile. The
              selected mode persists in localStorage per device. -->
         <div class="k3-view-toggle" id="k3ViewToggle" style="display:none;">
-          <button type="button" id="k3BtnList"  onclick="setDayViewMode('list')"  class="active">📋 قائمة</button>
-          <button type="button" id="k3BtnChair" onclick="setDayViewMode('chair')">🪑 حسب الكرسي</button>
+          <button type="button" id="k3BtnList"  onclick="setDayViewMode('list')"  class="active">قائمة</button>
+          <button type="button" id="k3BtnChair" onclick="setDayViewMode('chair')">حسب الكرسي</button>
         </div>
       </div>
       <div class="timeline" id="timeline"></div>
@@ -1070,7 +1070,7 @@ textarea { resize: vertical; min-height: 72px; }
       <label class="planned-toggle" id="plannedToggleWrap" for="fIsPlanned" style="display:none;">
         <input type="checkbox" id="fIsPlanned" onchange="onPlannedToggle()">
         <div class="pt-text">
-          <div class="pt-title">📋 موعد مخطّط (بدون تاريخ محدّد)</div>
+          <div class="pt-title">موعد مخطّط (بدون تاريخ محدّد)</div>
           <div class="pt-hint">يُحفظ كموعد قادم بدون قفل تاريخ — تُجدوله لاحقاً عند تأكيد المريض.</div>
         </div>
       </label>
@@ -1081,7 +1081,7 @@ textarea { resize: vertical; min-height: 72px; }
       <div class="form-grid">
         <!-- Gap 8: Template picker (hidden in edit mode) -->
         <div class="form-group full" id="apptTypePickerWrap" style="display:none;">
-          <label>⚡ قالب جاهز (اختياري) — لتعبئة المدة والعلاج تلقائياً</label>
+          <label>قالب جاهز (اختياري) — لتعبئة المدة والعلاج تلقائياً</label>
           <!-- Phase 6 L: chips view (auto-shown for ≤ 6 templates). Falls back
                to the <select> below when there are more than 6 templates. -->
           <div id="fApptTypeChips" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:6px;"></div>
@@ -1143,7 +1143,7 @@ textarea { resize: vertical; min-height: 72px; }
              K-bug-fix: onchange auto-syncs the provider picker to the
              operatory's default_provider_id (Option B — always replace). -->
         <div class="form-group" id="fOperatoryGroup" style="display:none;">
-          <label>🏥 الغرفة</label>
+          <label>الغرفة</label>
           <select id="fOperatory" onchange="onOperatoryChange()">
             <option value="">— بدون تخصيص —</option>
           </select>
@@ -1164,7 +1164,7 @@ textarea { resize: vertical; min-height: 72px; }
            items into the same DOM node. -->
       <div id="apptProcSection" style="display:none;margin-top:18px;padding:14px;background:rgba(var(--green-rgb),0.06);border:1px solid rgba(var(--green-rgb),0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:700;color:var(--text);">🦷 علاجات هذا الموعد</div>
+          <div style="font-weight:700;color:var(--text);">علاجات هذا الموعد</div>
           <div id="apptProcStats" style="font-size:12px;color:var(--text2);"></div>
         </div>
         <!-- Mode-specific hint. Different copy for 'create' vs 'active'. -->
@@ -1172,15 +1172,15 @@ textarea { resize: vertical; min-height: 72px; }
         <div id="apptProcList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;"></div>
         <div id="apptProcControls" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
-          <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
+          <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">إضافة</button>
         </div>
-        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:var(--green);color:var(--on-accent);border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
+        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:var(--green);color:var(--on-accent);border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
 
       <!-- 🥽 Lab orders section (visible only when editing + lab orders exist) -->
       <div id="apptLabSection" style="display:none;margin-top:12px;padding:14px;background:rgba(99,179,237,0.06);border:1px solid rgba(99,179,237,0.18);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:700;color:var(--text);">🥽 المخبر — مرتبط بهذا الموعد</div>
+          <div style="font-weight:700;color:var(--text);">المخبر — مرتبط بهذا الموعد</div>
           <a href="labs.html" style="font-size:12px;color:#63b3ed;text-decoration:none;">إدارة المخابر ←</a>
         </div>
         <div id="apptLabList" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -1192,18 +1192,18 @@ textarea { resize: vertical; min-height: 72px; }
            profile's الملفات tab. -->
       <div id="apptFilesSection" style="display:none;margin-top:12px;padding:14px;background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.20);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:700;color:var(--text);">📎 ملفات هذا الموعد</div>
+          <div style="font-weight:700;color:var(--text);">ملفات هذا الموعد</div>
           <select id="apptFileCategory" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);padding:6px 9px;font-family:Cairo,sans-serif;font-size:12px;cursor:pointer;">
-            <option value="xray">🦷 أشعة</option>
-            <option value="clinical_photo">📷 صورة سريرية</option>
-            <option value="document" selected>📄 مستند</option>
-            <option value="receipt">🧾 إيصال</option>
-            <option value="other">📎 أخرى</option>
+            <option value="xray">أشعة</option>
+            <option value="clinical_photo">صورة سريرية</option>
+            <option value="document" selected>مستند</option>
+            <option value="receipt">إيصال</option>
+            <option value="other">أخرى</option>
           </select>
         </div>
         <div id="apptFileDrop" onclick="document.getElementById('apptFileInput').click()"
              style="border:2px dashed rgba(167,139,250,0.4);border-radius:10px;padding:14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px;margin-bottom:10px;">
-          📎 انقر أو اسحب لرفع صورة أشعة / مستند لهذا الموعد
+          انقر أو اسحب لرفع صورة أشعة / مستند لهذا الموعد
         </div>
         <input type="file" id="apptFileInput" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
                style="display:none;" onchange="apptOnFilesPicked(this.files); this.value='';">
@@ -1212,13 +1212,13 @@ textarea { resize: vertical; min-height: 72px; }
       </div>
 
       <!-- 💸 No-show fee button (visible only when editing + status='no_show' + fee enabled + not yet applied) -->
-      <button type="button" id="noShowFeeBtn" onclick="applyNoShowFeeFromModal()" style="display:none;margin-top:12px;width:100%;padding:10px;background:#ef5350;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">💸 تطبيق رسم عدم الحضور</button>
+      <button type="button" id="noShowFeeBtn" onclick="applyNoShowFeeFromModal()" style="display:none;margin-top:12px;width:100%;padding:10px;background:#ef5350;color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;">تطبيق رسم عدم الحضور</button>
 
       <div class="modal-footer" style="display:flex;align-items:center;gap:10px;">
         <button type="button" class="btn-cancel" onclick="closeModal()">إلغاء</button>
-        <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">🗑️ حذف</button>
+        <button type="button" class="btn-cancel" id="deleteApptBtn" onclick="deleteApptFromModal()" style="display:none;border-color:rgba(239,83,80,0.4);color:#ef5350;">حذف</button>
         <span style="flex:1;"></span>
-        <button type="button" class="btn-save" id="scheduleNowBtn" onclick="scheduleNowFromModal()" style="display:none;background:#63b3ed;">📅 جدولة الآن</button>
+        <button type="button" class="btn-save" id="scheduleNowBtn" onclick="scheduleNowFromModal()" style="display:none;background:#63b3ed;">جدولة الآن</button>
         <button type="submit" class="btn-save" id="saveBtn">حفظ الموعد</button>
       </div>
     </form>
@@ -1232,7 +1232,7 @@ textarea { resize: vertical; min-height: 72px; }
 <div class="modal-overlay" id="apptMatDeductModal" onclick="if(event.target===this) closeApptMatDeductModal()">
   <div class="modal" style="max-width:480px;">
     <div class="modal-header">
-      <h2 class="modal-title">🧰 خصم مواد من المخزون</h2>
+      <h2 class="modal-title">خصم مواد من المخزون</h2>
       <button class="modal-close" type="button" onclick="closeApptMatDeductModal()">✕</button>
     </div>
     <div style="font-size:13px;color:var(--text2,#8da0bd);margin-bottom:14px;">
@@ -1249,7 +1249,7 @@ textarea { resize: vertical; min-height: 72px; }
 <div class="modal-overlay" id="waReminderModal" onclick="if(event.target===this) closeWaReminderModal()">
   <div class="modal" style="max-width:540px;">
     <div class="modal-header">
-      <h2 class="modal-title" style="color:#25D366;">📱 إرسال تذكير عبر WhatsApp</h2>
+      <h2 class="modal-title" style="color:#25D366;">إرسال تذكير عبر WhatsApp</h2>
       <button class="modal-close" type="button" onclick="closeWaReminderModal()">✕</button>
     </div>
     <div class="wa-info-row">
@@ -1285,7 +1285,7 @@ textarea { resize: vertical; min-height: 72px; }
 <div class="modal-overlay" id="dismissedCompleteModal" onclick="if(event.target===this) closeDismissedCompleteModal()">
   <div class="modal" style="max-width:560px;">
     <div class="modal-header">
-      <h2 class="modal-title">🚪 إنهاء الموعد + إكمال العلاجات</h2>
+      <h2 class="modal-title">إنهاء الموعد + إكمال العلاجات</h2>
       <button class="modal-close" type="button" onclick="closeDismissedCompleteModal()">✕</button>
     </div>
     <div style="padding:0 4px;">
@@ -1293,12 +1293,12 @@ textarea { resize: vertical; min-height: 72px; }
       <div id="dcmPatient" style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px;">—</div>
 
       <div id="dcmPlannedSection" style="display:none;">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">📋 علاجات مخطّطة لهذا الموعد:</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px;">علاجات مخطّطة لهذا الموعد:</div>
         <div id="dcmPlannedList" style="max-height:200px;overflow-y:auto;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:6px;margin-bottom:14px;"></div>
       </div>
 
       <div id="dcmLabsSection" style="display:none;">
-        <div id="dcmLabsHeader" style="font-size:13px;color:var(--text2);margin-bottom:8px;">🔬 طلبات مخبر مرتبطة:</div>
+        <div id="dcmLabsHeader" style="font-size:13px;color:var(--text2);margin-bottom:8px;">طلبات مخبر مرتبطة:</div>
         <div id="dcmLabsList" style="border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:8px;margin-bottom:14px;font-size:12px;color:var(--text2);"></div>
       </div>
 
@@ -1309,7 +1309,7 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-footer" style="gap:10px;">
       <button type="button" class="btn-cancel" onclick="closeDismissedCompleteModal()">إلغاء</button>
       <button type="button" id="dcmSkipBtn" onclick="dismissedSkipComplete()" style="background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:600;">⏸️ فقط تسجيل الخروج</button>
-      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:var(--green);color:var(--on-accent);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
+      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:var(--green);color:var(--on-accent);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">خرج + إكمال المحدد</button>
     </div>
   </div>
 </div>

@@ -179,11 +179,11 @@ body {
   <div class="topbar">
     <div style="display:flex;align-items:center;">
       <div>
-        <h1>📦 المخزون</h1>
+        <h1>المخزون</h1>
         <div class="sub">إدارة مواد ومستلزمات العيادة</div>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="openItemModal()">➕ صنف جديد</button>
+    <button class="btn btn-primary" onclick="openItemModal()">صنف جديد</button>
   </div>
 
   <div class="content">
@@ -196,7 +196,7 @@ body {
 
     <!-- دليل إدخال المواد -->
     <details class="mg-guide" id="mgGuide">
-      <summary>❓ كيف أُدخل المواد؟ — دليل سريع</summary>
+      <summary>كيف أُدخل المواد؟ — دليل سريع</summary>
       <div class="mg-body">
         <div class="mg-intro">
           صنّف كل مادة لواحد من <b>3 أنواع</b> — النوع بيحدّد كيف تُدخلها. اضغط «نسخ مثال» جنب أي صنف ليتعبّى لك جاهزاً في نافذة الإضافة، راجِعه واحفظ.
@@ -204,58 +204,58 @@ body {
 
         <!-- النوع 1 -->
         <div class="mg-sec mg-sec-1">
-          <div class="mg-h" style="color:var(--green);">🟢 النوع 1 — مواد معدودة (خصم تلقائي دقيق)</div>
+          <div class="mg-h" style="color:var(--green);">النوع 1 — مواد معدودة (خصم تلقائي دقيق)</div>
           <div class="mg-p">كل استخدام بياخد قطعة كاملة. عرّف الوحدة «قطعة» واربطها بالعلاج من زر «🧰 المواد». الكمية لكل استخدام = رقم صحيح.</div>
           <div class="mg-eg">أمثلة: كبسولة بنج، إبرة، ماتريكس باند، إسفين، فايل، زرعة، بوست، قفازات، كمامات.</div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">كبسولة بنج</div><div class="mg-row-meta">الوحدة: كبسولة · يُربَط بالعلاج · كمية الاستخدام: 1</div></div>
-            <button class="mg-copy" onclick="mgFillExample('بنج موضعي','كبسولة',50,10,'كل استخدام كبسولة واحدة')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('بنج موضعي','كبسولة',50,10,'كل استخدام كبسولة واحدة')">نسخ مثال</button>
           </div>
         </div>
 
         <!-- النوع 2 -->
         <div class="mg-sec mg-sec-2">
-          <div class="mg-h" style="color:var(--amber);">🟡 النوع 2 — مواد سائبة ثمينة (الحيلة المهمة)</div>
+          <div class="mg-h" style="color:var(--amber);">النوع 2 — مواد سائبة ثمينة (الحيلة المهمة)</div>
           <div class="mg-p">لا تعرّفها بوحدة العبوة، عرّفها بـ<b>وحدة الاستخدام الصغيرة</b> ليطلع الخصم منطقياً بلا كسور. اربطها بالعلاج بكمية 1 لكل استخدام.</div>
-          <div class="mg-eg" style="margin-bottom:4px;">⚠️ الأرقام تقريبية ابتدائية — عدّلها حسب ماركتك وأسلوبك.</div>
+          <div class="mg-eg" style="margin-bottom:4px;">الأرقام تقريبية ابتدائية — عدّلها حسب ماركتك وأسلوبك.</div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">كمبوزيت (سيرنج 4g)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 20–30 حشوة · استخدام: 1 (كبيرة خلفية: 2)</div></div>
-            <button class="mg-copy" onclick="mgFillExample('كمبوزيت — تطبيق','تطبيق',25,5,'سيرنج 4g تقريباً 25 تطبيق')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('كمبوزيت — تطبيق','تطبيق',25,5,'سيرنج 4g تقريباً 25 تطبيق')">نسخ مثال</button>
           </div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">كمبوزيت سائل Flow (2g)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 15–20 · استخدام: 1</div></div>
-            <button class="mg-copy" onclick="mgFillExample('كمبوزيت سائل — تطبيق','تطبيق',18,4,'سيرنج 2g تقريباً 18 تطبيق')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('كمبوزيت سائل — تطبيق','تطبيق',18,4,'سيرنج 2g تقريباً 18 تطبيق')">نسخ مثال</button>
           </div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">بوندينغ / أدهيزف (5ml)</div><div class="mg-row-meta">عرّفه «تطبيق» · العبوة ≈ 100 · استخدام: 1</div></div>
-            <button class="mg-copy" onclick="mgFillExample('بوندينغ — تطبيق','تطبيق',100,15,'عبوة 5ml تقريباً 100 تطبيق')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('بوندينغ — تطبيق','تطبيق',100,15,'عبوة 5ml تقريباً 100 تطبيق')">نسخ مثال</button>
           </div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">إتش / حمض (سيرنج 3ml)</div><div class="mg-row-meta">عرّفه «استخدام» · العبوة ≈ 30–40 · استخدام: 1</div></div>
-            <button class="mg-copy" onclick="mgFillExample('إتش — استخدام','استخدام',35,6,'سيرنج 3ml تقريباً 35 استخدام')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('إتش — استخدام','استخدام',35,6,'سيرنج 3ml تقريباً 35 استخدام')">نسخ مثال</button>
           </div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">سمنت زجاجي GIC (بودرة)</div><div class="mg-row-meta">عرّفه «خلطة» · العبوة ≈ 30 خلطة · استخدام: 1</div></div>
-            <button class="mg-copy" onclick="mgFillExample('سمنت زجاجي — خلطة','خلطة',30,5,'سكوب بودرة + نقطة سائل لكل خلطة')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('سمنت زجاجي — خلطة','خلطة',30,5,'سكوب بودرة + نقطة سائل لكل خلطة')">نسخ مثال</button>
           </div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">مادة طبعة ألجينات (كيس)</div><div class="mg-row-meta">عرّفها «طبعة» · الكيس ≈ 20–24 طبعة فك · استخدام: 1 (فكين: 2)</div></div>
-            <button class="mg-copy" onclick="mgFillExample('ألجينات — طبعة','طبعة',22,4,'كيس تقريباً 22 طبعة فك كامل')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('ألجينات — طبعة','طبعة',22,4,'كيس تقريباً 22 طبعة فك كامل')">نسخ مثال</button>
           </div>
         </div>
 
         <!-- النوع 3 -->
         <div class="mg-sec mg-sec-3">
-          <div class="mg-h" style="color:var(--text2);">⚪ النوع 3 — مواد رخيصة عالية الاستهلاك (لا تُربط بعلاج)</div>
+          <div class="mg-h" style="color:var(--text2);">النوع 3 — مواد رخيصة عالية الاستهلاك (لا تُربط بعلاج)</div>
           <div class="mg-p">ما تستاهل خصماً لكل حالة. خلّيها صنف عادي بحد إعادة طلب، و<b>آخر كل شهر</b> اعمل جرد فيزيائي وصحّح الكمية بحركة «تعديل».</div>
           <div class="mg-eg">أمثلة: قطن (رول)، شاش، لعّابات، بيبية المريض، مناديل.</div>
           <div class="mg-row">
             <div class="mg-row-info"><div class="mg-row-name">قطن (رول)</div><div class="mg-row-meta">الوحدة: رول · لا يُربَط بعلاج · جرد شهري بحركة «تعديل»</div></div>
-            <button class="mg-copy" onclick="mgFillExample('قطن','رول',10,3,'جرد شهري وتصحيح بحركة تعديل')">📋 نسخ مثال</button>
+            <button class="mg-copy" onclick="mgFillExample('قطن','رول',10,3,'جرد شهري وتصحيح بحركة تعديل')">نسخ مثال</button>
           </div>
         </div>
 
-        <div class="mg-tip">💡 نصيحة (FEFO = الأقرب انتهاءً أولاً): عند تسجيل <b>حركة شراء</b> حدّد «تاريخ صلاحية الشحنة» — كل شحنة تُسجَّل كدفعة مستقلّة، والبرنامج ينبّهك للدفعات القاربة/المنتهية مرتّبةً الأقرب أولاً، فتستعملها قبل غيرها وتتجنّب الهدر.</div>
+        <div class="mg-tip">نصيحة (FEFO = الأقرب انتهاءً أولاً): عند تسجيل <b>حركة شراء</b> حدّد «تاريخ صلاحية الشحنة» — كل شحنة تُسجَّل كدفعة مستقلّة، والبرنامج ينبّهك للدفعات القاربة/المنتهية مرتّبةً الأقرب أولاً، فتستعملها قبل غيرها وتتجنّب الهدر.</div>
       </div>
     </details>
 
@@ -278,7 +278,7 @@ body {
     <!-- تنبيه إعادة الطلب -->
     <div class="card" id="lowStockCard" style="display:none;border-color:rgba(245,166,35,0.4);">
       <div class="card-head">
-        <span class="card-title" style="color:var(--amber);">⚠️ أصناف تحتاج إعادة طلب</span>
+        <span class="card-title" style="color:var(--amber);">أصناف تحتاج إعادة طلب</span>
       </div>
       <div id="lowStockList"></div>
     </div>
@@ -294,7 +294,7 @@ body {
     <!-- قائمة الأصناف -->
     <div class="card">
       <div class="card-head">
-        <span class="card-title">📋 الأصناف</span>
+        <span class="card-title">الأصناف</span>
       </div>
       <div id="itemsList"><div class="empty"><div class="empty-icon">⏳</div><div style="margin-top:8px;">جارٍ التحميل…</div></div></div>
     </div>
@@ -305,7 +305,7 @@ body {
 <!-- Modal: صنف (إضافة/تعديل) -->
 <div class="modal-overlay" id="itemModal">
   <div class="modal-box">
-    <div class="modal-head"><h3 id="itemModalTitle">➕ صنف جديد</h3><button class="modal-close" onclick="closeModal('itemModal')">✕</button></div>
+    <div class="modal-head"><h3 id="itemModalTitle">صنف جديد</h3><button class="modal-close" onclick="closeModal('itemModal')">✕</button></div>
     <div class="modal-body">
       <div class="form-group">
         <label>اسم الصنف *</label>
@@ -352,10 +352,10 @@ body {
       <div class="form-group">
         <label>نوع الحركة</label>
         <select id="moveReason" onchange="onMoveReasonChange()">
-          <option value="purchase">🟢 شراء / إضافة وارد</option>
-          <option value="consume">🔴 استهلاك / صرف</option>
-          <option value="return">↩️ مرتجع</option>
-          <option value="adjust">⚖️ تعديل جرد (تصحيح الكمية)</option>
+          <option value="purchase">شراء / إضافة وارد</option>
+          <option value="consume">استهلاك / صرف</option>
+          <option value="return">مرتجع</option>
+          <option value="adjust">تعديل جرد (تصحيح الكمية)</option>
         </select>
       </div>
       <div class="form-group" id="moveQtyGroup">

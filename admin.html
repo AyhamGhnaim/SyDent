@@ -2598,7 +2598,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     </a>
     <div style="display:flex;gap:8px;align-items:center;">
       <span id="themeToggleMount" style="display:inline-flex;align-items:center;margin-left:4px"></span>
-      <button type="button" class="btn-logout" onclick="toggleEventsSection()" title="سجلّ أحداث الاشتراكات">📋 السجلّ</button>
+      <button type="button" class="btn-logout" onclick="toggleEventsSection()" title="سجلّ أحداث الاشتراكات">السجلّ</button>
       <button class="btn-logout" onclick="doLogout()">خروج</button>
     </div>
   </header>
@@ -2616,7 +2616,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="health-row">
       <div class="health-card" id="hcMrr">
         <div class="health-head">
-          <span class="health-title">💰 الإيراد الشهري (MRR)</span>
+          <span class="health-title">الإيراد الشهري (MRR)</span>
           <span class="health-info" title="مجموع أسعار الحسابات الشهرية + (أسعار السنوية ÷ 12) للحسابات النشطة (paid فقط). لا يشمل الدائم أو الموقوف أو الـ trial.">ⓘ</span>
         </div>
         <div class="health-value muted" id="hcMrrValue">--</div>
@@ -2624,7 +2624,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
       </div>
       <div class="health-card" id="hcActive">
         <div class="health-head">
-          <span class="health-title">🟢 اشتراكات نشطة</span>
+          <span class="health-title">اشتراكات نشطة</span>
           <span class="health-info" title="حسابات paid حالياً (شهري أو سنوي، غير دائم). لا تشمل trial / suspended / expired.">ⓘ</span>
         </div>
         <div class="health-value muted" id="hcActiveValue">--</div>
@@ -2642,7 +2642,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
       </div>
       <div class="health-card" id="hcConversion">
         <div class="health-head">
-          <span class="health-title">📈 معدّل التحويل</span>
+          <span class="health-title">معدّل التحويل</span>
           <span class="health-info" title="نسبة طلبات الـ trial (في آخر 90 يوم) التي تحوّلت إلى paid (شهري/سنوي).">ⓘ</span>
         </div>
         <div class="health-value muted" id="hcConversionValue">--</div>
@@ -2719,7 +2719,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <!-- Phase X2: Plans & Pricing Editor -->
     <div class="plan-editor-section" id="planEditorSection">
       <div class="plan-editor-header" onclick="togglePlanEditor()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePlanEditor();}">
-        <span>⚙️ إعدادات الخطط <span id="planDirtyIndicator" style="display:none;" class="plan-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
+        <span>إعدادات الخطط <span id="planDirtyIndicator" style="display:none;" class="plan-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
         <span class="plan-editor-toggle">▶</span>
       </div>
       <div class="plan-editor-body">
@@ -2754,7 +2754,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
                 <input type="number" id="planFldPriceYearly" min="0" oninput="onPlanFieldChange()" autocomplete="off">
               </div>
             </div>
-            <div class="plan-field-hint" id="planCycleHint" style="margin-bottom:14px;">💡 الطبيب يختار شهري أو سنوي عند الاشتراك/التجديد. الدورة الشهرية = 30 يوم، السنوية = 365 يوم (تلقائياً). التجربة تستخدم «المدة (يوم)» أعلاه.</div>
+            <div class="plan-field-hint" id="planCycleHint" style="margin-bottom:14px;">الطبيب يختار شهري أو سنوي عند الاشتراك/التجديد. الدورة الشهرية = 30 يوم، السنوية = 365 يوم (تلقائياً). التجربة تستخدم «المدة (يوم)» أعلاه.</div>
             <div class="plan-field-row">
               <div class="plan-field">
                 <label for="planFldMaxEmp">حد الموظفين <span style="color:var(--text3);font-weight:400;">(فارغ = بلا حد)</span></label>
@@ -2768,7 +2768,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             <div class="plan-field">
               <label>الميزات <span style="color:var(--text3);font-weight:400;">(كل بند يظهر بسطر في بطاقة العرض)</span></label>
               <div id="planFeaturesList" class="features-list"></div>
-              <button type="button" class="btn-add-feature" onclick="addFeatureRow()">➕ إضافة ميزة</button>
+              <button type="button" class="btn-add-feature" onclick="addFeatureRow()">إضافة ميزة</button>
               <div class="plan-field-hint"><strong style="color:#ffc107;">ملاحظة:</strong> رقم الخصم في الميزات (مثل "خصم ~16%") لا يُحسب تلقائياً — حدّثه يدوياً لو غيّرت السعر.</div>
             </div>
             <!-- Phase X11: Display layer (decoupled from enforcement) -->
@@ -2790,10 +2790,10 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
                 <input type="text" id="planFldFeaturedLabel" oninput="onPlanFieldChange()" autocomplete="off" placeholder="الأكثر شعبية">
               </div>
             </div>
-            <div class="plan-field-hint" style="margin-bottom:14px;">🎨 العبارة التعريفية وتسمية الفترة وشارة الإبراز أعلاه للعرض فقط في صفحة الأسعار — <strong>لا تؤثّر</strong> على المدة الفعلية أو حدود المرضى/الموظفين (تلك تُضبط من «المدة» و«حد الموظفين» و«حد المرضى»، وتظهر في البطاقة تلقائياً).</div>
+            <div class="plan-field-hint" style="margin-bottom:14px;">العبارة التعريفية وتسمية الفترة وشارة الإبراز أعلاه للعرض فقط في صفحة الأسعار — <strong>لا تؤثّر</strong> على المدة الفعلية أو حدود المرضى/الموظفين (تلك تُضبط من «المدة» و«حد الموظفين» و«حد المرضى»، وتظهر في البطاقة تلقائياً).</div>
             <div class="plan-toggle-row">
               <div>
-                <div class="plan-toggle-label">⭐ الأكثر شعبية</div>
+                <div class="plan-toggle-label">الأكثر شعبية</div>
                 <div class="plan-toggle-sublabel">تُبرَز هذه الخطة بشارة في صفحة الأسعار. تفعيلها يُلغي الإبراز عن باقي الخطط عند الحفظ.</div>
               </div>
               <div class="plan-switch" id="planSwitchFeatured" onclick="onPlanToggleFeatured()" role="switch" aria-checked="false" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();onPlanToggleFeatured();}">
@@ -2821,9 +2821,9 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
           </div>
         </div>
         <div class="plan-actions-row">
-          <button type="button" class="btn-delete-plan" id="btnDeletePlan" onclick="deleteCurrentPlan()">🗑 حذف الخطة</button>
-          <button type="button" class="btn-revert-plan" id="btnRevertPlan" onclick="revertPlanEdits()" disabled>↺ إلغاء التعديلات</button>
-          <button type="button" class="btn-save-plan"   id="btnSavePlan"   onclick="savePlanEdits()"   disabled>💾 حفظ التغييرات</button>
+          <button type="button" class="btn-delete-plan" id="btnDeletePlan" onclick="deleteCurrentPlan()">حذف الخطة</button>
+          <button type="button" class="btn-revert-plan" id="btnRevertPlan" onclick="revertPlanEdits()" disabled>إلغاء التعديلات</button>
+          <button type="button" class="btn-save-plan"   id="btnSavePlan"   onclick="savePlanEdits()"   disabled>حفظ التغييرات</button>
         </div>
       </div>
     </div>
@@ -2831,25 +2831,25 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <!-- Phase X3: Notification Templates Editor -->
     <div class="tpl-editor-section" id="tplEditorSection">
       <div class="tpl-editor-header" onclick="toggleTplEditor()" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTplEditor();}">
-        <span>💬 قوالب رسائل WhatsApp <span id="tplDirtyIndicator" style="display:none;" class="tpl-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
+        <span>قوالب رسائل WhatsApp <span id="tplDirtyIndicator" style="display:none;" class="tpl-dirty-indicator" title="هناك تعديلات غير محفوظة"></span></span>
         <span class="tpl-editor-toggle">▶</span>
       </div>
       <div class="tpl-editor-body">
         <!-- Phase X3 محادثة 3: Platform-wide settings (apply to ALL templates) -->
         <div class="tpl-platform-settings">
-          <div class="tpl-platform-settings-label">⚙️ إعدادات عامة (تنطبق على جميع القوالب)</div>
+          <div class="tpl-platform-settings-label">إعدادات عامة (تنطبق على جميع القوالب)</div>
           <div class="tpl-platform-settings-row">
-            <label for="fSupportPhone">📞 رقم الدعم الفني</label>
+            <label for="fSupportPhone">رقم الدعم الفني</label>
             <input type="tel" id="fSupportPhone" placeholder="مثلاً 0991234567" autocomplete="off" oninput="onSupportPhoneInput()">
-            <button type="button" class="btn-save-support" id="btnSaveSupport" onclick="saveSupportPhone()" disabled>💾 حفظ</button>
+            <button type="button" class="btn-save-support" id="btnSaveSupport" onclick="saveSupportPhone()" disabled>حفظ</button>
           </div>
           <div class="tpl-platform-settings-hint">يظهر داخل نصوص الرسائل عبر المتغيّر <code>{support_phone}</code>. عند تركه فارغاً، يبقى المتغيّر كما هو في النص (تنبيه مرئي للإدارة).</div>
         </div>
         <div class="tpl-tabs-wrap" id="tplTabsWrap">
-          <button type="button" class="tpl-tab active" data-tpl-code="wa_welcome"   onclick="selectTplTab('wa_welcome',this)">👋 ترحيب</button>
+          <button type="button" class="tpl-tab active" data-tpl-code="wa_welcome"   onclick="selectTplTab('wa_welcome',this)">ترحيب</button>
           <button type="button" class="tpl-tab"        data-tpl-code="wa_reminder"  onclick="selectTplTab('wa_reminder',this)">⏰ تذكير</button>
           <button type="button" class="tpl-tab"        data-tpl-code="wa_suspended" onclick="selectTplTab('wa_suspended',this)">⏸ إيقاف</button>
-          <button type="button" class="tpl-tab"        data-tpl-code="wa_renewed"   onclick="selectTplTab('wa_renewed',this)">✅ تجديد</button>
+          <button type="button" class="tpl-tab"        data-tpl-code="wa_renewed"   onclick="selectTplTab('wa_renewed',this)">تجديد</button>
         </div>
         <div class="tpl-edit-grid">
           <div class="tpl-edit-pane">
@@ -2880,7 +2880,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             </div>
           </div>
           <div class="tpl-preview-pane">
-            <div class="tpl-preview-label">📱 معاينة (ببيانات تجريبية)</div>
+            <div class="tpl-preview-label">معاينة (ببيانات تجريبية)</div>
             <div class="tpl-preview-bubble" id="tplPreviewBubble"></div>
             <div class="tpl-preview-meta">
               <span id="tplPreviewMeta">—</span>
@@ -2891,11 +2891,11 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
         <div class="tpl-actions-row">
           <div class="tpl-test-send">
             <input type="tel" id="tplTestPhone" placeholder="رقمك للاختبار (مثلاً 0991234567)" autocomplete="off">
-            <button type="button" class="btn-test-send-tpl" onclick="sendTplTest()" title="فتح WhatsApp مع الرسالة الحالية">📤 تجريبي</button>
+            <button type="button" class="btn-test-send-tpl" onclick="sendTplTest()" title="فتح WhatsApp مع الرسالة الحالية">تجريبي</button>
           </div>
-          <button type="button" class="btn-reset-tpl"  id="btnResetTpl"  onclick="resetTplToFallback()" title="إعادة النص إلى القيمة الافتراضية المُضمَّنة في الكود">↩ افتراضي</button>
-          <button type="button" class="btn-revert-tpl" id="btnRevertTpl" onclick="revertTplEdits()" disabled>↺ إلغاء التعديلات</button>
-          <button type="button" class="btn-save-tpl"   id="btnSaveTpl"   onclick="saveTplEdits()"   disabled>💾 حفظ التغييرات</button>
+          <button type="button" class="btn-reset-tpl"  id="btnResetTpl"  onclick="resetTplToFallback()" title="إعادة النص إلى القيمة الافتراضية المُضمَّنة في الكود">افتراضي</button>
+          <button type="button" class="btn-revert-tpl" id="btnRevertTpl" onclick="revertTplEdits()" disabled>إلغاء التعديلات</button>
+          <button type="button" class="btn-save-tpl"   id="btnSaveTpl"   onclick="saveTplEdits()"   disabled>حفظ التغييرات</button>
         </div>
       </div>
     </div>
@@ -2904,34 +2904,34 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="events-viewer-section" id="eventsViewerSection">
       <div class="events-viewer-header" onclick="toggleEventsSection()" role="button" tabindex="0"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleEventsSection();}">
-        <span>📋 سجلّ أحداث الاشتراكات</span>
+        <span>سجلّ أحداث الاشتراكات</span>
         <span class="events-viewer-toggle">▶</span>
       </div>
       <div class="events-viewer-body">
         <!-- Date + Search filters -->
         <div class="evf-filters">
           <div class="evf-group">
-            <label for="evfDateFrom">📅 من تاريخ</label>
+            <label for="evfDateFrom">من تاريخ</label>
             <input type="date" id="evfDateFrom" onchange="evfApplyFilters()">
           </div>
           <div class="evf-group">
-            <label for="evfDateTo">📅 إلى تاريخ</label>
+            <label for="evfDateTo">إلى تاريخ</label>
             <input type="date" id="evfDateTo" onchange="evfApplyFilters()">
           </div>
           <div class="evf-group evf-search">
-            <label for="evfSearch">🔍 بحث عميل (الاسم، الإيميل، الهاتف)</label>
+            <label for="evfSearch">بحث عميل (الاسم، الإيميل، الهاتف)</label>
             <input type="text" id="evfSearch" placeholder="مثال: محمد، 09xxxx" oninput="evfOnSearchInput()">
           </div>
           <div class="evf-actions">
-            <button type="button" class="evf-btn" onclick="evfResetFilters()">↺ إعادة تعيين</button>
-            <button type="button" class="evf-btn evf-btn-primary" onclick="evfApplyFilters()">🔄 تحديث</button>
+            <button type="button" class="evf-btn" onclick="evfResetFilters()">إعادة تعيين</button>
+            <button type="button" class="evf-btn evf-btn-primary" onclick="evfApplyFilters()">تحديث</button>
             <button type="button" class="evf-btn evf-btn-csv" onclick="evfExportCsv()">📥 CSV</button>
           </div>
         </div>
 
         <!-- Event type chips (multi-select) -->
         <div class="evf-chips-section">
-          <div class="evf-chips-label">🏷 نوع الحدث (متعدّد الاختيار، فاضي = الكل)</div>
+          <div class="evf-chips-label">نوع الحدث (متعدّد الاختيار، فاضي = الكل)</div>
           <div class="evf-chips" id="evfChipsWrap"></div>
         </div>
 
@@ -2951,7 +2951,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 
         <!-- Pagination -->
         <div class="evf-pagination" id="evfPaginationWrap" style="display:none;">
-          <button type="button" class="evf-load-more" id="evfBtnLoadMore" onclick="evfLoadMore()">⬇ تحميل المزيد (50)</button>
+          <button type="button" class="evf-load-more" id="evfBtnLoadMore" onclick="evfLoadMore()">تحميل المزيد (50)</button>
         </div>
       </div>
     </div>
@@ -2960,20 +2960,20 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="rpt-section" id="rptSection">
       <div class="rpt-section-header" onclick="rptToggle()" role="button" tabindex="0"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();rptToggle();}">
-        <span class="rpt-section-title">📊 التقارير</span>
+        <span class="rpt-section-title">التقارير</span>
         <span class="rpt-section-toggle">▶</span>
       </div>
       <div class="rpt-section-body">
 
         <!-- Controls: date range + refresh + CSV -->
         <div class="rpt-controls">
-          <span class="rpt-range-label">📅 الفترة:</span>
+          <span class="rpt-range-label">الفترة:</span>
           <div class="rpt-range-group" id="rptRangeGroup">
             <button type="button" class="rpt-range-btn"          data-range="3"  onclick="rptSetRange(3)">3 شهور</button>
             <button type="button" class="rpt-range-btn active"   data-range="6"  onclick="rptSetRange(6)">6 شهور</button>
             <button type="button" class="rpt-range-btn"          data-range="12" onclick="rptSetRange(12)">12 شهر</button>
           </div>
-          <button type="button" class="rpt-btn-refresh" id="rptBtnRefresh" onclick="rptRefresh()">🔄 تحديث</button>
+          <button type="button" class="rpt-btn-refresh" id="rptBtnRefresh" onclick="rptRefresh()">تحديث</button>
           <button type="button" class="rpt-btn-csv"     id="rptBtnCsv"     onclick="rptExportCsv()">📥 CSV</button>
         </div>
 
@@ -2991,11 +2991,11 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
               <div class="rpt-kpi-value kpi-arpu muted" id="kpiArpu">—</div>
             </div>
             <div class="rpt-kpi-cell">
-              <div class="rpt-kpi-label">📉 تسرّب الإيراد (آخر شهر) <span class="health-info" title="نسبة الإيراد الشهري المتكرّر المفقود في آخر شهر = MRR مفقود ÷ MRR بداية الشهر (الشهر السابق).">ⓘ</span></div>
+              <div class="rpt-kpi-label">تسرّب الإيراد (آخر شهر) <span class="health-info" title="نسبة الإيراد الشهري المتكرّر المفقود في آخر شهر = MRR مفقود ÷ MRR بداية الشهر (الشهر السابق).">ⓘ</span></div>
               <div class="rpt-kpi-value kpi-churn muted" id="kpiChurnLatest">—</div>
             </div>
             <div class="rpt-kpi-cell">
-              <div class="rpt-kpi-label">📉 متوسط تسرّب الإيراد <span class="health-info" title="متوسط معدّل تسرّب الإيراد الشهري على كامل الفترة المحدّدة.">ⓘ</span></div>
+              <div class="rpt-kpi-label">متوسط تسرّب الإيراد <span class="health-info" title="متوسط معدّل تسرّب الإيراد الشهري على كامل الفترة المحدّدة.">ⓘ</span></div>
               <div class="rpt-kpi-value kpi-churn muted" id="kpiChurnAvg">—</div>
             </div>
           </div>
@@ -3003,7 +3003,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
           <!-- Chart 1: MRR over time (line) — wide -->
           <div class="rpt-card rpt-card-wide">
             <div class="rpt-card-header">
-              <div class="rpt-card-title">💰 نمو الإيراد الشهري المتكرّر (MRR)</div>
+              <div class="rpt-card-title">نمو الإيراد الشهري المتكرّر (MRR)</div>
               <div class="rpt-card-subtitle" id="rptMrrSubtitle"></div>
             </div>
             <div class="rpt-canvas-wrap"><canvas id="rptChartMrr"></canvas></div>
@@ -3030,7 +3030,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
           <!-- Chart 2: MRR movement (stacked bar) -->
           <div class="rpt-card">
             <div class="rpt-card-header">
-              <div class="rpt-card-title">📈 حركة الإيراد الشهرية</div>
+              <div class="rpt-card-title">حركة الإيراد الشهرية</div>
               <div class="rpt-card-subtitle">جديد / إعادة تفعيل / مفقود</div>
             </div>
             <div class="rpt-canvas-wrap"><canvas id="rptChartMovement"></canvas></div>
@@ -3039,7 +3039,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
           <!-- Chart 3: Plan distribution (donut) -->
           <div class="rpt-card">
             <div class="rpt-card-header">
-              <div class="rpt-card-title">📊 توزيع الخطط الحالية</div>
+              <div class="rpt-card-title">توزيع الخطط الحالية</div>
               <div class="rpt-card-subtitle" id="rptPlanSubtitle"></div>
             </div>
             <div class="rpt-canvas-wrap"><canvas id="rptChartPlans"></canvas></div>
@@ -3048,7 +3048,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
           <!-- Chart 4: Conversion funnel (custom HTML) — wide -->
           <div class="rpt-card rpt-card-wide">
             <div class="rpt-card-header">
-              <div class="rpt-card-title">🎯 قمع التحويل</div>
+              <div class="rpt-card-title">قمع التحويل</div>
               <div class="rpt-card-subtitle" id="rptFunnelSubtitle"></div>
             </div>
             <div class="rpt-funnel" id="rptFunnel"></div>
@@ -3068,7 +3068,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="rpt-section" id="srqSection">
       <div class="rpt-section-header" onclick="srqToggle()" role="button" tabindex="0"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();srqToggle();}">
-        <span class="rpt-section-title">📥 طلبات الترقية/التجديد <span id="srqBadge" class="srq-badge" style="display:none;"></span></span>
+        <span class="rpt-section-title">طلبات الترقية/التجديد <span id="srqBadge" class="srq-badge" style="display:none;"></span></span>
         <span class="rpt-section-toggle">▶</span>
       </div>
       <div class="rpt-section-body">
@@ -3084,7 +3084,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="rpt-section ps-section" id="psSection">
       <div class="rpt-section-header" onclick="psToggle()" role="button" tabindex="0"
            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();psToggle();}">
-        <span class="rpt-section-title">⚙️ إعدادات المنصة</span>
+        <span class="rpt-section-title">إعدادات المنصة</span>
         <span class="rpt-section-toggle">▶</span>
       </div>
       <div class="rpt-section-body">
@@ -3092,7 +3092,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
         <!-- Card 1: Support info (phone + email) -->
         <div class="ps-card">
           <div class="ps-card-head">
-            <h3 class="ps-card-title">📞 معلومات الدعم</h3>
+            <h3 class="ps-card-title">معلومات الدعم</h3>
             <div class="ps-card-desc">رقم WhatsApp يظهر للمستأجرين في بانرات تنبيه التجديد ورسائل الدعم. الإيميل للعرض الإداري فقط.</div>
           </div>
           <div class="ps-field">
@@ -3106,14 +3106,14 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             <div class="ps-field-hint">للعرض في الواجهة الإدارية. لا يُستخدم لإرسال إيميلات (الإيميلات الفعلية تأتي من Supabase Auth).</div>
           </div>
           <div class="ps-actions">
-            <button type="button" class="ps-btn-save" id="btnPsSaveSupport" onclick="savePsSupportInfo()" disabled>💾 حفظ معلومات الدعم</button>
+            <button type="button" class="ps-btn-save" id="btnPsSaveSupport" onclick="savePsSupportInfo()" disabled>حفظ معلومات الدعم</button>
           </div>
         </div>
 
         <!-- Card 2: Admin profile (email + password change via Supabase Auth) -->
         <div class="ps-card">
           <div class="ps-card-head">
-            <h3 class="ps-card-title">🔐 حساب الـ Admin</h3>
+            <h3 class="ps-card-title">حساب الـ Admin</h3>
             <div class="ps-card-desc">تعديل إيميل أو كلمة سرّ حسابك الإداري. التغييرات تمرّ عبر Supabase Auth، لا تُخزَّن في DB.</div>
           </div>
 
@@ -3124,10 +3124,10 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             <div class="ps-field">
               <label for="psNewEmail">الإيميل الجديد</label>
               <input type="email" id="psNewEmail" autocomplete="off" placeholder="new@example.com" oninput="onPsEmailInput()">
-              <div class="ps-field-hint">⚠️ بعد الحفظ سيُرسَل إيميل تأكيد للعنوان الجديد. لن يفعَّل التغيير قبل الضغط على الرابط في الإيميل.</div>
+              <div class="ps-field-hint">بعد الحفظ سيُرسَل إيميل تأكيد للعنوان الجديد. لن يفعَّل التغيير قبل الضغط على الرابط في الإيميل.</div>
             </div>
             <div class="ps-actions">
-              <button type="button" class="ps-btn-save" id="btnPsSaveEmail" onclick="savePsAdminEmail()" disabled>📧 تحديث الإيميل</button>
+              <button type="button" class="ps-btn-save" id="btnPsSaveEmail" onclick="savePsAdminEmail()" disabled>تحديث الإيميل</button>
             </div>
           </div>
 
@@ -3142,9 +3142,9 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
               <label for="psConfirmPassword">تأكيد كلمة السرّ</label>
               <input type="password" id="psConfirmPassword" autocomplete="new-password" oninput="onPsPasswordInput()">
             </div>
-            <div class="ps-field-hint">⚠️ بعد التحديث سيُسجَّل خروجك من جميع الجلسات وستحتاج تسجيل الدخول مجدداً بكلمة السرّ الجديدة.</div>
+            <div class="ps-field-hint">بعد التحديث سيُسجَّل خروجك من جميع الجلسات وستحتاج تسجيل الدخول مجدداً بكلمة السرّ الجديدة.</div>
             <div class="ps-actions">
-              <button type="button" class="ps-btn-save" id="btnPsSavePassword" onclick="savePsAdminPassword()" disabled>🔑 تحديث كلمة السرّ</button>
+              <button type="button" class="ps-btn-save" id="btnPsSavePassword" onclick="savePsAdminPassword()" disabled>تحديث كلمة السرّ</button>
             </div>
           </div>
         </div>
@@ -3152,7 +3152,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
         <!-- Card 3: Platform info (name + renewal message) -->
         <div class="ps-card">
           <div class="ps-card-head">
-            <h3 class="ps-card-title">🏷️ معلومات المنصة</h3>
+            <h3 class="ps-card-title">معلومات المنصة</h3>
             <div class="ps-card-desc">إعدادات عرض داخلية. لا تظهر للمستأجرين حاليًا (تبقى admin-only في DB).</div>
           </div>
           <div class="ps-field">
@@ -3166,14 +3166,14 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             <div class="ps-field-hint">ℹ️ تُخزَّن للاستخدام المستقبلي. حالياً، البانرات في صفحات المستأجرين تستخدم نصاً ثابتاً في الكود.</div>
           </div>
           <div class="ps-actions">
-            <button type="button" class="ps-btn-save" id="btnPsSavePlatform" onclick="savePsPlatformInfo()" disabled>💾 حفظ معلومات المنصة</button>
+            <button type="button" class="ps-btn-save" id="btnPsSavePlatform" onclick="savePsPlatformInfo()" disabled>حفظ معلومات المنصة</button>
           </div>
         </div>
 
         <!-- Card 4: Payment instructions (TENANT-VISIBLE — shown in subscription.html) -->
         <div class="ps-card">
           <div class="ps-card-head">
-            <h3 class="ps-card-title">💳 تعليمات الدفع</h3>
+            <h3 class="ps-card-title">تعليمات الدفع</h3>
             <div class="ps-card-desc">تظهر للمستأجرين في صفحة الاشتراك عند طلب ترقية/تجديد. اذكر تفاصيل: شام كاش، حوالة داخلية، كرت بنك، كاش.</div>
           </div>
           <div class="ps-field">
@@ -3182,14 +3182,14 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
             <div class="ps-field-hint">يظهر للمستأجر داخل نافذة طلب الاشتراك. اتركه فارغاً لإخفائه.</div>
           </div>
           <div class="ps-actions">
-            <button type="button" class="ps-btn-save" id="btnPsSavePayment" onclick="savePsPaymentInstructions()">💾 حفظ تعليمات الدفع</button>
+            <button type="button" class="ps-btn-save" id="btnPsSavePayment" onclick="savePsPaymentInstructions()">حفظ تعليمات الدفع</button>
           </div>
         </div>
 
         <!-- Card 5: Settings change log (append-only audit — Migration 48) -->
         <div class="ps-card">
           <div class="ps-card-head">
-            <h3 class="ps-card-title">📜 سجل تغييرات الإعدادات</h3>
+            <h3 class="ps-card-title">سجل تغييرات الإعدادات</h3>
             <div class="ps-card-desc">آخر التغييرات على إعدادات المنصّة (مين غيّر شو، من القيمة القديمة للجديدة، وإيمتى). سجل للقراءة فقط — لا يشمل إيميل/كلمة سرّ الأدمن.</div>
           </div>
           <div id="psAuditList" class="ps-audit-list"><div class="ps-audit-empty">افتح القسم لعرض السجل…</div></div>
@@ -3202,7 +3202,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <div class="flt-section" id="fltSection">
       <div class="flt-header" onclick="fltToggle()">
         <div>
-          <span class="flt-header-title">🔍 فلاتر متقدمة</span>
+          <span class="flt-header-title">فلاتر متقدمة</span>
           <span class="flt-header-state" id="fltHeaderState"></span>
         </div>
         <span class="flt-header-chevron">▼</span>
@@ -3248,11 +3248,11 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
         </div>
         <div class="flt-checks">
           <label class="flt-check"><input type="checkbox" id="fltAdminOnly" onchange="fltOnChange()"> 👑 Admin فقط</label>
-          <label class="flt-check"><input type="checkbox" id="fltPermanentOnly" onchange="fltOnChange()"> ♾️ دائم فقط</label>
+          <label class="flt-check"><input type="checkbox" id="fltPermanentOnly" onchange="fltOnChange()"> دائم فقط</label>
         </div>
         <div class="flt-actions">
           <span class="flt-active-count none" id="fltActiveCount">لا فلاتر نشطة</span>
-          <button type="button" class="flt-reset" onclick="fltReset()">↻ إعادة تعيين</button>
+          <button type="button" class="flt-reset" onclick="fltReset()">إعادة تعيين</button>
         </div>
       </div>
     </div>
@@ -3260,20 +3260,20 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <!-- Phase X7: Bulk action bar (appears when ≥1 card selected) -->
     <div class="bk-bar" id="bkBar">
       <span class="bk-bar-count" id="bkBarCount">0 محدّد</span>
-      <button type="button" class="bk-bar-clear" onclick="bkClearSelection()">↻ إلغاء التحديد</button>
+      <button type="button" class="bk-bar-clear" onclick="bkClearSelection()">إلغاء التحديد</button>
       <span class="bk-bar-spacer"></span>
       <div class="bk-bar-actions">
         <button type="button" class="bk-action" onclick="bkExtendOpen()">⏰ تمديد</button>
-        <button type="button" class="bk-action" onclick="bkSendReminders()">💬 تذكير WA</button>
-        <button type="button" class="bk-action" onclick="bkSendWelcomes()">👋 ترحيب WA</button>
+        <button type="button" class="bk-action" onclick="bkSendReminders()">تذكير WA</button>
+        <button type="button" class="bk-action" onclick="bkSendWelcomes()">ترحيب WA</button>
         <button type="button" class="bk-action" onclick="bkExportCsv()">📥 CSV</button>
       </div>
     </div>
 
     <!-- Select-all link row -->
     <div class="bk-selectall-row" id="bkSelectAllRow" style="display:none;">
-      <button type="button" class="bk-selectall-link" onclick="bkSelectAllVisible()">☑ تحديد كل الظاهر</button>
-      <button type="button" class="bk-selectall-link" onclick="bkClearSelection()">☐ إلغاء التحديد</button>
+      <button type="button" class="bk-selectall-link" onclick="bkSelectAllVisible()">تحديد كل الظاهر</button>
+      <button type="button" class="bk-selectall-link" onclick="bkClearSelection()">إلغاء التحديد</button>
     </div>
 
     <!-- List -->
@@ -3300,7 +3300,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <input type="number" class="bk-extend-input" id="bkExtendDays" min="1" max="365" step="1" value="30" placeholder="عدد الأيام (1-365)">
     <div class="bk-extend-actions">
       <button type="button" class="bk-bar-clear" onclick="bkExtendClose()">إلغاء</button>
-      <button type="button" class="bk-action" onclick="bkExtendConfirm()">✅ تمديد</button>
+      <button type="button" class="bk-action" onclick="bkExtendConfirm()">تمديد</button>
     </div>
   </div>
 </div>
@@ -3329,12 +3329,12 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     <button type="button" class="c360-close" onclick="closeCustomer360()" aria-label="إغلاق">✕</button>
   </div>
   <div class="c360-tabs" id="c360Tabs" role="tablist">
-    <button type="button" class="c360-tab active" data-tab="overview" onclick="c360SwitchTab('overview')" role="tab">📊 نظرة عامة</button>
-    <button type="button" class="c360-tab" data-tab="timeline" onclick="c360SwitchTab('timeline')" role="tab">📜 السجل</button>
-    <button type="button" class="c360-tab" data-tab="risk" onclick="c360SwitchTab('risk')" role="tab">⚠️ المخاطر</button>
-    <button type="button" class="c360-tab" data-tab="actions" onclick="c360SwitchTab('actions')" role="tab">🔧 إجراءات</button>
-    <button type="button" class="c360-tab" data-tab="comm" onclick="c360SwitchTab('comm')" role="tab">💬 الاتصالات</button>
-    <button type="button" class="c360-tab" data-tab="payments" onclick="c360SwitchTab('payments')" role="tab">💵 المدفوعات</button>
+    <button type="button" class="c360-tab active" data-tab="overview" onclick="c360SwitchTab('overview')" role="tab">نظرة عامة</button>
+    <button type="button" class="c360-tab" data-tab="timeline" onclick="c360SwitchTab('timeline')" role="tab">السجل</button>
+    <button type="button" class="c360-tab" data-tab="risk" onclick="c360SwitchTab('risk')" role="tab">المخاطر</button>
+    <button type="button" class="c360-tab" data-tab="actions" onclick="c360SwitchTab('actions')" role="tab">إجراءات</button>
+    <button type="button" class="c360-tab" data-tab="comm" onclick="c360SwitchTab('comm')" role="tab">الاتصالات</button>
+    <button type="button" class="c360-tab" data-tab="payments" onclick="c360SwitchTab('payments')" role="tab">المدفوعات</button>
   </div>
   <div class="c360-body" id="c360Body"></div>
   <div class="c360-footer">
@@ -3348,7 +3348,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 <div class="modal-backdrop" id="editModal" onclick="onModalBackdropClick(event)">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-head">
-      <div class="modal-title">✏️ تعديل بيانات الحساب</div>
+      <div class="modal-title">تعديل بيانات الحساب</div>
       <button type="button" class="modal-close" onclick="closeEditModal()" aria-label="إغلاق">✕</button>
     </div>
 
@@ -3366,7 +3366,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
       <label>الإيميل (للعرض فقط)</label>
       <input type="text" id="editEmail" autocomplete="off" dir="ltr" style="text-align:right;">
       <div class="modal-hint">
-        ⚠️ هذا الحقل للعرض في طلب التجربة فقط، ولا يُغيّر بريد الدخول إلى الحساب.
+        هذا الحقل للعرض في طلب التجربة فقط، ولا يُغيّر بريد الدخول إلى الحساب.
       </div>
     </div>
 
@@ -3382,7 +3382,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 
     <div class="modal-actions">
       <button type="button" class="btn-cancel" onclick="closeEditModal()">إلغاء</button>
-      <button type="button" class="btn-save" id="editSaveBtn" onclick="saveEdit()">💾 حفظ</button>
+      <button type="button" class="btn-save" id="editSaveBtn" onclick="saveEdit()">حفظ</button>
     </div>
   </div>
 </div>
@@ -3391,14 +3391,14 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 <div class="modal-backdrop" id="planModal" onclick="onPlanModalBackdropClick(event)">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-head">
-      <div class="modal-title" id="planModalTitle">💎 اختر خطة الاشتراك</div>
+      <div class="modal-title" id="planModalTitle">اختر خطة الاشتراك</div>
       <button type="button" class="modal-close" onclick="closePlanModal()" aria-label="إغلاق">✕</button>
     </div>
     <div class="modal-state-hint" id="planModalHint"></div>
     <div id="planModalOptions"></div>
     <div class="modal-actions">
       <button type="button" class="btn-cancel" onclick="closePlanModal()">إلغاء</button>
-      <button type="button" class="btn-save" id="planConfirmBtn" onclick="confirmPlanChoice()" disabled>✅ تأكيد</button>
+      <button type="button" class="btn-save" id="planConfirmBtn" onclick="confirmPlanChoice()" disabled>تأكيد</button>
     </div>
   </div>
 </div>
@@ -3407,7 +3407,7 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
 <div class="modal-backdrop" id="payModal" onclick="onPayModalBackdropClick(event)">
   <div class="modal-card" onclick="event.stopPropagation()">
     <div class="modal-head">
-      <div class="modal-title">💵 تسجيل دفعة مستلمة</div>
+      <div class="modal-title">تسجيل دفعة مستلمة</div>
       <button type="button" class="modal-close" onclick="closePayModal()" aria-label="إغلاق">✕</button>
     </div>
     <div class="modal-state-hint">العيادة: <strong id="payTenantName">—</strong> <span id="payCtxLine" class="pay-ctx"></span></div>
@@ -3441,8 +3441,8 @@ l44 -30 346 -5 c376 -5 376 -6 411 -63 19 -30 20 -53 20 -372 0 -252 3 -344
     </div>
     <div class="modal-actions">
       <button type="button" class="btn-cancel" onclick="closePayModal()">إلغاء</button>
-      <button type="button" class="btn-save" onclick="recordPayment(false)">💾 حفظ</button>
-      <button type="button" class="btn-save" onclick="recordPayment(true)">🧾 حفظ وإصدار إيصال</button>
+      <button type="button" class="btn-save" onclick="recordPayment(false)">حفظ</button>
+      <button type="button" class="btn-save" onclick="recordPayment(true)">حفظ وإصدار إيصال</button>
     </div>
   </div>
 </div>
