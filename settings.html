@@ -909,6 +909,14 @@ textarea::placeholder { color: var(--text2); }
 </div>
 
 <script>
+// Rule #195: canonical FULL HTML escaper — every dynamic value injected via
+// innerHTML on this page must pass through here (supabase-init only exposes a
+// private escapeHtmlLock, so the page defines its own, house pattern).
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 let currentUser = null;
 
 // ─── Toast ───
@@ -1771,7 +1779,7 @@ function populateApptTypeTreatmentSelect() {
   var html = '<option value="">— بدون علاج افتراضي —</option>';
   for (var i = 0; i < _apptTypesTreatments.length; i++) {
     var t = _apptTypesTreatments[i];
-    var safeName = String(t.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(t.name || '');
     html += '<option value="' + t.id + '">' + safeName + '</option>';
   }
   sel.innerHTML = html;
@@ -1787,7 +1795,7 @@ function populateApptTypeProviderSelect() {
   var html = '<option value="">— بدون طبيب افتراضي —</option>';
   for (var i = 0; i < _apptTypesProviders.length; i++) {
     var d = _apptTypesProviders[i];
-    var safeName = String(d.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(d.name || '');
     html += '<option value="' + d.id + '">' + safeName + '</option>';
   }
   sel.innerHTML = html;
@@ -1903,9 +1911,9 @@ function renderApptTypesList() {
     opMap[_operatoriesList[oi].id] = _operatoriesList[oi];
   }
   el.innerHTML = _apptTypes.map(function(t) {
-    var safeName = String(t.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(t.name || '—');
     var trName = t.default_treatment_id && trMap[t.default_treatment_id]
-      ? String(trMap[t.default_treatment_id].name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      ? escapeHtml(trMap[t.default_treatment_id].name || '')
       : '— بدون علاج —';
     var trColor = t.default_treatment_id && trMap[t.default_treatment_id]
       ? (trMap[t.default_treatment_id].color || '#8da0bd')
@@ -1920,7 +1928,7 @@ function renderApptTypesList() {
     var extras = [];
     if (t.default_provider_id) {
       var docName = docMap[t.default_provider_id]
-        ? String(docMap[t.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        ? escapeHtml(docMap[t.default_provider_id].name)
         : '[طبيب محذوف]';
       extras.push('👨‍⚕️ ' + docName);
     }
@@ -1931,7 +1939,7 @@ function renderApptTypesList() {
       var opEntry = opMap[t.default_operatory_id];
       var opName;
       if (opEntry) {
-        opName = String(opEntry.name).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        opName = escapeHtml(opEntry.name);
         if (!opEntry.is_active) opName += ' (غير نشطة)';
       } else {
         opName = '[غرفة محذوفة]';
@@ -2559,7 +2567,7 @@ function renderOperatoriesList() {
     provMap[_apptTypesProviders[i].id] = _apptTypesProviders[i];
   }
   el.innerHTML = _operatoriesList.map(function(o) {
-    var safeName = String(o.name || '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(o.name || '—');
     // Defensive: even though saveOperatory enforces #RRGGBB, an old/manual
     // DB row could contain something else. Sanitize before inlining into
     // style="background:..." to avoid CSS injection.
@@ -2568,7 +2576,7 @@ function renderOperatoriesList() {
     var providerBadge = '';
     if (o.default_provider_id) {
       var pName = provMap[o.default_provider_id]
-        ? String(provMap[o.default_provider_id].name).replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        ? escapeHtml(provMap[o.default_provider_id].name)
         : '[طبيب غير نشط]';
       providerBadge = '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">👨‍⚕️ ' + pName + '</div>';
     }
@@ -2600,7 +2608,7 @@ function populateApptTypeOperatorySelect() {
   var html = '<option value="">— بدون غرفة —</option>';
   for (var i = 0; i < _operatoriesActive.length; i++) {
     var op = _operatoriesActive[i];
-    var safeName = String(op.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(op.name || '');
     html += '<option value="' + op.id + '">' + safeName + '</option>';
   }
   sel.innerHTML = html;
@@ -2617,7 +2625,7 @@ function populateOperatoryProviderSelect() {
   var html = '<option value="">— بدون طبيب افتراضي —</option>';
   for (var i = 0; i < _apptTypesProviders.length; i++) {
     var d = _apptTypesProviders[i];
-    var safeName = String(d.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var safeName = escapeHtml(d.name || '');
     html += '<option value="' + d.id + '">' + safeName + '</option>';
   }
   sel.innerHTML = html;

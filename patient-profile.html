@@ -6608,7 +6608,7 @@ function txButtonHtml(t){
   var laymanLine = (t.layman_name && String(t.layman_name).trim())
     ? '<div style="font-size:11px;color:#7dd3fc;margin-top:2px;font-weight:500;">👤 ' + escapeHtml(t.layman_name.trim()) + '</div>' : '';
   return '<button class="topt" style="border-color:' + t.fill + ';background:' + t.fill + '22;" '
-       + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + t.name.replace(/'/g, "\\'") + '\')">'
+       + 'onclick="pickToothTreatment(\'' + t.id + '\', \'' + escapeHtml(String(t.name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")) /* JS-string escape (\\ then ') + escapeHtml: onclick attr needs BOTH layers - Rule #195 */ + '\')">'
        + '<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:' + t.fill + ';border:1px solid ' + t.stroke + ';color:' + textColor + ';font-size:11px;font-weight:800;line-height:20px;text-align:center;margin-left:6px;vertical-align:middle;">' + t.label + '</span>'
        + '<span>' + escapeHtml(t.name) + '</span>' + laymanLine + '</button>';
 }
@@ -9885,7 +9885,7 @@ function renderPlannedAppts() {
       + '<div class="planned-pp-icon">📋</div>'
       + '<div class="planned-pp-info">'
       +   '<div class="planned-pp-title">موعد مخطّط</div>'
-      +   '<div class="planned-pp-reason" title="' + reasonLine.replace(/"/g,'&quot;') + '">'
+      +   '<div class="planned-pp-reason" title="' + reasonLine + '">' // reasonLine pre-escaped upstream (escapeHtml on type & notes) - dead manual replace removed per Rule #195, mirrors 838d1b7
       +     (reasonLine || '<span style="opacity:.5;">بدون تفاصيل</span>')
       +   '</div>'
       + '</div>'
