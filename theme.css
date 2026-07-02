@@ -28,7 +28,7 @@
 
   --text:      #102a43;
   --text2:     #5a7184;
-  --text3:     #8fa6b8;
+  --text3:     #64748b;   /* was #8fa6b8 (2.35:1 fail) → 4.76:1 on cards */
 
   --border:    #e2e9f0;
   --border2:   #cbd8e3;
@@ -40,8 +40,8 @@
   --red:       #dc2626;
   --red-dim:   rgba(220,38,38,0.10);
 
-  --yellow:    #d97706;
-  --yellow-dim:rgba(217,119,6,0.12);
+  --yellow:    #b45309;   /* was #d97706 (3.19:1) → 5.0:1 on white */
+  --yellow-dim:rgba(180,83,9,0.12);
 
   --blue:      #2563eb;
   --orange:    #ea580c;
@@ -49,6 +49,7 @@
   --amber:     #d97706;
   --cyan:      #0e7490;
   --wa:        #128c3e;
+  --on-accent: #ffffff;   /* text on --green surfaces (Phase1 contrast) */
 
   --bg-primary:    var(--bg);
   --bg-secondary:  var(--bg2);
@@ -94,6 +95,7 @@
   --amber:     #ffc107;
   --cyan:      #4dd0e1;
   --wa:        #25d366;
+  --on-accent: #0a1628;   /* text on --green surfaces (Phase1 contrast) */
 
   /* index.html alias naming */
   --bg-primary:    var(--bg);
@@ -318,8 +320,27 @@
    in light, var(--bg) = #fafaf7 which has poor contrast on #16a085. Force white. */
 :root[data-theme="light"] .btn-submit,
 :root[data-theme="light"] .btn-primary,
-:root[data-theme="light"] .tab.active {
-  color: #ffffff;
+:root[data-theme="light"] .tab.active,
+:root[data-theme="light"] .btn-add,
+:root[data-theme="light"] .btn-save,
+:root[data-theme="light"] .btn.primary,
+:root[data-theme="light"] .btn-save-support,
+:root[data-theme="light"] .evf-btn-primary,
+:root[data-theme="light"] .chip.active,
+:root[data-theme="light"] .method-chip.active,
+:root[data-theme="light"] .main-tab.active .count-badge,
+:root[data-theme="light"] .k3-view-toggle button.active,
+:root[data-theme="light"] .cal-cell.today .cal-date,
+:root[data-theme="light"] .planned-actions .btn-schedule,
+:root[data-theme="light"] .planned-pp-actions .btn-schedule-pp,
+:root[data-theme="light"] .tx-tab-active,
+:root[data-theme="light"] .doc-actions .btn-default-on,
+:root[data-theme="light"] .ob-item.done .ob-check,
+:root[data-theme="light"] .ob-clinic-prompt-actions button.primary,
+:root[data-theme="light"] .planned-toggle input[type=checkbox]:checked::after,
+:root[data-theme="light"] .planned-toggle-pp input[type=checkbox]:checked::after,
+:root[data-theme="light"] .dcm-chk.dcm-chk-checked::after {
+  color: var(--on-accent);
 }
 
 /* Spinner inside green button — border-top-color was hard-coded #0a1628 (dark) */

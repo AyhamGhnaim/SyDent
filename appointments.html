@@ -18,7 +18,7 @@
 <title>SyDent — المواعيد</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260701a"></script>
+<script src="theme.js?v=20260702a"></script>
 <style>
 :root {
   --bg:        #0a1628;
@@ -941,11 +941,11 @@ textarea { resize: vertical; min-height: 72px; }
 .wa-send-btn:disabled { opacity: .5; cursor: not-allowed; }
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260701a">
+<link rel="stylesheet" href="theme.css?v=20260702a">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260701a"></script>
-<script src="sidebar.js?v=20260701a"></script>
-<script src="timepicker.js?v=20260701a"></script>
+<script src="supabase-init.js?v=20260702a"></script>
+<script src="sidebar.js?v=20260702a"></script>
+<script src="timepicker.js?v=20260702a"></script>
 </head>
 <body>
 <script>
@@ -1185,7 +1185,7 @@ textarea { resize: vertical; min-height: 72px; }
           <select id="addPlannedSelect" style="flex:1;min-width:200px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:var(--text);font-family:Cairo,sans-serif;font-size:13px;"></select>
           <button type="button" id="addPlannedBtn" onclick="onAddPlannedClickA()" style="padding:8px 14px;background:rgba(var(--green-rgb),0.15);border:1px solid rgba(var(--green-rgb),0.4);color:var(--green);border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">➕ إضافة</button>
         </div>
-        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:var(--green);color:#0a1628;border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
+        <button type="button" id="completeApptBtn" onclick="completeApptWithProcedures()" style="margin-top:12px;width:100%;padding:10px;background:var(--green);color:var(--on-accent);border:none;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:14px;font-weight:800;display:none;">✅ إكمال الموعد + كل العلاجات المخطّطة</button>
       </div>
 
       <!-- 🥽 Lab orders section (visible only when editing + lab orders exist) -->
@@ -1320,7 +1320,7 @@ textarea { resize: vertical; min-height: 72px; }
     <div class="modal-footer" style="gap:10px;">
       <button type="button" class="btn-cancel" onclick="closeDismissedCompleteModal()">إلغاء</button>
       <button type="button" id="dcmSkipBtn" onclick="dismissedSkipComplete()" style="background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:600;">⏸️ فقط تسجيل الخروج</button>
-      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:var(--green);color:#0a1628;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
+      <button type="button" id="dcmConfirmBtn" onclick="dismissedConfirmComplete()" style="background:var(--green);color:var(--on-accent);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:Cairo,sans-serif;font-size:13px;font-weight:700;">✅ خرج + إكمال المحدد</button>
     </div>
   </div>
 </div>

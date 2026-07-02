@@ -43,7 +43,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <!-- Theme system: MUST load before inline <style> to apply data-theme synchronously and prevent FOUC. -->
-<script src="theme.js?v=20260701a"></script>
+<script src="theme.js?v=20260702a"></script>
 <style>
   :root {
     --bg-primary: #0a1628;
@@ -632,10 +632,10 @@
 .al-count{margin-inline-start:auto;background:var(--red-dim);color:var(--red);font-size:11px;font-weight:800;padding:3px 9px;border-radius:10px}
 </style>
 <!-- Theme system: loads AFTER inline <style> so light-mode :root overrides the dark defaults above. -->
-<link rel="stylesheet" href="theme.css?v=20260701a">
+<link rel="stylesheet" href="theme.css?v=20260702a">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-init.js?v=20260701a"></script>
-<script src="sidebar.js?v=20260701a"></script>
+<script src="supabase-init.js?v=20260702a"></script>
+<script src="sidebar.js?v=20260702a"></script>
 </head>
 <body>
 <script>
@@ -720,16 +720,16 @@
       // التواصل عبر واتساب للتجديد).
       var expiredTitle = isPaid ? 'انتهى اشتراكك' : 'انتهت فترة التجربة';
       document.body.innerHTML = `
-        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a1628;padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:24px;font-family:'Cairo',sans-serif;text-align:center;">
           <div style="font-size:60px;margin-bottom:16px;">⏰</div>
-          <div style="font-size:22px;font-weight:800;color:#e1f4ee;margin-bottom:10px;">${expiredTitle}</div>
-          <div style="font-size:14px;color:#8a9ab5;margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، اختر خطتك من صفحة الاشتراك.</div>
+          <div style="font-size:22px;font-weight:800;color:var(--text);margin-bottom:10px;">${expiredTitle}</div>
+          <div style="font-size:14px;color:var(--text2);margin-bottom:28px;max-width:320px;line-height:1.7;">لتجديد اشتراكك والاستمرار باستخدام SyDent، اختر خطتك من صفحة الاشتراك.</div>
           <a href="subscription.html"
-            style="padding:14px 28px;background:var(--green);border-radius:12px;color:#062018;font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
+            style="padding:14px 28px;background:var(--green);border-radius:12px;color:var(--on-accent);font-size:15px;font-weight:800;text-decoration:none;margin-bottom:12px;">
             💎 تجديد الاشتراك
           </a>
           <button onclick="window.sb.auth.signOut().then(()=>window.location.href='landing.html')"
-            style="padding:10px 20px;background:transparent;border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#8a9ab5;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
+            style="padding:10px 20px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--text2);font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;margin-top:8px;">
             تسجيل الخروج
           </button>
         </div>`;
